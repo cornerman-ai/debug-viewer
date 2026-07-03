@@ -50,6 +50,17 @@
 //     ]
 //   }
 //
+// Schema v2 (July 2026) adds honest row-based GT events per round:
+//   "lead_gt_events"/"rear_gt_events": [{start, end, mid, type, n_frames}]
+//   (absolute seconds; one event per labeled span — rapid same-class combos
+//   stay separate instead of fusing into one long rasterized block).
+// Schema v3 adds "lead_pred_events"/"rear_pred_events": the stage-1 combo
+//   decoder output (valley-split @0.02, class assigned per event). When
+//   present, the lens matches/draws these instead of run-length encoding
+//   the frame arrays; the arrays remain for the per-frame HUD + old files.
+//   See cornerman-backend: rescore_event_matching.py, decoder_experiment.py,
+//   upgrade_predictions_schema.py (local v1 -> v3 upgrade, no Colab needed).
+//
 // Notebook export snippet (already wired as cell 29 of the C notebook):
 //
 //   import json, numpy as np
@@ -622,12 +633,12 @@ function deriveSignals(round, dumpRoot) {
   const leadClassNames = dumpRoot?.lead_class_names || CLASS_NAMES_FALLBACK.lead;
   const rearClassNames = dumpRoot?.rear_class_names || CLASS_NAMES_FALLBACK.rear;
 
-  const leadGt   = runLength(round.lead_truth);
-  const rearGt   = runLength(round.rear_truth);
+  const leadGt   = gtEvents(round, "lead");
+  const rearGt   = gtEvents(round, "rear");
   // Pred filtered by min_event (default 4, matches notebook EVAL_MIN_EVENT).
   // GT is never filtered — comes from labels, not threshold flicker.
-  const leadPred = filterShort(runLength(round.lead_pred), cfg.minEventFrames);
-  const rearPred = filterShort(runLength(round.rear_pred), cfg.minEventFrames);
+  const leadPred = filterShort(predEvents(round, "lead"), cfg.minEventFrames);
+  const rearPred = filterShort(predEvents(round, "rear"), cfg.minEventFrames);
 
   const leadTag = matchAndTag(leadGt, leadPred);
   const rearTag = matchAndTag(rearGt, rearPred);
@@ -686,6 +697,40 @@ function runLength(labels) {
 function filterShort(events, minFrames) {
   if (!minFrames || minFrames <= 1) return events;
   return events.filter(e => (e.end_frame - e.start_frame + 1) >= minFrames);
+}
+
+// Convert schema-v2/v3 event dicts ({start, end, type, ...} in absolute
+// seconds, end exclusive on the frame grid) into lens frame events
+// ({start_frame, end_frame} inclusive). Events were built on the exact
+// frame grid, so rounding recovers the original integers.
+function eventsFromJson(events, round) {
+  const fps = round.fps || 30;
+  const rs = round.round_start_sec || 0;
+  return (events || []).map(e => {
+    const sf = Math.round((e.start - rs) * fps);
+    const ef = Math.round((e.end - rs) * fps) - 1;
+    return { start_frame: sf, end_frame: Math.max(sf, ef), type: e.type };
+  });
+}
+
+// Honest GT: prefer row-based events (schema >= 2) — one event per labeled
+// span, so rapid same-class combos stay separate instead of fusing into one
+// long block. Missing key (v1 files, on-device synth) falls back to
+// run-length encoding the truth array.
+function gtEvents(round, hand) {
+  const ev = round[hand + "_gt_events"];
+  return Array.isArray(ev) ? eventsFromJson(ev, round)
+                           : runLength(round[hand + "_truth"]);
+}
+
+// Pred: prefer stage-1 decoder events (schema >= 3, valley-split + event-
+// level class); fall back to legacy per-frame decode. Callers apply the
+// min-event filter so the lens control works on both paths (no-op at the
+// decoder's baked-in 4).
+function predEvents(round, hand) {
+  const ev = round[hand + "_pred_events"];
+  return Array.isArray(ev) ? eventsFromJson(ev, round)
+                           : runLength(round[hand + "_pred"]);
 }
 
 // One-to-one GT↔Pred matching by midpoint-inside-window, sorted by midpoint
@@ -747,10 +792,10 @@ function matchAndTag(gt, pred) {
 // Quick per-round stats for the dropdown — same shape as the full signals
 // stats but without retaining the tagged event lists.
 function quickStats(round) {
-  const leadGt   = runLength(round.lead_truth);
-  const rearGt   = runLength(round.rear_truth);
-  const leadPred = filterShort(runLength(round.lead_pred), cfg.minEventFrames);
-  const rearPred = filterShort(runLength(round.rear_pred), cfg.minEventFrames);
+  const leadGt   = gtEvents(round, "lead");
+  const rearGt   = gtEvents(round, "rear");
+  const leadPred = filterShort(predEvents(round, "lead"), cfg.minEventFrames);
+  const rearPred = filterShort(predEvents(round, "rear"), cfg.minEventFrames);
   const l = matchAndTag(leadGt, leadPred).stats;
   const r = matchAndTag(rearGt, rearPred).stats;
   const nGt   = l.nGt + r.nGt;
