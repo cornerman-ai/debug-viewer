@@ -147,6 +147,12 @@ let lastCacheKey = null;
 // detections rather than a stale prior round.
 let dumpFromOnDevice = false;
 let lastPunchesRef = null;
+// Timeline zoom window in frame space; null = fit the whole round. Kept
+// across min-event tweaks and playback, reset when the scoped round changes.
+let view = null;
+let lastFrame = 0;        // latest frame from update() — zoom/pan redraws reuse it
+let lastDrawnFrame = -1;  // playhead-follow fires only when the frame moved
+let lastZoomLabel = "";
 
 export const PunchClassifierRule = {
   id: "punch_classifier",
@@ -187,6 +193,7 @@ export const PunchClassifierRule = {
   },
 
   update(state) {
+    lastFrame = state.frame;
     // Re-scope when the loaded video / round changes.
     const k = cacheKey(state);
     if (k !== lastCacheKey || state.pose !== lastPose) {
@@ -263,7 +270,9 @@ function template() {
     <p class="hint">Below the video: 4 tracks (GT-lead, Pred-lead, GT-rear,
       Pred-rear). Green = GT hit · red striped = GT miss · orange = straight ·
       purple = hook · brighter purple = uppercut · teal = bodyshot · same hue
-      hatched = false alarm · magenta = mistype. Click to seek.</p>
+      hatched = false alarm · magenta = mistype. Click to seek · wheel to
+      zoom · drag to pan · double-click to fit — zoom in on long rounds to
+      read individual punches.</p>
 
     <details class="manual-fallback">
       <summary>Notebook export snippet</summary>
@@ -441,6 +450,7 @@ function wireRoundPicker(state) {
     const idx = parseInt(sel.value, 10);
     if (!Number.isFinite(idx)) return;
     activeRound = dump.rounds[idx] || null;
+    view = null;
     signals = activeRound ? deriveSignals(activeRound, dump) : null;
     renderStats();
     renderHud(state);
@@ -554,6 +564,7 @@ function clampInt(v, lo, hi) {
 }
 
 function refreshScope(state) {
+  const prevRound = activeRound;
   // Drop a stale synthesized dump when the punches reference changes
   // (user picked a different Firebase round) so we re-synth below.
   if (dumpFromOnDevice && state.punches !== lastPunchesRef) {
@@ -584,6 +595,7 @@ function refreshScope(state) {
   if (!dump || !dump.rounds.length) {
     activeRound = null;
     signals = null;
+    view = null;
     renderStats();
     renderStance(state);
     return;
@@ -622,6 +634,7 @@ function refreshScope(state) {
         `pick one manually above.`
       : `load a video so the lens can auto-match a round.`;
   }
+  if (activeRound !== prevRound) view = null;
   renderStats();
   renderStance(state);
 }
@@ -813,6 +826,18 @@ function quickStats(round) {
 // in the side panel so it spans the full stage width — aligns naturally
 // with the playback scrubber and reads cleanly on long rounds. viewer.js
 // clears #stage-extras on every lens switch, so we re-inject on mount.
+//
+// Long rounds pack hundreds of punches into one strip, so the timeline is
+// zoomable: wheel = zoom around the cursor (trackpad horizontal scroll =
+// pan), drag = pan, plain click = seek, double-click / Fit = whole round.
+// While zoomed, playback recenters the window whenever the playhead walks
+// out of it; manual pans are never fought because they don't move the frame.
+
+const LABEL_W = 64;           // left gutter for the track labels
+const PAD_R = 4;              // right edge padding
+const MIN_SPAN_FRAMES = 30;   // deepest zoom ≈ 1 s at 30 fps
+const ZOOM_HINT =
+  "click = seek · wheel = zoom · drag = pan · double-click = fit";
 
 function mountStageTimeline() {
   const slot = document.getElementById("stage-extras");
@@ -821,33 +846,171 @@ function mountStageTimeline() {
   const wrap = document.createElement("div");
   wrap.id = "pc-timeline-wrap";
   wrap.style.cssText = "margin-top:12px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px";
+
+  const header = document.createElement("div");
+  header.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
   const label = document.createElement("div");
+  label.id = "pc-tl-label";
   label.className = "muted small";
-  label.style.cssText = "margin-bottom:6px";
-  label.textContent = "Punch classifier — GT vs Pred timeline (click to seek)";
-  wrap.appendChild(label);
+  label.style.cssText = "flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+  label.textContent = `Punch classifier timeline — ${ZOOM_HINT}`;
+  header.appendChild(label);
+  const btnCss =
+    "background:var(--bg-elev);color:var(--fg);border:1px solid var(--border);" +
+    "border-radius:4px;padding:2px 9px;cursor:pointer;font:inherit;font-size:12px;line-height:1.4";
+  const mkBtn = (text, title, onClick) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = text;
+    b.title = title;
+    b.style.cssText = btnCss;
+    b.addEventListener("click", onClick);
+    header.appendChild(b);
+  };
+  mkBtn("−", "Zoom out", () => zoomStep(0.5));
+  mkBtn("+", "Zoom in on the playhead", () => zoomStep(2));
+  mkBtn("Fit", "Show the whole round", () => { view = null; redrawTimelineNow(); });
+  wrap.appendChild(header);
+
   const canvas = document.createElement("canvas");
   canvas.id = "pc-timeline";
-  canvas.style.cssText = "display:block;width:100%;height:120px";
+  canvas.style.cssText = "display:block;width:100%;height:134px";
   // Internal pixel size gets resized to match CSS width on first draw.
   canvas.width = 800;
-  canvas.height = 120;
+  canvas.height = 134;
   wrap.appendChild(canvas);
   slot.appendChild(wrap);
 
-  // Click-to-seek. The canvas is recreated on every mount, so the listener
-  // doesn't persist across lens switches and we wire it fresh here.
-  canvas.addEventListener("click", e => {
+  // Wheel: vertical = zoom around the cursor; horizontal (trackpad) = pan.
+  canvas.addEventListener("wheel", e => {
     if (!signals) return;
+    e.preventDefault();
     const rect = canvas.getBoundingClientRect();
-    const cx = e.clientX - rect.left;     // CSS pixels — draw also uses CSS pixels.
-    // Mirror drawTimeline's xmap (labelW = 64, right pad = 4).
-    const labelW = 64;
-    const W = rect.width;
-    const ratio = (cx - labelW) / Math.max(1, W - labelW - 4);
-    const f = Math.round(ratio * (signals.n_frames - 1));
-    seekHack(Math.max(0, Math.min(signals.n_frames - 1, f)));
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      panBy(e.deltaX * framesPerPx(rect.width));
+      return;
+    }
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;  // line-mode wheels
+    zoomAt(Math.exp(-dy * 0.002), xToFrame(e.clientX - rect.left, rect.width));
+  }, { passive: false });
+
+  // Drag = pan (when zoomed), plain click = seek. The canvas is recreated on
+  // every mount so nothing accumulates across lens switches; the window
+  // move/up pair detaches on mouseup.
+  canvas.addEventListener("mousedown", e => {
+    if (!signals || e.button !== 0) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const fpp = framesPerPx(rect.width);
+    const originX = e.clientX;
+    let lastX = e.clientX;
+    let moved = false;
+    const onMove = ev => {
+      if (Math.abs(ev.clientX - originX) > 3) moved = true;
+      if (moved) panBy((lastX - ev.clientX) * fpp);
+      lastX = ev.clientX;
+    };
+    const onUp = ev => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (!signals || (moved && view)) return;   // finished a pan → no seek
+      const f = Math.round(xToFrame(ev.clientX - rect.left, rect.width));
+      seekHack(Math.max(0, Math.min(signals.n_frames - 1, f)));
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   });
+
+  canvas.addEventListener("dblclick", e => {
+    e.preventDefault();
+    view = null;
+    redrawTimelineNow();
+  });
+}
+
+// ── Zoom state helpers ─────────────────────────────────────────────────────
+
+function viewRange() {
+  const N = Math.max(2, signals?.n_frames || 2);
+  if (!view) return { v0: 0, v1: N - 1 };
+  return { v0: view.start, v1: view.end };
+}
+
+function frameToX(f, cssW) {
+  const { v0, v1 } = viewRange();
+  return LABEL_W + ((f - v0) / Math.max(1e-6, v1 - v0)) * (cssW - LABEL_W - PAD_R);
+}
+
+function xToFrame(x, cssW) {
+  const { v0, v1 } = viewRange();
+  return v0 + ((x - LABEL_W) / Math.max(1, cssW - LABEL_W - PAD_R)) * (v1 - v0);
+}
+
+function framesPerPx(cssW) {
+  const { v0, v1 } = viewRange();
+  return (v1 - v0) / Math.max(1, cssW - LABEL_W - PAD_R);
+}
+
+// factor > 1 zooms in; `anchorFrame` keeps its screen position.
+function zoomAt(factor, anchorFrame) {
+  if (!signals) return;
+  const full = Math.max(1, signals.n_frames - 1);
+  const { v0, v1 } = viewRange();
+  const span = Math.max(Math.min(MIN_SPAN_FRAMES, full),
+                        Math.min(full, (v1 - v0) / factor));
+  if (span >= full) { view = null; redrawTimelineNow(); return; }
+  let start = anchorFrame - (anchorFrame - v0) * (span / (v1 - v0));
+  start = Math.max(0, Math.min(full - span, start));
+  view = { start, end: start + span };
+  redrawTimelineNow();
+}
+
+// Button zoom: anchor on the playhead when it's in view, else window center.
+function zoomStep(factor) {
+  if (!signals) return;
+  const { v0, v1 } = viewRange();
+  const anchor = (lastFrame >= v0 && lastFrame <= v1) ? lastFrame : (v0 + v1) / 2;
+  zoomAt(factor, anchor);
+}
+
+function panBy(dFrames) {
+  if (!signals || !view || !dFrames) return;
+  const full = Math.max(1, signals.n_frames - 1);
+  const span = view.end - view.start;
+  const start = Math.max(0, Math.min(full - span, view.start + dFrames));
+  view = { start, end: start + span };
+  redrawTimelineNow();
+}
+
+function redrawTimelineNow() {
+  drawTimeline(document.getElementById("pc-timeline"), signals, lastFrame);
+}
+
+function updateZoomLabel(sig) {
+  const el = document.getElementById("pc-tl-label");
+  if (!el) return;
+  let text = `Punch classifier timeline — ${ZOOM_HINT}`;
+  if (sig && view) {
+    const full = Math.max(1, sig.n_frames - 1);
+    const fps = sig.fps || 30;
+    const zoom = full / (view.end - view.start);
+    text = `showing ${fmtTime(view.start / fps)}–${fmtTime(view.end / fps)} ` +
+      `of ${fmtTime(full / fps)} · ${zoom >= 10 ? zoom.toFixed(0) : zoom.toFixed(1)}× — ${ZOOM_HINT}`;
+  }
+  if (text !== lastZoomLabel) {
+    lastZoomLabel = text;
+    el.textContent = text;
+  }
+}
+
+function fmtTime(sec, withTenths = false) {
+  if (withTenths) {
+    const m = Math.floor(sec / 60);
+    return `${m}:${(sec - m * 60).toFixed(1).padStart(4, "0")}`;
+  }
+  const t = Math.round(sec);
+  const m = Math.floor(t / 60);
+  return `${m}:${String(t - m * 60).padStart(2, "0")}`;
 }
 
 // ── Rendering ──────────────────────────────────────────────────────────────
@@ -1037,6 +1200,20 @@ function drawTimeline(canvas, sig, frame) {
   ctx.clearRect(0, 0, W, H);
   if (!sig) return;
 
+  // Keep the playhead visible while zoomed: recenter only when the FRAME
+  // moved (playback / scrub) and left the window — manual pans don't move
+  // the frame, so they're never fought.
+  const full = Math.max(1, sig.n_frames - 1);
+  if (view && frame !== lastDrawnFrame &&
+      (frame < view.start || frame > view.end)) {
+    const span = view.end - view.start;
+    const start = Math.max(0, Math.min(full - span, frame - span / 2));
+    view = { start, end: start + span };
+  }
+  lastDrawnFrame = frame;
+  updateZoomLabel(sig);
+  const { v0, v1 } = viewRange();
+
   // 4 tracks stacked: GT-lead, Pred-lead, GT-rear, Pred-rear.
   const tracks = [
     { events: sig.lead.gt,   isGt: true,  label: "GT lead",   classNames: sig.leadClassNames },
@@ -1044,12 +1221,12 @@ function drawTimeline(canvas, sig, frame) {
     { events: sig.rear.gt,   isGt: true,  label: "GT rear",   classNames: sig.rearClassNames },
     { events: sig.rear.pred, isGt: false, label: "Pred rear", classNames: sig.rearClassNames },
   ];
-  const labelW = 64;
-  const trackH = Math.max(16, Math.floor((H - 16) / 4) - 4);
   const gap = 4;
   const trackTop = 4;
-  const N = sig.n_frames;
-  const xmap = f => labelW + (f / Math.max(1, N - 1)) * (W - labelW - 4);
+  const axisH = 16;
+  const trackH = Math.max(14, Math.floor((H - trackTop - axisH) / 4) - gap);
+  const rowsBottom = trackTop + 3 * (trackH + gap) + trackH;
+  const trackW = W - LABEL_W - PAD_R;
 
   ctx.font = "10px ui-monospace, monospace";
   for (let i = 0; i < tracks.length; i++) {
@@ -1057,26 +1234,66 @@ function drawTimeline(canvas, sig, frame) {
     const y = trackTop + i * (trackH + gap);
     // Row background.
     ctx.fillStyle = COLORS.rowBg;
-    ctx.fillRect(labelW, y, W - labelW - 4, trackH);
+    ctx.fillRect(LABEL_W, y, trackW, trackH);
     // Row label.
     ctx.fillStyle = "#8a93a3";
     ctx.fillText(t.label, 4, y + trackH - 4);
-    // Events.
+    // Events, clipped to the zoom window.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(LABEL_W, y, trackW, trackH);
+    ctx.clip();
     for (const ev of t.events) {
-      const x1 = xmap(ev.start_frame);
-      const x2 = Math.max(x1 + 2, xmap(ev.end_frame));
-      drawEventBar(ctx, x1, y, x2 - x1, trackH, ev, t.isGt);
+      if (ev.end_frame < v0 - 1 || ev.start_frame > v1 + 1) continue;
+      // Clamp to the window so hatch/label work stays bounded on zoomed bars
+      // and the class label sticks to the visible part.
+      const x1 = Math.max(frameToX(ev.start_frame, W), LABEL_W - 2);
+      const x2 = Math.min(Math.max(x1 + 2, frameToX(ev.end_frame, W)), W - PAD_R + 2);
+      if (x2 <= x1) continue;
+      drawEventBar(ctx, x1, y, x2 - x1, trackH, ev, t.isGt,
+        shortClassName(t.classNames[ev.type]));
     }
+    ctx.restore();
   }
 
-  // Playhead across all tracks.
-  const ph = xmap(frame);
-  ctx.strokeStyle = COLORS.playhead;
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(ph, 0); ctx.lineTo(ph, H); ctx.stroke();
+  drawTimeAxis(ctx, sig, W, trackTop, rowsBottom);
+
+  // Playhead across all tracks (when inside the zoom window).
+  if (frame >= v0 - 0.5 && frame <= v1 + 0.5) {
+    const ph = frameToX(frame, W);
+    ctx.strokeStyle = COLORS.playhead;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ph, 0); ctx.lineTo(ph, rowsBottom + 4); ctx.stroke();
+  }
 }
 
-function drawEventBar(ctx, x, y, w, h, ev, isGt) {
+// Time axis under the tracks: light gridlines + M:SS labels at a nice
+// interval (~1 tick per 90 px). Sub-second tick spacing gets tenths.
+function drawTimeAxis(ctx, sig, W, gridTop, top) {
+  const fps = sig.fps || 30;
+  const { v0, v1 } = viewRange();
+  const spanSec = Math.max(1e-6, (v1 - v0) / fps);
+  const target = Math.max(3, Math.floor((W - LABEL_W) / 90));
+  const intervals = [0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+  const tick = intervals.find(iv => spanSec / iv <= target) || 600;
+  ctx.save();
+  ctx.font = "9px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.lineWidth = 1;
+  for (let k = Math.ceil(v0 / fps / tick - 1e-9); k * tick <= v1 / fps + 1e-9; k++) {
+    const x = frameToX(k * tick * fps, W);
+    if (x < LABEL_W - 1 || x > W - PAD_R + 1) continue;
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.beginPath(); ctx.moveTo(x, gridTop); ctx.lineTo(x, top); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + 3); ctx.stroke();
+    ctx.fillStyle = "#8a93a3";
+    ctx.fillText(fmtTime(k * tick, tick < 1), x, top + 12);
+  }
+  ctx.restore();
+}
+
+function drawEventBar(ctx, x, y, w, h, ev, isGt, name) {
   const color = isGt
     ? (ev.status === "miss" ? COLORS.gtMiss : familyColor(ev.type, COLORS.gtFamily))
     : (ev.status === "mistype" ? COLORS.predMistype : familyColor(ev.type, COLORS.predFamily));
@@ -1103,6 +1320,31 @@ function drawEventBar(ctx, x, y, w, h, ev, isGt) {
   ctx.strokeStyle = "rgba(0,0,0,0.45)";
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 1.5, Math.max(1, w - 1), h - 3);
+  // Class name once the bar is wide enough to read it (i.e. when zoomed in).
+  if (name && w > 34) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x + 2, y + 1, w - 4, h - 2);
+    ctx.clip();
+    ctx.font = "9px ui-monospace, monospace";
+    ctx.fillStyle = barTextColor(color);
+    ctx.fillText(name, x + 4, y + h / 2 + 3.5);
+    ctx.restore();
+  }
+}
+
+// "rear_uppercut_head" → "uppercut"; 7-class body variants keep "_body".
+function shortClassName(name) {
+  return (name || "").replace(/^(lead_|rear_)/, "").replace(/_head$/, "");
+}
+
+// Black on light bars (greens / orange), white on dark (hooks / body teal).
+function barTextColor(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return "rgba(255,255,255,0.92)";
+  const v = parseInt(m[1], 16);
+  const luma = 0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255);
+  return luma > 150 ? "rgba(0,0,0,0.75)" : "rgba(255,255,255,0.92)";
 }
 
 function familyColor(typ, palette) {
