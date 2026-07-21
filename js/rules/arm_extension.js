@@ -334,14 +334,16 @@ export const ArmExtensionRule = {
     const s = state.renderScale || 1;
     const f = state.frame;
 
-    // Draw both arms with their current ratio overlay.
-    drawArmRatio(ctx, pose, f, "L", signals.ratioL[f], cfg, s, signals.bodyAxis);
-    drawArmRatio(ctx, pose, f, "R", signals.ratioR[f], cfg, s, signals.bodyAxis);
-
-    // HUD — when the playhead is inside a labelled punch window, show the
-    // GT verdict + our prediction so you can eyeball agreement on-video.
+    // Only paint the angle/score overlay while a straight is actually being
+    // thrown — otherwise the bend arc + ratio readout cluttered every idle /
+    // guard frame on both arms. When inside a punch window, draw just the
+    // throwing arm and its verdict HUD.
     const active = activePunchAt(signals.punches, f);
-    if (active) drawVerdictHud(ctx, active, s, pose);
+    if (active) {
+      const ratio = active.side === "L" ? signals.ratioL[f] : signals.ratioR[f];
+      drawArmRatio(ctx, pose, f, active.side, ratio, cfg, s, signals.bodyAxis);
+      drawVerdictHud(ctx, active, s, pose);
+    }
   },
 
   update(state) {
