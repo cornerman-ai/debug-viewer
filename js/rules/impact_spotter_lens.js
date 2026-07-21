@@ -39,6 +39,9 @@ let activeVideo = null;   // dump.videos[base] for the scoped cache
 let activeBase = null;
 let activeRound = null;   // {fps, punches} for the scoped round
 let showBaseline = false;
+let loopOn = false;       // labeler-style punch loop mode
+let loopIdx = -1;         // index into chronoPunches()
+let keysBound = false;
 
 // ---------------------------------------------------------------- helpers
 function stripStem(s) { return String(s || "").replace(/_h264$/, ""); }
@@ -77,19 +80,98 @@ function seekFrame(f) {
 }
 
 function matchRound(state) {
+  const prev = activeRound;
   activeVideo = null; activeBase = null; activeRound = null;
   if (!dump || !state || !state.cacheBasename || state.cacheRound == null) return;
   const want = stripStem(state.cacheBasename);
   for (const [base, v] of Object.entries(dump.videos || {})) {
     if (stripStem(base) === want) { activeVideo = v; activeBase = base; break; }
   }
-  if (!activeVideo) return;
-  activeRound = activeVideo.rounds[String(state.cacheRound)] || null;
+  if (activeVideo) activeRound = activeVideo.rounds[String(state.cacheRound)] || null;
+  if (prev && activeRound !== prev) { loopOn = false; loopIdx = -1; }   // new round
 }
 
 function punchesSorted() {
   if (!activeRound) return [];
   return [...activeRound.punches].sort((a, b) => Math.abs(b.err_ms) - Math.abs(a.err_ms));
+}
+
+function chronoPunches() {
+  if (!activeRound) return [];
+  return [...activeRound.punches].sort((a, b) => a.gt_sec - b.gt_sec);
+}
+
+// Loop window in VIEWER frames: anchor on the viewer-clock gt frame, then
+// apply the punch-span extent as BlazePose-clock-relative offsets (the
+// offsets cancel any one-frame cross-clock drift), +-3 frames of margin.
+function loopWindow(state, p) {
+  const gtF = secToFrame(state, p.gt_sec);
+  const lo = gtF + (p.span[0] - p.gt) - 3;
+  const hi = gtF + (p.span[1] - p.gt) + 3;
+  const n = poseOf(state) ? poseOf(state).n_frames : Infinity;
+  return [Math.max(0, lo), Math.min(n - 1, Math.max(hi, lo + 6))];
+}
+
+function setLoopIdx(i, autoplay = true) {
+  const ps = chronoPunches();
+  if (!ps.length || !latestState) return;
+  loopIdx = ((i % ps.length) + ps.length) % ps.length;   // wrap both directions
+  const [lo] = loopWindow(latestState, ps[loopIdx]);
+  seekFrame(lo);
+  if (autoplay) document.getElementById("video")?.play?.()?.catch?.(() => {});
+  renderLoopBar();
+}
+
+function renderLoopBar() {
+  const cnt = host && host.querySelector("#is-loop-count");
+  const btn = host && host.querySelector("#is-loop");
+  if (btn) {
+    btn.textContent = loopOn ? "⏹ stop loop" : "⟲ loop punches";
+    btn.style.background = loopOn ? "#2d4a2f" : "";
+  }
+  if (cnt) {
+    const ps = chronoPunches();
+    const p = loopOn && loopIdx >= 0 ? ps[loopIdx] : null;
+    cnt.textContent = p ? `${loopIdx + 1}/${ps.length} · ${p.ptype}` : `${ps.length} punches`;
+  }
+}
+
+function toggleLoop() {
+  loopOn = !loopOn;
+  if (loopOn) {
+    // start from the punch nearest the playhead, else the first
+    const ps = chronoPunches();
+    let i = 0;
+    if (latestState && ps.length) {
+      const t = frameToSec(latestState, latestState.frame);
+      let bd = Infinity;
+      ps.forEach((p, k) => {
+        const d = Math.abs(p.gt_sec - t);
+        if (d < bd) { bd = d; i = k; }
+      });
+    }
+    setLoopIdx(i);
+  } else {
+    renderLoopBar();
+  }
+}
+
+function ensureKeys() {
+  if (keysBound) return;
+  keysBound = true;
+  // capture phase so loop-mode arrows beat the viewer's frame-step binding;
+  // inert unless this lens is selected AND loop mode is on
+  document.addEventListener("keydown", (e) => {
+    if (!loopOn || !activeRound) return;
+    const sel = document.getElementById("rule-select");
+    if (sel && sel.value !== "impact_spotter") return;
+    if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+    if (e.key === "ArrowRight") {
+      e.preventDefault(); e.stopPropagation(); setLoopIdx(loopIdx + 1);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault(); e.stopPropagation(); setLoopIdx(loopIdx - 1);
+    }
+  }, true);
 }
 
 function currentPunch(state) {
@@ -149,6 +231,14 @@ function buildSidebar(state) {
     <label style="font-size:12px;color:#aaa;display:block;margin-bottom:8px">
       <input type="checkbox" id="is-show-base"> show kinematic baseline (blue)
     </label>
+    <div id="is-loop-bar" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+      <button id="is-loop" style="cursor:pointer">⟲ loop punches</button>
+      <button id="is-prev" title="previous punch (←)" style="cursor:pointer">◀</button>
+      <button id="is-next" title="next punch (→)" style="cursor:pointer">▶</button>
+      <span id="is-loop-count" style="font-size:11px;color:#888"></span>
+    </div>
+    <div style="font-size:10px;color:#666;margin:-4px 0 8px">
+      loop mode: ←/→ switch punch · viewer speed dropdown sets loop speed</div>
     <div id="is-current" style="border:1px solid #333;border-radius:6px;
          padding:8px;margin-bottom:8px;min-height:52px;font-size:12px"></div>
     <canvas id="is-conf" style="display:block;width:100%;height:90px;
@@ -162,6 +252,15 @@ function buildSidebar(state) {
     showBaseline = cb.checked;
     document.getElementById("video").dispatchEvent(new Event("seeked"));
   });
+  host.querySelector("#is-loop").addEventListener("click", toggleLoop);
+  host.querySelector("#is-prev").addEventListener("click", () => {
+    if (!loopOn) toggleLoop(); else setLoopIdx(loopIdx - 1);
+  });
+  host.querySelector("#is-next").addEventListener("click", () => {
+    if (!loopOn) toggleLoop(); else setLoopIdx(loopIdx + 1);
+  });
+  ensureKeys();
+  renderLoopBar();
 }
 
 function buildTimelineSlot() {
@@ -197,6 +296,17 @@ function update(state) {
   latestState = state;
   if (!dump) return;
   matchRound(state);
+
+  // labeler-style loop: when the playhead runs past the punch window, wrap
+  if (loopOn && activeRound && loopIdx >= 0) {
+    const ps = chronoPunches();
+    const p = ps[loopIdx];
+    if (p) {
+      const [lo, hi] = loopWindow(state, p);
+      if (state.frame > hi || state.frame < lo - 2) seekFrame(lo);
+    }
+    renderLoopBar();
+  }
 
   const scope = host.querySelector("#is-scope");
   if (scope) {
@@ -274,8 +384,14 @@ function renderList(state) {
     </div>`;
   }).join("");
   el.querySelectorAll("[data-sec]").forEach((row) => {
-    row.addEventListener("click", () =>
-      seekFrame(secToFrame(latestState, parseFloat(row.dataset.sec))));
+    row.addEventListener("click", () => {
+      const sec = parseFloat(row.dataset.sec);
+      if (loopOn) {
+        const i = chronoPunches().findIndex((p) => p.gt_sec === sec);
+        if (i >= 0) { setLoopIdx(i); return; }
+      }
+      seekFrame(secToFrame(latestState, sec));
+    });
   });
 }
 
