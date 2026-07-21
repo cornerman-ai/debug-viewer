@@ -364,6 +364,40 @@ function buildHandReturnPathBlock(hr, state) {
     </div>`;
 }
 
+// On-device elbow_flare — frame-scoped width rule. Dumb display of the
+// sidecar's per-frame flare (L/R) + frontal-ness, computed on the phone.
+function buildElbowFlareBlock(ef, state) {
+  if (!ef) {
+    return `<p class="muted" style="margin-top:18px">No elbow_flare rule in this sidecar — record a fresh round with the latest build.</p>`;
+  }
+  const header = `
+    <h3 style="margin:18px 0 6px; font-size:14px">Elbow flare (width)
+      <span class="muted" style="font-size:11px">v${ef.version}</span>
+      <span style="display:inline-block; padding:1px 8px; border-radius:10px; background:${severityColor(ef.severity)}; color:#000; font-size:11px; font-weight:700; text-transform:uppercase">${ef.severity}</span>
+    </h3>`;
+  const x = ef.extras || {};
+  const f = state.frame ?? 0;
+  const fl = ef.flareL && Number.isFinite(ef.flareL[f]) ? ef.flareL[f] : NaN;
+  const fr = ef.flareR && Number.isFinite(ef.flareR[f]) ? ef.flareR[f] : NaN;
+  const fro = ef.frontal && Number.isFinite(ef.frontal[f]) ? ef.frontal[f] : NaN;
+  const thr = Number(x.flare_threshold ?? 0.3);
+  const col = v => !Number.isFinite(v) ? "#888" : v > 0.3 ? "#ff5d6c" : v > 0.2 ? "#ff9e64" : "#7adf7a";
+  const gate = Number(x.frontal_gate ?? 0);
+  return `${header}
+    <div style="font-size:13px; line-height:1.6">
+      flagged: <code>${x.flagged_frames ?? "—"} / ${x.considered_frames ?? "—"}</code> considered ·
+      ratio: <code>${fmt(ef.violationRatio, 2)}</code><br>
+      <span class="muted">L flagged <code>${fmt(x.flag_pct_l, 0)}%</code> (med <code>${fmt(x.median_flare_l, 2)}</code>) ·
+        R flagged <code>${fmt(x.flag_pct_r, 0)}%</code> (med <code>${fmt(x.median_flare_r, 2)}</code>) ·
+        thr ${thr.toFixed(2)} · gate ${gate > 0 ? gate.toFixed(2) : "off"}</span><br>
+      <strong>frame ${f}:</strong>
+        L <code style="color:${col(fl)}">${fmt(fl, 2)}</code> ·
+        R <code style="color:${col(fr)}">${fmt(fr, 2)}</code> ·
+        <span class="muted">frontal</span> <code>${fmt(fro, 2)}</code><br>
+      <em style="color:#ccc">${ef.coachCue || ""}</em>
+    </div>`;
+}
+
 function buildHitHeightBlock(hh, state) {
   if (!hh) {
     return `<p class="muted" style="margin-top:18px">No hit_height rule in this sidecar — record a fresh round with the latest build.</p>`;
@@ -483,6 +517,9 @@ function renderSidebar(state) {
   // Hand return path (straights — U-dip prominence on the way back to guard).
   const handReturnHtml = buildHandReturnPathBlock(a.rules.hand_return_path, state);
 
+  // Elbow flare (frame-scoped — horizontal shoulder→elbow gap / torso).
+  const elbowFlareHtml = buildElbowFlareBlock(a.rules.elbow_flare, state);
+
   // DEPRECATED: legacy LogReg orientation, tucked into a collapsed details.
   const deprecatedBlock = a.orientation
     ? `<details style="margin-top:18px">
@@ -505,6 +542,7 @@ function renderSidebar(state) {
     ${armExtHtml}
     ${hitHeightHtml}
     ${handReturnHtml}
+    ${elbowFlareHtml}
     ${deprecatedBlock}
   `;
   wirePivotSeek();

@@ -153,6 +153,11 @@ export async function loadOnDeviceAnalysis(jsonBlob) {
       perPunch: Array.isArray(r.per_punch) ? r.per_punch : null,
       orientationAngles: r.orientation_angle_b64 ? base64ToFloat32(r.orientation_angle_b64) : null,
       orientationConfs: r.orientation_conf_b64 ? base64ToFloat32(r.orientation_conf_b64) : null,
+      // elbow_flare v1: per-frame flare per side + frontal-ness (shoulderW/
+      // torso). NaN where the torso was degenerate. null on other rules.
+      flareL: r.flare_l_b64 ? base64ToFloat32(r.flare_l_b64) : null,
+      flareR: r.flare_r_b64 ? base64ToFloat32(r.flare_r_b64) : null,
+      frontal: r.frontal_b64 ? base64ToFloat32(r.frontal_b64) : null,
     };
   }
 
