@@ -358,6 +358,21 @@ function renderCurrent(state) {
   const gtF = secToFrame(state, p.gt_sec);
   const predF = secToFrame(state, p.pred_sec);
   const baseF = secToFrame(state, p.gt_sec + p.base_err_ms / 1000);
+  let platTxt = `<br><span style="color:#666">no plateau (degenerate extension)</span>`;
+  if (p.plat_sec) {
+    let warn = "";
+    if (p.gt_in_plat === false) {
+      // signed distance from the labeled time to the nearest band edge, in ms
+      const gap = p.gt_sec < p.plat_sec[0]
+        ? (p.gt_sec - p.plat_sec[0]) * 1000
+        : (p.gt_sec - p.plat_sec[1]) * 1000;
+      warn = ` <span style="color:#d3b136">⚠ GT ${Math.abs(gap).toFixed(0)}ms ` +
+             `${gap < 0 ? "before" : "after"} plateau</span>`;
+    }
+    platTxt = `<br>plateau <b style="color:${C.gt}">${p.plat_frames}f</b> ` +
+      `<span style="color:#888">(f${secToFrame(state, p.plat_sec[0])}–` +
+      `f${secToFrame(state, p.plat_sec[1])})</span>` + warn;
+  }
   el.innerHTML =
     `<b>${p.ptype}</b> <span style="color:#888">(${p.hand})</span><br>` +
     `GT <span style="color:${C.gt}">f${gtF}</span> · ` +
@@ -366,7 +381,7 @@ function renderCurrent(state) {
     (showBaseline
       ? ` · base <span style="color:${C.base}">f${baseF}</span> ` +
         `(${p.base_err_ms > 0 ? "+" : ""}${p.base_err_ms}ms)`
-      : "");
+      : "") + platTxt;
 }
 
 function renderList(state) {
@@ -428,11 +443,19 @@ function drawTimeline(state) {
   ctx.fillText("lead", 4 * dpr, rowY.lead - 3 * dpr);
   ctx.fillText("rear", 4 * dpr, rowY.rear - 3 * dpr);
 
+  const halfF = 0.5 / 30;
   for (const p of activeRound.punches) {
     const y = rowY[p.hand] ?? rowY.lead;
     const sLo = frameSecSpan(state, p)[0], sHi = frameSecSpan(state, p)[1];
     ctx.fillStyle = C.span;
     ctx.fillRect(x(sLo), y, Math.max(2, x(sHi) - x(sLo)), rowH);
+    if (p.plat_sec) {
+      // extension-plateau band: where "deepest point" is ambiguous
+      ctx.fillStyle = "rgba(86, 211, 100, 0.30)";
+      ctx.fillRect(x(p.plat_sec[0] - halfF), y + rowH * 0.2,
+                   Math.max(2, x(p.plat_sec[1] + halfF) - x(p.plat_sec[0] - halfF)),
+                   rowH * 0.6);
+    }
     // GT tick
     ctx.strokeStyle = C.gt; ctx.lineWidth = 2 * dpr;
     line(ctx, x(p.gt_sec), y - 2 * dpr, x(p.gt_sec), y + rowH + 2 * dpr);
@@ -477,6 +500,14 @@ function drawConf(state) {
   const t0 = p.conf_t0, dt = p.conf_dt, n = p.conf.length;
   const x = (t) => ((t - t0) / Math.max(1e-6, (n - 1) * dt)) * W;
   const y = (v) => H - v * (H - 8 * dpr) - 4 * dpr;
+  if (p.plat_sec) {
+    // extension-plateau band — predictions anywhere in here are "deepest
+    // point" candidates; GT (green) should normally sit inside it
+    const halfF = 0.5 / 30;
+    ctx.fillStyle = "rgba(86, 211, 100, 0.14)";
+    ctx.fillRect(x(p.plat_sec[0] - halfF), 0,
+                 x(p.plat_sec[1] + halfF) - x(p.plat_sec[0] - halfF), H);
+  }
   ctx.strokeStyle = C.grid;
   ctx.lineWidth = 1;
   line(ctx, 0, y(0.5), W, y(0.5));
