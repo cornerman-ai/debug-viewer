@@ -108,6 +108,24 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
 }
 .picker-row select:disabled { opacity: 0.5; }
 
+.lens-row { margin-bottom: 14px; }
+.lens-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.lens-row select {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+}
+#lens-pick-status { margin: 6px 0 0; }
+
 .manual-fallback {
   margin-top: 14px;
   font-size: 12px;

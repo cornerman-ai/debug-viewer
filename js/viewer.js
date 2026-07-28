@@ -6,7 +6,7 @@
 // Bump this on every push so the user can tell whether the new code is
 // actually live or whether GitHub Pages / their browser is still serving
 // a cached copy. Format: YYYY-MM-DD.N where N restarts at 1 each day.
-const BUILD = "2026-06-30.1";
+const BUILD = "2026-07-28.1";
 {
   const el = document.getElementById("build-tag");
   if (el) el.textContent = `build ${BUILD}`;
@@ -51,6 +51,8 @@ const els = {
   frameLabel:  document.getElementById("frame-label"),
   scrubber:    document.getElementById("scrubber"),
   ruleSel:     document.getElementById("rule-select"),
+  lensPick:    document.getElementById("lens-pick"),
+  lensStatus:  document.getElementById("lens-pick-status"),
   ruleHost:    document.getElementById("rule-panel"),
   videoInfo:   document.getElementById("video-info"),
   viName:      document.getElementById("vi-name"),
@@ -322,6 +324,7 @@ function populateDriveVideoSelect() {
   if (!driveVideos || driveVideos.size === 0) {
     sel.innerHTML = `<option value="">— connect a Drive folder to populate —</option>`;
     sel.disabled = true;
+    setLensStatus(null, null);
     return;
   }
   const placeholder = document.createElement("option");
@@ -347,13 +350,16 @@ function populateDriveVideoSelect() {
     if (a.anyCache !== b.anyCache) return a.anyCache ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
+  let matchedCount = 0;
   for (const it of items) {
     if (!it.matched) continue;   // hide non-matching videos entirely
+    matchedCount++;
     const o = document.createElement("option");
     o.value = it.name;
     o.textContent = it.name;
     sel.appendChild(o);
   }
+  setLensStatus(matchedCount, items.length);
   // Restore previous selection if it's still selectable, else clear.
   if (previousValue && [...sel.options].some(o => o.value === previousValue && !o.disabled)) {
     sel.value = previousValue;
@@ -1374,18 +1380,24 @@ if (videoWrap) {
 }
 
 // ── Rule panels ─────────────────────────────────────────────────────────────
-function populateRuleSelect() {
-  // Preserve current selection across the rebuild so loading a new video
-  // doesn't snap the lens back to the first one. The RULES list is static
-  // so the previous id will always still exist.
-  const prev = els.ruleSel.value;
-  els.ruleSel.innerHTML = "";
+function fillLensOptions(sel) {
+  sel.innerHTML = "";
   for (const r of RULES) {
     const o = document.createElement("option");
     o.value = r.id;
     o.textContent = r.label;
-    els.ruleSel.appendChild(o);
+    sel.appendChild(o);
   }
+}
+
+function populateRuleSelect() {
+  // Preserve the active lens across the rebuild so loading a new video
+  // doesn't snap it back to the first one — including a lens the user
+  // picked in the picker card before any video was loaded (at which point
+  // this select is still empty, so fall back to state.rule). The RULES list
+  // is static so the previous id will always still exist.
+  const prev = els.ruleSel.value || state.rule?.id;
+  fillLensOptions(els.ruleSel);
   if (prev && [...els.ruleSel.options].some(o => o.value === prev)) {
     els.ruleSel.value = prev;
   }
@@ -1397,12 +1409,22 @@ function setRule(id) {
   const rule = RULES.find(r => r.id === id);
   if (!rule) return;
   state.rule = rule;
-  els.ruleHost.innerHTML = "";
-  // Clear the stage-wide extras slot so a lens that added a full-width
-  // canvas (e.g. punch_classifier's timeline) doesn't leak into the next
-  // lens. Lenses that want it back put their elements back in mount().
-  if (els.stageExtras) els.stageExtras.innerHTML = "";
-  rule.mount(els.ruleHost, state);
+  // Two selects show the lens — the picker card's (usable before a video is
+  // loaded) and the side panel's. Keep them pointed at the same rule.
+  if (els.lensPick && els.lensPick.value !== id) els.lensPick.value = id;
+  if (els.ruleSel.value !== id && [...els.ruleSel.options].some(o => o.value === id)) {
+    els.ruleSel.value = id;
+  }
+  // Mounting the panel needs a loaded round; before that the lens is only a
+  // filter for the video/round dropdowns.
+  if (state.pose) {
+    els.ruleHost.innerHTML = "";
+    // Clear the stage-wide extras slot so a lens that added a full-width
+    // canvas (e.g. punch_classifier's timeline) doesn't leak into the next
+    // lens. Lenses that want it back put their elements back in mount().
+    if (els.stageExtras) els.stageExtras.innerHTML = "";
+    rule.mount(els.ruleHost, state);
+  }
   // Lens may change which videos/rounds are valid — refresh the dropdowns
   // so they reflect the new lens's requirements. We do NOT auto-swap the
   // currently-loaded video; the lens's own mount() shows an empty/hint
@@ -1411,6 +1433,24 @@ function setRule(id) {
   const v = els.videoFile.files[0];
   if (v) populateRoundSelect(cacheIndex?.get(videoBasename(v.name)));
   redraw();
+}
+
+// Picker-card lens select: lets the user choose the lens FIRST and see only
+// the videos it can render, instead of having to load a video before the
+// side-panel lens dropdown exists.
+function setLensStatus(matched, total) {
+  if (!els.lensStatus) return;
+  if (matched == null) { els.lensStatus.textContent = ""; return; }
+  const label = state.rule?.label || "this lens";
+  els.lensStatus.textContent = matched === 0
+    ? `No videos in the Drive folder have a cache for ${label}.`
+    : `${matched} of ${total} videos have a cache for ${label}.`;
+}
+
+if (els.lensPick) {
+  fillLensOptions(els.lensPick);
+  els.lensPick.addEventListener("change", () => setRule(els.lensPick.value));
+  setRule(els.lensPick.value);
 }
 
 // Expose the viewer's redraw to lenses that need to repaint the main canvas
