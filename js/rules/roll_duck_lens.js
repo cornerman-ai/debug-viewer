@@ -167,7 +167,10 @@ function computeEvents(m) {
 // ── GT + matching (mirrors match()) ─────────────────────────────────────────
 
 function gtSpans(state, n) {
-  const dets = state.labels?.detections;
+  // A failed fetch / failed auto-match leaves {error, detections: []} — an
+  // empty ARRAY, which must not render as "GT rolls 0". Treat it as unscored.
+  if (!state.labels || state.labels.error) return null;
+  const dets = state.labels.detections;
   if (!Array.isArray(dets)) return null;
   const rolls = [], other = [];
   for (const d of dets) {
@@ -332,8 +335,12 @@ export const RollDuckLensRule = {
     const f = state.frame;
 
     host.querySelector("#rd-round").innerHTML = s.gt === null
-      ? `<span class="muted">No Sheet labels for this round — detections shown unscored
-         (<code>${s.events.length}</code> events).</span>`
+      ? `<span class="muted">Sheet labels unavailable — detections shown unscored
+         (<code>${s.events.length}</code> events).<br>${
+           state.labels?.error
+             ? `Labels: <span class="bad">${state.labels.error}</span>`
+             : state.labels ? "No label rows matched this round."
+             : "Labels not loaded (yet) — still fetching, or no Sheet source."}</span>`
       : `GT rolls <code>${s.nGt}</code> ·
          <span style="color:${COLOR_TP}">caught ${s.tp}</span> ·
          missed <code>${s.missed}</code><br>
