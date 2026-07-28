@@ -177,7 +177,7 @@ function gtSpans(state, n) {
     const t = String(d.punch_type || "").toLowerCase();
     const span = [Math.max(0, Math.round(d.start_frame)), Math.min(n - 1, Math.round(d.end_frame))];
     if (span[1] <= span[0]) continue;
-    if (ROLL_LABELS.has(t)) rolls.push(span);
+    if (ROLL_LABELS.has(t)) rolls.push({ span, type: t });
     else if (OTHER_DEFENSE.has(t)) other.push({ span, type: t });
   }
   return { rolls, other };
@@ -212,7 +212,7 @@ function score(state, m) {
   if (!gt) return { events, gt: null };
 
   const rollPreds = events.filter(e => e.kind === "roll");
-  const { mg, mp } = matchEvents(gt.rolls, rollPreds);
+  const { mg, mp } = matchEvents(gt.rolls.map(g => g.span), rollPreds);
   rollPreds.forEach((e, i) => { if (mp.has(i)) e.verdict = "tp"; });
   const leftovers = rollPreds.filter((_, i) => !mp.has(i));
   const { mp: mo } = matchEvents(gt.other.map(o => o.span), leftovers);
@@ -409,6 +409,29 @@ export const RollDuckLensRule = {
     }
     ctx.restore();
 
+    // Top-left GT-vs-Pred box — same idiom as the punch classifier HUD.
+    const gtRoll = s.gt?.rolls.find(g => g.span[0] <= f && f <= g.span[1]) || null;
+    const gtOther = !gtRoll && s.gt
+      ? s.gt.other.find(o => o.span[0] <= f && f <= o.span[1]) || null : null;
+    const evNow = eventAt(s.events, f);
+    let predText, predCol;
+    if (evNow) {
+      const mark = evNow.verdict === "tp" ? " ✓"
+        : evNow.verdict === "fa" ? " (false+)"
+        : evNow.verdict === "conf" ? " (other-def)"
+        : gtRoll ? " (miss)" : "";   // duck while a GT roll is active = missed
+      predText = evNow.kind.toUpperCase() + mark;
+      predCol = VERDICT_COLOR[evNow.verdict];
+    } else if (gtRoll) {
+      predText = "MISS"; predCol = COLOR_FA;
+    } else {
+      predText = "idle"; predCol = "#888888";
+    }
+    drawGtPredBox(ctx,
+      s.gt === null ? "no labels" : gtRoll ? gtRoll.type : gtOther ? gtOther.type : "idle",
+      s.gt === null ? "#888888" : gtRoll ? COLOR_TP : gtOther ? COLOR_GT_OTHER : "#888888",
+      predText, predCol, rs);
+
     // Corner HUD.
     const fsz = Math.round(13 * rs), lineH = fsz + 4 * rs;
     const lines = [
@@ -433,6 +456,32 @@ export const RollDuckLensRule = {
     ctx.restore();
   },
 };
+
+// Top-left 3-line HUD (header / GT / Pred), punch-classifier geometry.
+function drawGtPredBox(ctx, gtText, gtCol, predText, predCol, scale) {
+  const fontPx = Math.round(13 * scale);
+  ctx.save();
+  ctx.font = `bold ${fontPx}px ui-monospace, "SF Mono", monospace`;
+  const lines = [
+    { text: "Roll/Duck",        color: "#dddddd" },
+    { text: `GT:   ${gtText}`,  color: gtCol },
+    { text: `Pred: ${predText}`, color: predCol },
+  ];
+  const pad = 5 * scale;
+  const lineH = fontPx + 4 * scale;
+  let width = 0;
+  for (const ln of lines) width = Math.max(width, ctx.measureText(ln.text).width);
+  const x = 8 * scale, y = 8 * scale;
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillRect(x, y, width + pad * 2, lineH * lines.length + pad * 2);
+  let ty = y + pad + fontPx;
+  for (const ln of lines) {
+    ctx.fillStyle = ln.color;
+    ctx.fillText(ln.text, x + pad, ty);
+    ty += lineH;
+  }
+  ctx.restore();
+}
 
 // ── below-video timeline: GT track + detection track ────────────────────────
 
@@ -509,7 +558,7 @@ function drawTimeline(canvas, m, s, frame) {
     for (const g of s.gt.rolls) {
       ctx.fillStyle = COLOR_GT;
       ctx.globalAlpha = 0.95;
-      ctx.fillRect(xOf(g[0]), top, Math.max(2, xOf(g[1]) - xOf(g[0])), trackH);
+      ctx.fillRect(xOf(g.span[0]), top, Math.max(2, xOf(g.span[1]) - xOf(g.span[0])), trackH);
     }
     ctx.globalAlpha = 1;
   }
@@ -551,7 +600,7 @@ function drawTrace(canvas, m, s, frame) {
     ctx.fillStyle = COLOR_GT;
     ctx.globalAlpha = 0.25;
     for (const g of s.gt.rolls) {
-      ctx.fillRect(xOf(g[0]), 0, Math.max(1.5, xOf(g[1]) - xOf(g[0])), H);
+      ctx.fillRect(xOf(g.span[0]), 0, Math.max(1.5, xOf(g.span[1]) - xOf(g.span[0])), H);
     }
     ctx.globalAlpha = 1;
   }
