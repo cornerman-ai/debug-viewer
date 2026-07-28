@@ -39,6 +39,7 @@ import { StanceWidthLensRule } from "./stance_width_lens.js";
 import { AudioImpactLensRule } from "./audio_impact_lens.js";
 import { ImpactSpotterLensRule } from "./impact_spotter_lens.js";
 import { PunchPredictionsRule } from "./punch_predictions.js";
+import { RollDuckLensRule } from "./roll_duck_lens.js";
 
 // Overview stays first as the default; the rest are alphabetical by label.
 export const RULES = [
@@ -63,6 +64,7 @@ export const RULES = [
   PoseCoverageLensRule,
   PunchClassifierRule,
   PunchPredictionsRule,
+  RollDuckLensRule,
   RoundV6Rule,
   ShoulderGateRule,
   SkeletonCompareRule,
