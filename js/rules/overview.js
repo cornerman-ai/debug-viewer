@@ -31,6 +31,9 @@ function ovSources(state) {
   return out;
 }
 let ovSel = null;   // selected source label (persists across rounds)
+let ovShowSkel = true;  // skeleton overlay on/off (persists across rounds)
+// Style that fully suppresses the base skeleton draw in viewer.js.
+const HIDDEN_SKELETON = { boneColor: "rgba(0,0,0,0)", jointRadius: 0, minConf: Infinity, showImputed: false };
 // Map the viewer's current frame to the selected pose's frame by ABSOLUTE pts
 // (same alignment engine_compare uses); falls back to the start_sec+fps model.
 function ovFrame(p, state) {
@@ -73,6 +76,8 @@ export const OverviewRule = {
       <h2>Per-joint state</h2>
       <label class="hint" style="display:block;margin-bottom:6px">Skeleton:
         <select id="ov-engine" style="background:#1c1c1c;color:#eee;border:1px solid #444;border-radius:4px;padding:1px 5px">${opts || "<option>—</option>"}</select></label>
+      <label class="hint" style="display:block;margin-bottom:6px">
+        <input type="checkbox" id="ov-skel"${ovShowSkel ? " checked" : ""}> Show skeleton overlay</label>
       <div id="ov-source" class="hint" style="margin-bottom:8px"></div>
       <p class="hint">Confidence is colour-coded: green ≥ 0.5, amber ≥ 0.2, red below.
       A zero means the engine didn't detect that joint (Vision emits 0; YOLO/RTMPose
@@ -88,6 +93,11 @@ export const OverviewRule = {
       ovSel = sel.value;
       this.update(state);
       window.__viewerRedraw?.();   // repaint the overlay too, not just the table
+    });
+    const skel = host.querySelector("#ov-skel");
+    if (skel) skel.addEventListener("change", () => {
+      ovShowSkel = skel.checked;
+      window.__viewerRedraw?.();
     });
     renderSourceLine(state);
   },
@@ -121,9 +131,10 @@ export const OverviewRule = {
   // skeleton ourselves in draw() — the overlay then tracks the dropdown, not
   // just the per-joint table. "primary" selected → {} → normal overlay.
   skeletonStyle(state) {
+    if (!ovShowSkel) return HIDDEN_SKELETON;
     const src = ovSelected(state);
     if (src && src.pose !== state.pose) {
-      return { boneColor: "rgba(0,0,0,0)", jointRadius: 0, minConf: Infinity, showImputed: false };
+      return HIDDEN_SKELETON;
     }
     return {};
   },
@@ -136,7 +147,7 @@ export const OverviewRule = {
     // Picked a non-primary engine → draw its skeleton (PTS-mapped to this
     // frame), confidence-coloured exactly like the primary overlay.
     const src = ovSelected(state);
-    if (src && src.pose !== state.pose) {
+    if (ovShowSkel && src && src.pose !== state.pose) {
       drawSkeleton(ctx, src.pose, ovFrame(src.pose, state), {
         boneWidth: 2 * s,
         jointRadius: 4 * s,
