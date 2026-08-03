@@ -37,7 +37,7 @@
 
 import { J } from "../skeleton.js";
 import { activeDetections } from "./_detections.js";
-import { curatedInfo } from "./frontal_segments_lens.js";
+import { curatedInfo, isCuratedVideo } from "./frontal_segments_lens.js";
 
 const cfg = {
   wScale: 1.0,        // multiplies the auto W estimate (1.0 = use it as-is)
@@ -45,9 +45,14 @@ const cfg = {
   squaredBelow: 25,   // GUESS — below this = too squared
   bladedAbove: 65,    // GUESS — above this = too bladed
   minConfidence: 0.5,
-  curatedOnly: true,  // restrict stats to the curated spans
   excludePunches: true,
 };
+
+// Curated-only is NOT a toggle. The camera-as-opponent assumption is what makes
+// these angles mean anything, and it only holds inside the curated spans — a
+// number measured outside them is not a worse measurement, it's a meaningless
+// one. So frames outside a span are excluded, and a video that isn't in the set
+// gets refused outright rather than silently measured.
 
 const REQ_SH = [J.L_SHOULDER, J.R_SHOULDER, J.L_HIP, J.R_HIP];
 const REQ_FT = [J.L_ANKLE, J.R_ANKLE];
@@ -148,8 +153,8 @@ function footDeg(c, f) {
 // A frame counts toward the round stats only if it's measurable, inside the
 // curated span (when that filter is on), and not mid-punch.
 function counted(c, cur, f) {
+  if (!cur?.entry || !cur.inSpan[f]) return false;   // curated spans only, always
   if (cfg.excludePunches && c.punch[f]) return false;
-  if (cfg.curatedOnly && cur?.entry && !cur.inSpan[f]) return false;
   return true;
 }
 
@@ -200,6 +205,11 @@ export const BladednessRule = {
   id: "bladedness_lens",
   label: "Bladedness (squared vs side-on)",
 
+  // Only the curated frontal videos are selectable. The dropdown filter alone
+  // isn't enough — the manual file picker and the Firebase path bypass it — so
+  // update()/draw() refuse to measure a non-curated video as well.
+  requiresVideo: isCuratedVideo,
+
   skeletonStyle() {
     return {
       boneColor: "rgba(255,255,255,0.22)",
@@ -244,8 +254,6 @@ export const BladednessRule = {
         too bladed above = <output id="bl-bd-out">65</output>°
         <input type="range" id="bl-bd" min="30" max="90" step="1" value="65"></label>
       <label style="display:block; font-size:12px; margin-top:4px">
-        <input type="checkbox" id="bl-cur" checked> curated spans only</label>
-      <label style="display:block; font-size:12px">
         <input type="checkbox" id="bl-pun" checked> exclude punch frames</label>
 
       <h3>Round</h3>
@@ -272,11 +280,9 @@ export const BladednessRule = {
     wire("#bl-k", "footK", 2, "#bl-k-out");
     wire("#bl-sq", "squaredBelow", 0, "#bl-sq-out");
     wire("#bl-bd", "bladedAbove", 0, "#bl-bd-out");
-    const check = (id, key) => host.querySelector(id).addEventListener("change", e => {
-      cfg[key] = e.target.checked; refresh();
+    host.querySelector("#bl-pun").addEventListener("change", e => {
+      cfg.excludePunches = e.target.checked; refresh();
     });
-    check("#bl-cur", "curatedOnly");
-    check("#bl-pun", "excludePunches");
   },
 
   update(state) {
@@ -285,15 +291,32 @@ export const BladednessRule = {
     const roundEl = host.querySelector("#bl-round");
     if (!c) { if (roundEl) roundEl.innerHTML = `<p class="muted">No pose cache loaded.</p>`; return; }
     const cur = curatedInfo(state);
+
+    // Not in the curated set ⇒ refuse. Showing an angle here would be showing a
+    // number whose reference axis doesn't hold.
+    if (!cur?.entry) {
+      roundEl.innerHTML =
+        `<div style="color:${C_BLADED}; font-weight:600">Not in the curated set</div>
+         <div class="muted small" style="margin-top:3px">
+           These angles only mean something where the camera stands in for the
+           opponent. <code>${state.cacheBasename || "this video"}</code> isn't in
+           <code>frontal_segments.json</code>, so nothing is measured.
+         </div>`;
+      host.querySelector("#bl-frame").innerHTML = `<span class="muted">—</span>`;
+      const tl = document.getElementById("bl-timeline");
+      if (tl) fitCanvas(tl);
+      const tr = host.querySelector("#bl-trace");
+      if (tr) tr.getContext("2d").clearRect(0, 0, tr.width, tr.height);
+      return;
+    }
+
     const r = rollup(c, cur);
     const f = state.frame;
 
     host.querySelector("#bl-w-eff").textContent =
       Number.isFinite(c.wAuto) ? `(auto ${c.wAuto.toFixed(3)} → ${(c.wAuto * cfg.wScale).toFixed(3)})` : "";
 
-    const curNote = !cur?.entry
-      ? `<span style="color:${C_BLADED}">video not in the curated set</span>`
-      : cfg.curatedOnly ? `curated spans only` : `whole round`;
+    const curNote = `curated spans only`;
 
     roundEl.innerHTML = `
       <div><span style="color:${C_SH}">shoulders</span>
@@ -311,7 +334,7 @@ export const BladednessRule = {
     host.querySelector("#bl-frame").innerHTML = `
       <strong>frame ${f}</strong>
       ${c.punch[f] ? `<span style="color:${C_PUNCH}"> punch</span>` : ""}
-      ${cur?.entry && !cur.inSpan[f] ? `<span class="muted"> · outside span</span>` : ""}<br>
+      ${!cur.inSpan[f] ? `<span style="color:${C_INVALID}"> · outside span, not counted</span>` : ""}<br>
       <span style="color:${C_SH}">sh</span>
         <code style="color:${bandColor(s)}">${fmt(s)}°</code>
         <span class="muted">gap ${fmt(c.gap[f], 3)}</span> ·
@@ -326,8 +349,31 @@ export const BladednessRule = {
   draw(ctx, state) {
     const c = computeMetrics(state);
     if (!c) return;
+    const cur = curatedInfo(state);
+    const f = state.frame, sc = state.renderScale || 1;
+
+    // Outside the curated set / span: say so and draw nothing else. No angle is
+    // better than an angle whose reference axis doesn't hold.
+    if (!cur?.entry || !cur.inSpan[f]) {
+      const msg = !cur?.entry ? "VIDEO NOT IN CURATED SET" : "OUTSIDE CURATED SPAN";
+      const fsz = Math.round(14 * sc);
+      ctx.save();
+      ctx.strokeStyle = C_INVALID; ctx.lineWidth = 4 * sc; ctx.globalAlpha = 0.8;
+      ctx.strokeRect(2 * sc, 2 * sc, ctx.canvas.width - 4 * sc, ctx.canvas.height - 4 * sc);
+      ctx.globalAlpha = 1;
+      ctx.font = `600 ${fsz}px ui-monospace, monospace`;
+      ctx.textBaseline = "top";
+      const w = ctx.measureText(msg).width + 20 * sc;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.beginPath(); ctx.roundRect(10 * sc, 10 * sc, w, fsz + 14 * sc, 6 * sc); ctx.fill();
+      ctx.fillStyle = C_INVALID;
+      ctx.fillText(msg, 20 * sc, 17 * sc);
+      ctx.restore();
+      return;
+    }
+
     const pose = pickPose(state);
-    const f = state.frame, sc = state.renderScale || 1, b = f * 17;
+    const b = f * 17;
     const P = j => [pose.skeleton[(b + j) * 2], pose.skeleton[(b + j) * 2 + 1]];
 
     const seg = (aJ, bJ, color) => {
@@ -455,9 +501,15 @@ function drawTimeline(canvas, c, cur, frame) {
     ctx.fillStyle = t.accent;
     ctx.fillText(t.label, 6, y + trackH / 2 + 3);
     for (let f = 0; f < N; f++) {
-      const inSpan = !cur?.entry || cur.inSpan[f];
-      ctx.fillStyle = (cfg.excludePunches && c.punch[f]) ? C_PUNCH : bandColor(t.fn(f));
-      ctx.globalAlpha = inSpan ? 0.9 : 0.18;
+      // Out-of-span frames are drawn flat grey, not a dimmed measurement —
+      // there is no measurement there to dim.
+      const inSpan = cur?.entry && cur.inSpan[f];
+      if (!inSpan) {
+        ctx.fillStyle = C_INVALID; ctx.globalAlpha = 0.15;
+      } else {
+        ctx.fillStyle = (cfg.excludePunches && c.punch[f]) ? C_PUNCH : bandColor(t.fn(f));
+        ctx.globalAlpha = 0.9;
+      }
       ctx.fillRect(xOf(f), y, colW + 0.5, trackH);
     }
     ctx.globalAlpha = 1;

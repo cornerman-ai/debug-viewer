@@ -146,6 +146,16 @@ export function curatedInfo(state) {
   return compute(state);
 }
 
+// Shared video filter. Pending ⇒ hide (loadManifest re-fires the filter once
+// the data lands). Failed ⇒ show everything, because an unexplained empty
+// dropdown is a dead end. Used as `requiresVideo` by every lens that only
+// makes sense on the curated set.
+export function isCuratedVideo(base) {
+  if (manifestError) return true;
+  if (!manifest) return false;
+  return !!matchEntry(base);
+}
+
 function fmtTime(sec) {
   if (sec == null) return "—";
   const m = Math.floor(sec / 60), s = sec - m * 60;
@@ -174,11 +184,7 @@ export const FrontalSegmentsRule = {
   // loadManifest re-filters the moment the data lands). Failed ⇒ show
   // everything: an unexplained empty dropdown would be a dead end, since the
   // sidebar that carries the error only mounts once a round is loaded.
-  requiresVideo(base) {
-    if (manifestError) return true;
-    if (!manifest) return false;
-    return !!matchEntry(base);
-  },
+  requiresVideo: isCuratedVideo,
 
   mount(_host, state) {
     host = _host;
