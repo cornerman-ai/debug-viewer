@@ -438,11 +438,27 @@ function slotMatchesActiveLens(slot) {
 function videoMatchesActiveLens(base) {
   const rounds = cacheIndex?.get(base);
   if (!rounds) return false;
+  // Optional per-VIDEO predicate, alongside the per-slot `requires`. A lens
+  // that curates a specific set of source videos (frontal_segments) filters on
+  // the basename — engine availability says nothing about whether the clip is
+  // in the set. Lenses without it are unaffected.
+  const requiresVideo = state.rule?.requiresVideo;
+  if (requiresVideo) {
+    try { if (!requiresVideo(base)) return false; }
+    catch { return false; }
+  }
   for (const slot of rounds.values()) {
     if (slotMatchesActiveLens(slot)) return true;
   }
   return false;
 }
+
+// A lens whose video filter depends on data it fetches (a manifest, an index)
+// can't answer requiresVideo() until that lands. It fires this once the data
+// is in so the dropdowns re-filter instead of staying stale.
+window.addEventListener("lens-filter-changed", () => {
+  populateDriveVideoSelect();
+});
 
 async function onDriveVideoPick() {
   const name = els.videoPick.value;

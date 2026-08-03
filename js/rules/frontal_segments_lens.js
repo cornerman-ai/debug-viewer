@@ -31,6 +31,7 @@ const COLOR_ACCENT  = "#b48cff";
 
 let manifest = null;        // { segments: {stem: [{label,start_sec,end_sec}]} }
 let manifestError = null;
+let manifestPromise = null;
 
 async function loadManifest() {
   if (manifest || manifestError) return;
@@ -41,7 +42,15 @@ async function loadManifest() {
   } catch (err) {
     manifestError = err.message || String(err);
   }
+  // The video dropdown filters on requiresVideo(), which can't answer until
+  // this lands — tell the viewer to re-filter now that it can.
+  window.dispatchEvent(new Event("lens-filter-changed"));
 }
+
+// Kick the fetch off at module load (registry.js imports every lens on page
+// load), so by the time the user connects a Drive folder and picks this lens
+// the manifest is already in and the dropdown filters on the first paint.
+manifestPromise = loadManifest();
 
 // Stems in the wild pick up `_prepared` / `_h264` re-encode tails, and these
 // YouTube titles contain double spaces that are easy to lose in a copy-paste.
@@ -151,6 +160,17 @@ export const FrontalSegmentsRule = {
     return { boneColor: "rgba(255,255,255,0.25)", boneWidth: 1.5, jointRadius: 3 };
   },
 
+  // Per-video filter for the Drive dropdown: only the curated videos are
+  // selectable while this lens is active. Pending ⇒ hide (the dispatch in
+  // loadManifest re-filters the moment the data lands). Failed ⇒ show
+  // everything: an unexplained empty dropdown would be a dead end, since the
+  // sidebar that carries the error only mounts once a round is loaded.
+  requiresVideo(base) {
+    if (manifestError) return true;
+    if (!manifest) return false;
+    return !!matchEntry(base);
+  },
+
   mount(_host, state) {
     host = _host;
     cache = { pose: null, basename: null };
@@ -158,7 +178,7 @@ export const FrontalSegmentsRule = {
     mountStageTimeline();
 
     const token = ++mountToken;
-    loadManifest().then(() => {
+    (manifestPromise || loadManifest()).then(() => {
       if (token !== mountToken || !host) return;   // lens switched mid-fetch
       renderShell();
       refresh();
