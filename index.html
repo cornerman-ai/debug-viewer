@@ -153,6 +153,19 @@
   <section id="viewer" hidden>
     <div class="layout">
       <div id="stage">
+        <!-- Mirror of the picker card's video + round dropdowns so you can
+             switch rounds without scrolling back up. Kept in sync by
+             syncStagePickers(); changing one drives the other. -->
+        <div class="stage-pick">
+          <label>
+            <span>Video</span>
+            <select id="stage-video-pick" disabled></select>
+          </label>
+          <label>
+            <span>Round</span>
+            <select id="stage-round-select" disabled></select>
+          </label>
+        </div>
         <div class="video-wrap">
           <video id="video" preload="auto" playsinline></video>
           <canvas id="overlay"></canvas>

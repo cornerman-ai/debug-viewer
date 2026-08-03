@@ -6,7 +6,7 @@
 // Bump this on every push so the user can tell whether the new code is
 // actually live or whether GitHub Pages / their browser is still serving
 // a cached copy. Format: YYYY-MM-DD.N where N restarts at 1 each day.
-const BUILD = "2026-07-28.3";
+const BUILD = "2026-08-03.1";
 {
   const el = document.getElementById("build-tag");
   if (el) el.textContent = `build ${BUILD}`;
@@ -36,6 +36,8 @@ const els = {
   driveStatus:  document.getElementById("drive-status"),
   driveSection: document.getElementById("drive-section"),
   roundSel:     document.getElementById("round-select"),
+  stageVideoPick: document.getElementById("stage-video-pick"),
+  stageRoundSel:  document.getElementById("stage-round-select"),
   loadStatus:   document.getElementById("load-status"),
   pickerCard:   document.getElementById("picker-card"),
   viewer:      document.getElementById("viewer"),
@@ -148,6 +150,15 @@ els.poseFile.addEventListener("change", onManualPose);
 if (els.driveConnect)    els.driveConnect.addEventListener("click", onDriveConnect);
 if (els.driveDisconnect) els.driveDisconnect.addEventListener("click", onDriveDisconnect);
 if (els.videoPick)       els.videoPick.addEventListener("change", onDriveVideoPick);
+if (els.stageVideoPick)  els.stageVideoPick.addEventListener("change", () => {
+  if (!els.videoPick) return;
+  els.videoPick.value = els.stageVideoPick.value;
+  onDriveVideoPick();
+});
+if (els.stageRoundSel)   els.stageRoundSel.addEventListener("change", () => {
+  els.roundSel.value = els.stageRoundSel.value;
+  onRoundPick();
+});
 if (els.fbLoad)          els.fbLoad.addEventListener("click", onFirebaseLoad);
 if (els.fbListRecent)    els.fbListRecent.addEventListener("click", onFirebaseListRecent);
 if (els.fbRecent)        els.fbRecent.addEventListener("change", onFirebaseRecentPick);
@@ -325,6 +336,7 @@ function populateDriveVideoSelect() {
     sel.innerHTML = `<option value="">— connect a Drive folder to populate —</option>`;
     sel.disabled = true;
     setLensStatus(null, null);
+    syncStagePickers();
     return;
   }
   const placeholder = document.createElement("option");
@@ -365,6 +377,29 @@ function populateDriveVideoSelect() {
     sel.value = previousValue;
   }
   sel.disabled = false;
+  syncStagePickers();
+}
+
+// The stage-side dropdowns are pure mirrors of the picker-card ones: same
+// options, same enabled/disabled state, same value. Rebuilt whenever the
+// source dropdowns are.
+function mirrorSelect(src, dst) {
+  if (!src || !dst) return;
+  dst.innerHTML = "";
+  for (const o of src.options) {
+    const c = document.createElement("option");
+    c.value = o.value;
+    c.textContent = o.textContent;
+    c.disabled = o.disabled;
+    dst.appendChild(c);
+  }
+  dst.value = src.value;
+  dst.disabled = src.disabled;
+}
+
+function syncStagePickers() {
+  mirrorSelect(els.videoPick, els.stageVideoPick);
+  mirrorSelect(els.roundSel, els.stageRoundSel);
 }
 
 // True if a round-slot satisfies the active lens's requirements.
@@ -578,6 +613,7 @@ function onVideoPick() {
   // you can still pick r1, r2, …)
   const first = [...rounds.keys()].sort((a, b) => a - b)[0];
   els.roundSel.value = String(first);
+  syncStagePickers();
   loadFromIndex(v, rounds.get(first));
 }
 
@@ -1100,6 +1136,7 @@ function populateRoundSelect(rounds) {
   if (!rounds || rounds.size === 0) {
     els.roundSel.innerHTML = `<option value="">—</option>`;
     els.roundSel.disabled = true;
+    syncStagePickers();
     return;
   }
   // Lens-aware: rounds without a cache for the active lens are still listed
@@ -1121,6 +1158,7 @@ function populateRoundSelect(rounds) {
   if (prev && [...els.roundSel.options].some(o => o.value === prev && !o.disabled)) {
     els.roundSel.value = prev;
   }
+  syncStagePickers();
 }
 
 // Strip extension; the cache files were named after the source video so

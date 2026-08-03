@@ -184,6 +184,35 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
   padding: 14px;
 }
 
+/* Video/round dropdowns pinned above the video so switching rounds
+   doesn't need a scroll back up to the picker card. */
+.stage-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.stage-pick label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.stage-pick label:first-child { flex: 1; min-width: 0; }
+.stage-pick select {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font: inherit;
+  max-width: 100%;
+}
+.stage-pick label:first-child select { flex: 1; min-width: 0; }
+.stage-pick select:disabled { opacity: 0.5; }
+
 .video-wrap {
   position: relative;
   background: #000;
