@@ -212,6 +212,18 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
 }
 .stage-pick label:first-child select { flex: 1; min-width: 0; }
 .stage-pick select:disabled { opacity: 0.5; }
+.stage-pick button {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.stage-pick button:hover { border-color: #3a4250; }
+.stage-pick button:disabled { opacity: 0.5; cursor: default; }
 
 .video-wrap {
   position: relative;

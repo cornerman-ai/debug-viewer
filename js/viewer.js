@@ -6,7 +6,7 @@
 // Bump this on every push so the user can tell whether the new code is
 // actually live or whether GitHub Pages / their browser is still serving
 // a cached copy. Format: YYYY-MM-DD.N where N restarts at 1 each day.
-const BUILD = "2026-08-03.1";
+const BUILD = "2026-08-03.2";
 {
   const el = document.getElementById("build-tag");
   if (el) el.textContent = `build ${BUILD}`;
@@ -38,6 +38,7 @@ const els = {
   roundSel:     document.getElementById("round-select"),
   stageVideoPick: document.getElementById("stage-video-pick"),
   stageRoundSel:  document.getElementById("stage-round-select"),
+  stageCopyName:  document.getElementById("stage-copy-name"),
   loadStatus:   document.getElementById("load-status"),
   pickerCard:   document.getElementById("picker-card"),
   viewer:      document.getElementById("viewer"),
@@ -159,6 +160,26 @@ if (els.stageRoundSel)   els.stageRoundSel.addEventListener("change", () => {
   els.roundSel.value = els.stageRoundSel.value;
   onRoundPick();
 });
+if (els.stageCopyName)   els.stageCopyName.addEventListener("click", onCopyVideoName);
+
+// Copy the loaded video's filename to the clipboard (for pasting into the
+// labels Sheet / a cache filename). Falls back to the picked-but-not-yet-
+// loaded name so the button still works mid-load.
+async function onCopyVideoName() {
+  const name = state.videoFileName || els.videoPick?.value || "";
+  if (!name) return;
+  const btn = els.stageCopyName;
+  const original = "⧉ Copy";
+  try {
+    await navigator.clipboard.writeText(name);
+    btn.textContent = "✓ Copied";
+  } catch (err) {
+    console.error("[copy video name]", err);
+    btn.textContent = "✕ Failed";
+  }
+  clearTimeout(btn._resetTimer);
+  btn._resetTimer = setTimeout(() => { btn.textContent = original; }, 1200);
+}
 if (els.fbLoad)          els.fbLoad.addEventListener("click", onFirebaseLoad);
 if (els.fbListRecent)    els.fbListRecent.addEventListener("click", onFirebaseListRecent);
 if (els.fbRecent)        els.fbRecent.addEventListener("change", onFirebaseRecentPick);
