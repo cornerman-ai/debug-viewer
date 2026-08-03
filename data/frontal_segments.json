@@ -1,0 +1,48 @@
+{
+  "_about": "Hand-curated segments where the boxer is working TOWARD the camera, i.e. the camera stands where the opponent would be. Selection criterion is gaze/punch direction, NOT shoulder-line squareness -- selecting on squareness would produce a set with no bladed boxers in it. Times are SOURCE-VIDEO seconds; index the blazepose caches via the cache's _pts.npy (searchsorted), never actual_start + i/fps. See spans_from_rows() in roll_duck_experiment.py.",
+  "_schema": "stem -> [ {label, start_sec, end_sec} ]. null start_sec = video start; null end_sec = runs to end of video/round. Stems match video_wh.json exactly (beware double spaces in titles).",
+  "_curated": "2026-08-03, hand-picked from the shadowboxing corpus",
+
+  "segments": {
+    "10 mins Shadow Boxing Workout ⧸ No Equipment (follow along)": [
+      { "label": "all", "start_sec": null, "end_sec": null }
+    ],
+    "10 Minute Shadow Boxing Workout At Home": [
+      { "label": "R0", "start_sec": 151.014, "end_sec": null },
+      { "label": "R1", "start_sec": 188.131, "end_sec": null }
+    ],
+    "15 MIN SHADOWBOXING WORKOUT SLIPPING PUNCHES": [
+      { "label": "R0", "start_sec": 78.800, "end_sec": null }
+    ],
+    "30 Days of Basic Boxing at Home for Beginners #DAY10 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [UJyeAXZjwVk]": [
+      { "label": "R0", "start_sec": 45.850, "end_sec": 53.450 }
+    ],
+    "BEGINNER SHADOW BOXING DRILLS": [
+      { "label": "R0", "start_sec": 41.376, "end_sec": 50.718 }
+    ],
+    "Beginners Boxing Combos To Improve Your Shadow Boxing🥊 #boxing #beginners #combo": [
+      { "label": "R0", "start_sec": 5.700, "end_sec": null }
+    ],
+    "Do This 5 Minute Shadow Boxing Workout For A Strong Left Hook": [
+      { "label": "R0", "start_sec": 47.316, "end_sec": 74.476 }
+    ],
+    "Exercise- Hook and uppercuts (shadow boxing)": [
+      { "label": "R0", "start_sec": 50.490, "end_sec": 68.050 }
+    ],
+    "first week boxing shadow boxing need as much constructive criticism as possible ! [e84o1g0z6i8h1]": [
+      { "label": "all", "start_sec": null, "end_sec": null }
+    ],
+    "Full Body in 10 Minutes ｜ Shadow Boxing Workout": [
+      { "label": "R0", "start_sec": 273.371, "end_sec": 279.076 }
+    ],
+    "HOOKS 🪝 & FOOTWORK 🥊. Shadow Boxing Drill (female boxing) #boxingworkout #shadowboxing #shorts": [
+      { "label": "all", "start_sec": null, "end_sec": null }
+    ],
+    "How to get better at #shadowboxing": [
+      { "label": "all", "start_sec": null, "end_sec": null }
+    ],
+    "I got a lot of great feedback here. Time for another critique of my shadow boxing -- after 3 years [BSmTYUs5vdQ]": [
+      { "label": "R0", "start_sec": 6.909, "end_sec": null }
+    ]
+  }
+}

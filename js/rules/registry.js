@@ -19,6 +19,7 @@ import { HandReturnPathRule } from "./hand_return_path.js";
 import { HeadOffCenterLensRule } from "./head_offcenter_lens.js";
 import { HitHeightRule } from "./hit_height.js";
 import { EngineCompareRule } from "./engine_compare.js";
+import { FrontalSegmentsRule } from "./frontal_segments_lens.js";
 import { BlazePoseInspectorRule } from "./blazepose_inspector.js";
 import { WristSwapRule } from "./wrist_swap.js";
 import { CombinedCompareRule } from "./combined_compare.js";
@@ -52,6 +53,7 @@ export const RULES = [
   CombinedCompareRule,
   ElbowTuckRule,
   EngineCompareRule,
+  FrontalSegmentsRule,
   GuardDropRule,
   GuardHeightRule,
   HandReturnPathRule,
