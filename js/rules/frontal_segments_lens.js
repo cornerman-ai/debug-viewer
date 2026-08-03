@@ -137,6 +137,15 @@ function compute(state) {
   return cache;
 }
 
+// Exported so other lenses (bladedness) can restrict their measurements to the
+// curated spans without re-implementing the manifest match or the source-second
+// → cache-frame conversion. Returns null when no pose is loaded; otherwise
+// { entry, inSpan: Uint8Array, ranges, n, fps, startSec, nIn }. `entry` is null
+// when the loaded video isn't in the set.
+export function curatedInfo(state) {
+  return compute(state);
+}
+
 function fmtTime(sec) {
   if (sec == null) return "—";
   const m = Math.floor(sec / 60), s = sec - m * 60;
