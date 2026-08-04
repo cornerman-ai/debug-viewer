@@ -200,10 +200,15 @@ function mountGrid() {
   // have.
   const takeover = document.createElement("style");
   takeover.textContent = `
-    #stage .stage-pick, #stage video, #stage .controls, #stage .transport,
-    #stage #scrubber, #stage .meta-line, #side { display:none !important; }
+    /* Everything in the stage except our own slot. Hiding the <video> alone
+       left .video-wrap holding its space, and enumerating each element misses
+       whatever gets added later — so hide the lot and keep only #stage-extras. */
+    #stage > *:not(#stage-extras) { display:none !important; }
+    #side { display:none !important; }
     .layout { display:block !important; }
-    #stage { width:100% !important; max-width:none !important; }
+    #stage { width:100% !important; max-width:none !important;
+             padding:0 !important; background:none !important; }
+    #stage-extras { margin-top:0 !important; }
   `;
   slot.appendChild(takeover);
   const wrap = document.createElement("div");
