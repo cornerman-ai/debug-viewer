@@ -37,7 +37,8 @@ const C_BAD  = "#ff5d6c";
 const C_ACC  = "#b48cff";
 const C_WARN = "#ff9e64";
 
-const cfg = { wMode: "p99", footK: 1.0, sortBy: "sh", blind: true, overlay: true };
+const cfg = { wMode: "leanfix", footK: 1.0, sortBy: "sh", blind: true, overlay: true,
+              leanFix: true };
 
 let data = null, dataError = null, dataPromise = null;
 let host = null, grid = null;
@@ -70,7 +71,10 @@ function wFor(f, cohort) {
 
 function angles(f, cohort) {
   const W = wFor(f, cohort);
-  const sh = W > 1e-6 ? Math.acos(Math.max(0, Math.min(1, f.gap / W))) * DEG : NaN;
+  // gap ships lean-CORRECTED; gap_raw is the uncorrected one, so the fix can be
+  // switched off and compared rather than taken on faith.
+  const g = cfg.leanFix ? f.gap : (f.gap_raw ?? f.gap);
+  const sh = W > 1e-6 ? Math.acos(Math.max(0, Math.min(1, g / W))) * DEG : NaN;
   const ft = (f.adx != null && f.ady != null)
     ? Math.atan2(f.ady * cfg.footK, f.adx) * DEG : null;
   return { W, sh, ft };
@@ -148,6 +152,7 @@ function renderBar() {
   bar.innerHTML = `
     <label>W
       <select id="bf-w">
+        <option value="leanfix">leanfix — corrects lean frames</option>
         <option value="p99">p99 (shipped)</option>
         <option value="p95">p95</option>
         <option value="max">max</option>
@@ -164,6 +169,7 @@ function renderBar() {
       <input type="range" id="bf-k" min="0.2" max="4.0" step="0.05"
              value="${cfg.footK}" style="width:110px"></label>
     <label><input type="checkbox" id="bf-ov" ${cfg.overlay ? "checked" : ""}> overlay</label>
+    <label><input type="checkbox" id="bf-lean" ${cfg.leanFix ? "checked" : ""}> lean fix</label>
     <button id="bf-blind">${cfg.blind ? "Reveal numbers" : "Hide numbers"}</button>
     <span class="note" id="bf-wnote"></span>
     <span class="note" id="bf-spread"></span>
@@ -180,6 +186,9 @@ function renderBar() {
   });
   bar.querySelector("#bf-ov").addEventListener("change", e => {
     cfg.overlay = e.target.checked; rebuild();
+  });
+  bar.querySelector("#bf-lean").addEventListener("change", e => {
+    cfg.leanFix = e.target.checked; rebuild();
   });
   bar.querySelector("#bf-blind").addEventListener("click", e => {
     cfg.blind = !cfg.blind;
@@ -293,7 +302,8 @@ function rebuild() {
       <figcaption>
         <div class="rank">#${i + 1}</div>
         <div class="hideable">sh <b>${fmt(r.sh)}°</b>${r.ft == null ? "" : ` ft ${fmt(r.ft)}°`}</div>
-        <div class="hideable dim">gap ${r.f.gap.toFixed(3)} / W ${r.W.toFixed(3)}${
+        <div class="hideable dim">gap ${(cfg.leanFix ? r.f.gap : (r.f.gap_raw ?? r.f.gap)).toFixed(3)}${
+          r.f.leaned ? ` <span style="color:${C_WARN}">lean</span>` : ""} / W ${r.W.toFixed(3)}${
           bad ? ` <span style="color:${C_BAD}">${off > 0 ? "+" : ""}${off.toFixed(0)}%</span>` : ""}</div>
         <div class="hideable dim">${r.f.stem.slice(0, 22)}<br>r${r.f.round} · ${r.f.t}s</div>
       </figcaption>

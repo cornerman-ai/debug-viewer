@@ -45,7 +45,21 @@ const cfg = {
   bladedAbove: 65,    // GUESS — above this = too bladed
   minConfidence: 0.5,
   excludePunches: true,
+  leanFix: true,      // correct gap on frames where the torso is foreshortened
 };
+
+// Lean gate. gap = shoulder_width / torso_height, and a forward lean rotates
+// the torso about the HIP axis: it foreshortens the torso while leaving the
+// shoulder line's horizontal extent alone. So gap inflates without the boxer
+// being any wider, the frame reads as squarer than it is, and — worse — those
+// frames set W, corrupting every angle in the round.
+//
+// Below this fraction of the round's own median torso, gap is rescaled as if
+// the torso were its median length:
+//     gap_fixed = shoulder_px / torso_median = gap * (torso / torso_median)
+// which is the geometrically correct undo, not a fudge. Clamped so it can only
+// ever shrink gap, never inflate it.
+const LEAN_GATE = 0.90;
 
 // Curated-only is NOT a toggle. The camera-as-opponent assumption is what makes
 // these angles mean anything, and it only holds inside the curated spans — a
@@ -257,21 +271,24 @@ function computeMetrics(state) {
   const pose = pickPose(state);
   if (!pose) return null;
   const dets = activeDetections(state);
-  if (mc.pose === pose && mc.dets === dets && mc.minConf === cfg.minConfidence) return mc;
+  if (mc.pose === pose && mc.dets === dets && mc.minConf === cfg.minConfidence
+      && mc.leanFix === cfg.leanFix) return mc;
 
   const n = pose.n_frames, sk = pose.skeleton, conf = pose.conf;
-  const gap = new Float64Array(n).fill(NaN);   // |shoulder width| / torso
-  const fdx = new Float64Array(n).fill(NaN);   // ankle |dx| / torso
-  const fdy = new Float64Array(n).fill(NaN);   // ankle |dy| / torso
+  const gapRaw = new Float64Array(n).fill(NaN);   // |shoulder width| / torso
+  const tor = new Float64Array(n).fill(NaN);      // torso height, px
+  const fdx = new Float64Array(n).fill(NaN);      // ankle |dx| / torso
+  const fdy = new Float64Array(n).fill(NaN);      // ankle |dy| / torso
   const validSh = new Uint8Array(n), validFt = new Uint8Array(n);
 
   for (let f = 0; f < n; f++) {
     const th = torso(sk, f);
     if (!(th > 1e-6)) continue;
+    tor[f] = th;
     const b = f * 17;
     if (ok(conf, f, REQ_SH, cfg.minConfidence)) {
       const d = Math.abs(sk[(b + J.L_SHOULDER) * 2] - sk[(b + J.R_SHOULDER) * 2]) / th;
-      if (Number.isFinite(d)) { gap[f] = d; validSh[f] = 1; }
+      if (Number.isFinite(d)) { gapRaw[f] = d; validSh[f] = 1; }
     }
     if (ok(conf, f, REQ_FT, cfg.minConfidence)) {
       const dx = Math.abs(sk[(b + J.L_ANKLE) * 2]     - sk[(b + J.R_ANKLE) * 2]) / th;
@@ -292,14 +309,37 @@ function computeMetrics(state) {
     }
   }
 
+  // Median torso for this round, from the frames we can measure.
+  const tv = [...tor].filter(Number.isFinite).sort((a, b) => a - b);
+  const torMed = tv.length ? tv[tv.length >> 1] : NaN;
+
+  // Lean correction, applied BEFORE W is estimated so a leaning frame can't
+  // set the reference.
+  const gap = new Float64Array(n).fill(NaN);
+  const leaned = new Uint8Array(n);
+  for (let f = 0; f < n; f++) {
+    if (!Number.isFinite(gapRaw[f])) continue;
+    const ratio = torMed > 1e-6 ? tor[f] / torMed : 1;
+    if (cfg.leanFix && Number.isFinite(ratio) && ratio < LEAN_GATE) {
+      gap[f] = gapRaw[f] * Math.min(1, ratio);
+      leaned[f] = 1;
+    } else {
+      gap[f] = gapRaw[f];
+    }
+  }
+
   // W: 99th percentile of |gap| over the round — "they went broadside once".
   // See the header for why this is the weakest link in the whole lens.
   const finite = [...gap].filter(Number.isFinite).sort((a, b) => a - b);
   const wAuto = finite.length ? finite[Math.min(finite.length - 1,
                   Math.floor(0.99 * finite.length))] : NaN;
 
-  mc = { pose, dets, minConf: cfg.minConfidence, n, gap, fdx, fdy,
-         validSh, validFt, punch, wAuto };
+  let nLeaned = 0;
+  for (let f = 0; f < n; f++) if (leaned[f]) nLeaned++;
+
+  mc = { pose, dets, minConf: cfg.minConfidence, leanFix: cfg.leanFix,
+         n, gap, gapRaw, tor, torMed,
+         leaned, nLeaned, fdx, fdy, validSh, validFt, punch, wAuto };
   return mc;
 }
 
@@ -425,6 +465,9 @@ export const BladednessRule = {
         <input type="range" id="bl-bd" min="30" max="90" step="1" value="65"></label>
       <label style="display:block; font-size:12px; margin-top:4px">
         <input type="checkbox" id="bl-pun" checked> exclude punch frames</label>
+      <label style="display:block; font-size:12px">
+        <input type="checkbox" id="bl-lean" checked> lean fix
+        <span class="muted small">(rescale gap where torso &lt; 90% of median)</span></label>
 
       <h3>Round</h3>
       <div id="bl-round" style="font-size:13px; line-height:1.6"></div>
@@ -462,6 +505,9 @@ export const BladednessRule = {
     wire("#bl-bd", "bladedAbove", 0, "#bl-bd-out");
     host.querySelector("#bl-pun").addEventListener("change", e => {
       cfg.excludePunches = e.target.checked; refresh();
+    });
+    host.querySelector("#bl-lean").addEventListener("change", e => {
+      cfg.leanFix = e.target.checked; refresh();
     });
   },
 
@@ -510,7 +556,10 @@ export const BladednessRule = {
       <div style="margin-top:3px">shoulders − feet
         <code>${fmt(r.medDiff)}°</code>
         <span class="muted">(&gt;0 = chest turned further than the feet)</span></div>
-      <div class="muted small" style="margin-top:3px">${curNote} · ${r.nCounted} frames counted</div>`;
+      <div class="muted small" style="margin-top:3px">${curNote} · ${r.nCounted} frames counted</div>
+      <div class="muted small">torso median <code>${fmt(c.torMed, 0)}px</code> ·
+        lean-corrected <code>${c.nLeaned}</code> frames
+        ${cfg.leanFix ? "" : `<span style="color:${C_SQUARE}">(fix OFF)</span>`}</div>`;
 
     const spansEl = host.querySelector("#bl-spans");
     if (spansEl) {
@@ -542,10 +591,14 @@ export const BladednessRule = {
                ? `<div style="color:${C_BLADED}">NOT CUT — flagged for re-curation</div>` : ""}
            </div>`
         : other
-          ? `<span class="muted">Cut from <code style="color:${C_REEL}">r${other.round}</code>,
-               not this round — only one clip per video.</span>`
+          ? `<span class="muted">Cut from
+               <code style="color:${C_REEL}">r${other.round}</code>, not this round —
+               only one clip per video.</span>
+             <button id="bl-goto-round" style="margin-top:4px; cursor:pointer">
+               Go to r${other.round}</button>`
           : `<span class="muted">No reel clip for this round.</span>`;
       reelEl.querySelector("#bl-reel-jump")?.addEventListener("click", () => seekTo(rw.s));
+      reelEl.querySelector("#bl-goto-round")?.addEventListener("click", () => gotoRound(other.round));
     }
 
     const s = shoulderDeg(c, f), t = footDeg(c, f);
@@ -555,7 +608,9 @@ export const BladednessRule = {
       ${!cur.inSpan[f] ? `<span style="color:${C_INVALID}"> · outside span, not counted</span>` : ""}<br>
       <span style="color:${C_SH}">sh</span>
         <code style="color:${bandColor(s)}">${fmt(s)}°</code>
-        <span class="muted">gap ${fmt(c.gap[f], 3)}</span> ·
+        <span class="muted">gap ${fmt(c.gap[f], 3)}${
+          c.leaned[f] ? ` <span style="color:${C_SQUARE}">(lean: raw ${fmt(c.gapRaw[f], 3)}, torso ${
+            fmt(100 * c.tor[f] / c.torMed, 0)}%)</span>` : ""}</span> ·
       <span style="color:${C_FT}">ft</span>
         <code style="color:${bandColor(t)}">${fmt(t)}°</code>
         <span class="muted">dx ${fmt(c.fdx[f], 3)} dy ${fmt(c.fdy[f], 3)}</span>`;
@@ -632,6 +687,7 @@ export const BladednessRule = {
       [`W ${fmt(W, 3)}  k ${cfg.footK.toFixed(2)}`, "#fff"],
     ];
     if (c.punch[f]) lines.push([`punch — excluded`, C_PUNCH]);
+    if (c.leaned[f]) lines.push([`lean ${fmt(100 * c.tor[f] / c.torMed, 0)}% torso`, C_SQUARE]);
     const padX = 10 * sc, padY = 8 * sc, boxW = 168 * sc;
     const boxH = lines.length * lh + padY * 2 - 4 * sc;
     ctx.save();
@@ -653,6 +709,18 @@ export const BladednessRule = {
 
 function refresh() {
   document.getElementById("video")?.dispatchEvent(new Event("seeked"));
+}
+
+// Switch the viewer to another cache round. The reel clip is cut from ONE round
+// per video, and the picker opens on r0, so without this you have to know which
+// round to hunt for. Drives the same <select> the user would.
+function gotoRound(r) {
+  const sel = document.getElementById("round-select");
+  if (!sel) return;
+  const opt = [...sel.options].find(o => o.value === String(r));
+  if (!opt || opt.disabled) return;
+  sel.value = String(r);
+  sel.dispatchEvent(new Event("change"));
 }
 
 function seekTo(f) {
