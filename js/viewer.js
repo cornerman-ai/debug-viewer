@@ -1492,13 +1492,22 @@ function setRule(id) {
   }
   // Mounting the panel needs a loaded round; before that the lens is only a
   // filter for the video/round dropdowns.
-  if (state.pose) {
-    els.ruleHost.innerHTML = "";
-    // Clear the stage-wide extras slot so a lens that added a full-width
-    // canvas (e.g. punch_classifier's timeline) doesn't leak into the next
-    // lens. Lenses that want it back put their elements back in mount().
-    if (els.stageExtras) els.stageExtras.innerHTML = "";
+  //
+  // A lens marked `standalone` renders from its own data rather than from the
+  // loaded round (e.g. bladedness_frames, a cross-video grid), so it mounts
+  // with no round at all and the viewer section is revealed for it.
+  // Clear UNCONDITIONALLY. A standalone lens can have filled these with no
+  // round loaded, so clearing only when we're about to mount would strip
+  // nothing and leave the previous lens's DOM — and its stage takeover CSS —
+  // behind when switching to a lens that can't mount.
+  els.ruleHost.innerHTML = "";
+  if (els.stageExtras) els.stageExtras.innerHTML = "";
+  if (state.pose || rule.standalone) {
+    if (rule.standalone && els.viewer.hidden) els.viewer.hidden = false;
     rule.mount(els.ruleHost, state);
+  } else if (!state.pose) {
+    // Nothing to show without a round; put the section back the way it was.
+    els.viewer.hidden = true;
   }
   // Lens may change which videos/rounds are valid — refresh the dropdowns
   // so they reflect the new lens's requirements. We do NOT auto-swap the

@@ -84,9 +84,10 @@ export const BladednessFramesRule = {
   id: "bladedness_frames_lens",
   label: "Bladedness frames (all videos)",
 
-  // Deliberately NO requiresVideo: this grid doesn't depend on what's loaded.
-  // Restricting the dropdown would add friction for no benefit — you just need
-  // something loaded for the viewer to mount a lens at all.
+  // Renders entirely from its own data file, so it needs no loaded round —
+  // the viewer mounts it and reveals the stage on selection alone. Also no
+  // requiresVideo: the grid doesn't depend on what (if anything) is loaded.
+  standalone: true,
 
   mount(_host) {
     host = _host;
