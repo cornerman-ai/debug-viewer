@@ -65,6 +65,7 @@ const C_PUNCH   = "#2e8b57";   // dark green — punch frame, excluded
 const C_SH      = "#7ec8ff";   // shoulder accent
 const C_FT      = "#ffd95c";   // foot accent
 const C_FRAME   = "#3ad9e0";
+const C_REEL    = "#ffd95c";   // the slice cut for the coach reel
 
 // ── metric core ─────────────────────────────────────────────────────────────
 
@@ -259,6 +260,9 @@ export const BladednessRule = {
       <h3>Round</h3>
       <div id="bl-round" style="font-size:13px; line-height:1.6"></div>
 
+      <h3>Reel clip <span class="muted small">(what the coach sees)</span></h3>
+      <div id="bl-reel" style="font-size:12px; line-height:1.5"></div>
+
       <h3>Current frame</h3>
       <div id="bl-frame" style="font-size:13px; line-height:1.6"></div>
 
@@ -329,6 +333,28 @@ export const BladednessRule = {
         <code>${fmt(r.medDiff)}°</code>
         <span class="muted">(&gt;0 = chest turned further than the feet)</span></div>
       <div class="muted small" style="margin-top:3px">${curNote} · ${r.nCounted} frames counted</div>`;
+
+    const reelEl = host.querySelector("#bl-reel");
+    if (reelEl) {
+      const rw = cur.reel, other = cur.reelElsewhere;
+      reelEl.innerHTML = rw
+        ? `<div id="bl-reel-jump" style="cursor:pointer">
+             <code style="color:${C_REEL}">${rw.window_sec}s</code>
+             <span class="muted">frames ${rw.s}–${rw.e} ·
+               ${Math.round((rw.nonpunch_frac ?? 0) * 100)}% non-punch ·
+               ${rw.punch_events} punches — click to jump</span>
+             ${rw.excluded_from_reel
+               ? `<div style="color:${C_BLADED}">NOT CUT — flagged for re-curation</div>` : ""}
+           </div>`
+        : other
+          ? `<span class="muted">Cut from <code style="color:${C_REEL}">r${other.round}</code>,
+               not this round — only one clip per video.</span>`
+          : `<span class="muted">No reel clip for this round.</span>`;
+      reelEl.querySelector("#bl-reel-jump")?.addEventListener("click", () => {
+        const sl = document.getElementById("scrubber");
+        if (sl) { sl.value = rw.s; sl.dispatchEvent(new Event("input")); }
+      });
+    }
 
     const s = shoulderDeg(c, f), t = footDeg(c, f);
     host.querySelector("#bl-frame").innerHTML = `
@@ -514,6 +540,15 @@ function drawTimeline(canvas, c, cur, frame) {
     }
     ctx.globalAlpha = 1;
   });
+
+  // bracket the slice that became the coach clip
+  if (cur?.reel) {
+    ctx.strokeStyle = C_REEL; ctx.lineWidth = 2;
+    const x0 = xOf(cur.reel.s), x1 = xOf(cur.reel.e);
+    ctx.strokeRect(x0, 2, Math.max(2, x1 - x0), H - 4);
+    ctx.fillStyle = C_REEL; ctx.font = "9px ui-monospace, monospace";
+    ctx.fillText("reel", Math.min(W - 24, x0 + 3), H - 3);
+  }
 
   ctx.strokeStyle = C_FRAME; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(xOf(frame), 1); ctx.lineTo(xOf(frame), H - 1); ctx.stroke();

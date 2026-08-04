@@ -154,18 +154,26 @@ function compute(state) {
   for (let f = 0; f < n; f++) if (inSpan[f]) nIn++;
 
   // The slice make_clips.py cut for the reel, mapped into this round's frames.
-  let reel = null;
+  // Only ONE clip is cut per video, so on a multi-round video most rounds have
+  // no window — `reelElsewhere` names the round that does, instead of the UI
+  // just going blank and leaving you wondering.
+  let reel = null, reelElsewhere = null;
   const w = entry && windows ? windows[entry.stem] : null;
-  if (w && (w.round == null || state.cacheRound == null || w.round === state.cacheRound)) {
-    const s = Math.floor(w.start_sec * fps) - startFrame;
-    const e = Math.floor(w.end_sec * fps) - startFrame;
-    if (e >= 0 && s <= n - 1) {
-      reel = { ...w, s: Math.max(0, Math.min(n - 1, s)), e: Math.max(0, Math.min(n - 1, e)) };
+  if (w) {
+    const sameRound = w.round == null || state.cacheRound == null
+                      || w.round === state.cacheRound;
+    if (sameRound) {
+      const s = Math.floor(w.start_sec * fps) - startFrame;
+      const e = Math.floor(w.end_sec * fps) - startFrame;
+      if (e >= 0 && s <= n - 1) {
+        reel = { ...w, s: Math.max(0, Math.min(n - 1, s)), e: Math.max(0, Math.min(n - 1, e)) };
+      }
     }
+    if (!reel) reelElsewhere = w;
   }
 
   cache = { pose, basename, round: state.cacheRound, n, fps, startSec,
-            entry, inSpan, ranges, nIn, reel };
+            entry, inSpan, ranges, nIn, reel, reelElsewhere };
   return cache;
 }
 
@@ -282,7 +290,13 @@ export const FrontalSegmentsRule = {
     if (reelEl) {
       const r = c.reel;
       if (!r) {
-        reelEl.innerHTML = `<span class="muted">No reel clip for this round.</span>`;
+        const o = c.reelElsewhere;
+        reelEl.innerHTML = o
+          ? `<span class="muted">No reel clip in this round — it was cut from
+               <code style="color:${COLOR_REEL}">r${o.round}</code>
+               (src ${fmtTime(o.start_sec)} → ${fmtTime(o.end_sec)}).
+               Only one clip is cut per video.</span>`
+          : `<span class="muted">No reel clip for this round.</span>`;
       } else {
         const pct = Math.round((r.nonpunch_frac ?? 0) * 100);
         const excl = r.excluded_from_reel
