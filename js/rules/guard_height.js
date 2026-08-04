@@ -24,8 +24,23 @@
 // fist from being flagged as "low", while still catching the classic mistake of
 // the guard hand dropping during the other hand's punch (e.g. the left dropping
 // on a right cross). A small ± frame pad covers the hand still returning home.
+//
+// Torso confidence: the shared torsoHeight() averages BOTH shoulders and BOTH
+// hips with no confidence check, so one dropped joint silently inflates the
+// torso, pushes the target line below the chin, and quietly stops flagging —
+// while the frame still counts as eligible. torsoAt() below gates each pair at
+// minWristConfidence instead:
+//   - both sides good  → midpoint, as before (torso status OK)
+//   - one side good    → that side alone, frame still measured but flagged
+//                        ONE_SIDED (amber target line + counter)
+//   - neither good     → torso unusable: target line drawn RED from the last
+//                        good torso (display only) and both wrists GATED, so
+//                        the frame is dropped from the % entirely.
+// The one-sided fallback is not bias-free — the lead shoulder rides higher than
+// the rear, so a single-side torso shifts by half that gap. It's flagged rather
+// than hidden so we can see how often it fires before deciding it matters.
 
-import { J, torsoHeight } from "../skeleton.js";
+import { J } from "../skeleton.js";
 import { activeDetections } from "./_detections.js";
 
 const DEFAULTS = {
@@ -37,6 +52,7 @@ const DEFAULTS = {
 const COLORS = {
   nose:    "#7ec8ff",
   target:  "#5fd97a",
+  degraded: "#f5b945",   // torso built from one shoulder and/or one hip
   l_wrist: "#ff8a5c",
   r_wrist: "#ffd95c",
   low:     "#e85a5a",
@@ -46,6 +62,9 @@ const COLORS = {
 
 // Per-frame, per-hand status codes (also drive the timeline colours).
 const ST = { GATED: 0, EXCLUDED: 1, UP: 2, LOW: 3 };
+
+// Per-frame torso-normaliser quality (see torsoAt).
+const TS = { OK: 0, ONE_SIDED: 1, BAD: 2 };
 
 const TL_LABEL_W = 56;   // px reserved on the left of the stage timeline for L/R labels
 
@@ -110,7 +129,7 @@ export const GuardHeightRule = {
         <span style="color:#f5b945">low conf</span>. Click to seek.</p>
       <canvas id="gh-timeline" width="320" height="48" style="cursor:pointer;width:100%"></canvas>
 
-      <h3>Wrist vs target (torso units, − = above)</h3>
+      <h3>Wrist vs target (torso units, + = above)</h3>
       <div class="metric-grid">
         <div class="metric">
           <div class="metric-label">L wrist</div>
@@ -122,7 +141,13 @@ export const GuardHeightRule = {
           <div class="metric-val" id="r-target-dist">—</div>
           <div class="metric-sub" id="r-target-verdict"></div>
         </div>
+        <div class="metric">
+          <div class="metric-label">Torso source</div>
+          <div class="metric-val" id="gh-torso-src">—</div>
+          <div class="metric-sub" id="gh-torso-sub"></div>
+        </div>
       </div>
+      <p class="hint" id="gh-torso-note"></p>
 
       <h3>Config</h3>
       <label class="slider">
@@ -175,13 +200,21 @@ export const GuardHeightRule = {
     const nose = jt(p, f, J.NOSE);
     const lw = jt(p, f, J.L_WRIST);
     const rw = jt(p, f, J.R_WRIST);
-    const torso = Math.max(1e-6, torsoHeight(p, f));
+    const tStat = data.torsoStat[f];
+    const torso = Math.max(1e-6, data.torsoVal[f]);
     const targetY = nose.y + cfg.targetOffset * torso;
 
     drawHLine(ctx, nose.y,  W, COLORS.nose,   2 * s, null);
-    drawHLine(ctx, targetY, W, COLORS.target, 2 * s, 3 * s);
+    drawHLine(ctx, targetY, W, torsoColor(tStat), 2 * s, 3 * s);
     drawHLine(ctx, lw.y,    W, lineColor(data.L[f], COLORS.l_wrist), 2 * s, 3 * s);
     drawHLine(ctx, rw.y,    W, lineColor(data.R[f], COLORS.r_wrist), 2 * s, 3 * s);
+
+    // Say WHY the target line changed colour, right on the line.
+    if (tStat !== TS.OK) {
+      drawTag(ctx, 8 * s, targetY - 4 * s,
+        tStat === TS.BAD ? "torso unusable — gated" : `torso ${data.torsoSrc[f]}`,
+        torsoColor(tStat), s);
+    }
 
     drawTag(ctx, lw.x + 8 * s, lw.y, "L " + statusLabel(data.L[f]), tagColor(data.L[f], COLORS.l_wrist), s);
     drawTag(ctx, rw.x + 8 * s, rw.y, "R " + statusLabel(data.R[f]), tagColor(data.R[f], COLORS.r_wrist), s);
@@ -195,13 +228,28 @@ export const GuardHeightRule = {
     const nose = jt(p, f, J.NOSE);
     const lw = jt(p, f, J.L_WRIST);
     const rw = jt(p, f, J.R_WRIST);
-    const torso = Math.max(1e-6, torsoHeight(p, f));
+    const tStat = data.torsoStat[f];
+    const torso = Math.max(1e-6, data.torsoVal[f]);
     const targetY = nose.y + cfg.targetOffset * torso;
 
-    setText("l-target-dist", ((lw.y - targetY) / torso).toFixed(2));
-    setText("r-target-dist", ((rw.y - targetY) / torso).toFixed(2));
+    // Displayed sign is flipped vs image space: y grows downward, but "above
+    // the target" reading as positive is what anyone expects. Only the readout
+    // is flipped — the LOW test in compute() still works in raw image y.
+    setText("l-target-dist", ((targetY - lw.y) / torso).toFixed(2));
+    setText("r-target-dist", ((targetY - rw.y) / torso).toFixed(2));
     setText("l-target-verdict", verdictFor(data.L[f]));
     setText("r-target-verdict", verdictFor(data.R[f]));
+
+    setText("gh-torso-src", torsoLabel(tStat));
+    setText("gh-torso-sub", tStat === TS.OK
+      ? `${torso.toFixed(0)} px`
+      : `<span style="color:${torsoColor(tStat)}">shoulders/hips: ${data.torsoSrc[f]}</span>`);
+    const cN = data.torsoCounts;
+    const pct = (n) => `${Math.round(100 * n / Math.max(1, data.N))}%`;
+    setText("gh-torso-note",
+      `Torso normaliser over the clip: ${pct(cN[TS.OK])} both-sided · ` +
+      `<span style="color:${COLORS.degraded}">${pct(cN[TS.ONE_SIDED])} one-sided (${cN[TS.ONE_SIDED]}f, used + flagged)</span> · ` +
+      `<span style="color:${COLORS.low}">${pct(cN[TS.BAD])} unusable (${cN[TS.BAD]}f, gated)</span>.`);
 
     const fmt = (st) => st.elig ? `${Math.round(100 * st.low / st.elig)}% <span class="metric-sub">(${st.low}/${st.elig})</span>` : "—";
     setText("gh-l-low", fmt(data.stats.L));
@@ -256,14 +304,35 @@ function compute(p, dets) {
   const L = new Uint8Array(N), R = new Uint8Array(N);
   const stats = { L: { elig: 0, low: 0 }, R: { elig: 0, low: 0 } };
 
+  // Per-frame torso normaliser + how trustworthy it was. Kept on the cache so
+  // draw()/update() read the same numbers the flagging used instead of calling
+  // the confidence-blind torsoHeight() again.
+  const torsoVal = new Float32Array(N);
+  const torsoStat = new Uint8Array(N);
+  const torsoSrc = new Array(N);
+  const torsoCounts = { [TS.OK]: 0, [TS.ONE_SIDED]: 0, [TS.BAD]: 0 };
+  let lastGoodTorso = 0;
+
   for (let f = 0; f < N; f++) {
     const i = f * 17;
     const noseY = p.skeleton[(i + J.NOSE) * 2 + 1];
     const noseC = p.conf[i + J.NOSE];
-    const torso = torsoHeight(p, f);
+
+    const t = torsoAt(p, f);
+    torsoStat[f] = t.status;
+    torsoSrc[f] = t.src;
+    torsoCounts[t.status]++;
+    // BAD frames keep the last good torso purely so the red target line stays
+    // put on the overlay — they're gated out below, so it never reaches a stat.
+    if (t.status !== TS.BAD) lastGoodTorso = t.torso;
+    const torso = t.status === TS.BAD ? lastGoodTorso : t.torso;
+    torsoVal[f] = torso;
+
     const target = noseY + cfg.targetOffset * torso;
-    // Frame-level validity: need a trustworthy nose + a sane torso for the target.
-    const frameOk = noseC >= cfg.minWristConfidence && torso > 1 && Number.isFinite(noseY);
+    // Frame-level validity: need a trustworthy nose + a usable torso for the target.
+    const frameOk = noseC >= cfg.minWristConfidence &&
+                    t.status !== TS.BAD &&
+                    Number.isFinite(noseY);
 
     for (const side of ["L", "R"]) {
       const jIdx = side === "L" ? J.L_WRIST : J.R_WRIST;
@@ -281,7 +350,41 @@ function compute(p, dets) {
     }
   }
 
-  return { N, L, R, stats, detCount };
+  return { N, L, R, stats, detCount, torsoVal, torsoStat, torsoSrc, torsoCounts };
+}
+
+// Confidence-aware torso height: shoulder mid → hip mid, but each pair falls
+// back to whichever side is trustworthy. Returns the height, a TS status, and a
+// short source string for the readout ("both/both", "L/both", …).
+//
+// `torso > 1` px stays as the sanity floor — a sub-pixel torso means the pose
+// collapsed even if every confidence looks fine.
+function torsoAt(pose, frame) {
+  const shoulder = pairY(pose, frame, J.L_SHOULDER, J.R_SHOULDER);
+  const hip = pairY(pose, frame, J.L_HIP, J.R_HIP);
+  const src = `${shoulder.src}/${hip.src}`;
+
+  if (shoulder.src === "none" || hip.src === "none") {
+    return { torso: 0, status: TS.BAD, src };
+  }
+  const torso = Math.abs(shoulder.y - hip.y);
+  if (!(torso > 1)) return { torso: 0, status: TS.BAD, src };
+
+  const status = (shoulder.src === "both" && hip.src === "both") ? TS.OK : TS.ONE_SIDED;
+  return { torso, status, src };
+}
+
+// y of a left/right joint pair: midpoint when both clear the confidence gate,
+// the single good side when only one does, "none" when neither.
+function pairY(pose, frame, lIdx, rIdx) {
+  const l = jt(pose, frame, lIdx);
+  const r = jt(pose, frame, rIdx);
+  const lOk = l.c >= cfg.minWristConfidence && Number.isFinite(l.y);
+  const rOk = r.c >= cfg.minWristConfidence && Number.isFinite(r.y);
+  if (lOk && rOk) return { y: (l.y + r.y) / 2, src: "both" };
+  if (lOk) return { y: l.y, src: "L" };
+  if (rOk) return { y: r.y, src: "R" };
+  return { y: NaN, src: "none" };
 }
 
 function sideFor(d) {
@@ -298,6 +401,18 @@ function verdictFor(status) {
     case ST.LOW:      return `<span class="bad">below target</span>`;
     default:          return `<span class="good">at/above target</span>`;
   }
+}
+
+function torsoColor(status) {
+  if (status === TS.BAD) return COLORS.low;
+  if (status === TS.ONE_SIDED) return COLORS.degraded;
+  return COLORS.target;
+}
+
+function torsoLabel(status) {
+  if (status === TS.BAD) return `<span class="bad">unusable</span>`;
+  if (status === TS.ONE_SIDED) return `<span style="color:${COLORS.degraded}">one-sided</span>`;
+  return `<span class="good">both sides</span>`;
 }
 
 function statusLabel(status) {
