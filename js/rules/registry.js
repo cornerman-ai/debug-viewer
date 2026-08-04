@@ -20,6 +20,7 @@ import { HeadOffCenterLensRule } from "./head_offcenter_lens.js";
 import { HitHeightRule } from "./hit_height.js";
 import { EngineCompareRule } from "./engine_compare.js";
 import { BladednessRule } from "./bladedness_lens.js";
+import { BladednessFramesRule } from "./bladedness_frames_lens.js";
 import { BlazePoseInspectorRule } from "./blazepose_inspector.js";
 import { WristSwapRule } from "./wrist_swap.js";
 import { CombinedCompareRule } from "./combined_compare.js";
@@ -50,6 +51,7 @@ export const RULES = [
   ArmExtensionRule,
   AudioImpactLensRule,
   BladednessRule,
+  BladednessFramesRule,
   BlazePoseInspectorRule,
   CombinedCompareRule,
   ElbowTuckRule,
