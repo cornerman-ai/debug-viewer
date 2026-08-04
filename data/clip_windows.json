@@ -7,6 +7,7 @@
       "start_sec": 177.6,
       "end_sec": 188.1,
       "window_sec": 10.5,
+      "nonpunch_sec": 2.83,
       "nonpunch_frac": 0.269,
       "punch_events": 13,
       "span": [
@@ -23,6 +24,7 @@
       "start_sec": 171.797,
       "end_sec": 186.77,
       "window_sec": 14.97,
+      "nonpunch_sec": 8.93,
       "nonpunch_frac": 0.594,
       "punch_events": 9,
       "span": [
@@ -34,20 +36,21 @@
       "excluded_from_reel": false
     },
     "15 MIN SHADOWBOXING WORKOUT SLIPPING PUNCHES": {
-      "label": "R0",
-      "round": 0,
-      "start_sec": 78.8,
-      "end_sec": 93.767,
+      "label": "R1",
+      "round": 1,
+      "start_sec": 183.433,
+      "end_sec": 198.4,
       "window_sec": 14.97,
-      "nonpunch_frac": 1.0,
-      "punch_events": 0,
+      "nonpunch_sec": 14.37,
+      "nonpunch_frac": 0.958,
+      "punch_events": 1,
       "span": [
-        78.8,
-        127.933
+        183.433,
+        198.433
       ],
-      "span_sec": 49.13,
+      "span_sec": 15.0,
       "boxing_gate_met": false,
-      "excluded_from_reel": true
+      "excluded_from_reel": false
     },
     "30 Days of Basic Boxing at Home for Beginners #DAY10 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [UJyeAXZjwVk]": {
       "label": "R0",
@@ -55,6 +58,7 @@
       "start_sec": 45.867,
       "end_sec": 53.433,
       "window_sec": 7.57,
+      "nonpunch_sec": 1.1,
       "nonpunch_frac": 0.145,
       "punch_events": 11,
       "span": [
@@ -71,6 +75,7 @@
       "start_sec": 41.416,
       "end_sec": 50.717,
       "window_sec": 9.3,
+      "nonpunch_sec": 1.54,
       "nonpunch_frac": 0.165,
       "punch_events": 5,
       "span": [
@@ -87,6 +92,7 @@
       "start_sec": 0.0,
       "end_sec": 5.7,
       "window_sec": 5.7,
+      "nonpunch_sec": 0.93,
       "nonpunch_frac": 0.163,
       "punch_events": 9,
       "span": [
@@ -103,6 +109,7 @@
       "start_sec": 50.05,
       "end_sec": 65.032,
       "window_sec": 14.98,
+      "nonpunch_sec": 9.88,
       "nonpunch_frac": 0.658,
       "punch_events": 6,
       "span": [
@@ -119,6 +126,7 @@
       "start_sec": 50.52,
       "end_sec": 65.48,
       "window_sec": 14.96,
+      "nonpunch_sec": 11.68,
       "nonpunch_frac": 0.779,
       "punch_events": 5,
       "span": [
@@ -135,6 +143,7 @@
       "start_sec": 273.373,
       "end_sec": 279.045,
       "window_sec": 5.67,
+      "nonpunch_sec": 2.27,
       "nonpunch_frac": 0.398,
       "punch_events": 6,
       "span": [
@@ -151,6 +160,7 @@
       "start_sec": 0.0,
       "end_sec": 14.067,
       "window_sec": 14.07,
+      "nonpunch_sec": 4.87,
       "nonpunch_frac": 0.345,
       "punch_events": 13,
       "span": [
@@ -167,6 +177,7 @@
       "start_sec": 31.2,
       "end_sec": 46.167,
       "window_sec": 14.97,
+      "nonpunch_sec": 14.63,
       "nonpunch_frac": 0.976,
       "punch_events": 2,
       "span": [
@@ -183,6 +194,7 @@
       "start_sec": 0.601,
       "end_sec": 6.907,
       "window_sec": 6.31,
+      "nonpunch_sec": 4.07,
       "nonpunch_frac": 0.642,
       "punch_events": 7,
       "span": [
@@ -199,6 +211,7 @@
       "start_sec": 37.867,
       "end_sec": 52.833,
       "window_sec": 14.97,
+      "nonpunch_sec": 10.77,
       "nonpunch_frac": 0.718,
       "punch_events": 12,
       "span": [

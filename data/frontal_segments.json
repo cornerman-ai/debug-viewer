@@ -14,9 +14,8 @@
       { "label": "R1", "round": 1, "start_sec": null, "end_sec": 188.131 }
     ],
     "15 MIN SHADOWBOXING WORKOUT SLIPPING PUNCHES": [
-      { "label": "R0", "round": 0, "start_sec": 78.800, "end_sec": 127.933,
-        "exclude_from_reel": true,
-        "_note": "NEEDS RE-CURATION — excluded from the coach reel, still counted for analysis. Read as 'until 1:18.800' the span is 0-78.8s, which is 79s of the presenter standing still talking to camera: the classifier finds ZERO punches and frame sampling confirms it's the intro. So this entry seems to mean the round STARTS at 1:18.800, and 78.8-127.933 (r0's tail) is used here. But that stretch is still walking/demonstrating — no punches anywhere in it either. Sampling shows a real guard stance only from ~147s, which is past r0's end and sits in r1 (183.433-287.100). Re-curate against r1." }
+      { "label": "R1", "round": 1, "start_sec": null, "end_sec": 198.433,
+        "_note": "Re-curated 2026-08-04: the first 15s of r1 (183.433-198.433). The original R0 entry was wrong whichever way it was read — 0-78.8s is the presenter standing still talking to camera, and 78.8-127.933 is still walking and demonstrating; the classifier finds zero punches in either. r1 is where the actual stance work is." }
     ],
     "30 Days of Basic Boxing at Home for Beginners #DAY10 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [UJyeAXZjwVk]": [
       { "label": "R0", "round": 0, "start_sec": 45.850, "end_sec": 53.450 }
