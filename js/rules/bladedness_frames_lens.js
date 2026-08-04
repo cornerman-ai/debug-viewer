@@ -231,11 +231,27 @@ function mountGrid() {
     #bf-bar .note { color:#79808f; }
     #bf-grid .bf-wrap { position:relative; }
     #bf-grid .bf-wrap canvas { position:absolute; inset:0; pointer-events:none; }
+    #bf-wref { margin-bottom:14px; }
+    #bf-wref .row { display:flex; flex-wrap:wrap; gap:8px; }
+    #bf-wref h4 { margin:0 0 6px; font-size:12px; font-weight:600; }
+    #bf-wref .wr { background:#171a22; border:1px solid #262b36; border-radius:6px;
+                   overflow:hidden; width:max-content; }
+    #bf-wref .wr.lean { border-color:${C_BAD}; }
+    #bf-wref .bf-wrap { position:relative; }
+    #bf-wref .bf-wrap canvas { position:absolute; inset:0; pointer-events:none; }
+    #bf-wref img { display:block; height:150px; }
+    #bf-wref figcaption { padding:3px 5px; font-size:9px;
+                          font-family:ui-monospace,monospace; line-height:1.35; }
+    #bf-wref .dim { color:#79808f; }
   `;
   wrap.appendChild(style);
   const bar = document.createElement("div");
   bar.id = "bf-bar";
   wrap.appendChild(bar);
+
+  const wref = document.createElement("div");
+  wref.id = "bf-wref";
+  wrap.appendChild(wref);
   grid = document.createElement("div");
   grid.id = "bf-grid";
   grid.className = cfg.blind ? "blind" : "";
@@ -287,6 +303,8 @@ function rebuild() {
     const r = rows[+cv.dataset.i];
     drawOverlay(cv, r);
   });
+
+  renderWRefs();
 
   const shs = rows.map(r => r.sh).filter(Number.isFinite);
   const nBad = [...perVid.entries()].filter(([, w]) => Math.abs((w - medW) / medW) > 0.2).length;
@@ -365,4 +383,58 @@ function drawOverlay(cv, r) {
     ctx.stroke();
     ctx.setLineDash([]);
   }
+}
+
+
+// The frames that DEFINE W, one per video, for whichever estimator is selected.
+// W is essentially "the widest shoulder line we saw in this round", so a single
+// bad pose sets it — and every angle for that video is then measured against a
+// wrong reference. This strip makes that inspectable instead of assumed.
+//
+// The tell is the TORSO. gap = shoulder_width / torso_height, so a frame where
+// the boxer leans (torso foreshortens) inflates gap without the shoulders
+// actually being wider. Frames whose torso is well under that round's median
+// are flagged: they are the ones that corrupt W.
+function renderWRefs() {
+  const box = document.getElementById("bf-wref");
+  if (!box) return;
+  const refs = data.w_refs || [];
+  if (!refs.length) { box.innerHTML = ""; return; }
+
+  // cohort has no defining frame of its own — it's the median of the per-video
+  // robust estimates — so show the robust frames and say so.
+  const mode = cfg.wMode === "cohort" ? "robust" : cfg.wMode;
+  const mine = refs.filter(r => r.mode === mode)
+                   .sort((a, b) => b.W - a.W);
+  if (!mine.length) { box.innerHTML = ""; return; }
+
+  box.innerHTML = `
+    <h4>Frames that set W — <code>${cfg.wMode}</code>${
+      cfg.wMode === "cohort" ? ` <span class="dim">(cohort has no single frame; showing the robust ones it's a median of)</span>` : ""}
+      <span class="dim">— red = torso well below this round's median, so gap is inflated by a lean, not by wider shoulders</span>
+    </h4>
+    <div class="row">${mine.map((r, i) => {
+      const ratio = r.torso_median_px ? r.torso_px / r.torso_median_px : 1;
+      const lean = ratio < 0.88;
+      const cw = Math.round(150 * (r.aspect || 0.75));
+      return `<figure class="wr${lean ? " lean" : ""}">
+        <div class="bf-wrap" style="width:${cw}px;height:150px">
+          <img src="data:image/jpeg;base64,${r.img}" alt="" title="${r.stem.replace(/"/g, "&quot;")}">
+          <canvas width="${cw}" height="150" data-wi="${i}"></canvas>
+        </div>
+        <figcaption>
+          <div>W <b>${r.W.toFixed(3)}</b> <span class="dim">gap ${r.gap.toFixed(3)}</span></div>
+          <div class="${lean ? "" : "dim"}" ${lean ? `style="color:${C_BAD}"` : ""}>torso ${
+            (ratio * 100).toFixed(0)}% of median</div>
+          <div class="dim">${r.stem.slice(0, 20)}<br>r${r.round} · ${r.t}s</div>
+        </figcaption>
+      </figure>`;
+    }).join("")}</div>`;
+
+  box.querySelectorAll("canvas").forEach(cv => {
+    const r = mine[+cv.dataset.wi];
+    // At a W-defining frame gap ≈ W, so the blue shoulder line should sit right
+    // on the dashed ghost. If it doesn't, the estimate is off.
+    drawOverlay(cv, { f: r, W: r.W });
+  });
 }
