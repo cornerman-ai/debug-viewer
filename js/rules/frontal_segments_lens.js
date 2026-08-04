@@ -20,18 +20,26 @@
 // pts is non-uniform; if a span ever looks a frame or two off here, that's why.
 
 const DATA_URL = "./data/frontal_segments.json";
+// The window make_clips.py actually cut for the coach reel: the <=15s stretch
+// of each span with the most non-punch time. Shown so the pick is inspectable
+// rather than taken on trust. Refresh alongside the manifest with
+//   cp ~/code/cornerman-backend/bladedness/clip_windows.json \
+//      ~/code/cornerman-debug-viewer/data/clip_windows.json
+const WINDOWS_URL = "./data/clip_windows.json";
 
 const COLOR_IN      = "#7adf7a";  // green — inside a curated span
 const COLOR_OUT     = "#888";     // grey  — outside
 const COLOR_MISS    = "#ff5d6c";  // red   — this video isn't in the set at all
 const COLOR_FRAME   = "#3ad9e0";  // cyan  — current-frame marker
 const COLOR_ACCENT  = "#b48cff";
+const COLOR_REEL    = "#ffd95c";  // yellow — the slice cut for the coach reel
 
 // ── manifest loading ────────────────────────────────────────────────────────
 
 let manifest = null;        // { segments: {stem: [{label,start_sec,end_sec}]} }
 let manifestError = null;
 let manifestPromise = null;
+let windows = null;         // { stem: {start_sec, end_sec, nonpunch_frac, ...} }
 
 async function loadManifest() {
   if (manifest || manifestError) return;
@@ -42,6 +50,11 @@ async function loadManifest() {
   } catch (err) {
     manifestError = err.message || String(err);
   }
+  // Optional — the lens works without it, just without the reel-window band.
+  try {
+    const res = await fetch(WINDOWS_URL, { cache: "no-store" });
+    if (res.ok) windows = (await res.json()).windows || null;
+  } catch { /* no reel windows available */ }
   // The video dropdown filters on requiresVideo(), which can't answer until
   // this lands — tell the viewer to re-filter now that it can.
   window.dispatchEvent(new Event("lens-filter-changed"));
@@ -140,8 +153,19 @@ function compute(state) {
   let nIn = 0;
   for (let f = 0; f < n; f++) if (inSpan[f]) nIn++;
 
+  // The slice make_clips.py cut for the reel, mapped into this round's frames.
+  let reel = null;
+  const w = entry && windows ? windows[entry.stem] : null;
+  if (w && (w.round == null || state.cacheRound == null || w.round === state.cacheRound)) {
+    const s = Math.floor(w.start_sec * fps) - startFrame;
+    const e = Math.floor(w.end_sec * fps) - startFrame;
+    if (e >= 0 && s <= n - 1) {
+      reel = { ...w, s: Math.max(0, Math.min(n - 1, s)), e: Math.max(0, Math.min(n - 1, e)) };
+    }
+  }
+
   cache = { pose, basename, round: state.cacheRound, n, fps, startSec,
-            entry, inSpan, ranges, nIn };
+            entry, inSpan, ranges, nIn, reel };
   return cache;
 }
 
@@ -254,6 +278,32 @@ export const FrontalSegmentsRule = {
       }
     }
 
+    const reelEl = host.querySelector("#fs-reel");
+    if (reelEl) {
+      const r = c.reel;
+      if (!r) {
+        reelEl.innerHTML = `<span class="muted">No reel clip for this round.</span>`;
+      } else {
+        const pct = Math.round((r.nonpunch_frac ?? 0) * 100);
+        const excl = r.excluded_from_reel
+          ? `<div style="color:${COLOR_MISS}">NOT CUT — span flagged for re-curation</div>` : "";
+        reelEl.innerHTML = excl +
+          `<div style="cursor:pointer" id="fs-reel-jump">
+             <code style="color:${COLOR_REEL}">${r.window_sec}s</code>
+             <span class="muted">src ${fmtTime(r.start_sec)} → ${fmtTime(r.end_sec)}
+               · frames ${r.s}–${r.e}</span>
+           </div>
+           <div><code>${pct}%</code> non-punch ·
+             <code>${r.punch_events}</code> punch events
+             ${r.boxing_gate_met
+                ? ""
+                : `<span style="color:${COLOR_MISS}"> — NO PUNCHES IN SPAN</span>`}</div>
+           <div class="muted small">picked from a ${r.span_sec}s span · click to jump</div>`;
+        reelEl.querySelector("#fs-reel-jump")
+              ?.addEventListener("click", () => seekTo(r.s));
+      }
+    }
+
     const f = state.frame;
     const inNow = c.entry && c.inSpan[f];
     if (frameEl) {
@@ -285,10 +335,13 @@ export const FrontalSegmentsRule = {
       ctx.restore();
     }
 
+    const inReel = c.reel && state.frame >= c.reel.s && state.frame <= c.reel.e;
     const label = !c.entry ? "VIDEO NOT IN SET"
+                : inReel ? (c.reel.excluded_from_reel ? "WINDOW NOT CUT" : "IN REEL CLIP")
                 : inNow ? "IN CURATED SPAN"
                 : "OUTSIDE SPAN";
-    const color = inNow ? COLOR_IN : COLOR_MISS;
+    const color = inReel ? (c.reel.excluded_from_reel ? COLOR_OUT : COLOR_REEL)
+                : inNow ? COLOR_IN : COLOR_MISS;
     const fsz = Math.round(14 * s);
     ctx.save();
     ctx.font = `600 ${fsz}px ui-monospace, monospace`;
@@ -335,6 +388,9 @@ function renderShell() {
     <h3>Spans here <span class="muted small">(click to jump)</span></h3>
     <div id="fs-spans" style="font-size:12px"></div>
 
+    <h3>Reel clip <span class="muted small">(what was cut for the coach)</span></h3>
+    <div id="fs-reel" style="font-size:12px; line-height:1.6"></div>
+
     <h3>Current frame</h3>
     <div id="fs-frame" style="font-size:13px; line-height:1.6"></div>
 
@@ -372,12 +428,12 @@ function mountStageTimeline() {
   const label = document.createElement("div");
   label.className = "muted small";
   label.style.cssText = "margin-bottom:6px";
-  label.textContent = "Curated frontal spans (click to seek)";
+  label.textContent = "Curated frontal spans + the reel clip cut from them (click to seek)";
   wrap.appendChild(label);
   const canvas = document.createElement("canvas");
   canvas.id = "fs-timeline";
-  canvas.style.cssText = "display:block;width:100%;height:40px";
-  canvas.width = 800; canvas.height = 40;
+  canvas.style.cssText = "display:block;width:100%;height:56px";
+  canvas.width = 800; canvas.height = 56;
   wrap.appendChild(canvas);
   slot.appendChild(wrap);
 
@@ -407,7 +463,8 @@ function drawTimeline(canvas, c, frame) {
   const xOf = f => TL_LABEL_W + (f / Math.max(1, N - 1)) * (W - TL_LABEL_W - 4);
   const colW = Math.max(1, (W - TL_LABEL_W - 4) / Math.max(1, N - 1));
 
-  const top = 6, barH = H - 18;
+  const reelH = 8;
+  const top = 6, barH = H - 18 - reelH - 3;
   ctx.font = "10px ui-monospace, monospace";
   ctx.fillStyle = c.entry ? COLOR_IN : COLOR_MISS;
   ctx.fillText(c.entry ? "curated" : "not in set", 6, top + barH / 2 + 3);
@@ -419,10 +476,23 @@ function drawTimeline(canvas, c, frame) {
   }
   ctx.globalAlpha = 1;
 
+  // reel-clip band directly under the span bar
+  const ry = top + barH + 3;
+  if (c.reel) {
+    const rc = c.reel.excluded_from_reel ? COLOR_OUT
+             : c.reel.boxing_gate_met ? COLOR_REEL : COLOR_MISS;
+    ctx.fillStyle = rc;
+    ctx.fillRect(xOf(c.reel.s), ry, Math.max(2, xOf(c.reel.e) - xOf(c.reel.s)), reelH);
+    ctx.fillText(c.reel.excluded_from_reel ? "not cut" : "reel", 6, ry + reelH);
+  } else {
+    ctx.fillStyle = COLOR_OUT;
+    ctx.fillText("no reel", 6, ry + reelH);
+  }
+
   // span labels along the bottom
   ctx.fillStyle = COLOR_ACCENT;
   for (const r of c.ranges) {
-    ctx.fillText(r.label, Math.min(W - 20, xOf(r.s) + 2), H - 4);
+    ctx.fillText(r.label, Math.min(W - 20, xOf(r.s) + 2), H - 2);
   }
 
   ctx.strokeStyle = COLOR_FRAME;

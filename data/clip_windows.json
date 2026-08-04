@@ -1,0 +1,213 @@
+{
+  "_about": "Auto-picked coach-reel windows: the 15s stretch of each curated span with the most NON-PUNCH time, gated on the window containing >= 2 punch events so a no-punch conditioning block can't win. Spans shorter than 15s are taken whole. Regenerate: python bladedness/pick_windows.py",
+  "windows": {
+    "10 Minute Shadow Boxing Workout At Home": {
+      "label": "R1",
+      "round": 1,
+      "start_sec": 177.6,
+      "end_sec": 188.1,
+      "window_sec": 10.5,
+      "nonpunch_frac": 0.269,
+      "punch_events": 13,
+      "span": [
+        177.6,
+        188.131
+      ],
+      "span_sec": 10.53,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "10 mins Shadow Boxing Workout ⧸ No Equipment (follow along)": {
+      "label": "all",
+      "round": 1,
+      "start_sec": 171.797,
+      "end_sec": 186.77,
+      "window_sec": 14.97,
+      "nonpunch_frac": 0.594,
+      "punch_events": 9,
+      "span": [
+        0.0,
+        586.628
+      ],
+      "span_sec": 31.32,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "15 MIN SHADOWBOXING WORKOUT SLIPPING PUNCHES": {
+      "label": "R0",
+      "round": 0,
+      "start_sec": 78.8,
+      "end_sec": 93.767,
+      "window_sec": 14.97,
+      "nonpunch_frac": 1.0,
+      "punch_events": 0,
+      "span": [
+        78.8,
+        127.933
+      ],
+      "span_sec": 49.13,
+      "boxing_gate_met": false,
+      "excluded_from_reel": true
+    },
+    "30 Days of Basic Boxing at Home for Beginners #DAY10 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [UJyeAXZjwVk]": {
+      "label": "R0",
+      "round": 0,
+      "start_sec": 45.867,
+      "end_sec": 53.433,
+      "window_sec": 7.57,
+      "nonpunch_frac": 0.145,
+      "punch_events": 11,
+      "span": [
+        45.85,
+        53.45
+      ],
+      "span_sec": 7.6,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "BEGINNER SHADOW BOXING DRILLS": {
+      "label": "R0",
+      "round": 0,
+      "start_sec": 41.416,
+      "end_sec": 50.717,
+      "window_sec": 9.3,
+      "nonpunch_frac": 0.165,
+      "punch_events": 5,
+      "span": [
+        41.376,
+        50.718
+      ],
+      "span_sec": 9.34,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "Beginners Boxing Combos To Improve Your Shadow Boxing🥊 #boxing #beginners #combo": {
+      "label": "span",
+      "round": 0,
+      "start_sec": 0.0,
+      "end_sec": 5.7,
+      "window_sec": 5.7,
+      "nonpunch_frac": 0.163,
+      "punch_events": 9,
+      "span": [
+        0.0,
+        5.7
+      ],
+      "span_sec": 5.72,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "Do This 5 Minute Shadow Boxing Workout For A Strong Left Hook": {
+      "label": "span",
+      "round": 0,
+      "start_sec": 50.05,
+      "end_sec": 65.032,
+      "window_sec": 14.98,
+      "nonpunch_frac": 0.658,
+      "punch_events": 6,
+      "span": [
+        47.316,
+        74.476
+      ],
+      "span_sec": 27.16,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "Exercise- Hook and uppercuts (shadow boxing)": {
+      "label": "span",
+      "round": 0,
+      "start_sec": 50.52,
+      "end_sec": 65.48,
+      "window_sec": 14.96,
+      "nonpunch_frac": 0.779,
+      "punch_events": 5,
+      "span": [
+        50.49,
+        68.05
+      ],
+      "span_sec": 17.56,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "Full Body in 10 Minutes ｜ Shadow Boxing Workout": {
+      "label": "span",
+      "round": 0,
+      "start_sec": 273.373,
+      "end_sec": 279.045,
+      "window_sec": 5.67,
+      "nonpunch_frac": 0.398,
+      "punch_events": 6,
+      "span": [
+        273.371,
+        279.076
+      ],
+      "span_sec": 5.71,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "HOOKS 🪝 & FOOTWORK 🥊. Shadow Boxing Drill (female boxing) #boxingworkout #shadowboxing #shorts": {
+      "label": "all",
+      "round": 0,
+      "start_sec": 0.0,
+      "end_sec": 14.067,
+      "window_sec": 14.07,
+      "nonpunch_frac": 0.345,
+      "punch_events": 13,
+      "span": [
+        0.0,
+        14.1
+      ],
+      "span_sec": 14.1,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "How to get better at #shadowboxing": {
+      "label": "all",
+      "round": 0,
+      "start_sec": 31.2,
+      "end_sec": 46.167,
+      "window_sec": 14.97,
+      "nonpunch_frac": 0.976,
+      "punch_events": 2,
+      "span": [
+        0.0,
+        46.633
+      ],
+      "span_sec": 46.63,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "I got a lot of great feedback here. Time for another critique of my shadow boxing -- after 3 years [BSmTYUs5vdQ]": {
+      "label": "span",
+      "round": 0,
+      "start_sec": 0.601,
+      "end_sec": 6.907,
+      "window_sec": 6.31,
+      "nonpunch_frac": 0.642,
+      "punch_events": 7,
+      "span": [
+        0.0,
+        6.909
+      ],
+      "span_sec": 6.34,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    },
+    "first week boxing shadow boxing need as much constructive criticism as possible ! [e84o1g0z6i8h1]": {
+      "label": "all",
+      "round": 0,
+      "start_sec": 37.867,
+      "end_sec": 52.833,
+      "window_sec": 14.97,
+      "nonpunch_frac": 0.718,
+      "punch_events": 12,
+      "span": [
+        0.0,
+        57.7
+      ],
+      "span_sec": 57.7,
+      "boxing_gate_met": true,
+      "excluded_from_reel": false
+    }
+  }
+}
