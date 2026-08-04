@@ -86,7 +86,8 @@ function compute(state) {
   const pose = pickPose(state);
   if (!pose) return null;
   const basename = state.cacheBasename || null;
-  if (cache.pose === pose && cache.basename === basename) return cache;
+  if (cache.pose === pose && cache.basename === basename
+      && cache.round === state.cacheRound) return cache;
 
   const n = pose.n_frames;
   const fps = pose.fps || state.fps || 30;
@@ -98,10 +99,16 @@ function compute(state) {
   const ranges = [];                         // [{label, s, e, startSec, endSec}]
 
   if (entry) {
-    // An open-ended span ("R0 starts at 151.014") runs until the NEXT span on
-    // the same video starts, not to the end of the video — otherwise R0 and R1
-    // both claim every frame of every round.
-    const ordered = [...entry.spans].sort((a, b) => (a.start_sec ?? 0) - (b.start_sec ?? 0));
+    // A span with `round` set belongs to THAT cache round only. Spans starting
+    // at "the round's start" (start_sec null) would otherwise apply to every
+    // round of the video — R0's span would also paint r1 and r2.
+    const roundIdx = state.cacheRound;
+    const mine = entry.spans.filter(
+      sp => sp.round == null || roundIdx == null || sp.round === roundIdx);
+
+    // A span left open at the end runs until the next one on the same video
+    // starts, rather than to the end of the video.
+    const ordered = [...mine].sort((a, b) => (a.start_sec ?? 0) - (b.start_sec ?? 0));
     const resolved = ordered.map((sp, i) => {
       const inherited = sp.end_sec == null && ordered[i + 1]?.start_sec != null;
       return {
@@ -133,7 +140,8 @@ function compute(state) {
   let nIn = 0;
   for (let f = 0; f < n; f++) if (inSpan[f]) nIn++;
 
-  cache = { pose, basename, n, fps, startSec, entry, inSpan, ranges, nIn };
+  cache = { pose, basename, round: state.cacheRound, n, fps, startSec,
+            entry, inSpan, ranges, nIn };
   return cache;
 }
 
