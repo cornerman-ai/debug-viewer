@@ -4,7 +4,7 @@
 // shoulder line (and foot line) has turned away from lying across your view
 // and toward pointing at the camera. 0° = squared (chest to camera),
 // 90° = fully side-on. The curated frontal set exists so the camera can stand
-// in for the opponent — see frontal_segments_lens.js.
+// in for the opponent — the curated set is defined below.
 //
 // NO DEPTH IS USED. BlazePose z is not reliable enough, so both angles come
 // from foreshortening instead:
@@ -37,7 +37,6 @@
 
 import { J } from "../skeleton.js";
 import { activeDetections } from "./_detections.js";
-import { curatedInfo, isCuratedVideo } from "./frontal_segments_lens.js";
 
 const cfg = {
   wScale: 1.0,        // multiplies the auto W estimate (1.0 = use it as-is)
@@ -66,6 +65,7 @@ const C_SH      = "#7ec8ff";   // shoulder accent
 const C_FT      = "#ffd95c";   // foot accent
 const C_FRAME   = "#3ad9e0";
 const C_REEL    = "#ffd95c";   // the slice cut for the coach reel
+const C_ACCENT  = "#b48cff";   // span labels
 
 // ── metric core ─────────────────────────────────────────────────────────────
 
@@ -83,6 +83,175 @@ const ok = (conf, f, js, min) => js.every(j => conf[f * 17 + j] > min);
 let mc = { pose: null };
 
 const pickPose = s => s.poseV6 || s.pose;
+
+// ── curated frontal set (merged in from the retired frontal_segments lens) ──
+//
+// Data: ./data/frontal_segments.json — a copy of the backend's source of truth,
+// plus ./data/clip_windows.json, the slices make_clips.py actually cut for the
+// coach reel. Refresh both with:
+//   cp ~/code/cornerman-backend/bladedness/frontal_segments.json \
+//      ~/code/cornerman-debug-viewer/data/frontal_segments.json
+//   cp ~/code/cornerman-backend/bladedness/clip_windows.json \
+//      ~/code/cornerman-debug-viewer/data/clip_windows.json
+//
+// TIME BASE (the thing that silently breaks): manifest times are SOURCE-VIDEO
+// seconds, but a cache holds one round starting at `pose.start_sec`. We convert
+// with the viewer's own start-frame convention —
+//     cacheFrame = floor(t * fps) - floor(start_sec * fps)
+// — matching how the viewer seeks. The backend uses the cache's `_pts.npy`
+// clock, which is authoritative when pts is non-uniform; if a span ever looks a
+// frame or two off here, that is why.
+
+const DATA_URL = "./data/frontal_segments.json";
+const WINDOWS_URL = "./data/clip_windows.json";
+
+let manifest = null;
+let manifestError = null;
+let manifestPromise = null;
+let windows = null;
+
+async function loadManifest() {
+  if (manifest || manifestError) return;
+  try {
+    const res = await fetch(DATA_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    manifest = await res.json();
+  } catch (err) {
+    manifestError = err.message || String(err);
+  }
+  try {
+    const res = await fetch(WINDOWS_URL, { cache: "no-store" });
+    if (res.ok) windows = (await res.json()).windows || null;
+  } catch { /* reel windows are optional */ }
+  // The video dropdown filters on requiresVideo(), which can't answer until
+  // this lands — tell the viewer to re-filter now that it can.
+  window.dispatchEvent(new Event("lens-filter-changed"));
+}
+
+// Kick the fetch off at module load (registry.js imports every lens on page
+// load) so the dropdown filters correctly on the first paint.
+manifestPromise = loadManifest();
+
+// Stems in the wild pick up `_prepared` / `_h264` re-encode tails, and these
+// YouTube titles contain double spaces that are easy to lose in a copy-paste.
+function normStem(s) {
+  return String(s || "")
+    .replace(/_(prepared|h264)$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function matchEntry(basename) {
+  if (!manifest || !basename) return null;
+  const segs = manifest.segments || {};
+  if (segs[basename]) return { stem: basename, spans: segs[basename] };
+  const want = normStem(basename);
+  for (const [stem, spans] of Object.entries(segs)) {
+    if (normStem(stem) === want) return { stem, spans };
+  }
+  return null;
+}
+
+// Video filter. Pending ⇒ hide (loadManifest re-fires the filter once the data
+// lands). Failed ⇒ show everything, because an unexplained empty dropdown is a
+// dead end when the error message lives in a panel you can't reach.
+function isCuratedVideo(base) {
+  if (manifestError) return true;
+  if (!manifest) return false;
+  return !!matchEntry(base);
+}
+
+let spanCache = { pose: null, basename: null };
+
+function curatedInfo(state) {
+  const pose = pickPose(state);
+  if (!pose) return null;
+  const basename = state.cacheBasename || null;
+  if (spanCache.pose === pose && spanCache.basename === basename
+      && spanCache.round === state.cacheRound) return spanCache;
+
+  const n = pose.n_frames;
+  const fps = pose.fps || state.fps || 30;
+  const startSec = Number(pose.start_sec || 0);
+  const startFrame = Math.floor(startSec * fps);
+
+  const entry = matchEntry(basename);
+  const inSpan = new Uint8Array(n);
+  const ranges = [];
+
+  if (entry) {
+    // A span with `round` set belongs to THAT cache round only. Spans starting
+    // at "the round's start" (start_sec null) would otherwise apply to every
+    // round of the video — R0's span would also paint r1 and r2.
+    const roundIdx = state.cacheRound;
+    const mine = entry.spans.filter(
+      sp => sp.round == null || roundIdx == null || sp.round === roundIdx);
+
+    const ordered = [...mine].sort((a, b) => (a.start_sec ?? 0) - (b.start_sec ?? 0));
+    const resolved = ordered.map((sp, i) => {
+      const inherited = sp.end_sec == null && ordered[i + 1]?.start_sec != null;
+      return {
+        ...sp,
+        _end: sp.end_sec != null ? sp.end_sec : (ordered[i + 1]?.start_sec ?? null),
+        // An explicit end_sec is inclusive; an end inherited from the next
+        // span's start is exclusive — R0 stops one frame BEFORE R1 begins.
+        _endExclusive: inherited,
+      };
+    });
+
+    for (const sp of resolved) {
+      const s = sp.start_sec == null ? 0 : Math.floor(sp.start_sec * fps) - startFrame;
+      const e = sp._end == null
+        ? n - 1
+        : Math.floor(sp._end * fps) - startFrame - (sp._endExclusive ? 1 : 0);
+      const cs = Math.max(0, Math.min(n - 1, s));
+      const ce = Math.max(0, Math.min(n - 1, e));
+      // A span landing entirely outside this round belongs to a different round
+      // of the same video — skip it rather than clamping it to a sliver.
+      if (e < 0 || s > n - 1) continue;
+      for (let f = cs; f <= ce; f++) inSpan[f] = 1;
+      ranges.push({ label: sp.label, s: cs, e: ce, startSec: sp.start_sec, endSec: sp._end });
+    }
+    ranges.sort((a, b) => a.s - b.s);
+  }
+
+  let nIn = 0;
+  for (let f = 0; f < n; f++) if (inSpan[f]) nIn++;
+
+  // The slice make_clips.py cut for the reel. Only ONE clip is cut per video,
+  // so on a multi-round video most rounds have no window — `reelElsewhere`
+  // names the round that does, instead of the UI silently going blank.
+  let reel = null, reelElsewhere = null;
+  const w = entry && windows ? windows[entry.stem] : null;
+  if (w) {
+    const sameRound = w.round == null || state.cacheRound == null
+                      || w.round === state.cacheRound;
+    if (sameRound) {
+      const s = Math.floor(w.start_sec * fps) - startFrame;
+      const e = Math.floor(w.end_sec * fps) - startFrame;
+      if (e >= 0 && s <= n - 1) {
+        reel = { ...w, s: Math.max(0, Math.min(n - 1, s)), e: Math.max(0, Math.min(n - 1, e)) };
+      }
+    }
+    if (!reel) reelElsewhere = w;
+  }
+
+  spanCache = { pose, basename, round: state.cacheRound, n, fps, startSec,
+                entry, inSpan, ranges, nIn, reel, reelElsewhere };
+  return spanCache;
+}
+
+function fmtTime(sec) {
+  if (sec == null) return "—";
+  const m = Math.floor(sec / 60), s = sec - m * 60;
+  return `${m}:${s.toFixed(3).padStart(6, "0")}`;
+}
+
+function shortStem(s, max = 44) {
+  return s.length <= max ? s : s.slice(0, max - 1) + "…";
+}
+
 
 function computeMetrics(state) {
   const pose = pickPose(state);
@@ -260,6 +429,9 @@ export const BladednessRule = {
       <h3>Round</h3>
       <div id="bl-round" style="font-size:13px; line-height:1.6"></div>
 
+      <h3>Curated spans here <span class="muted small">(click to jump)</span></h3>
+      <div id="bl-spans" style="font-size:12px"></div>
+
       <h3>Reel clip <span class="muted small">(what the coach sees)</span></h3>
       <div id="bl-reel" style="font-size:12px; line-height:1.5"></div>
 
@@ -269,7 +441,11 @@ export const BladednessRule = {
       <h3><span style="color:${C_SH}">shoulders</span> /
           <span style="color:${C_FT}">feet</span> over time</h3>
       <canvas id="bl-trace" width="320" height="130"></canvas>
+
+      <h3>Curated set <span class="muted small" id="bl-set-count"></span></h3>
+      <div id="bl-set" style="font-size:11px; line-height:1.5; max-height:200px; overflow:auto"></div>
     `;
+    renderSetList();
     mountStageTimeline();
 
     const wire = (id, key, dec, out) => {
@@ -307,6 +483,8 @@ export const BladednessRule = {
            <code>frontal_segments.json</code>, so nothing is measured.
          </div>`;
       host.querySelector("#bl-frame").innerHTML = `<span class="muted">—</span>`;
+      host.querySelector("#bl-spans").innerHTML = "";
+      host.querySelector("#bl-reel").innerHTML = "";
       const tl = document.getElementById("bl-timeline");
       if (tl) fitCanvas(tl);
       const tr = host.querySelector("#bl-trace");
@@ -334,6 +512,23 @@ export const BladednessRule = {
         <span class="muted">(&gt;0 = chest turned further than the feet)</span></div>
       <div class="muted small" style="margin-top:3px">${curNote} · ${r.nCounted} frames counted</div>`;
 
+    const spansEl = host.querySelector("#bl-spans");
+    if (spansEl) {
+      spansEl.innerHTML = cur.ranges.length
+        ? cur.ranges.map((rg, i) =>
+            `<div class="bl-span" data-i="${i}" style="cursor:pointer; padding:3px 0;
+                  border-bottom:1px solid var(--border)">
+               <code style="color:${C_ACCENT}">${rg.label}</code>
+               <span class="muted">src ${fmtTime(rg.startSec)} → ${fmtTime(rg.endSec)}</span><br>
+               <span class="small">frames <code>${rg.s}</code>–<code>${rg.e}</code>
+                 · ${rg.e - rg.s + 1} fr</span>
+             </div>`).join("")
+        : `<p class="muted small">In the set, but no span falls inside this round —
+             try another round.</p>`;
+      spansEl.querySelectorAll(".bl-span").forEach(el =>
+        el.addEventListener("click", () => seekTo(cur.ranges[+el.dataset.i].s)));
+    }
+
     const reelEl = host.querySelector("#bl-reel");
     if (reelEl) {
       const rw = cur.reel, other = cur.reelElsewhere;
@@ -350,10 +545,7 @@ export const BladednessRule = {
           ? `<span class="muted">Cut from <code style="color:${C_REEL}">r${other.round}</code>,
                not this round — only one clip per video.</span>`
           : `<span class="muted">No reel clip for this round.</span>`;
-      reelEl.querySelector("#bl-reel-jump")?.addEventListener("click", () => {
-        const sl = document.getElementById("scrubber");
-        if (sl) { sl.value = rw.s; sl.dispatchEvent(new Event("input")); }
-      });
+      reelEl.querySelector("#bl-reel-jump")?.addEventListener("click", () => seekTo(rw.s));
     }
 
     const s = shoulderDeg(c, f), t = footDeg(c, f);
@@ -461,6 +653,37 @@ export const BladednessRule = {
 
 function refresh() {
   document.getElementById("video")?.dispatchEvent(new Event("seeked"));
+}
+
+function seekTo(f) {
+  const sl = document.getElementById("scrubber");
+  if (!sl) return;
+  sl.value = f;
+  sl.dispatchEvent(new Event("input"));
+}
+
+// The whole curated set, so you can see what else is loadable without leaving
+// the lens. Built once at mount; the manifest may still be in flight, in which
+// case the fetch's completion re-renders it.
+function renderSetList() {
+  const el = host?.querySelector("#bl-set");
+  const cnt = host?.querySelector("#bl-set-count");
+  if (!el) return;
+  if (!manifest) {
+    el.innerHTML = `<span class="muted">loading…</span>`;
+    manifestPromise?.then(() => renderSetList());
+    return;
+  }
+  const segs = manifest.segments || {};
+  const stems = Object.keys(segs);
+  if (cnt) cnt.textContent =
+    `${stems.length} videos · ${stems.reduce((a, k) => a + segs[k].length, 0)} spans`;
+  el.innerHTML = stems.map(k => `
+    <div title="${k.replace(/"/g, "&quot;")}" style="padding:2px 0;
+         border-bottom:1px solid var(--border)">
+      <span style="color:${C_ACCENT}">${segs[k].map(s => s.label).join(", ")}</span>
+      — ${shortStem(k)}
+    </div>`).join("");
 }
 
 const TL_LABEL_W = 56;
