@@ -37,7 +37,7 @@ const C_BAD  = "#ff5d6c";
 const C_ACC  = "#b48cff";
 const C_WARN = "#ff9e64";
 
-const cfg = { wMode: "p99", footK: 1.0, sortBy: "sh", blind: true };
+const cfg = { wMode: "p99", footK: 1.0, sortBy: "sh", blind: true, overlay: true };
 
 let data = null, dataError = null, dataPromise = null;
 let host = null, grid = null;
@@ -104,7 +104,7 @@ export const BladednessFramesRule = {
       el.classList.toggle("mine", !!mine);
       if (mine) n++;
     }
-    const el = host?.querySelector("#bf-loaded");
+    const el = document.getElementById("bf-loaded");
     if (el) el.textContent = n ? `${n} frames below are from the round you have open` : "";
   },
 
@@ -135,52 +135,76 @@ function renderShell() {
       angle first tells you what to think.
     </p>
 
-    <label style="display:block; font-size:12px; margin-top:8px">W estimator
-      <select id="bf-w" style="width:100%">
-        <option value="p99">p99 — the shipped one</option>
-        <option value="p95">p95 — less tail-sensitive</option>
-        <option value="max">max — most optimistic</option>
+    <p class="hint">Controls are above the grid.</p>`;
+
+  mountGrid();
+  renderBar();
+}
+
+function renderBar() {
+  const bar = document.getElementById("bf-bar");
+  if (!bar) return;
+  bar.innerHTML = `
+    <label>W
+      <select id="bf-w">
+        <option value="p99">p99 (shipped)</option>
+        <option value="p95">p95</option>
+        <option value="max">max</option>
         <option value="robust">robust — ignores lean frames</option>
-        <option value="cohort">cohort — one W for everybody</option>
+        <option value="cohort">cohort — one W for all</option>
       </select></label>
-    <div class="muted small" id="bf-wnote" style="margin-top:3px"></div>
-
-    <label class="slider-row" style="display:block; font-size:12px; margin-top:6px">
-      foot depth scale k = <output id="bf-k-out">1.00</output>
-      <input type="range" id="bf-k" min="0.2" max="4.0" step="0.05" value="1.0"></label>
-
-    <label style="display:block; font-size:12px; margin-top:4px">sort by
-      <select id="bf-sort" style="width:100%">
+    <label>sort
+      <select id="bf-sort">
         <option value="sh">shoulders</option>
         <option value="ft">feet</option>
-        <option value="gap">raw gap (uncalibrated)</option>
+        <option value="gap">raw gap</option>
       </select></label>
+    <label>foot k <output id="bf-k-out">${cfg.footK.toFixed(2)}</output>
+      <input type="range" id="bf-k" min="0.2" max="4.0" step="0.05"
+             value="${cfg.footK}" style="width:110px"></label>
+    <label><input type="checkbox" id="bf-ov" ${cfg.overlay ? "checked" : ""}> overlay</label>
+    <button id="bf-blind">${cfg.blind ? "Reveal numbers" : "Hide numbers"}</button>
+    <span class="note" id="bf-wnote"></span>
+    <span class="note" id="bf-spread"></span>
+    <span class="note" id="bf-loaded"></span>`;
 
-    <button id="bf-blind" style="margin-top:8px; width:100%">Reveal numbers</button>
-    <div class="muted small" id="bf-loaded" style="margin-top:6px"></div>
-    <div class="muted small" id="bf-spread" style="margin-top:6px"></div>`;
-
-  host.querySelector("#bf-w").value = cfg.wMode;
-  host.querySelector("#bf-sort").value = cfg.sortBy;
-  host.querySelector("#bf-w").addEventListener("change", e => { cfg.wMode = e.target.value; rebuild(); });
-  host.querySelector("#bf-sort").addEventListener("change", e => { cfg.sortBy = e.target.value; rebuild(); });
-  host.querySelector("#bf-k").addEventListener("input", e => {
+  bar.querySelector("#bf-w").value = cfg.wMode;
+  bar.querySelector("#bf-sort").value = cfg.sortBy;
+  bar.querySelector("#bf-w").addEventListener("change", e => { cfg.wMode = e.target.value; rebuild(); });
+  bar.querySelector("#bf-sort").addEventListener("change", e => { cfg.sortBy = e.target.value; rebuild(); });
+  bar.querySelector("#bf-k").addEventListener("input", e => {
     cfg.footK = parseFloat(e.target.value);
-    host.querySelector("#bf-k-out").textContent = cfg.footK.toFixed(2);
+    bar.querySelector("#bf-k-out").textContent = cfg.footK.toFixed(2);
     rebuild();
   });
-  host.querySelector("#bf-blind").addEventListener("click", e => {
+  bar.querySelector("#bf-ov").addEventListener("change", e => {
+    cfg.overlay = e.target.checked; rebuild();
+  });
+  bar.querySelector("#bf-blind").addEventListener("click", e => {
     cfg.blind = !cfg.blind;
     e.target.textContent = cfg.blind ? "Reveal numbers" : "Hide numbers";
     grid?.classList.toggle("blind", cfg.blind);
   });
-  mountGrid();
 }
 
 function mountGrid() {
   const slot = document.getElementById("stage-extras");
   if (!slot) return;
   slot.innerHTML = "";
+
+  // This lens IS the view — the video player and the side panel are noise when
+  // you're comparing 65 stills. The hiding CSS lives INSIDE #stage-extras on
+  // purpose: the viewer clears that slot on every lens switch, so everything
+  // comes back by itself without needing an unmount hook the contract doesn't
+  // have.
+  const takeover = document.createElement("style");
+  takeover.textContent = `
+    #stage .stage-pick, #stage video, #stage .controls, #stage .transport,
+    #stage #scrubber, #stage .meta-line, #side { display:none !important; }
+    .layout { display:block !important; }
+    #stage { width:100% !important; max-width:none !important; }
+  `;
+  slot.appendChild(takeover);
   const wrap = document.createElement("div");
   wrap.style.cssText = "margin-top:12px;padding:10px 12px;background:var(--bg-card);" +
                        "border:1px solid var(--border);border-radius:8px";
@@ -197,13 +221,20 @@ function mountGrid() {
     #bf-grid .rank { color:${C_ACC}; font-weight:700; }
     #bf-grid .dim { color:#79808f; }
     #bf-grid.blind .hideable { visibility:hidden; }
+    #bf-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+              margin-bottom:10px; font-size:12px; }
+    #bf-bar label { display:flex; gap:5px; align-items:center; }
+    #bf-bar select, #bf-bar button { background:#232836; color:#e7e9ee;
+              border:1px solid #39405180; border-radius:5px; padding:4px 8px;
+              font:inherit; cursor:pointer; }
+    #bf-bar .note { color:#79808f; }
+    #bf-grid .bf-wrap { position:relative; }
+    #bf-grid .bf-wrap canvas { position:absolute; inset:0; pointer-events:none; }
   `;
   wrap.appendChild(style);
-  const label = document.createElement("div");
-  label.className = "muted small";
-  label.style.cssText = "margin-bottom:6px";
-  label.textContent = "Squarest → most side-on. Red border = W suspect. Purple outline = the round you have open.";
-  wrap.appendChild(label);
+  const bar = document.createElement("div");
+  bar.id = "bf-bar";
+  wrap.appendChild(bar);
   grid = document.createElement("div");
   grid.id = "bf-grid";
   grid.className = cfg.blind ? "blind" : "";
@@ -227,11 +258,16 @@ function rebuild() {
   const ws = [...perVid.values()].sort((a, b) => a - b);
   const medW = ws.length ? ws[ws.length >> 1] : NaN;
 
+  const THUMB = 190;
   grid.innerHTML = rows.map((r, i) => {
     const off = (r.W - medW) / medW * 100;
     const bad = Math.abs(off) > 20;
+    const cw = Math.round(THUMB * (r.f.aspect || 0.75));
     return `<figure class="bf-card${bad ? " wbad" : ""}" data-stem="${r.f.stem.replace(/"/g, "&quot;")}">
-      <img src="data:image/jpeg;base64,${r.f.img}" alt="" title="${r.f.stem.replace(/"/g, "&quot;")}">
+      <div class="bf-wrap" style="width:${cw}px;height:${THUMB}px">
+        <img src="data:image/jpeg;base64,${r.f.img}" alt="" title="${r.f.stem.replace(/"/g, "&quot;")}">
+        <canvas width="${cw}" height="${THUMB}" data-i="${i}"></canvas>
+      </div>
       <figcaption>
         <div class="rank">#${i + 1}</div>
         <div class="hideable">sh <b>${fmt(r.sh)}°</b>${r.ft == null ? "" : ` ft ${fmt(r.ft)}°`}</div>
@@ -242,13 +278,90 @@ function rebuild() {
     </figure>`;
   }).join("");
 
+  // Draw what the model sees: the skeleton, the shoulder segment the gap is
+  // measured on, the full-width W ghost it's compared against, and the ankle
+  // vector with its dx/dy legs. Seeing the ghost next to the real shoulder line
+  // IS the metric — the ratio between them is the whole angle.
+  grid.querySelectorAll("canvas").forEach(cv => {
+    const r = rows[+cv.dataset.i];
+    drawOverlay(cv, r);
+  });
+
   const shs = rows.map(r => r.sh).filter(Number.isFinite);
   const nBad = [...perVid.entries()].filter(([, w]) => Math.abs((w - medW) / medW) > 0.2).length;
-  const note = host?.querySelector("#bf-wnote");
+  const note = document.getElementById("bf-wnote");
   if (note) note.textContent = cfg.wMode === "cohort"
     ? `one W = ${fmt(medW, 3)} for all videos`
     : `${nBad} video(s) more than 20% off the median W ${fmt(medW, 3)}`;
-  const spread = host?.querySelector("#bf-spread");
+  const spread = document.getElementById("bf-spread");
   if (spread && shs.length) spread.textContent =
     `range ${fmt(Math.min(...shs))}° – ${fmt(Math.max(...shs))}°`;
+}
+
+
+// COCO-17 bones, plus the joints each measurement uses.
+const EDGES = [[5,7],[7,9],[6,8],[8,10],[5,6],[5,11],[6,12],[11,12],
+               [11,13],[13,15],[12,14],[14,16],[0,5],[0,6]];
+const L_SH = 5, R_SH = 6, L_HIP = 11, R_HIP = 12, L_ANK = 15, R_ANK = 16;
+
+function drawOverlay(cv, r) {
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (!cfg.overlay) return;
+  const J = r.f.joints;
+  if (!J) return;
+  const P = j => {
+    const p = J[j];
+    return p ? [p[0] * cv.width, p[1] * cv.height, p[2]] : null;
+  };
+
+  // skeleton, dim so the measurement lines read on top of it
+  ctx.strokeStyle = "rgba(255,255,255,0.30)";
+  ctx.lineWidth = 1.2;
+  for (const [a, b] of EDGES) {
+    const p = P(a), q = P(b);
+    if (!p || !q || p[2] < 0.3 || q[2] < 0.3) continue;
+    ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  for (let j = 0; j < 17; j++) {
+    const p = P(j);
+    if (!p || p[2] < 0.3) continue;
+    ctx.beginPath(); ctx.arc(p[0], p[1], 1.8, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // shoulder segment = the numerator of gap
+  const ls = P(L_SH), rs = P(R_SH);
+  if (ls && rs) {
+    ctx.strokeStyle = "#7ec8ff"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(ls[0], ls[1]); ctx.lineTo(rs[0], rs[1]); ctx.stroke();
+
+    // W ghost: the same shoulder line at full anatomical width, centred on the
+    // real one. Real ÷ ghost = gap / W = cos(bladedness).
+    const lh = P(L_HIP), rh = P(R_HIP);
+    if (lh && rh && r.W > 1e-6) {
+      const smx = (ls[0] + rs[0]) / 2, smy = (ls[1] + rs[1]) / 2;
+      const hmx = (lh[0] + rh[0]) / 2, hmy = (lh[1] + rh[1]) / 2;
+      const torso = Math.hypot(smx - hmx, smy - hmy);
+      const half = (r.W * torso) / 2;
+      ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(smx - half, smy); ctx.lineTo(smx + half, smy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // ankle vector + its dx / dy legs, the two terms of atan2
+  const la = P(L_ANK), ra = P(R_ANK);
+  if (la && ra) {
+    ctx.strokeStyle = "#ffd95c"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(la[0], la[1]); ctx.lineTo(ra[0], ra[1]); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,217,92,0.45)"; ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(la[0], la[1]); ctx.lineTo(ra[0], la[1]);   // dx leg
+    ctx.lineTo(ra[0], ra[1]);                              // dy leg
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
