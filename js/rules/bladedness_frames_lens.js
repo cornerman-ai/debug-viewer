@@ -50,7 +50,7 @@ const C_ACC  = "#b48cff";
 const C_WARN = "#ff9e64";
 const C_3D   = "#5fd1ff";   // the world-landmark hip angle
 
-const cfg = { wMode: "cohort", footK: 1.0, sortBy: "sh", blind: true, overlay: true,
+const cfg = { wMode: "cohort", footK: 1.0, sortBy: "sh", blind: false, overlay: true,
               leanFix: true };
 
 let data = null, dataError = null, dataPromise = null;
@@ -286,7 +286,9 @@ function mountGrid() {
     #bf-grid table.m td.warn { color:${C_WARN}; }
     #bf-grid table.m td.bad { color:${C_BAD}; }
     #bf-grid table.m tr.on td.k { color:${C_ACC}; }
-    #bf-grid.blind .hideable { visibility:hidden; }
+    /* Collapse, don't just hide: visibility:hidden reserved the full height of
+       the metric table and left a large void under every image. */
+    #bf-grid.blind .hideable { display:none; }
     #bf-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center;
               margin-bottom:10px; font-size:12px; }
     #bf-bar label { display:flex; gap:5px; align-items:center; }
