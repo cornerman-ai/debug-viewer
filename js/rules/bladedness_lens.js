@@ -130,7 +130,7 @@ function b33Frame(b, state) {
 // horizontal offset, so this needs no camera constant — unlike the atan2 foot
 // angle. Squared feet sit side by side (wide); a bladed stance stacks the rear
 // foot behind the lead one and it collapses toward zero.
-function tightrope(state, torsoPx) {
+function tightrope(state, torsoPx) {   // signed; negative = feet crossed
   const b = state.blaze33;
   if (!b || !b.data || !(torsoPx > 1e-6)) return null;
   const f = b33Frame(b, state);
@@ -147,7 +147,12 @@ function tightrope(state, torsoPx) {
   const tx = at(toeJ, BP_X) * W, hx = at(heelJ, BP_X) * W;
   const ty = at(toeJ, BP_Y), hy = at(heelJ, BP_Y);
   if (![tx, hx, ty, hy].every(Number.isFinite) || !(W > 0)) return null;
-  return { dist: Math.abs(hx - tx) / torsoPx, tx, hx,
+  // SIGNED — the rear heel belongs on the rear side of the lead-toe line. For
+  // an orthodox boxer the right heel sits to the boxer's right, which is the
+  // image LEFT because the camera faces them, so correct is hx < tx. Southpaw
+  // mirrors. Negative means the feet have crossed; an absolute value would hide
+  // that behind an ordinary-looking number.
+  return { dist: (leadLeft ? tx - hx : hx - tx) / torsoPx, tx, hx,
            toeY: ty * H, heelY: hy * H,
            stance: st ? st.stance : "orthodox (assumed)", votes: st };
 }

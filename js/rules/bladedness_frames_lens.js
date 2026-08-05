@@ -345,7 +345,7 @@ function rebuild() {
     const g = cfg.leanFix ? f.gap : (f.gap_raw ?? f.gap);
     const key = cfg.sortBy === "ft"    ? (a.ft ?? 1e9)
               : cfg.sortBy === "gap"   ? -g
-              : cfg.sortBy === "tight" ? -(f.tight ?? -1)
+              : cfg.sortBy === "tight" ? -(f.tight ?? -1e9)
               : cfg.sortBy === "hip3d" ? (a.hip3d ?? 1e9)
               : cfg.sortBy === "sh3d"  ? (a.sh3d ?? 1e9)
               : cfg.sortBy === "hip2d" ? (a.hip2d ?? 1e9)
@@ -369,7 +369,9 @@ function rebuild() {
     ["sh3D",  "sh3d",  r => (r.sh3d  == null ? "—" : fmt(r.sh3d, 0) + "°")],
     ["hip3D", "hip3d", r => (r.hip3d == null ? "—" : fmt(r.hip3d, 0) + "°")],
     ["feet",  "ft",    r => (r.ft    == null ? "—" : fmt(r.ft) + "°")],
-    ["tight", "tight", r => (r.f.tight == null ? "—" : r.f.tight.toFixed(2))],
+    ["tight", "tight", r => (r.f.tight == null ? "—"
+        : (r.f.tight < 0 ? `<span style="color:${C_BAD}">${r.f.tight.toFixed(2)}</span>`
+                         : r.f.tight.toFixed(2)))],
   ];
 
   grid.innerHTML = rows.map((r, i) => {
