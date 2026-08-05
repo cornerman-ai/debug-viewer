@@ -264,16 +264,25 @@ function mountGrid() {
                        "border:1px solid var(--border);border-radius:8px";
   const style = document.createElement("style");
   style.textContent = `
-    #bf-grid { display:flex; flex-wrap:wrap; gap:10px; }
+    #bf-grid { display:grid; gap:14px;
+               grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); }
     #bf-grid .bf-card { background:#171a22; border:1px solid #262b36; border-radius:6px;
                         overflow:hidden; width:max-content; }
     #bf-grid .bf-card.wbad { border-color:${C_BAD}; }
     #bf-grid .bf-card.mine { outline:2px solid ${C_ACC}; }
-    #bf-grid .bf-card img { display:block; height:190px; }
-    #bf-grid figcaption { padding:4px 6px; font-size:10px;
-                          font-family:ui-monospace,monospace; line-height:1.4; }
-    #bf-grid .rank { color:${C_ACC}; font-weight:700; }
-    #bf-grid .dim { color:#79808f; }
+    #bf-grid .bf-card { display:flex; flex-direction:column; }
+    #bf-grid .bf-card img { display:block; height:360px; }
+    #bf-grid .bf-wrap { align-self:center; }
+    #bf-grid figcaption { padding:6px 8px; font-family:ui-monospace,monospace; }
+    #bf-grid .rank { color:${C_ACC}; font-weight:700; font-size:13px;
+                     margin-bottom:3px; }
+    #bf-grid .dim { color:#79808f; font-size:11px; }
+    #bf-grid table.m { width:100%; border-collapse:collapse; font-size:14px; }
+    #bf-grid table.m td { padding:1px 0; }
+    #bf-grid table.m td.k { color:#8b93a3; width:52px; }
+    #bf-grid table.m td.v { text-align:right; font-weight:700; }
+    #bf-grid table.m tr.on td { background:#232a3a; }
+    #bf-grid table.m tr.on td.k { color:${C_ACC}; }
     #bf-grid.blind .hideable { visibility:hidden; }
     #bf-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center;
               margin-bottom:10px; font-size:12px; }
@@ -342,11 +351,25 @@ function rebuild() {
   const ws = [...perVid.values()].sort((a, b) => a - b);
   const medW = ws.length ? ws[ws.length >> 1] : NaN;
 
-  const THUMB = 190;
+  const THUMB = 360;
+  // Metric rows, in a fixed order so the eye can scan down the same place on
+  // every card. The one you're sorting by is highlighted.
+  const ROWS = [
+    ["sh2D",  "sh",    r => fmt(r.sh) + "°"],
+    ["hip2D", "hip2d", r => (r.hip2d == null ? "—" : fmt(r.hip2d) + "°")],
+    ["sh3D",  "sh3d",  r => (r.sh3d  == null ? "—" : fmt(r.sh3d, 0) + "°")],
+    ["hip3D", "hip3d", r => (r.hip3d == null ? "—" : fmt(r.hip3d, 0) + "°")],
+    ["feet",  "ft",    r => (r.ft    == null ? "—" : fmt(r.ft) + "°")],
+    ["tight", "tight", r => (r.f.tight == null ? "—" : r.f.tight.toFixed(2))],
+  ];
+
   grid.innerHTML = rows.map((r, i) => {
     const off = (r.W - medW) / medW * 100;
     const bad = Math.abs(off) > 20;
     const cw = Math.round(THUMB * (r.f.aspect || 0.75));
+    const body = ROWS.map(([label, mode, get]) =>
+      `<tr class="${cfg.sortBy === mode ? "on" : ""}">
+         <td class="k">${label}</td><td class="v">${get(r)}</td></tr>`).join("");
     return `<figure class="bf-card${bad ? " wbad" : ""}" data-stem="${r.f.stem.replace(/"/g, "&quot;")}">
       <div class="bf-wrap" style="width:${cw}px;height:${THUMB}px">
         <img src="data:image/jpeg;base64,${r.f.img}" alt="" title="${r.f.stem.replace(/"/g, "&quot;")}">
@@ -354,18 +377,13 @@ function rebuild() {
       </div>
       <figcaption>
         <div class="rank">#${i + 1}</div>
-        <div class="hideable">sh <b>${fmt(r.sh)}°</b>${
-          r.hip2d == null ? "" : ` hip ${fmt(r.hip2d)}°`}${
-          r.sh3d == null ? "" : ` <span style="color:${C_3D}">s3d ${fmt(r.sh3d,0)}°</span>`}${
-          r.hip3d == null ? "" : ` <span style="color:${C_3D}">h3d ${fmt(r.hip3d,0)}°</span>`}${
-          r.ft == null ? "" : ` ft ${fmt(r.ft)}°`}${
-          r.f.tight == null ? "" : ` <span style="color:${C_WARN}">tr ${r.f.tight.toFixed(2)}</span>`}${
-          ""}</div>
-        <div class="hideable dim">gap ${(cfg.leanFix ? r.f.gap : (r.f.gap_raw ?? r.f.gap)).toFixed(3)}${
+        <table class="m hideable">${body}</table>
+        <div class="hideable dim" style="margin-top:4px">gap ${
+          (cfg.leanFix ? r.f.gap : (r.f.gap_raw ?? r.f.gap)).toFixed(3)}${
           r.f.leaned ? ` <span style="color:${C_WARN}">lean</span>` : ""} / W ${r.W.toFixed(3)}${
           bad ? ` <span style="color:${C_BAD}">${off > 0 ? "+" : ""}${off.toFixed(0)}%</span>` : ""}${
-          wIsFallback(r.f) ? ` <span style="color:${C_WARN}">W unknown → cohort</span>` : ""}</div>
-        <div class="hideable dim">${r.f.stem.slice(0, 22)}<br>r${r.f.round} · ${r.f.t}s</div>
+          wIsFallback(r.f) ? ` <span style="color:${C_WARN}">W→cohort</span>` : ""}</div>
+        <div class="hideable dim">${r.f.stem.slice(0, 30)}<br>r${r.f.round} · ${r.f.t}s</div>
       </figcaption>
     </figure>`;
   }).join("");
