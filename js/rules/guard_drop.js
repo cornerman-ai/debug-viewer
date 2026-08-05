@@ -30,6 +30,7 @@
 //     stance / facing-direction read.
 
 import { J, torsoHeight } from "../skeleton.js";
+import { isGlovelessVideo, gloveNote } from "./_glove_filter.js";
 
 // Defaults match rules_config.json → rules.guard_drop.params at the time
 // this viewer was written. The UI exposes sliders so we can re-tune without
@@ -56,6 +57,10 @@ export const GuardDropRule = {
   id: "guard_drop",
   label: "Guard drop",
 
+  // Bare-handed videos only — a glove hides the wrist joint both metrics are
+  // built on (wrist→nose and wrist→shoulder). See _glove_filter.js.
+  requiresVideo: isGlovelessVideo,
+
   skeletonStyle() {
     // Fade the rest of the body, highlight the joints the rule cares about.
     return {
@@ -77,6 +82,7 @@ export const GuardDropRule = {
         <span style="color:${COLORS.r_wrist}">R wrist</span> ·
         <span style="color:#aac">L/R shoulders (faint)</span>.
         Wrist‐to‐nose &gt; threshold ⇒ guard considered low.</p>
+      <p class="hint" id="gd-glove-note"></p>
 
       <div class="metric-grid">
         <div class="metric"><div class="metric-label">L wrist conf</div><div class="metric-val" id="l-wrist-conf">—</div></div>
@@ -187,6 +193,8 @@ export const GuardDropRule = {
     const ls = jt(p, f, J.L_SHOULDER);
     const rs = jt(p, f, J.R_SHOULDER);
     const torso = Math.max(1e-6, torsoHeight(p, f));
+
+    setText("gd-glove-note", gloveNote(state));
 
     setText("l-wrist-conf", lw.c.toFixed(2), confTextColor(lw.c));
     setText("r-wrist-conf", rw.c.toFixed(2), confTextColor(rw.c));
