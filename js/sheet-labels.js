@@ -26,6 +26,7 @@ const COMBINED_SHEET = "Combined Data";
 const FORM_LABELS_SHEET = "Combined Form Labels";
 const ORIENTATION_SHEET = "Orientation Labels";
 const PUNCH_DIR_SHEET = "Punch Directions";
+const VIDEO_SUMMARY_SHEET = "Video Summary";
 // Form-rule fields we surface on each detection so per-rule lenses can
 // score their predictions against the coach's verdict.
 const FORM_LABEL_KEYS = [
@@ -47,10 +48,13 @@ let cachedFetchedAt = 0;
 let cachedFormByUuid = null;     // { punch_uuid -> {rule_*: 'pass'|'fail'|'unclear'|''} }
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+let cachedGlove = null;          // { byName: Map<video_name, glove>, counts }
+
 export function clearCache() {
   cachedRows = null;
   cachedFetchedAt = 0;
   cachedFormByUuid = null;
+  cachedGlove = null;
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -150,6 +154,56 @@ export async function fetchRows({ force = false } = {}) {
   };
 }
 
+// Per-video "is the boxer wearing gloves?" from the Video Summary tab.
+//
+// That tab keys rows by `video_file` — a Drive URL, not a name — so it can't
+// be matched against a cache basename on its own. Combined Data carries BOTH
+// `video_file` and `video_name`, so we join the two on the Drive file id and
+// hand back a name-keyed map that findSourceByBasename() can resolve into.
+//
+// Values are lowercased as the sheet writes them: "yes" | "no" | "mixed", or
+// "" for a row nobody has filled in yet. Callers decide what an unlabelled
+// video means for them — this function does not guess.
+export async function fetchGloveByVideo({ force = false } = {}) {
+  if (!force && cachedGlove) return cachedGlove;
+
+  const url = `https://docs.google.com/spreadsheets/d/${PUBLIC_SHEET_ID}` +
+    `/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(VIDEO_SUMMARY_SHEET)}`;
+  const [{ rows }, resp] = await Promise.all([
+    fetchRows({ force }),
+    fetch(url, { cache: "no-store" }),
+  ]);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} on ${VIDEO_SUMMARY_SHEET}`);
+
+  // Drive file id → video_name, from the label rows.
+  const nameById = new Map();
+  for (const r of rows) {
+    const id = driveFileId(r.video_file);
+    const name = (r.video_name || "").trim();
+    if (id && name && !nameById.has(id)) nameById.set(id, name);
+  }
+
+  const byName = new Map();
+  const counts = { yes: 0, no: 0, mixed: 0, unlabelled: 0, unmatched: 0 };
+  for (const r of parseCsv(await resp.text())) {
+    const id = driveFileId(r.video_file);
+    const name = id ? nameById.get(id) : null;
+    if (!name) { counts.unmatched++; continue; }
+    const glove = (r.Glove || "").trim().toLowerCase();
+    byName.set(name, glove);
+    if (glove === "yes" || glove === "no" || glove === "mixed") counts[glove]++;
+    else counts.unlabelled++;
+  }
+
+  cachedGlove = { byName, counts };
+  return cachedGlove;
+}
+
+function driveFileId(url) {
+  const m = /\/d\/([A-Za-z0-9_-]+)/.exec(String(url || ""));
+  return m ? m[1] : null;
+}
+
 // Normalize a filename / basename for fuzzy matching: drop extension,
 // lowercase, collapse non-alphanum to single spaces, trim.
 function normalize(s) {
@@ -158,6 +212,13 @@ function normalize(s) {
     .replace(/\.[a-z0-9]+$/, "")     // drop one extension
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+// The matcher's own normalisation, exposed so callers that need to reason
+// about AMBIGUITY (more than one sheet name matching one basename) can compare
+// names the same way findSourceByBasename does.
+export function normalizeName(s) {
+  return normalize(s);
 }
 
 // Find the source video in the Sheet that best matches a cache basename.

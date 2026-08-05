@@ -42,6 +42,7 @@
 
 import { J } from "../skeleton.js";
 import { activeDetections } from "./_detections.js";
+import { fetchGloveByVideo, fetchRows, findSourceByBasename, normalizeName } from "../sheet-labels.js";
 
 const DEFAULTS = {
   targetOffset: 0.30,          // fraction of torso height below the nose
@@ -79,9 +80,98 @@ let host;
 let cfg = { ...DEFAULTS };
 let cache = null;   // memoised whole-clip flagging (see getData)
 
+// ── glove filter ─────────────────────────────────────────────────────────────
+//
+// Wrist tracking is only trustworthy on bare hands: a glove moves the visual
+// wrist away from the joint the pose model was trained on, so every wrist-vs-
+// target reading on a gloved video is measuring the wrong point. Rather than
+// let the lens quietly produce wrong numbers, we hide those videos.
+//
+// Source of truth is the "Video Summary" tab of the labels Sheet (Glove =
+// Yes/No/Mixed), pulled live over the same public gviz endpoint the label
+// fetcher uses — no export step, no sidecar JSON. Add a video there and it
+// appears (or doesn't) on the next page load.
+//
+// Only Glove == "no" passes. "mixed" is excluded too: the boxer is bare-handed
+// for part of the clip, so the rollup would blend valid and invalid frames.
+// Unlabelled rows are excluded as well — unknown is not the same as no.
+//
+// If the Sheet can't be reached we fail OPEN (show everything) rather than
+// present an empty dropdown, matching bladedness_lens's manifest behaviour.
+let gloveIndex = null;    // Map<video_name, "yes"|"no"|"mixed"|"">
+let gloveCounts = null;
+let gloveRows = null;     // Combined Data rows, for findSourceByBasename
+let gloveError = null;
+
+async function loadGloveIndex() {
+  try {
+    const [{ byName, counts }, { rows }] = await Promise.all([
+      fetchGloveByVideo(),
+      fetchRows(),
+    ]);
+    gloveIndex = byName;
+    gloveCounts = counts;
+    gloveRows = rows;
+  } catch (err) {
+    gloveError = err.message || String(err);
+  }
+  // requiresVideo() can't answer until this lands — re-filter the dropdowns.
+  window.dispatchEvent(new Event("lens-filter-changed"));
+}
+loadGloveIndex();
+
+// base (cache basename) → { glove, name } | null when the video isn't in the
+// Sheet at all. `glove` is "" for a row with an empty Glove cell.
+//
+// Only 'exact' and 'substr' matches are trusted. findSourceByBasename's third
+// tier ('tokens' — every token of the shorter name appears in the longer one)
+// is far too loose for a short basename: `round_1` "matches" a video titled
+// "Do a full ROUND practicing a combo. Today： 1 - 2 - 3…". Inheriting that
+// video's glove flag would be worse than not knowing, so a tokens-tier hit is
+// treated as unknown — which hides the video rather than risking showing a
+// gloved one. `_h264` / `_r0` tails are still handled, by the substr tier.
+// A second hazard is ambiguity: the Sheet holds both "Learn This Deadly Boxing
+// Combo.mp4" (Glove=no) and "Learn This Deadly Boxing Combo🥊💥 [zRBL7ISpYGk]
+// .mp4" (Glove=yes). One name contains the other, so the matcher picks whichever
+// has more label rows — and a gloved video sails through as bare-handed. When
+// several sheet names match one basename and disagree on gloves, we return
+// "conflict", which fails closed (hidden) and names the problem in the panel.
+const gloveMemo = new Map();
+
+function gloveFor(base) {
+  if (!gloveIndex || !gloveRows || !base) return null;
+  if (gloveMemo.has(base)) return gloveMemo.get(base);
+
+  let result = null;
+  const src = findSourceByBasename(gloveRows, base);
+  if (src && (src.confidence === "exact" || src.confidence === "substr")) {
+    const glove = gloveIndex.get(src.name);
+    if (glove !== undefined) {
+      const stem = normalizeName(base.replace(/_(yolo|vision|blazepose)_r\d+$/i, ""));
+      const rival = new Set();
+      for (const [name, g] of gloveIndex) {
+        const n = normalizeName(name);
+        if (n && (n === stem || stem.includes(n) || n.includes(stem))) rival.add(g);
+      }
+      result = { glove: rival.size > 1 ? "conflict" : glove, name: src.name };
+    }
+  }
+  gloveMemo.set(base, result);
+  return result;
+}
+
+function isGlovelessVideo(base) {
+  if (gloveError) return true;        // Sheet unreachable → don't hide anything
+  if (!gloveIndex) return false;      // still loading; the event re-filters
+  return gloveFor(base)?.glove === "no";
+}
+
 export const GuardHeightRule = {
   id: "guard_height",
   label: "Guard height",
+
+  // Bare-handed videos only — see the glove filter block above.
+  requiresVideo: isGlovelessVideo,
 
   skeletonStyle() {
     return {
@@ -103,6 +193,7 @@ export const GuardHeightRule = {
         Target = nose_y + offset × torso height (shoulder→hip), so it scales
         with the boxer instead of being a pixel constant. A wrist below the
         target while it isn't punching is flagged <span style="color:${COLORS.low}">low</span>.</p>
+      <p class="hint" id="gh-glove-note"></p>
 
       <h3>Guard low % (punches excluded)</h3>
       <div class="metric-grid">
@@ -261,6 +352,8 @@ export const GuardHeightRule = {
       ? `${data.detCount} punches excluded per-hand (±${Math.round(cfg.punchPad)}f pad).`
       : `No punches loaded — nothing excluded, so this is raw per-frame flagging.`);
 
+    setText("gh-glove-note", gloveNote(state));
+
     drawTimeline(host.querySelector("#gh-timeline"), data, f);
     drawStageTimeline(document.getElementById("gh-stage-timeline"), data, f);
   },
@@ -401,6 +494,29 @@ function verdictFor(status) {
     case ST.LOW:      return `<span class="bad">below target</span>`;
     default:          return `<span class="good">at/above target</span>`;
   }
+}
+
+// One line under the legend: what the video dropdown is filtered to, and where
+// the loaded video sits in that filter. Rebuilt per frame, so keep it cheap.
+function gloveNote(state) {
+  if (gloveError) {
+    return `<span class="bad">Video Summary unreachable (${gloveError})</span> — ` +
+           `glove filter off, every video is listed.`;
+  }
+  if (!gloveCounts) return `Loading glove labels from the Sheet…`;
+  const c = gloveCounts;
+  const hidden = c.yes + c.mixed + c.unlabelled;
+  const here = gloveFor(state?.cacheBasename);
+  const mine = here === null
+    ? `This video isn't in the Video Summary tab.`
+    : here.glove === "no"
+      ? `<span class="good">This video: bare hands.</span>`
+      : here.glove === "conflict"
+        ? `<span class="bad">This video matches two Video Summary rows that disagree on Glove</span> — fix the duplicate in the Sheet.`
+        : `<span class="bad">This video: Glove = ${here.glove || "(unlabelled)"}</span> — readings are unreliable.`;
+  return `${mine} Dropdown shows the ${c.no} bare-handed videos; ` +
+         `${hidden} hidden (${c.yes} gloved, ${c.mixed} mixed, ${c.unlabelled} unlabelled). ` +
+         `Fill the Glove column in the Sheet and reload to unhide more.`;
 }
 
 function torsoColor(status) {
