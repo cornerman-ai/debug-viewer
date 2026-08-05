@@ -21,6 +21,12 @@
 //   robust  p99 over frames whose TORSO is near its own median, so leaning /
 //           crouching frames (where torso collapses and gap spikes without the
 //           shoulders widening) can't set it
+//   sq3d    W read off frames the 3D calls square + upright, rather than
+//           inferred from "the widest we ever saw". Tightens the spread on
+//           paper (61% -> 23%) and returns "unknown" for 5 of 25 rounds that
+//           contain no such frame — but eyeballing the frames it picks, the
+//           3D hip angle is not reliable enough to identify square. Kept as an
+//           option, NOT trusted.
 //   cohort  ONE W for everybody, the median robust W. W is anatomical
 //           (~0.7 shoulder-width / torso) so it should barely vary between
 //           people; this is the fairest cross-video comparison and the closest
@@ -38,7 +44,7 @@ const C_ACC  = "#b48cff";
 const C_WARN = "#ff9e64";
 const C_3D   = "#5fd1ff";   // the world-landmark hip angle
 
-const cfg = { wMode: "leanfix", footK: 1.0, sortBy: "sh", blind: true, overlay: true,
+const cfg = { wMode: "cohort", footK: 1.0, sortBy: "sh", blind: true, overlay: true,
               leanFix: true };
 
 let data = null, dataError = null, dataPromise = null;
@@ -60,14 +66,24 @@ const DEG = 180 / Math.PI;
 
 // One W for everybody: the median of the per-video robust estimates.
 function cohortW() {
+  // Cohort = median of the per-video sq3d estimates where they exist (the most
+  // trustworthy source), else robust.
   const per = new Map();
-  for (const f of data.frames) if (!per.has(f.stem)) per.set(f.stem, f.w.robust);
+  for (const f of data.frames) if (!per.has(f.stem)) per.set(f.stem, f.w.sq3d ?? f.w.robust);
   const v = [...per.values()].sort((a, b) => a - b);
   return v.length ? v[v.length >> 1] : NaN;
 }
 
 function wFor(f, cohort) {
-  return cfg.wMode === "cohort" ? cohort : f.w[cfg.wMode];
+  if (cfg.wMode === "cohort") return cohort;
+  const v = f.w[cfg.wMode];
+  // sq3d is deliberately null when a round contains no square, upright frame —
+  // the honest answer where the widest-observed estimators just guessed. Fall
+  // back to the cohort constant and let the card say so.
+  return (v == null) ? cohort : v;
+}
+function wIsFallback(f) {
+  return cfg.wMode !== "cohort" && f.w[cfg.wMode] == null;
 }
 
 function angles(f, cohort) {
@@ -153,6 +169,7 @@ function renderBar() {
   bar.innerHTML = `
     <label>W
       <select id="bf-w">
+        <option value="sq3d">sq3d — measured where 3D says square</option>
         <option value="leanfix">leanfix — corrects lean frames</option>
         <option value="p99">p99 (shipped)</option>
         <option value="p95">p95</option>
@@ -321,7 +338,8 @@ function rebuild() {
           r.f.hip3d == null ? "" : ` <span style="color:${C_3D}">h3d ${r.f.hip3d.toFixed(0)}°</span>`}</div>
         <div class="hideable dim">gap ${(cfg.leanFix ? r.f.gap : (r.f.gap_raw ?? r.f.gap)).toFixed(3)}${
           r.f.leaned ? ` <span style="color:${C_WARN}">lean</span>` : ""} / W ${r.W.toFixed(3)}${
-          bad ? ` <span style="color:${C_BAD}">${off > 0 ? "+" : ""}${off.toFixed(0)}%</span>` : ""}</div>
+          bad ? ` <span style="color:${C_BAD}">${off > 0 ? "+" : ""}${off.toFixed(0)}%</span>` : ""}${
+          wIsFallback(r.f) ? ` <span style="color:${C_WARN}">W unknown → cohort</span>` : ""}</div>
         <div class="hideable dim">${r.f.stem.slice(0, 22)}<br>r${r.f.round} · ${r.f.t}s</div>
       </figcaption>
     </figure>`;
