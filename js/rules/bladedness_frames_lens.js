@@ -21,6 +21,12 @@
 //   robust  p99 over frames whose TORSO is near its own median, so leaning /
 //           crouching frames (where torso collapses and gap spikes without the
 //           shoulders widening) can't set it
+//   leanfix95  the same lean-corrected gap at the 95th percentile instead of
+//           the 99th. Across 25 videos the W spread drops 61% -> 37% of median
+//           for 5.1% of frames saturating at 0 deg (vs 1.0%). Pulls the
+//           contaminated videos in hard while barely touching the clean ones.
+//           Does NOT help the too-small-W cases — a boxer who never squares up
+//           is not rescued by a lower percentile.
 //   sq3d    W read off frames the 3D calls square + upright, rather than
 //           inferred from "the widest we ever saw". Tightens the spread on
 //           paper (61% -> 23%) and returns "unknown" for 5 of 25 rounds that
@@ -170,7 +176,8 @@ function renderBar() {
     <label>W
       <select id="bf-w">
         <option value="sq3d">sq3d — measured where 3D says square</option>
-        <option value="leanfix">leanfix — corrects lean frames</option>
+        <option value="leanfix95">leanfix p95 — safer percentile</option>
+        <option value="leanfix">leanfix p99</option>
         <option value="p99">p99 (shipped)</option>
         <option value="p95">p95</option>
         <option value="max">max</option>
