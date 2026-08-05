@@ -135,14 +135,6 @@
         "end_sec": null
       }
     ],
-    "Need honest feedback and advice. Started 3 months ago. I want to do better. Please be kind [cm6PEb-79Zc]": [
-      {
-        "label": "span",
-        "round": null,
-        "start_sec": 8.2,
-        "end_sec": null
-      }
-    ],
     "Quick Shadow Boxing Tutorial by Olympian [J4j3AOVWuHE]": [
       {
         "label": "R1",
@@ -215,5 +207,8 @@
         "end_sec": 701.067
       }
     ]
+  },
+  "_removed": {
+    "Need honest feedback and advice. Started 3 months ago. I want to do better. Please be kind [cm6PEb-79Zc]": "2026-08-05 — not truly frontal. She never squares to the camera, so the camera is not standing where the opponent is and every angle measured against it is referenced to the wrong axis."
   }
 }
