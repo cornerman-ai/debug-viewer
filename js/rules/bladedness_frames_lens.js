@@ -36,6 +36,7 @@ const C_OK   = "#7adf7a";
 const C_BAD  = "#ff5d6c";
 const C_ACC  = "#b48cff";
 const C_WARN = "#ff9e64";
+const C_3D   = "#5fd1ff";   // the world-landmark hip angle
 
 const cfg = { wMode: "leanfix", footK: 1.0, sortBy: "sh", blind: true, overlay: true,
               leanFix: true };
@@ -165,6 +166,7 @@ function renderBar() {
         <option value="ft">feet</option>
         <option value="gap">raw gap</option>
         <option value="tight">tightrope (lead toe → rear heel)</option>
+        <option value="hip3d">hip angle 3D (0°=bladed, 90°=square)</option>
       </select></label>
     <label>foot k <output id="bf-k-out">${cfg.footK.toFixed(2)}</output>
       <input type="range" id="bf-k" min="0.2" max="4.0" step="0.05"
@@ -279,8 +281,20 @@ function rebuild() {
   const cohort = cohortW();
   const rows = data.frames.map(f => {
     const a = angles(f, cohort);
-    return { f, ...a, key: cfg.sortBy === "ft" ? (a.ft ?? 1e9)
-                        : cfg.sortBy === "gap" ? -f.gap : a.sh };
+    // Sort key. Every mode is ordered "most square first" so the grid always
+    // reads left-to-right squarest -> most side-on, whichever signal you pick:
+    //   sh     0 = square              -> ascending
+    //   gap    high = square           -> negated
+    //   ft     high = bladed           -> ascending
+    //   tight  0 = rear foot stacked   -> negated (wide = square first)
+    //   hip3d  0 = depth-aligned       -> negated (90 = square first)
+    const g = cfg.leanFix ? f.gap : (f.gap_raw ?? f.gap);
+    const key = cfg.sortBy === "ft"    ? (a.ft ?? 1e9)
+              : cfg.sortBy === "gap"   ? -g
+              : cfg.sortBy === "tight" ? -(f.tight ?? -1)
+              : cfg.sortBy === "hip3d" ? -(f.hip3d ?? -1)
+              : a.sh;
+    return { f, ...a, key };
   });
   rows.sort((x, y) => x.key - y.key);
 
@@ -303,7 +317,8 @@ function rebuild() {
       <figcaption>
         <div class="rank">#${i + 1}</div>
         <div class="hideable">sh <b>${fmt(r.sh)}°</b>${r.ft == null ? "" : ` ft ${fmt(r.ft)}°`}${
-          r.f.tight == null ? "" : ` <span style="color:${C_WARN}">tr ${r.f.tight.toFixed(2)}</span>`}</div>
+          r.f.tight == null ? "" : ` <span style="color:${C_WARN}">tr ${r.f.tight.toFixed(2)}</span>`}${
+          r.f.hip3d == null ? "" : ` <span style="color:${C_3D}">h3d ${r.f.hip3d.toFixed(0)}°</span>`}</div>
         <div class="hideable dim">gap ${(cfg.leanFix ? r.f.gap : (r.f.gap_raw ?? r.f.gap)).toFixed(3)}${
           r.f.leaned ? ` <span style="color:${C_WARN}">lean</span>` : ""} / W ${r.W.toFixed(3)}${
           bad ? ` <span style="color:${C_BAD}">${off > 0 ? "+" : ""}${off.toFixed(0)}%</span>` : ""}</div>
