@@ -293,18 +293,22 @@ function mountGrid() {
     #bf-bar .note { color:#79808f; }
     #bf-grid .bf-wrap { position:relative; }
     #bf-grid .bf-wrap canvas { position:absolute; inset:0; pointer-events:none; }
-    #bf-wref { margin-bottom:14px; }
-    #bf-wref .row { display:flex; flex-wrap:wrap; gap:8px; }
-    #bf-wref h4 { margin:0 0 6px; font-size:12px; font-weight:600; }
+    #bf-wref { margin-bottom:18px; }
+    #bf-wref .row { display:grid; gap:14px;
+                    grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); }
+    #bf-wref h4 { margin:0 0 8px; font-size:13px; font-weight:600; }
     #bf-wref .wr { background:#171a22; border:1px solid #262b36; border-radius:6px;
-                   overflow:hidden; width:max-content; }
+                   overflow:hidden; display:flex; flex-direction:column; }
     #bf-wref .wr.lean { border-color:${C_BAD}; }
-    #bf-wref .bf-wrap { position:relative; }
+    #bf-wref .bf-wrap { position:relative; align-self:center; }
     #bf-wref .bf-wrap canvas { position:absolute; inset:0; pointer-events:none; }
-    #bf-wref img { display:block; height:150px; }
-    #bf-wref figcaption { padding:3px 5px; font-size:9px;
-                          font-family:ui-monospace,monospace; line-height:1.35; }
-    #bf-wref .dim { color:#79808f; }
+    #bf-wref img { display:block; height:300px; }
+    #bf-wref figcaption { padding:6px 8px; font-family:ui-monospace,monospace; }
+    #bf-wref table.m { width:100%; border-collapse:collapse; font-size:14px; }
+    #bf-wref table.m td { padding:1px 0; }
+    #bf-wref table.m td.k { color:#8b93a3; width:48px; }
+    #bf-wref table.m td.v { text-align:right; font-weight:700; }
+    #bf-wref .dim { color:#79808f; font-size:11px; }
   `;
   wrap.appendChild(style);
   const bar = document.createElement("div");
@@ -532,17 +536,20 @@ function renderWRefs() {
     <div class="row">${mine.map((r, i) => {
       const ratio = r.torso_median_px ? r.torso_px / r.torso_median_px : 1;
       const lean = ratio < 0.88;
-      const cw = Math.round(150 * (r.aspect || 0.75));
+      const cw = Math.round(300 * (r.aspect || 0.75));
       return `<figure class="wr${lean ? " lean" : ""}">
-        <div class="bf-wrap" style="width:${cw}px;height:150px">
+        <div class="bf-wrap" style="width:${cw}px;height:300px">
           <img src="data:image/jpeg;base64,${r.img}" alt="" title="${r.stem.replace(/"/g, "&quot;")}">
-          <canvas width="${cw}" height="150" data-wi="${i}"></canvas>
+          <canvas width="${cw}" height="300" data-wi="${i}"></canvas>
         </div>
         <figcaption>
-          <div>W <b>${r.W.toFixed(3)}</b> <span class="dim">gap ${r.gap.toFixed(3)}</span></div>
-          <div class="${lean ? "" : "dim"}" ${lean ? `style="color:${C_BAD}"` : ""}>torso ${
-            (ratio * 100).toFixed(0)}% of median</div>
-          <div class="dim">${r.stem.slice(0, 20)}<br>r${r.round} · ${r.t}s</div>
+          <table class="m">
+            <tr><td class="k">W</td><td class="v">${r.W.toFixed(3)}</td></tr>
+            <tr><td class="k">gap</td><td class="v">${r.gap.toFixed(3)}</td></tr>
+            <tr><td class="k">torso</td><td class="v"${lean ? ` style="color:${C_BAD}"` : ""}>${
+              (ratio * 100).toFixed(0)}%</td></tr>
+          </table>
+          <div class="dim" style="margin-top:4px">${r.stem.slice(0, 30)}<br>r${r.round} · ${r.t}s</div>
         </figcaption>
       </figure>`;
     }).join("")}</div>`;
