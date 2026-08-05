@@ -282,6 +282,9 @@ function mountGrid() {
     #bf-grid table.m td.k { color:#8b93a3; width:52px; }
     #bf-grid table.m td.v { text-align:right; font-weight:700; }
     #bf-grid table.m tr.on td { background:#232a3a; }
+    #bf-grid table.m tr.sep td { border-top:1px solid #2b3140; padding-top:4px; }
+    #bf-grid table.m td.warn { color:${C_WARN}; }
+    #bf-grid table.m td.bad { color:${C_BAD}; }
     #bf-grid table.m tr.on td.k { color:${C_ACC}; }
     #bf-grid.blind .hideable { visibility:hidden; }
     #bf-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center;
@@ -371,9 +374,22 @@ function rebuild() {
     const off = (r.W - medW) / medW * 100;
     const bad = Math.abs(off) > 20;
     const cw = Math.round(THUMB * (r.f.aspect || 0.75));
+    const g = cfg.leanFix ? r.f.gap : (r.f.gap_raw ?? r.f.gap);
+    // torso as a % of this round's median: the tell for a leaning frame, and
+    // the same figure the W-reference strip shows. Was previously only a bare
+    // "lean" word with no number behind it.
+    const tmed = r.f.w?.torso_median_px;
+    const tpct = (r.f.torso_px != null && tmed > 0)
+      ? Math.round(r.f.torso_px / tmed * 100) : null;
     const body = ROWS.map(([label, mode, get]) =>
       `<tr class="${cfg.sortBy === mode ? "on" : ""}">
-         <td class="k">${label}</td><td class="v">${get(r)}</td></tr>`).join("");
+         <td class="k">${label}</td><td class="v">${get(r)}</td></tr>`).join("")
+      + `<tr class="sep${cfg.sortBy === "gap" ? " on" : ""}">
+           <td class="k">gap</td><td class="v">${g.toFixed(3)}</td></tr>`
+      + `<tr><td class="k">W</td><td class="v${bad ? " bad" : ""}">${r.W.toFixed(3)}${
+           bad ? ` ${off > 0 ? "+" : ""}${off.toFixed(0)}%` : ""}</td></tr>`
+      + (tpct == null ? "" :
+         `<tr><td class="k">torso</td><td class="v${r.f.leaned ? " warn" : ""}">${tpct}%</td></tr>`);
     return `<figure class="bf-card${bad ? " wbad" : ""}" data-stem="${r.f.stem.replace(/"/g, "&quot;")}">
       <div class="bf-wrap" style="width:${cw}px;height:${THUMB}px">
         <img src="data:image/jpeg;base64,${r.f.img}" alt="" title="${r.f.stem.replace(/"/g, "&quot;")}">
@@ -382,12 +398,10 @@ function rebuild() {
       <figcaption>
         <div class="rank">#${i + 1}</div>
         <table class="m hideable">${body}</table>
-        <div class="hideable dim" style="margin-top:4px">gap ${
-          (cfg.leanFix ? r.f.gap : (r.f.gap_raw ?? r.f.gap)).toFixed(3)}${
-          r.f.leaned ? ` <span style="color:${C_WARN}">lean</span>` : ""} / W ${r.W.toFixed(3)}${
-          bad ? ` <span style="color:${C_BAD}">${off > 0 ? "+" : ""}${off.toFixed(0)}%</span>` : ""}${
-          wIsFallback(r.f) ? ` <span style="color:${C_WARN}">W→cohort</span>` : ""}</div>
-        <div class="hideable dim">${r.f.stem.slice(0, 30)}<br>r${r.f.round} · ${r.f.t}s</div>
+        <div class="hideable dim" style="margin-top:4px">${
+          r.f.leaned ? `<span style="color:${C_WARN}">lean-corrected</span> · ` : ""}${
+          wIsFallback(r.f) ? `<span style="color:${C_WARN}">W→cohort</span> · ` : ""}${
+          r.f.stem.slice(0, 30)}<br>r${r.f.round} · ${r.f.t}s</div>
       </figcaption>
     </figure>`;
   }).join("");
