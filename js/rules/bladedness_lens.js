@@ -79,7 +79,78 @@ const C_SH      = "#7ec8ff";   // shoulder accent
 const C_FT      = "#ffd95c";   // foot accent
 const C_FRAME   = "#3ad9e0";
 const C_REEL    = "#ffd95c";   // the slice cut for the coach reel
+const C_TIGHT   = "#ff9e64";   // tightrope: lead-toe line -> rear heel
 const C_ACCENT  = "#b48cff";   // span labels
+
+// ── stance + tightrope ──────────────────────────────────────────────────────
+//
+// LEAD FOOT FROM STANCE, not from a guess. The labels Sheet carries `stance`
+// per punch, so the fighter's stance is the majority vote over the round's
+// detections. Orthodox leads with the LEFT foot, southpaw with the RIGHT.
+// (The frames lens still uses the lower-in-image heuristic — its data is
+// extracted offline where the Sheet isn't available.)
+function roundStance(state) {
+  const dets = activeDetections(state);
+  if (!dets || !dets.length) return null;
+  let o = 0, s = 0;
+  for (const d of dets) {
+    const v = String(d.stance || "").trim().toLowerCase();
+    if (v === "orthodox") o++;
+    else if (v === "southpaw") s++;
+  }
+  if (!o && !s) return null;
+  return { stance: s > o ? "southpaw" : "orthodox", orthodox: o, southpaw: s };
+}
+
+// Full BlazePose-33 indices — the COCO-17 remap the rules engine uses stops at
+// the ankles, so heels and toes only exist on state.blaze33.
+const BP = { L_ANKLE: 27, R_ANKLE: 28, L_HEEL: 29, R_HEEL: 30, L_TOE: 31, R_TOE: 32 };
+const BP_CH = 8, BP_X = 0, BP_Y = 1, BP_VIS = 6;
+
+// Map the viewer's current frame onto the blaze33 cache (same shape as the
+// inspector lens's frameOf: aligned when it's the primary timeline, else via pts).
+function b33Frame(b, state) {
+  if (!b) return null;
+  const aligned = b.n_frames === state.n_frames
+    && Math.abs((b.fps || 0) - (state.fps || 0)) < 0.01
+    && Math.abs((b.start_sec || 0) - (state.start_sec || 0)) < 1e-3;
+  if (aligned) return Math.min(Math.max(state.frame, 0), b.n_frames - 1);
+  const t = (state.start_sec || 0) + state.frame / (state.fps || 30);
+  if (b.pts && b.pts.length) {
+    let lo = 0, hi = b.pts.length - 1;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (b.pts[m] < t) lo = m + 1; else hi = m; }
+    return lo;
+  }
+  const f = Math.round((t - (b.start_sec || 0)) * (b.fps || 30));
+  return (f >= 0 && f < b.n_frames) ? f : null;
+}
+
+// Perpendicular distance from the REAR HEEL to a vertical line through the LEAD
+// TOE, over torso height. Shortest distance to a vertical line IS the
+// horizontal offset, so this needs no camera constant — unlike the atan2 foot
+// angle. Squared feet sit side by side (wide); a bladed stance stacks the rear
+// foot behind the lead one and it collapses toward zero.
+function tightrope(state, torsoPx) {
+  const b = state.blaze33;
+  if (!b || !b.data || !(torsoPx > 1e-6)) return null;
+  const f = b33Frame(b, state);
+  if (f == null) return null;
+  const st = roundStance(state);
+  const leadLeft = !st || st.stance === "orthodox";
+  const toeJ  = leadLeft ? BP.L_TOE  : BP.R_TOE;
+  const heelJ = leadLeft ? BP.R_HEEL : BP.L_HEEL;
+  const vid = document.getElementById("video");
+  const W = (vid && vid.videoWidth) || state.pose?.width || b.width || 0;
+  const H = (vid && vid.videoHeight) || state.pose?.height || b.height || 0;
+  const at = (j, c) => b.data[(f * 33 + j) * BP_CH + c];
+  if (at(toeJ, BP_VIS) <= cfg.minConfidence || at(heelJ, BP_VIS) <= cfg.minConfidence) return null;
+  const tx = at(toeJ, BP_X) * W, hx = at(heelJ, BP_X) * W;
+  const ty = at(toeJ, BP_Y), hy = at(heelJ, BP_Y);
+  if (![tx, hx, ty, hy].every(Number.isFinite) || !(W > 0)) return null;
+  return { dist: Math.abs(hx - tx) / torsoPx, tx, hx,
+           toeY: ty * H, heelY: hy * H,
+           stance: st ? st.stance : "orthodox (assumed)", votes: st };
+}
 
 // ── metric core ─────────────────────────────────────────────────────────────
 
@@ -557,6 +628,9 @@ export const BladednessRule = {
         <code>${fmt(r.medDiff)}°</code>
         <span class="muted">(&gt;0 = chest turned further than the feet)</span></div>
       <div class="muted small" style="margin-top:3px">${curNote} · ${r.nCounted} frames counted</div>
+      <div class="muted small">stance <code>${(() => { const st = roundStance(state);
+          return st ? `${st.stance} (${st.orthodox}o/${st.southpaw}s)` : "no labels — assuming orthodox"; })()}</code>
+        <span class="muted">→ lead foot</span></div>
       <div class="muted small">torso median <code>${fmt(c.torMed, 0)}px</code> ·
         lean-corrected <code>${c.nLeaned}</code> frames
         ${cfg.leanFix ? "" : `<span style="color:${C_SQUARE}">(fix OFF)</span>`}</div>`;
@@ -611,6 +685,9 @@ export const BladednessRule = {
         <span class="muted">gap ${fmt(c.gap[f], 3)}${
           c.leaned[f] ? ` <span style="color:${C_SQUARE}">(lean: raw ${fmt(c.gapRaw[f], 3)}, torso ${
             fmt(100 * c.tor[f] / c.torMed, 0)}%)</span>` : ""}</span> ·
+      <span style="color:${C_TIGHT}">tr</span>
+        <code>${(() => { const q = tightrope(state, torso(pickPose(state).skeleton, f));
+                         return q ? fmt(q.dist, 2) : "—"; })()}</code> ·
       <span style="color:${C_FT}">ft</span>
         <code style="color:${bandColor(t)}">${fmt(t)}°</code>
         <span class="muted">dx ${fmt(c.fdx[f], 3)} dy ${fmt(c.fdy[f], 3)}</span>`;
@@ -680,11 +757,29 @@ export const BladednessRule = {
       ctx.restore();
     }
 
+    // Tightrope: vertical through the lead toe, horizontal to the rear heel.
+    const tr = tightrope(state, torso(pose.skeleton, f));
+    if (tr) {
+      ctx.save();
+      ctx.strokeStyle = C_TIGHT; ctx.lineWidth = 2 * sc;
+      ctx.setLineDash([6 * sc, 6 * sc]);
+      ctx.beginPath(); ctx.moveTo(tr.tx, 0); ctx.lineTo(tr.tx, ctx.canvas.height); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineWidth = 4 * sc;
+      ctx.beginPath(); ctx.moveTo(tr.tx, tr.heelY); ctx.lineTo(tr.hx, tr.heelY); ctx.stroke();
+      ctx.fillStyle = C_TIGHT;
+      for (const [px, py] of [[tr.tx, tr.toeY], [tr.hx, tr.heelY]]) {
+        ctx.beginPath(); ctx.arc(px, py, 5 * sc, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
     const fsz = Math.round(13 * sc), lh = fsz + 4 * sc;
     const lines = [
       [`shoulders ${fmt(sDeg)}°`, bandColor(sDeg)],
       [`feet      ${fmt(tDeg)}°`, bandColor(tDeg)],
       [`W ${fmt(W, 3)}  k ${cfg.footK.toFixed(2)}`, "#fff"],
+      [tr ? `tightrope ${fmt(tr.dist, 2)}` : `tightrope —`, tr ? C_TIGHT : C_INVALID],
     ];
     if (c.punch[f]) lines.push([`punch — excluded`, C_PUNCH]);
     if (c.leaned[f]) lines.push([`lean ${fmt(100 * c.tor[f] / c.torMed, 0)}% torso`, C_SQUARE]);
