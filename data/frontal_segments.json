@@ -1,51 +1,219 @@
 {
   "_about": "Hand-curated segments where the boxer is working TOWARD the camera, i.e. the camera stands where the opponent would be. Selection criterion is gaze/punch direction, NOT shoulder-line squareness -- selecting on squareness would produce a set with no bladed boxers in it. Times are SOURCE-VIDEO seconds; index the blazepose caches via the cache's _pts.npy (searchsorted), never actual_start + i/fps. See spans_from_rows() in roll_duck_experiment.py.",
-  "_schema": "stem -> [ {label, round, start_sec, end_sec} ]. start_sec null = from the beginning (of the round when `round` is set, else of the video); end_sec null = runs to the end. `round` binds a span to one cache round and MUST be set whenever start_sec is null and the video has several rounds, otherwise the span leaks into every round. Optional `clip_window: [a, b]` pins which slice make_clips.py cuts for the coach reel instead of sampling one at random -- it does NOT narrow the span used for analysis. Stems match video_wh.json exactly (beware double spaces in titles).",
-  "_curated": "2026-08-03, hand-picked from the shadowboxing corpus",
-
+  "_schema": "stem -> [ {label, round, start_sec, end_sec} ]. start_sec null = from the beginning of the round named by `round`. In the hand-written notes \"start\" always means the START OF r0, never video time 0 — so a bare \"start - X\" entry carries round 0; end_sec null = runs to the end. `round` binds a span to one cache round and MUST be set whenever start_sec is null and the video has several rounds, otherwise the span leaks into every round. Optional `clip_window: [a, b]` pins which slice make_clips.py cuts for the coach reel instead of sampling one at random -- it does NOT narrow the span used for analysis. Stems match video_wh.json exactly (beware double spaces in titles).",
+  "_curated": "2026-08-03 initial 13; 2026-08-05 +6, +6",
   "segments": {
     "10 mins Shadow Boxing Workout ⧸ No Equipment (follow along)": [
-      { "label": "all", "round": null, "start_sec": null, "end_sec": null,
-        "clip_window": [41.294, 120.219],
-        "clip_window_why": "This video is a CIRCUIT -- boxing combos alternating with sumo squats, good mornings, jumping jacks, shoulder presses. A random window straddles both (three seeds tried, all landed on conditioning). This window was eyeballed and is continuous boxing. The curated span for ANALYSIS is still the whole video; this only pins the coach-reel clip." }
+      {
+        "label": "all",
+        "round": null,
+        "start_sec": null,
+        "end_sec": null,
+        "clip_window": [
+          41.294,
+          120.219
+        ],
+        "clip_window_why": "This video is a CIRCUIT -- boxing combos alternating with sumo squats, good mornings, jumping jacks, shoulder presses. A random window straddles both (three seeds tried, all landed on conditioning). This window was eyeballed and is continuous boxing. The curated span for ANALYSIS is still the whole video; this only pins the coach-reel clip."
+      }
     ],
     "10 Minute Shadow Boxing Workout At Home": [
-      { "label": "R0", "round": 0, "start_sec": null, "end_sec": 151.014 },
-      { "label": "R1", "round": 1, "start_sec": null, "end_sec": 188.131 }
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 151.014
+      },
+      {
+        "label": "R1",
+        "round": 1,
+        "start_sec": null,
+        "end_sec": 188.131
+      }
     ],
     "15 MIN SHADOWBOXING WORKOUT SLIPPING PUNCHES": [
-      { "label": "R1", "round": 1, "start_sec": null, "end_sec": 198.433,
-        "_note": "Re-curated 2026-08-04: the first 15s of r1 (183.433-198.433). The original R0 entry was wrong whichever way it was read — 0-78.8s is the presenter standing still talking to camera, and 78.8-127.933 is still walking and demonstrating; the classifier finds zero punches in either. r1 is where the actual stance work is." }
+      {
+        "label": "R1",
+        "round": 1,
+        "start_sec": null,
+        "end_sec": 198.433,
+        "_note": "Re-curated 2026-08-04: the first 15s of r1 (183.433-198.433). The original R0 entry was wrong whichever way it was read — 0-78.8s is the presenter standing still talking to camera, and 78.8-127.933 is still walking and demonstrating; the classifier finds zero punches in either. r1 is where the actual stance work is."
+      }
     ],
     "30 Days of Basic Boxing at Home for Beginners #DAY10 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [UJyeAXZjwVk]": [
-      { "label": "R0", "round": 0, "start_sec": 45.850, "end_sec": 53.450 }
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": 45.85,
+        "end_sec": 53.45
+      }
     ],
     "BEGINNER SHADOW BOXING DRILLS": [
-      { "label": "R0", "round": 0, "start_sec": 41.376, "end_sec": 50.718 }
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": 41.376,
+        "end_sec": 50.718
+      }
     ],
     "Beginners Boxing Combos To Improve Your Shadow Boxing🥊 #boxing #beginners #combo": [
-      { "label": "span", "round": null, "start_sec": null, "end_sec": 5.700 }
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 5.7
+      }
     ],
     "Do This 5 Minute Shadow Boxing Workout For A Strong Left Hook": [
-      { "label": "span", "round": null, "start_sec": 47.316, "end_sec": 74.476 }
+      {
+        "label": "span",
+        "round": null,
+        "start_sec": 47.316,
+        "end_sec": 74.476
+      }
     ],
     "Exercise- Hook and uppercuts (shadow boxing)": [
-      { "label": "span", "round": null, "start_sec": 50.490, "end_sec": 68.050 }
+      {
+        "label": "span",
+        "round": null,
+        "start_sec": 50.49,
+        "end_sec": 68.05
+      }
     ],
     "first week boxing shadow boxing need as much constructive criticism as possible ! [e84o1g0z6i8h1]": [
-      { "label": "all", "round": null, "start_sec": null, "end_sec": null }
+      {
+        "label": "all",
+        "round": null,
+        "start_sec": null,
+        "end_sec": null
+      }
     ],
     "Full Body in 10 Minutes ｜ Shadow Boxing Workout": [
-      { "label": "span", "round": null, "start_sec": 273.371, "end_sec": 279.076 }
+      {
+        "label": "span",
+        "round": null,
+        "start_sec": 273.371,
+        "end_sec": 279.076
+      }
     ],
     "HOOKS 🪝 & FOOTWORK 🥊. Shadow Boxing Drill (female boxing) #boxingworkout #shadowboxing #shorts": [
-      { "label": "all", "round": null, "start_sec": null, "end_sec": null }
+      {
+        "label": "all",
+        "round": null,
+        "start_sec": null,
+        "end_sec": null
+      }
     ],
     "How to get better at #shadowboxing": [
-      { "label": "all", "round": null, "start_sec": null, "end_sec": null }
+      {
+        "label": "all",
+        "round": null,
+        "start_sec": null,
+        "end_sec": null
+      }
     ],
     "I got a lot of great feedback here. Time for another critique of my shadow boxing -- after 3 years [BSmTYUs5vdQ]": [
-      { "label": "span", "round": null, "start_sec": null, "end_sec": 6.909 }
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 6.909
+      }
+    ],
+    "INTENSE 10 Miniute Shadow boxing workout #boxing [7PCYxd3uhVY]": [
+      {
+        "label": "R1",
+        "round": 1,
+        "start_sec": null,
+        "end_sec": 203.955
+      }
+    ],
+    "Learn This Deadly Boxing Combo🥊💥 [zRBL7ISpYGk]": [
+      {
+        "label": "span",
+        "round": null,
+        "start_sec": 5.05,
+        "end_sec": null
+      }
+    ],
+    "Need honest feedback and advice. Started 3 months ago. I want to do better. Please be kind [cm6PEb-79Zc]": [
+      {
+        "label": "span",
+        "round": null,
+        "start_sec": 8.2,
+        "end_sec": null
+      }
+    ],
+    "Quick Shadow Boxing Tutorial by Olympian [J4j3AOVWuHE]": [
+      {
+        "label": "R1",
+        "round": 1,
+        "start_sec": null,
+        "end_sec": 35.014
+      }
+    ],
+    "Shadow boxing critique [zsku4k0ugxjg1]": [
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 30.0
+      }
+    ],
+    "Shadow Boxing Drill for Home ｜ Tom Yankello's Drill #1": [
+      {
+        "label": "span",
+        "round": null,
+        "start_sec": 11.433,
+        "end_sec": 17.567
+      }
+    ],
+    "Shadow Boxing Work Out for Better Boxing": [
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 163.667
+      }
+    ],
+    "Shadow Boxing Workout – 25 Min Follow Along (No Talking)": [
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 739.726
+      }
+    ],
+    "Shadow Boxing Workout ｜ Follow Along": [
+      {
+        "label": "span",
+        "round": null,
+        "start_sec": 192.023,
+        "end_sec": 198.78
+      }
+    ],
+    "Shadow boxing workout with an app": [
+      {
+        "label": "r0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": null
+      }
+    ],
+    "Shadowboxing critique [0T75blmMW50]": [
+      {
+        "label": "span",
+        "round": null,
+        "start_sec": 67.892,
+        "end_sec": 79.57
+      }
+    ],
+    "WOW!  These Boxing Combos Are Amazing ｜ Follow Along Training": [
+      {
+        "label": "R1",
+        "round": 1,
+        "start_sec": null,
+        "end_sec": 701.067
+      }
     ]
   }
 }
