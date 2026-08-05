@@ -164,6 +164,7 @@ function renderBar() {
         <option value="sh">shoulders</option>
         <option value="ft">feet</option>
         <option value="gap">raw gap</option>
+        <option value="tight">tightrope (lead toe → rear heel)</option>
       </select></label>
     <label>foot k <output id="bf-k-out">${cfg.footK.toFixed(2)}</output>
       <input type="range" id="bf-k" min="0.2" max="4.0" step="0.05"
@@ -301,7 +302,8 @@ function rebuild() {
       </div>
       <figcaption>
         <div class="rank">#${i + 1}</div>
-        <div class="hideable">sh <b>${fmt(r.sh)}°</b>${r.ft == null ? "" : ` ft ${fmt(r.ft)}°`}</div>
+        <div class="hideable">sh <b>${fmt(r.sh)}°</b>${r.ft == null ? "" : ` ft ${fmt(r.ft)}°`}${
+          r.f.tight == null ? "" : ` <span style="color:${C_WARN}">tr ${r.f.tight.toFixed(2)}</span>`}</div>
         <div class="hideable dim">gap ${(cfg.leanFix ? r.f.gap : (r.f.gap_raw ?? r.f.gap)).toFixed(3)}${
           r.f.leaned ? ` <span style="color:${C_WARN}">lean</span>` : ""} / W ${r.W.toFixed(3)}${
           bad ? ` <span style="color:${C_BAD}">${off > 0 ? "+" : ""}${off.toFixed(0)}%</span>` : ""}</div>
@@ -382,6 +384,29 @@ function drawOverlay(cv, r) {
       ctx.setLineDash([4, 4]);
       ctx.beginPath(); ctx.moveTo(smx - half, smy); ctx.lineTo(smx + half, smy); ctx.stroke();
       ctx.setLineDash([]);
+    }
+  }
+
+  // Tightrope: a vertical line dropped through the LEAD TOE, and the shortest
+  // (i.e. horizontal) distance from it to the REAR HEEL. Squared feet sit side
+  // by side and this is wide; a bladed stance stacks the rear foot behind the
+  // lead one and it collapses toward zero. Needs no camera constant.
+  const FT = r.f.feet;   // [L_heel, R_heel, L_toe, R_toe] in crop coords
+  if (FT && r.f.tight != null && r.f.lead) {
+    const leadL = r.f.lead === "L";
+    const toe = FT[leadL ? 2 : 3], heel = FT[leadL ? 1 : 0];
+    if (toe && heel) {
+      const tx = toe[0] * cv.width, hx = heel[0] * cv.width, hy = heel[1] * cv.height;
+      ctx.strokeStyle = "#ff9e64"; ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(tx, 0); ctx.lineTo(tx, cv.height); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(tx, hy); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = "#ff9e64";
+      for (const [px, py] of [[toe[0] * cv.width, toe[1] * cv.height], [hx, hy]]) {
+        ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+      }
     }
   }
 
