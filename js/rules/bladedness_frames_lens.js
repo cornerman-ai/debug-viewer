@@ -94,13 +94,23 @@ function wIsFallback(f) {
 
 function angles(f, cohort) {
   const W = wFor(f, cohort);
+  // Hip line, same construction as the shoulders but with its own W. Kept on
+  // the leanfix95 estimator regardless of the shoulder W dropdown — the hip W
+  // has no cohort/sq3d variants.
+  const Wh = f.w?.hip95;
+  const hip2d = (f.hgap != null && Wh > 1e-6)
+    ? Math.acos(Math.max(0, Math.min(1, f.hgap / Wh))) * DEG : null;
   // gap ships lean-CORRECTED; gap_raw is the uncorrected one, so the fix can be
   // switched off and compared rather than taken on faith.
   const g = cfg.leanFix ? f.gap : (f.gap_raw ?? f.gap);
   const sh = W > 1e-6 ? Math.acos(Math.max(0, Math.min(1, g / W))) * DEG : NaN;
   const ft = (f.adx != null && f.ady != null)
     ? Math.atan2(f.ady * cfg.footK, f.adx) * DEG : null;
-  return { W, sh, ft };
+  // 3D angles arrive as 0 = depth-aligned (bladed); flip so every metric here
+  // shares one direction: 0 = square, 90 = side-on.
+  const sh3d = f.sh3d == null ? null : 90 - f.sh3d;
+  const hip3d = f.hip3d == null ? null : 90 - f.hip3d;
+  return { W, sh, ft, hip2d, sh3d, hip3d };
 }
 
 const fmt = (n, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : "—");
@@ -186,11 +196,13 @@ function renderBar() {
       </select></label>
     <label>sort
       <select id="bf-sort">
-        <option value="sh">shoulders</option>
+        <option value="sh">shoulders 2D (gap/W)</option>
+        <option value="hip2d">hips 2D (hip gap/W)</option>
+        <option value="sh3d">shoulders 3D</option>
         <option value="ft">feet</option>
         <option value="gap">raw gap</option>
         <option value="tight">tightrope (lead toe → rear heel)</option>
-        <option value="hip3d">hip angle 3D (0°=bladed, 90°=square)</option>
+        <option value="hip3d">hips 3D</option>
       </select></label>
     <label>foot k <output id="bf-k-out">${cfg.footK.toFixed(2)}</output>
       <input type="range" id="bf-k" min="0.2" max="4.0" step="0.05"
@@ -316,7 +328,9 @@ function rebuild() {
     const key = cfg.sortBy === "ft"    ? (a.ft ?? 1e9)
               : cfg.sortBy === "gap"   ? -g
               : cfg.sortBy === "tight" ? -(f.tight ?? -1)
-              : cfg.sortBy === "hip3d" ? -(f.hip3d ?? -1)
+              : cfg.sortBy === "hip3d" ? (a.hip3d ?? 1e9)
+              : cfg.sortBy === "sh3d"  ? (a.sh3d ?? 1e9)
+              : cfg.sortBy === "hip2d" ? (a.hip2d ?? 1e9)
               : a.sh;
     return { f, ...a, key };
   });
@@ -340,9 +354,13 @@ function rebuild() {
       </div>
       <figcaption>
         <div class="rank">#${i + 1}</div>
-        <div class="hideable">sh <b>${fmt(r.sh)}°</b>${r.ft == null ? "" : ` ft ${fmt(r.ft)}°`}${
+        <div class="hideable">sh <b>${fmt(r.sh)}°</b>${
+          r.hip2d == null ? "" : ` hip ${fmt(r.hip2d)}°`}${
+          r.sh3d == null ? "" : ` <span style="color:${C_3D}">s3d ${fmt(r.sh3d,0)}°</span>`}${
+          r.hip3d == null ? "" : ` <span style="color:${C_3D}">h3d ${fmt(r.hip3d,0)}°</span>`}${
+          r.ft == null ? "" : ` ft ${fmt(r.ft)}°`}${
           r.f.tight == null ? "" : ` <span style="color:${C_WARN}">tr ${r.f.tight.toFixed(2)}</span>`}${
-          r.f.hip3d == null ? "" : ` <span style="color:${C_3D}">h3d ${r.f.hip3d.toFixed(0)}°</span>`}</div>
+          ""}</div>
         <div class="hideable dim">gap ${(cfg.leanFix ? r.f.gap : (r.f.gap_raw ?? r.f.gap)).toFixed(3)}${
           r.f.leaned ? ` <span style="color:${C_WARN}">lean</span>` : ""} / W ${r.W.toFixed(3)}${
           bad ? ` <span style="color:${C_BAD}">${off > 0 ? "+" : ""}${off.toFixed(0)}%</span>` : ""}${
