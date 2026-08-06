@@ -82,19 +82,33 @@ function partsBlock(c) {
     return `<div class="cr-parts"><div class="cr-pbasis">no hip/shoulder split in
       this data file — regenerate with <code>coach_review_page.py</code></div></div>`;
   }
-  const chip = (b, name) => `<span class="cr-band b${b < 0 ? "m1" : b}">${name}</span>`;
   return `
     <div class="cr-parts${c.split ? " split" : ""}">
-      <div class="cr-prow"><span class="cr-plab">hips</span>
-        ${chip(c.hipBand, c.hipBandName)}
-        <span class="cr-pm">hip3D ${c.m.hip3D ?? "—"}°</span></div>
-      <div class="cr-prow"><span class="cr-plab">shoulders</span>
-        ${chip(c.shBand, c.shBandName)}
-        <span class="cr-pm">sh3D ${c.m.sh3D ?? "—"}°</span></div>
+      ${partRow("hips", c.hipBand, c.hipBandName, "hip3D", c.m.hip3D,
+                c.hipSays, c.hipAgree, data.hip_cut)}
+      ${partRow("shoulders", c.shBand, c.shBandName, "sh3D", c.m.sh3D,
+                c.shSays, c.shAgree, data.sh_cut)}
       <div class="cr-pbasis">${c.split ? "<b>he split them</b> — " : ""}${c.basisNote}
         ${c.hedge ? `· <i>hedged (${c.hedge})</i>` : ""}
         <br><span class="cr-pev">from: “${c.evidence}”</span></div>
     </div>`;
+}
+
+// One row per body part: his call, our metric for THAT joint, and whether the
+// two agree at that joint's own cut. Two metrics are being tracked, so neither
+// borrows the other's verdict — a single "bladed" line would hide exactly the
+// hip-vs-shoulder difference this lens exists to show.
+function partRow(label, band, bandName, mname, mval, says, agree, cut) {
+  const tag =
+    agree === true
+      ? '<span style="color:#8ce0a3">agrees</span>'
+      : agree === false
+      ? '<span style="color:#ff9db0">DISAGREES</span>'
+      : '<span style="color:#9fb0d0">not scored</span>';
+  return `<div class="cr-prow"><span class="cr-plab">${label}</span>
+    <span class="cr-band b${band < 0 ? "m1" : band}">${bandName}</span>
+    <span class="cr-pm">${mname} ${mval ?? "—"}° → <b>${says || "—"}</b>
+      at ${cut}° · ${tag}</span></div>`;
 }
 
 function metricRows(m) {
@@ -123,16 +137,10 @@ function paintOne() {
     <div class="cr-meta">
       <div>
         <span class="cr-n">#${c.n}</span>
-        <span class="cr-band b${c.band < 0 ? "m1" : c.band}">${c.bandName}</span>
-        <span class="cr-verdict">metric says <b>${c.says || "—"}</b> at hip3D
-          ${c.m.hip3D ?? "—"}° ·
-          ${
-            c.agree === true
-              ? '<span style="color:#8ce0a3">agrees</span>'
-              : c.agree === false
-              ? '<span style="color:#ff9db0">DISAGREES</span>'
-              : '<span style="color:#9fb0d0">not scored</span>'
-          }</span>
+        <span class="cr-hdr">hips
+          <span class="cr-band b${c.hipBand < 0 ? "m1" : c.hipBand}">${c.hipBandName}</span></span>
+        <span class="cr-hdr">shoulders
+          <span class="cr-band b${c.shBand < 0 ? "m1" : c.shBand}">${c.shBandName}</span></span>
         <blockquote>${c.quote}</blockquote>
         ${partsBlock(c)}
         <div class="cr-src">${c.video} · r${c.round} f${c.frame} · ${c.t}s</div>
@@ -237,6 +245,7 @@ function renderShell() {
     .cr-meta blockquote{margin:11px 0 0;padding:9px 14px;border-left:3px solid #e94560;
       background:#101728;border-radius:0 7px 7px 0;color:#d3dcee;font-size:15px}
     .cr-verdict{display:block;margin-top:9px;font-family:ui-monospace,monospace;font-size:13px}
+    .cr-hdr{font-size:12px;color:#5f6d8c;margin-left:14px}
     .cr-t{border-collapse:collapse;font-family:ui-monospace,monospace;font-size:14px}
     .cr-t td{padding:3px 18px 3px 0} .cr-t td:first-child{color:#5f6d8c}
     .cr-v{font-weight:700;color:#e0e0e0}
@@ -248,8 +257,13 @@ function renderShell() {
     .cr-parts{margin-top:11px;padding:9px 12px;border-radius:8px;
       background:#101728;border:1px solid #1d2740}
     .cr-parts.split{border-color:#e94560}
-    .cr-prow{display:flex;align-items:center;gap:9px;margin:3px 0}
-    .cr-plab{display:inline-block;min-width:74px;color:#5f6d8c;font-size:13px}
+    /* Fixed label and chip widths so the two metric readouts start at the same
+       x — otherwise "bladed" and "very squared" shift them apart and the rows
+       stop being comparable at a glance, which is the whole point of them. */
+    .cr-prow{display:flex;align-items:baseline;gap:9px;margin:5px 0}
+    .cr-plab{flex:none;width:74px;color:#5f6d8c;font-size:13px}
+    .cr-prow .cr-band{flex:none;width:104px;margin-left:0;text-align:center}
+    .cr-prow .cr-pm{flex:1;min-width:0}
     .cr-pm{font-family:ui-monospace,monospace;font-size:12px;color:#8b9ab8}
     .cr-pbasis{margin-top:7px;font-size:12px;color:#8b9ab8;line-height:1.5}
     .cr-pev{color:#5f6d8c;font-style:italic}
@@ -275,14 +289,17 @@ function renderShell() {
         <option value="judge">judgeable</option>
         <option value="oop">out of position</option>
       </select>
-      <span class="s"><b>${data.n_agree}</b>/${data.n_scored} agree at hip3D
-        ${data.hip_cut}°</span>
+      <span class="s">hips <b>${data.hip_agree ?? data.n_agree}</b>/${
+        data.hip_scored ?? data.n_scored} at ${data.hip_cut}°${
+        data.sh_cut == null ? "" :
+        ` · shoulders <b>${data.sh_agree}</b>/${data.sh_scored} at ${data.sh_cut}°`}</span>
       <span style="flex:1"></span>
       <span class="s">← → to page</span>
     </div>
-    <div id="cr-warn">⚠ The hip3D cut was chosen by looking at these same
-      frames — the agree/disagree call describes the fit, it does not measure
-      accuracy.</div>
+    <div id="cr-warn">⚠ Both cuts were swept on these same 30 frames — the
+      agree/disagree calls describe the fit, they do not measure accuracy. The
+      hip/shoulder split of his verdict is an interpretation of his words; the
+      phrase behind each one is shown.</div>
     <div id="cr-stage"></div>`;
   slot.appendChild(panel);
 
