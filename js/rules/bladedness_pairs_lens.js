@@ -1,7 +1,7 @@
 // Bladedness pairs — every human comparison, and whether the metric agrees.
 //
 // The frames lens asks "does the ordering look right". This one is the audit:
-// 700 pairwise judgements were collected in the boxing-labeler's SHOULDER
+// 700 pairwise judgements were collected in the cornerman-labeler's SHOULDER
 // bladedness labeler, and this shows, pair by pair, which frame the human
 // picked, which one the metric picked, and how far apart the metric claimed
 // they were.
