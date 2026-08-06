@@ -61,6 +61,7 @@ const FILTERS = {
   all: () => true,
   bad: (c) => !c.ok,
   ok: (c) => c.ok,
+  split: (c) => c.split,
   flip: (c) => c.flip,
 };
 
@@ -98,13 +99,34 @@ function sideHtml(c, which) {
     <img loading="lazy" src="${url}" alt="${side} frame">
     <figcaption>
       <div class="bp-picks">
-        ${you ? '<span class="p-you">● human picked</span>' : ""}
-        ${met ? '<span class="p-met">● metric picked</span>' : ""}
-        ${!you && !met ? '<span class="p-non">—</span>' : ""}
+        ${you ? '<span class="p-you">● human</span>' : ""}
+        ${["sh3D", "hip3D"]
+          .filter((k) => c.v && c.v[k] && c.v[k].says === side)
+          .map((k) => `<span class="p-met">● ${k}</span>`)
+          .join("")}
       </div>
       <div class="bp-src">${s.v} · r${s.r} f${s.f}</div>
     </figcaption>
   </figure>`;
+}
+
+// Both torso metrics get a verdict on every pair. The 700 comparisons chose
+// shoulders 3D and the coach's 30 verdicts chose hips 3D, so the honest thing
+// is to show both calls rather than privilege one — and to make the pairs where
+// they pick DIFFERENT frames easy to find, because at most one can be right
+// there and that is where the whole disagreement lives.
+function verdictRows(c) {
+  return ["sh3D", "hip3D"]
+    .map((name) => {
+      const v = c.v && c.v[name];
+      if (!v) return `<tr><td class="k">${name}</td><td colspan="3">—</td></tr>`;
+      return `<tr>
+        <td class="k">${name}</td>
+        <td>picks <b>${v.says}</b></td>
+        <td>${v.d}°</td>
+        <td class="${v.ok ? "vok" : "vno"}">${v.ok ? "✓" : "✗"}</td></tr>`;
+    })
+    .join("");
 }
 
 function paintOne() {
@@ -122,14 +144,20 @@ function paintOne() {
     <div class="bp-meta">
       <div>
         <span class="bp-id">pair ${c.id}</span>
-        <span class="bp-tag ${c.ok ? "ok" : "no"}">${c.ok ? "AGREE" : "DISAGREE"}</span>
+        ${c.split ? '<span class="bp-tag sp">SHOULDERS vs HIPS SPLIT</span>' : ""}
         ${c.flip ? '<span class="bp-tag fl">NO STABLE HUMAN ANSWER</span>' : ""}
-        <div class="bp-gap">metric called them <b>${c.d}°</b> apart</div>
+        <div class="bp-gap">human picked <b>${c.won}</b></div>
       </div>
+      <table class="bp-t bp-v">
+        <tr><th>vs human</th><th></th><th>apart</th><th></th></tr>
+        ${verdictRows(c)}
+      </table>
       ${metricTable(c)}
       <p class="bp-note">${
         c.flip
-          ? "This pair was re-shown swapped and answered differently, so there is no stable human answer to get right."
+          ? "Re-shown swapped and answered differently — no stable human answer to get right."
+          : c.split
+          ? "The two torso metrics pick different frames here, so at most one can be right. These 151 pairs are where the shoulder-vs-hip question actually lives."
           : c.d < 5
           ? "A near-tie. Losing these is expected — the labeler flips on them too."
           : c.ok
@@ -228,6 +256,10 @@ function renderShell() {
     .bp-tag.ok{background:#1d4429;color:#8ce0a3}
     .bp-tag.no{background:#4a1626;color:#ff9db0}
     .bp-tag.fl{background:#4a3a12;color:#f5cf72}
+    .bp-tag.sp{background:#2b2450;color:#c3b6ff}
+    .bp-v td{white-space:nowrap}
+    .bp-v td.vok{color:#8ce0a3;font-weight:700}
+    .bp-v td.vno{color:#ff9db0;font-weight:700}
     .bp-gap{margin-top:9px;font-family:ui-monospace,monospace;font-size:13px;color:#8ea2c8}
     .bp-t{border-collapse:collapse;font-family:ui-monospace,monospace;font-size:13px;width:100%}
     .bp-t th{color:#5f6d8c;font-weight:400;font-size:11px;text-align:right;padding:0 0 4px}
@@ -241,7 +273,10 @@ function renderShell() {
   `;
   slot.appendChild(takeover);
 
-  const pct = ((data.agree / Math.max(data.n, 1)) * 100).toFixed(1);
+  const tal = (k) => {
+    const t = data.tally && data.tally[k];
+    return t ? `${((t.ok / Math.max(t.n, 1)) * 100).toFixed(1)}%` : "—";
+  };
   const panel = document.createElement("div");
   panel.id = "bp-panel";
   panel.innerHTML = `
@@ -254,9 +289,16 @@ function renderShell() {
         <option value="all">all ${data.n}</option>
         <option value="bad">disagreements (${data.n - data.agree})</option>
         <option value="ok">agreements</option>
+        <option value="split">shoulders vs hips split (${data.n_split ?? 0})</option>
         <option value="flip">no stable answer (${data.flipped})</option>
       </select>
-      <span class="s"><b>${data.agree}</b>/${data.n} = <b>${pct}%</b> agree</span>
+      <span class="s">sh3D <b>${tal("sh3D")}</b> · hip3D <b>${tal("hip3D")}</b></span>
+      ${
+        data.n_split
+          ? `<span class="s">on the ${data.n_split} they split:
+             sh3D <b>${data.split_sh}</b> vs hip3D <b>${data.split_hip}</b></span>`
+          : ""
+      }
       <span style="flex:1"></span>
       <span class="s">worst disagreements first · ← → to page</span>
     </div>
