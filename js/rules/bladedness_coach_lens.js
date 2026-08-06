@@ -85,9 +85,9 @@ function partsBlock(c) {
   return `
     <div class="cr-parts${c.split ? " split" : ""}">
       ${partRow("hips", c.hipBand, c.hipBandName, "hip3D", c.m.hip3D,
-                c.hipSays, c.hipAgree, data.hip_cut)}
+                c.hipSays, c.hipAgree, c.hipOff, c.hipWhy, data.hip_cuts)}
       ${partRow("shoulders", c.shBand, c.shBandName, "sh3D", c.m.sh3D,
-                c.shSays, c.shAgree, data.sh_cut)}
+                c.shSays, c.shAgree, c.shOff, c.shWhy, data.sh_cuts)}
       <div class="cr-pbasis">${c.split ? "<b>he split them</b> — " : ""}${c.basisNote}
         ${c.hedge ? `· <i>hedged (${c.hedge})</i>` : ""}
         <br><span class="cr-pev">from: “${c.evidence}”</span></div>
@@ -98,17 +98,22 @@ function partsBlock(c) {
 // two agree at that joint's own cut. Two metrics are being tracked, so neither
 // borrows the other's verdict — a single "bladed" line would hide exactly the
 // hip-vs-shoulder difference this lens exists to show.
-function partRow(label, band, bandName, mname, mval, says, agree, cut) {
+function partRow(label, band, bandName, mname, mval, says, agree, off, why, cuts) {
+  // "not scored" now means exactly one thing — he declined to judge the frame —
+  // so it says which, rather than reading as a fault in the page. His "between"
+  // used to land here too, because a two-way cut had no band for it.
   const tag =
     agree === true
       ? '<span style="color:#8ce0a3">agrees</span>'
       : agree === false
-      ? '<span style="color:#ff9db0">DISAGREES</span>'
-      : '<span style="color:#9fb0d0">not scored</span>';
+      ? off === 1
+        ? '<span style="color:#e3e08a">off by one band</span>'
+        : '<span style="color:#ff9db0">DISAGREES</span>'
+      : `<span style="color:#9fb0d0">not scored — ${why || "?"}</span>`;
+  const at = cuts ? ` (${cuts[0]}/${cuts[1]})` : "";
   return `<div class="cr-prow"><span class="cr-plab">${label}</span>
     <span class="cr-band b${band < 0 ? "m1" : band}">${bandName}</span>
-    <span class="cr-pm">${mname} ${mval ?? "—"}° → <b>${says || "—"}</b>
-      at ${cut}° · ${tag}</span></div>`;
+    <span class="cr-pm">${mname} ${mval ?? "—"}° → <b>${says || "—"}</b>${at} · ${tag}</span></div>`;
 }
 
 function metricRows(m) {
@@ -289,17 +294,19 @@ function renderShell() {
         <option value="judge">judgeable</option>
         <option value="oop">out of position</option>
       </select>
-      <span class="s">hips <b>${data.hip_agree ?? data.n_agree}</b>/${
-        data.hip_scored ?? data.n_scored} at ${data.hip_cut}°${
-        data.sh_cut == null ? "" :
-        ` · shoulders <b>${data.sh_agree}</b>/${data.sh_scored} at ${data.sh_cut}°`}</span>
+      <span class="s">hips <b>${data.hip_agree}</b>/${data.hip_scored} at ${
+        data.hip_cuts ? data.hip_cuts.join("/") : "?"}° · shoulders <b>${
+        data.sh_agree}</b>/${data.sh_scored} at ${
+        data.sh_cuts ? data.sh_cuts.join("/") : "?"}°</span>
       <span style="flex:1"></span>
       <span class="s">← → to page</span>
     </div>
-    <div id="cr-warn">⚠ Both cuts were swept on these same 30 frames — the
-      agree/disagree calls describe the fit, they do not measure accuracy. The
-      hip/shoulder split of his verdict is an interpretation of his words; the
-      phrase behind each one is shown.</div>
+    <div id="cr-warn">⚠ Both band schemes were fitted on these same 30 frames —
+      the agree/disagree calls describe the fit, they do not measure accuracy.
+      Cuts sit midway between the class medians; the maximum-accuracy fit
+      collapses "between" to a 1.5°/0.5° sliver and is not usable as a
+      threshold. The hip/shoulder split of his verdict is an interpretation of
+      his words; the phrase behind each one is shown.</div>
     <div id="cr-stage"></div>`;
   slot.appendChild(panel);
 
