@@ -11,29 +11,23 @@
 // To add a new rule: drop a file in rules/, import + push it here.
 
 import { OverviewRule } from "./overview.js";
-import { Pose3DInspectRule } from "./pose3d_inspect_lens.js";
 import { GuardDropRule } from "./guard_drop.js";
 import { GuardHeightRule } from "./guard_height.js";
 import { ArmExtensionRule } from "./arm_extension.js";
 import { HandReturnPathRule } from "./hand_return_path.js";
 import { HeadOffCenterLensRule } from "./head_offcenter_lens.js";
 import { HitHeightRule } from "./hit_height.js";
-import { EngineCompareRule } from "./engine_compare.js";
 import { BladednessRule } from "./bladedness_lens.js";
 import { BladednessFramesRule } from "./bladedness_frames_lens.js";
 import { BladednessPairsRule } from "./bladedness_pairs_lens.js";
 import { BladednessCoachRule } from "./bladedness_coach_lens.js";
 import { BlazePoseInspectorRule } from "./blazepose_inspector.js";
-import { WristSwapRule } from "./wrist_swap.js";
-import { CombinedCompareRule } from "./combined_compare.js";
 import { ElbowTuckRule } from "./elbow_tuck_lens.js";
 import { StepPunchSyncRule } from "./step_punch_sync.js";
 import { StepDetectorRule } from "./step_detector.js";
 import { HipRotationReviewRule } from "./hip_rotation_review.js";
 import { HipRotationModelRule } from "./hip_rotation_model.js";
-import { Vision3DRule } from "./vision_3d.js";
 import { AngleChangeRule } from "./angle_change.js";
-import { RoundV6Rule } from "./round_v6.js";
 import { ShoulderGateRule } from "./shoulder_gate_lens.js";
 import { PunchClassifierRule } from "./punch_classifier.js";
 import { OnDeviceLensRule } from "./ondevice_lens.js";
@@ -48,7 +42,6 @@ import { RollDuckLensRule } from "./roll_duck_lens.js";
 // Overview stays first as the default; the rest are alphabetical by label.
 export const RULES = [
   OverviewRule,
-  Pose3DInspectRule,
   AngleChangeRule,
   ArmExtensionRule,
   AudioImpactLensRule,
@@ -57,9 +50,7 @@ export const RULES = [
   BladednessPairsRule,
   BladednessCoachRule,
   BlazePoseInspectorRule,
-  CombinedCompareRule,
   ElbowTuckRule,
-  EngineCompareRule,
   GuardDropRule,
   GuardHeightRule,
   HandReturnPathRule,
@@ -73,12 +64,9 @@ export const RULES = [
   PunchClassifierRule,
   PunchPredictionsRule,
   RollDuckLensRule,
-  RoundV6Rule,
   ShoulderGateRule,
   SkeletonCompareRule,
   StanceWidthLensRule,
   StepPunchSyncRule,
   StepDetectorRule,
-  Vision3DRule,
-  WristSwapRule,
 ];
