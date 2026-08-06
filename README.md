@@ -57,20 +57,6 @@ The lens dropdown in the app is the authoritative list — one module per
 lens in [js/rules/](js/rules/), registered in
 [js/rules/registry.js](js/rules/registry.js).
 
-## The partner demo (second front-end)
-
-`demo/` is a separate, branded front-end — the **Clip Review dashboard**
-shown to prospective coaching partners. It reuses this repo's DOM-free
-modules (`skeleton.js`, `ondevice-loader.js`) but has its own HTML, JS,
-brand, and docs. Build + preview:
-
-```bash
-demo/build.sh && python3 -m http.server 8766 --directory dist
-```
-
-Deploys via `firebase deploy` (Firebase Hosting site `corner-man-dashboard`
-— config in `firebase.json`); the debug viewer itself is GitHub Pages.
-
 ## Running locally
 
 ```bash
