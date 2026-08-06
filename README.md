@@ -53,13 +53,9 @@ Pick both files together via multi-select in the pose picker.
 
 ## Lenses
 
-- **Overview** — per-joint table of (x, y, conf) at the current frame.
-- **Guard drop** — highlights nose + both wrists + shoulders, draws
-  horizontal y-lines through them, shows wrist→nose / wrist→shoulder
-  normalised distances (the metrics
-  `cornerman_rules/rules/guard_drop.py` uses), plus a wrist trail and
-  full-clip y/conf sparklines. Includes threshold sliders matching
-  `rules_config.json`.
+The lens dropdown in the app is the authoritative list — one module per
+lens in [js/rules/](js/rules/), registered in
+[js/rules/registry.js](js/rules/registry.js).
 
 ## Running locally
 
