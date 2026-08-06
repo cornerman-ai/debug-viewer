@@ -28,13 +28,13 @@
 // Data comes from cornerman-backend. Refresh with:
 //   python bladedness/pair_review.py
 //   cp ~/code/cornerman-backend/bladedness/pair_lens_data.json \
-//      ~/code/cornerman-debug-viewer/data/bladedness_pairs.json
+//      ~/code/cornerman-debug-viewer/lens_data/bladedness_pairs.json
 //
 // Images are served from the labeler's GitHub Pages rather than committed here
 // — the same JPEGs, 10 MB, already published. This lens therefore needs
 // network, unlike the frames lens which embeds its thumbnails.
 
-const DATA_URL = "./data/bladedness_pairs.json";
+const DATA_URL = "./lens_data/bladedness_pairs.json";
 
 let host = null;
 let data = null;
@@ -190,7 +190,7 @@ function renderShell() {
       <p class="hint">Generate + copy it:<br>
         <code>python bladedness/pair_review.py</code><br>
         <code>cp ~/code/cornerman-backend/bladedness/pair_lens_data.json
-        ~/code/cornerman-debug-viewer/data/bladedness_pairs.json</code></p>`;
+        ~/code/cornerman-debug-viewer/lens_data/bladedness_pairs.json</code></p>`;
     return;
   }
   const slot = document.getElementById("stage-extras");

@@ -28,12 +28,12 @@
 // Data comes from cornerman-backend. Refresh with:
 //   python bladedness/coach_review_page.py
 //   cp ~/code/cornerman-backend/bladedness/coach_lens_data.json \
-//      ~/code/cornerman-debug-viewer/data/bladedness_coach.json
+//      ~/code/cornerman-debug-viewer/lens_data/bladedness_coach.json
 //
 // Images are embedded (3 MB) rather than linked: unlike the labeler's frames
 // these are not published anywhere, and they are the record of a coach review.
 
-const DATA_URL = "./data/bladedness_coach.json";
+const DATA_URL = "./lens_data/bladedness_coach.json";
 
 let host = null;
 let data = null;
@@ -174,7 +174,7 @@ function renderShell() {
       <p class="hint">Generate + copy it:<br>
         <code>python bladedness/coach_review_page.py</code><br>
         <code>cp ~/code/cornerman-backend/bladedness/coach_lens_data.json
-        ~/code/cornerman-debug-viewer/data/bladedness_coach.json</code></p>`;
+        ~/code/cornerman-debug-viewer/lens_data/bladedness_coach.json</code></p>`;
     return;
   }
   const slot = document.getElementById("stage-extras");

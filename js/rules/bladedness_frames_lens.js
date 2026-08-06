@@ -8,7 +8,7 @@
 // Frames are pre-extracted (cropped to the boxer, common height) by
 // `bladedness/frame_viewer.py` in cornerman-backend. Refresh with:
 //   cp ~/code/cornerman-backend/bladedness/frame_viewer_data.json \
-//      ~/code/cornerman-debug-viewer/data/bladedness_frames.json
+//      ~/code/cornerman-debug-viewer/lens_data/bladedness_frames.json
 //
 // WHY A LENS AND NOT THE STATIC PAGE: the data file ships each frame's RAW
 // geometry (gap, ankle dx/dy, torso px) plus every candidate W, so the angles
@@ -42,7 +42,7 @@
 // from lean frames; `robust` brings it to 0.775. Switch between them and watch
 // that video's five frames move.
 
-const DATA_URL = "./data/bladedness_frames.json";
+const DATA_URL = "./lens_data/bladedness_frames.json";
 
 const C_OK   = "#7adf7a";
 const C_BAD  = "#ff5d6c";
@@ -156,7 +156,7 @@ function renderShell() {
       <p class="hint">Generate + copy it:<br>
         <code>python bladedness/frame_viewer.py</code><br>
         <code>cp ~/code/cornerman-backend/bladedness/frame_viewer_data.json
-        ~/code/cornerman-debug-viewer/data/bladedness_frames.json</code></p>`;
+        ~/code/cornerman-debug-viewer/lens_data/bladedness_frames.json</code></p>`;
     return;
   }
   const nVids = new Set(data.frames.map(f => f.stem)).size;

@@ -176,13 +176,13 @@ const pickPose = s => s.poseV6 || s.pose;
 
 // ── curated frontal set (merged in from the retired frontal_segments lens) ──
 //
-// Data: ./data/frontal_segments.json — a copy of the backend's source of truth,
-// plus ./data/clip_windows.json, the slices make_clips.py actually cut for the
+// Data: ./lens_data/frontal_segments.json — a copy of the backend's source of truth,
+// plus ./lens_data/clip_windows.json, the slices make_clips.py actually cut for the
 // coach reel. Refresh both with:
 //   cp ~/code/cornerman-backend/bladedness/frontal_segments.json \
-//      ~/code/cornerman-debug-viewer/data/frontal_segments.json
+//      ~/code/cornerman-debug-viewer/lens_data/frontal_segments.json
 //   cp ~/code/cornerman-backend/bladedness/clip_windows.json \
-//      ~/code/cornerman-debug-viewer/data/clip_windows.json
+//      ~/code/cornerman-debug-viewer/lens_data/clip_windows.json
 //
 // TIME BASE (the thing that silently breaks): manifest times are SOURCE-VIDEO
 // seconds, but a cache holds one round starting at `pose.start_sec`. We convert
@@ -192,8 +192,8 @@ const pickPose = s => s.poseV6 || s.pose;
 // clock, which is authoritative when pts is non-uniform; if a span ever looks a
 // frame or two off here, that is why.
 
-const DATA_URL = "./data/frontal_segments.json";
-const WINDOWS_URL = "./data/clip_windows.json";
+const DATA_URL = "./lens_data/frontal_segments.json";
+const WINDOWS_URL = "./lens_data/clip_windows.json";
 
 let manifest = null;
 let manifestError = null;

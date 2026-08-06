@@ -1,10 +1,10 @@
 // Impact spotter — GT vs predicted impact (turnaround) frames per punch, from
 // the two-head TCN trained on the "Impact Frames" sheet labels.
 //
-// Loads ./data/impact_spotter_data.json (committed to this repo). Regenerate:
+// Loads ./lens_data/impact_spotter_data.json (committed to this repo). Regenerate:
 //   cd ~/code/cornerman-backend && .venv/bin/python impact_spotter/train_impact_spotter.py
 //   cp "$HOME/Google Drive/My Drive/Cornerman/data/model_outputs/impact_spotter/impact_spotter_viewer_latest.json" \
-//      ~/code/cornerman-debug-viewer/data/impact_spotter_data.json
+//      ~/code/cornerman-debug-viewer/lens_data/impact_spotter_data.json
 //
 // Schema (times are SOURCE-VIDEO seconds; gt/pred/span are BlazePose cache
 // frame indices — the lens maps via *_sec + the viewer's start_sec/fps, so it
@@ -17,7 +17,7 @@
 // Tolerance convention (matches the trainer): |err| <= 50 ms counts as +-1
 // frame @30fps, <= 83 ms as +-2 (quantization-fair).
 
-const DATA_URL = "./data/impact_spotter_data.json";
+const DATA_URL = "./lens_data/impact_spotter_data.json";
 
 const TOL1_MS = 50, TOL2_MS = 83.3;
 const C = {
@@ -222,7 +222,7 @@ function buildSidebar(state) {
       `<div style="color:${C.bad}">impact_spotter_data.json failed to load ` +
       `(${dumpError}).<br>Deploy it with:<br>` +
       `<code style="font-size:11px">cp "$HOME/Google Drive/My Drive/Cornerman/data/model_outputs/` +
-      `impact_spotter/impact_spotter_viewer_latest.json" data/impact_spotter_data.json</code></div>`;
+      `impact_spotter/impact_spotter_viewer_latest.json" lens_data/impact_spotter_data.json</code></div>`;
     return;
   }
   host.innerHTML = `
