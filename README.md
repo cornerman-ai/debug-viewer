@@ -1,10 +1,11 @@
 # Cornerman rule debug viewer
 
-A static, dependency-free web app for inspecting YOLO-Pose and Apple
-Vision Drive caches against the
+A static, dependency-free web app for inspecting BlazePose Drive caches
+against the
 [Cornerman](https://github.com/cornerman-ai/cornerman-backend) rules
-engine, frame by frame. When both engines exist for a round, the
-engine-compare lens overlays them side-by-side.
+engine, frame by frame. Legacy YOLO-Pose / Apple Vision caches (from
+`Cornerman/archive/`) still open, and when two engines exist for a round
+the engine-compare lens overlays them side-by-side.
 
 **Live**: https://cornerman-ai.github.io/cornerman-debug-viewer/
 
@@ -39,7 +40,8 @@ nothing is uploaded.
 
 ## Input format
 
-Drive cache (same shape for both YOLO-Pose and on-device Apple Vision):
+Drive cache (same shape for every engine — BlazePose today; legacy
+YOLO-Pose / Apple Vision caches identical):
 
 - `<round>.npy` — float32, shape `(N, 17, 3)`, one row per joint per
   frame holding `(x, y, conf)`. Layout is COCO-17. Coords are normalised
