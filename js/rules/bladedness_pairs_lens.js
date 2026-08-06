@@ -11,14 +11,19 @@
 // deg apart is a near-tie — the labeler flips on those themselves, and no
 // metric can win them. A disagreement where it claimed 55 deg means it put a
 // squared boxer and a bladed one at opposite ends of the scale, and that is
-// what breaks a threshold. Cards are sorted worst-disagreement first for
+// what breaks a threshold. Cards are ordered worst-disagreement first for
 // exactly that reason.
 //
-// The YOU FLIPPED filter is the control. 30 already-answered pairs were salted
-// back into the labeler left/right swapped under new ids; those are the pairs
-// with no stable human answer. The metric losing one of those is not evidence
-// against the metric — of the 4 flipped, it "lost" 3, which is the signature
-// of a metric limited by label noise rather than by its own quality.
+// The "no stable answer" filter is the control. 30 already-answered pairs were
+// salted back into the labeler left/right swapped under new ids; those are the
+// pairs with no stable human answer. The metric losing one of those is not
+// evidence against the metric — of the 4 flipped, it "lost" 3, which is the
+// signature of a metric limited by label noise rather than by its own quality.
+//
+// UX matches the coach-review lens on purpose: one comparison at a time filling
+// the window, stats beside it, arrows to page. A scrolling wall of 700 cards is
+// unreadable, and these two lenses are used for the same thing — looking at a
+// disagreement closely enough to explain it.
 //
 // Data comes from cornerman-backend. Refresh with:
 //   python bladedness/pair_review.py
@@ -30,15 +35,14 @@
 // network, unlike the frames lens which embeds its thumbnails.
 
 const DATA_URL = "./data/bladedness_pairs.json";
-const C_OK = "#3f9d55";
-const C_BAD = "#e94560";
-const C_MET = "#e9a03f";
 
 let host = null;
 let data = null;
 let dataPromise = null;
 let dataError = null;
 let filter = "all";
+let idx = 0;
+let onKey = null;
 
 async function loadData() {
   dataPromise = (async () => {
@@ -60,124 +64,238 @@ const FILTERS = {
   flip: (c) => c.flip,
 };
 
-function metricTable(m) {
-  return `<table class="bp-m">${Object.entries(m)
-    .map(([k, v]) => `<tr><td>${k}</td><td>${v == null ? "—" : v}</td></tr>`)
-    .join("")}</table>`;
+const shown = () => data.cards.filter(FILTERS[filter]);
+
+// Both frames' metrics in ONE table, side by side. Two separate tables would
+// make the reader hold six numbers in their head to compare them; the whole
+// question here is which frame is higher on each row.
+function metricTable(c) {
+  const keys = Object.keys(c.L.m);
+  const cell = (v) => (v == null ? "—" : v);
+  return `<table class="bp-t">
+    <tr><th></th><th>left</th><th>right</th></tr>
+    ${keys
+      .map((k) => {
+        const a = c.L.m[k];
+        const b = c.R.m[k];
+        const hiL = a != null && b != null && a > b;
+        const hiR = a != null && b != null && b > a;
+        return `<tr><td class="k">${k}</td>
+          <td class="${hiL ? "hi" : ""}">${cell(a)}</td>
+          <td class="${hiR ? "hi" : ""}">${cell(b)}</td></tr>`;
+      })
+      .join("")}
+  </table>`;
 }
 
-function sideHtml(s, you, met) {
-  const cls = `${you ? " you" : ""}${met ? " met" : ""}`;
+function sideHtml(c, which) {
+  const s = which === "L" ? c.L : c.R;
+  const side = which === "L" ? "left" : "right";
+  const you = c.won === side;
+  const met = c.says === side;
   const url = data.imgs[String(s.i)] || "";
-  return `<div class="bp-side${cls}">
-    <img loading="lazy" src="${url}" alt="">
-    <div class="bp-who">
-      ${you ? `<span style="color:${C_OK}">● human picked this</span>` : ""}
-      ${met ? `<span style="color:${C_MET}">● metric picked this</span>` : ""}
-    </div>
-    ${metricTable(s.m)}
-    <div class="bp-src">${s.v} · r${s.r} f${s.f}</div>
-  </div>`;
+  return `<figure class="bp-side${you ? " you" : ""}${met ? " met" : ""}">
+    <img loading="lazy" src="${url}" alt="${side} frame">
+    <figcaption>
+      <div class="bp-picks">
+        ${you ? '<span class="p-you">● human picked</span>' : ""}
+        ${met ? '<span class="p-met">● metric picked</span>' : ""}
+        ${!you && !met ? '<span class="p-non">—</span>' : ""}
+      </div>
+      <div class="bp-src">${s.v} · r${s.r} f${s.f}</div>
+    </figcaption>
+  </figure>`;
 }
 
-function renderList() {
-  const box = document.getElementById("bp-list");
-  if (!box) return;
-  const cards = data.cards.filter(FILTERS[filter]);
-  box.innerHTML = cards
-    .map(
-      (c) => `<div class="bp-card ${c.ok ? "ok" : "no"}">
-      <div class="bp-hd">
+function paintOne() {
+  const stage = document.getElementById("bp-stage");
+  if (!stage) return;
+  const list = shown();
+  if (!list.length) {
+    stage.innerHTML = `<p class="hint">nothing in this filter</p>`;
+    return;
+  }
+  idx = Math.max(0, Math.min(idx, list.length - 1));
+  const c = list[idx];
+  stage.innerHTML = `
+    <div class="bp-pair">${sideHtml(c, "L")}${sideHtml(c, "R")}</div>
+    <div class="bp-meta">
+      <div>
+        <span class="bp-id">pair ${c.id}</span>
         <span class="bp-tag ${c.ok ? "ok" : "no"}">${c.ok ? "AGREE" : "DISAGREE"}</span>
-        <span>pair ${c.id}</span>
-        <span>metric called them <b>${c.d}°</b> apart</span>
-        ${c.flip ? `<span class="bp-tag fl">NO STABLE HUMAN ANSWER</span>` : ""}
+        ${c.flip ? '<span class="bp-tag fl">NO STABLE HUMAN ANSWER</span>' : ""}
+        <div class="bp-gap">metric called them <b>${c.d}°</b> apart</div>
       </div>
-      <div class="bp-pair">
-        ${sideHtml(c.L, c.won === "left", c.says === "left")}
-        ${sideHtml(c.R, c.won === "right", c.says === "right")}
-      </div></div>`
-    )
-    .join("");
-  const cnt = document.getElementById("bp-count");
-  if (cnt) cnt.textContent = `${cards.length} shown`;
+      ${metricTable(c)}
+      <p class="bp-note">${
+        c.flip
+          ? "This pair was re-shown swapped and answered differently, so there is no stable human answer to get right."
+          : c.d < 5
+          ? "A near-tie. Losing these is expected — the labeler flips on them too."
+          : c.ok
+          ? ""
+          : "A confident miss. This is the kind that breaks a threshold."
+      }</p>
+    </div>`;
+  document.getElementById("bp-pos").textContent = `${idx + 1} / ${list.length}`;
+  document.getElementById("bp-prev").disabled = idx === 0;
+  document.getElementById("bp-next").disabled = idx === list.length - 1;
+  for (const j of [idx + 1, idx - 1]) {
+    const n = list[j];
+    if (n) for (const s of [n.L, n.R]) { const im = new Image(); im.src = data.imgs[String(s.i)]; }
+  }
 }
+
+function step(d) {
+  idx += d;
+  paintOne();
+}
+
 
 function renderShell() {
   if (dataError) {
     host.innerHTML = `<h2>Bladedness pairs</h2>
-      <div style="color:${C_BAD}">bladedness_pairs.json failed to load — ${dataError}</div>
+      <div style="color:#e94560">bladedness_pairs.json failed to load — ${dataError}</div>
       <p class="hint">Generate + copy it:<br>
         <code>python bladedness/pair_review.py</code><br>
         <code>cp ~/code/cornerman-backend/bladedness/pair_lens_data.json
         ~/code/cornerman-debug-viewer/data/bladedness_pairs.json</code></p>`;
     return;
   }
-  const pct = ((data.agree / Math.max(data.n, 1)) * 100).toFixed(1);
-  host.innerHTML = `
-    <style>
-      .bp-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}
-      .bp-bar b{color:${C_BAD}}
-      .bp-bar button{background:#1a2138;border:1px solid #2b3555;color:#cbd5e8;
-        padding:4px 11px;border-radius:5px;cursor:pointer;font-size:12px}
-      .bp-bar button.on{background:${C_BAD};border-color:${C_BAD};color:#fff}
-      .bp-card{margin:12px 0;border-radius:9px;background:#161d33;
-        border-left:5px solid;padding:9px 13px}
-      .bp-card.ok{border-color:${C_OK}} .bp-card.no{border-color:${C_BAD}}
-      .bp-hd{display:flex;gap:13px;align-items:baseline;flex-wrap:wrap;
-        margin-bottom:7px;font-family:ui-monospace,monospace;font-size:12px;color:#8ea2c8}
-      .bp-tag{padding:1px 8px;border-radius:9px;font-size:11px;font-weight:700}
-      .bp-tag.ok{background:#1d4429;color:#8ce0a3}
-      .bp-tag.no{background:#4a1626;color:#ff9db0}
-      .bp-tag.fl{background:#4a3a12;color:#f5cf72}
-      .bp-pair{display:grid;grid-template-columns:1fr 1fr;gap:13px}
-      .bp-side{background:#101728;border-radius:7px;padding:7px;border:2px solid transparent}
-      .bp-side.you{border-color:${C_OK}}
-      .bp-side.met{box-shadow:inset 0 0 0 2px ${C_MET}}
-      .bp-side img{width:100%;max-height:400px;object-fit:contain;border-radius:5px;display:block}
-      .bp-who{font-size:11px;margin:5px 0 2px;font-family:ui-monospace,monospace}
-      .bp-m{font-family:ui-monospace,monospace;font-size:11px;color:#93a3c4;border-collapse:collapse}
-      .bp-m td{padding:0 8px 0 0} .bp-m td:first-child{color:#5f6d8c}
-      .bp-src{font-size:10px;color:#5f6d8c;margin-top:3px;word-break:break-all}
-    </style>
-    <h2>Bladedness pairs — human vs <code>${data.metric}</code></h2>
-    <p class="hint">
-      <b>${data.agree}</b>/${data.n} = <b>${pct}%</b> of comparisons ordered the
-      same way. Sorted worst-disagreement first: a miss on frames called 3° apart
-      is a near-tie, a miss at 50° is what breaks a threshold.
-      Of the ${data.flipped} pairs the labeler answered differently when re-shown
-      swapped, the metric lost ${data.flipped_lost} — those have no stable answer
-      to get right.
-    </p>
-    <div class="bp-bar">
-      <button data-f="all" class="on">all</button>
-      <button data-f="bad">disagreements (${data.n - data.agree})</button>
-      <button data-f="ok">agreements</button>
-      <button data-f="flip">no stable answer (${data.flipped})</button>
-      <span class="hint" id="bp-count"></span>
-    </div>
-    <div id="bp-list"></div>`;
+  const slot = document.getElementById("stage-extras");
+  if (!slot) return;
+  slot.innerHTML = "";
 
-  for (const b of host.querySelectorAll(".bp-bar button")) {
-    b.addEventListener("click", () => {
-      host.querySelectorAll(".bp-bar button").forEach((x) => x.classList.remove("on"));
-      b.classList.add("on");
-      filter = b.dataset.f;
-      renderList();
-    });
-  }
-  renderList();
+  // Takeover CSS lives INSIDE #stage-extras: the viewer clears that slot on
+  // every lens switch, so the player, pickers and sidebar come back by
+  // themselves. There is no unmount hook to do it.
+  const takeover = document.createElement("style");
+  takeover.textContent = `
+    #stage > *:not(#stage-extras) { display:none !important; }
+    #side { display:none !important; }
+    /* Renders 700 fixed comparisons and never reads a round, so every way of
+       loading one is noise. The LENS select stays — with #side hidden it is the
+       only way back out. */
+    .picker-row, #firebase-section, #ondevice-section, .manual-fallback,
+    #drive-section, #cache-section { display:none !important; }
+    body > header { display:none !important; }
+    #picker-card { margin:0 !important; padding:6px 10px !important; }
+    .layout { display:block !important; }
+    #stage { width:100% !important; max-width:none !important;
+             padding:0 !important; background:none !important; }
+    #viewer { padding:4px 6px 0 !important; }
+    #stage-extras { margin-top:0 !important; }
+    /* HEIGHT IS DONE IN CSS, NOT MEASURED. Two earlier attempts measured
+       window.innerHeight and set a pixel height: the first read 0 before the
+       pane had laid out, the second read a stale value because the takeover
+       below moves this panel several hundred pixels up. A flex chain from
+       <body> has neither failure mode and needs no resize listener. */
+    html, body { height:100% !important; }
+    body { display:flex !important; flex-direction:column !important;
+           overflow:hidden !important; }
+    #viewer { flex:1 1 auto !important; min-height:0 !important;
+              display:flex !important; flex-direction:column !important; }
+    .layout { flex:1 1 auto !important; min-height:0 !important; }
+    #stage, #stage-extras { height:100% !important; min-height:0 !important; }
+
+    #bp-panel{height:100%;display:flex;flex-direction:column;background:#12182b;color:#e0e0e0;
+      font:15px/1.55 system-ui,sans-serif;border-radius:8px;overflow:hidden}
+    #bp-top{display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+      padding:9px 18px;background:#0f1424;border-bottom:1px solid #24304f}
+    #bp-top h2{font-size:15px;margin:0}
+    #bp-top .s{font-family:ui-monospace,monospace;font-size:13px;color:#8ea2c8}
+    #bp-top .s b{color:#e94560}
+    #bp-panel button,#bp-panel select{background:#1a2138;border:1px solid #2b3555;
+      color:#cbd5e8;padding:5px 13px;border-radius:5px;cursor:pointer;font-size:13px}
+    #bp-panel button:disabled{opacity:.3;cursor:default}
+    #bp-pos{font-family:ui-monospace,monospace;color:#e94560;font-weight:700}
+    #bp-stage{flex:1;min-height:0;display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(290px,25%);gap:20px;padding:14px 18px}
+    .bp-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;min-height:0}
+    .bp-side{margin:0;display:flex;flex-direction:column;min-height:0;
+      background:#101728;border-radius:9px;padding:8px;border:2px solid transparent}
+    .bp-side.you{border-color:#3f9d55}
+    .bp-side.met{box-shadow:inset 0 0 0 2px #e9a03f}
+    .bp-side img{flex:1;min-height:0;width:100%;object-fit:contain;border-radius:6px}
+    .bp-side figcaption{margin-top:7px;font-family:ui-monospace,monospace;font-size:11px}
+    .bp-picks{display:flex;gap:12px;font-size:12px;margin-bottom:3px}
+    .p-you{color:#8ce0a3} .p-met{color:#e9a03f} .p-non{color:#5f6d8c}
+    .bp-src{color:#5f6d8c;word-break:break-all;line-height:1.35}
+    .bp-meta{display:flex;flex-direction:column;gap:14px;overflow:auto}
+    .bp-id{font-family:ui-monospace,monospace;font-size:20px;color:#e94560;font-weight:700}
+    .bp-tag{display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;
+      font-weight:700;margin-left:8px}
+    .bp-tag.ok{background:#1d4429;color:#8ce0a3}
+    .bp-tag.no{background:#4a1626;color:#ff9db0}
+    .bp-tag.fl{background:#4a3a12;color:#f5cf72}
+    .bp-gap{margin-top:9px;font-family:ui-monospace,monospace;font-size:13px;color:#8ea2c8}
+    .bp-t{border-collapse:collapse;font-family:ui-monospace,monospace;font-size:13px;width:100%}
+    .bp-t th{color:#5f6d8c;font-weight:400;font-size:11px;text-align:right;padding:0 0 4px}
+    .bp-t th:first-child{text-align:left}
+    .bp-t td{padding:3px 0;text-align:right;color:#93a3c4}
+    .bp-t td.k{text-align:left;color:#5f6d8c}
+    .bp-t td.hi{color:#fff;font-weight:700}
+    .bp-note{margin:0;font-size:12.5px;color:#8ea2c8;line-height:1.45}
+    @media (max-width:1000px){#bp-stage{grid-template-columns:1fr;
+      grid-template-rows:minmax(52vh,1fr) auto;overflow:auto}}
+  `;
+  slot.appendChild(takeover);
+
+  const pct = ((data.agree / Math.max(data.n, 1)) * 100).toFixed(1);
+  const panel = document.createElement("div");
+  panel.id = "bp-panel";
+  panel.innerHTML = `
+    <div id="bp-top">
+      <h2>Bladedness pairs — human vs <code>${data.metric}</code></h2>
+      <button id="bp-prev">← prev</button>
+      <span id="bp-pos"></span>
+      <button id="bp-next">next →</button>
+      <select id="bp-filter">
+        <option value="all">all ${data.n}</option>
+        <option value="bad">disagreements (${data.n - data.agree})</option>
+        <option value="ok">agreements</option>
+        <option value="flip">no stable answer (${data.flipped})</option>
+      </select>
+      <span class="s"><b>${data.agree}</b>/${data.n} = <b>${pct}%</b> agree</span>
+      <span style="flex:1"></span>
+      <span class="s">worst disagreements first · ← → to page</span>
+    </div>
+    <div id="bp-stage"></div>`;
+  slot.appendChild(panel);
+
+  panel.querySelector("#bp-prev").onclick = () => step(-1);
+  panel.querySelector("#bp-next").onclick = () => step(1);
+  panel.querySelector("#bp-filter").onchange = (e) => {
+    filter = e.target.value;
+    idx = 0;
+    paintOne();
+  };
+
+  // The viewer has no unmount hook, so this listener manages itself: drop the
+  // one from a previous mount (or switching away and back doubles every
+  // keypress) and no-op once the panel has left the DOM (or it keeps stealing
+  // the arrow keys the viewer uses to step the video).
+  if (onKey) document.removeEventListener("keydown", onKey, true);
+  onKey = (e) => {
+    if (!document.getElementById("bp-panel")) return;
+    if (e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); step(-1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); step(1); }
+  };
+  document.addEventListener("keydown", onKey, true);
+
+
+  paintOne();
 }
 
 export const BladednessPairsRule = {
   id: "bladedness_pairs_lens",
   label: "Bladedness pairs (labels vs metric)",
 
-  // Its own data file, no round needed — same as the frames lens.
   standalone: true,
 
   mount(_host) {
     host = _host;
+    idx = 0;
     host.innerHTML = `<h2>Bladedness pairs</h2><p class="hint">Loading…</p>`;
     (dataPromise || loadData()).then(renderShell);
   },

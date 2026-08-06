@@ -120,15 +120,6 @@ function step(d) {
   paintOne();
 }
 
-// Size the panel to whatever viewport is left BELOW it, measured rather than
-// guessed: the lens picker stays visible above, and hard-coding its height
-// would leave the page scrolling by exactly the amount the guess was wrong.
-let onResize = null;
-function fitPanel() {
-  const el = document.getElementById("cr-panel");
-  if (!el) return;
-  el.style.height = Math.max(320, window.innerHeight - el.getBoundingClientRect().top - 6) + "px";
-}
 
 function renderShell() {
   if (dataError) {
@@ -174,8 +165,20 @@ function renderShell() {
        what makes the page scroll by a sliver. */
     #viewer { padding:4px 6px 0 !important; }
     #stage-extras { margin-top:0 !important; }
+    /* HEIGHT IS DONE IN CSS, NOT MEASURED. Two earlier attempts measured
+       window.innerHeight and set a pixel height: the first read 0 before the
+       pane had laid out, the second read a stale value because the takeover
+       below moves this panel several hundred pixels up. A flex chain from
+       <body> has neither failure mode and needs no resize listener. */
+    html, body { height:100% !important; }
+    body { display:flex !important; flex-direction:column !important;
+           overflow:hidden !important; }
+    #viewer { flex:1 1 auto !important; min-height:0 !important;
+              display:flex !important; flex-direction:column !important; }
+    .layout { flex:1 1 auto !important; min-height:0 !important; }
+    #stage, #stage-extras { height:100% !important; min-height:0 !important; }
 
-    #cr-panel{display:flex;flex-direction:column;
+    #cr-panel{height:100%;display:flex;flex-direction:column;
       background:#12182b;color:#e0e0e0;font:15px/1.55 system-ui,sans-serif;
       border-radius:8px;overflow:hidden}
     #cr-top{display:flex;gap:14px;align-items:center;flex-wrap:wrap;
@@ -259,12 +262,8 @@ function renderShell() {
   };
   document.addEventListener("keydown", onKey, true);
 
-  if (onResize) window.removeEventListener("resize", onResize);
-  onResize = () => fitPanel();
-  window.addEventListener("resize", onResize);
 
   paintOne();
-  fitPanel();
 }
 
 export const BladednessCoachRule = {
