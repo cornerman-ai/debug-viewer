@@ -29,9 +29,9 @@
       </div>
       <p class="hint">
         Point at the folder that contains your videos + cache subfolders
-        (e.g. <code>My Drive/boxing_ai/</code>). Sub-directories are walked
-        recursively so yolo_pose_cache, apple_vision_pose_cache (2D and 3D
-        <code>_vision3d_</code> caches alongside) all get picked up. Chrome
+        (e.g. <code>My Drive/Cornerman/data/</code>). Sub-directories are
+        walked recursively, so <code>skeleton_data/blazepose/</code> and
+        <code>raw_videos/</code> both get picked up in one grant. Chrome
         and Edge only — Safari/Firefox use the manual picker below.
       </p>
     </details>
@@ -45,10 +45,9 @@
       </label>
       <p class="hint">
         Use this when you don't want a persistent Drive-folder grant.
-        Pick <code>yolo_pose_cache/</code>, then pick again for
-        <code>apple_vision_pose_cache/</code>; index merges across picks.
-        The 2D and 3D Apple Vision caches share the same folder — both
-        get indexed.
+        Pick <code>Cornerman/data/skeleton_data/blazepose/</code> (legacy
+        engine caches from <code>Cornerman/archive/</code> can be added
+        the same way); picking again merges into one index.
       </p>
     </details>
 
