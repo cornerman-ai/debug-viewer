@@ -48,8 +48,8 @@ import { gloveXY, gloveConf } from "../../pose-loader.js";
 // and joined by punch_uuid). 0 = flat across the image (side-on), 1 = down the
 // camera axis (foreshortened) — same scale and meaning the gate always used.
 import { ensureAxialityModel, axialityForPunch } from "../shared/axiality_predictions.js";
-import { activeDetections, isStraightType } from "../shared/detections.js";
-import { toQuality, qualityOf } from "../shared/score.js";
+import { activeDetections, isStraightType } from "../shared/punch_detections.js";
+import { toQuality, qualityOf } from "../shared/rules_score.js";
 
 const DEFAULTS = {
   threshold:        0.98,     // pass if peak ratio ≥ this (geometric straightness); 0.98 ≈ 23° bend = where it starts being a mistake

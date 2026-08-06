@@ -37,7 +37,7 @@
 //   else                          → high
 
 import { J, torsoHeight, drawSkeleton } from "../../skeleton.js";
-import { activeDetections, isRotationApplicable } from "../shared/detections.js";
+import { activeDetections, isRotationApplicable } from "../shared/punch_detections.js";
 
 // W_est is per-VIDEO, not per-round. As the user visits more rounds of the
 // same video we take the running max so the estimate gets more accurate (the

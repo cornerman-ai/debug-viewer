@@ -37,7 +37,7 @@
 
 import { J } from "../../skeleton.js";
 import { STANCE_FITS } from "../research/orientation.js";
-import { qualityOf } from "../shared/score.js";
+import { qualityOf } from "../shared/rules_score.js";
 
 const MIN_ANKLE_CONF = 0.30;
 

@@ -16,7 +16,7 @@
 // out) so a node parity script can drive it against the Python rule.
 
 import { J } from "../../skeleton.js";
-import { qualityOf } from "../shared/score.js";
+import { qualityOf } from "../shared/rules_score.js";
 
 // Defaults match rules_config.json → rules.stance_width v4 and
 // StanceWidthConfig.default in the Swift port.

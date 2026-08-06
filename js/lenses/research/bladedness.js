@@ -36,7 +36,7 @@
 // band thresholds are guesses pending a coach — do not read them as tuned.
 
 import { J } from "../../skeleton.js";
-import { activeDetections } from "../shared/detections.js";
+import { activeDetections } from "../shared/punch_detections.js";
 
 const cfg = {
   wScale: 1.0,        // multiplies the auto W estimate (1.0 = use it as-is)

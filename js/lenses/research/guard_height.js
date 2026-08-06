@@ -41,7 +41,7 @@
 // than hidden so we can see how often it fires before deciding it matters.
 
 import { J } from "../../skeleton.js";
-import { activeDetections } from "../shared/detections.js";
+import { activeDetections } from "../shared/punch_detections.js";
 import { isGlovelessVideo, gloveNote } from "../shared/glove_filter.js";
 
 const DEFAULTS = {

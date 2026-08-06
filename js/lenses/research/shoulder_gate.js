@@ -15,7 +15,7 @@
 // so that side's flare is excluded within the hook's frame window.
 
 import { J } from "../../skeleton.js";
-import { activeDetections } from "../shared/detections.js";
+import { activeDetections } from "../shared/punch_detections.js";
 
 const cfg = {
   thresholdDeg: 35,       // shoulder within this many degrees of broadside ⇒ qualifies

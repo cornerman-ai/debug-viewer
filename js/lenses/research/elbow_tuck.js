@@ -17,7 +17,7 @@
 // stays "just the width" until we decide how to gate.
 
 import { J } from "../../skeleton.js";
-import { activeDetections } from "../shared/detections.js";
+import { activeDetections } from "../shared/punch_detections.js";
 
 // ── tunables (driven by the sidebar sliders) ────────────────────────────────
 const cfg = {

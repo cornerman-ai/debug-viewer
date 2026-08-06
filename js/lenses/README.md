@@ -10,7 +10,11 @@ Folders (the folder is the type — filenames carry no `_lens`/`_model` suffix):
 - `models/`    — inspect a trained model's outputs (GT vs predictions)
 - `research/`  — lenses for `cornerman-backend/ml/research/<topic>` work (same topic names)
 - `inspect/`   — pose/data-quality tools (no rule, no model)
-- `shared/`    — helpers lenses import; not lenses themselves, never in the registry
+- `shared/`    — helpers lenses import (punch_detections = which punches a lens
+                 analyzes: GT labels else classifier predictions; rules_score =
+                 mistake→quality mapping mirroring rules_config.json scoring.bands;
+                 glove_filter, skeleton_schemas, axiality_predictions); not lenses,
+                 never in the registry
 
 Data a lens fetches lives in `/lens_data/` (fetch paths resolve against the
 page, so moving modules never breaks them).
