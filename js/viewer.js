@@ -13,7 +13,6 @@ const BUILD = "2026-08-03.2";
 }
 
 import { loadPose, loadGloveWrists, loadPtsArray, loadBlaze33 } from "./pose-loader.js";
-import { loadPose3D } from "./pose-3d-loader.js";
 import { loadPunches } from "./punches-loader.js";
 import { fetchLiveLabels } from "./sheet-labels.js";
 import { drawSkeleton } from "./skeleton.js";
@@ -941,24 +940,10 @@ function loadFromIndex(videoFile, slot) {
           console.warn("punches load failed:", err.message);
         }
       }
-      // Optional: Apple Vision 3D cache lives in slot.vision3d. Loaded
-      // entirely independently of the 2D engines — different layout
-      // (17-joint Apple-native), different coordinate space (body-frame
-      // metres). The Vision 3D lens consumes it; 2D rules ignore it.
+      // Apple Vision 3D support was archived 2026-08-06
+      // (cornerman-archive/legacy-pose/debug-viewer-lenses/);
+      // state.pose3d stays null so lens contracts are unchanged.
       let pose3d = null;
-      if (slot.vision3d) {
-        try {
-          const v3 = slot.vision3d;
-          pose3d = await loadPose3D({
-            npy:  await drive.toFile(v3.npy),
-            meta: await drive.toFile(v3.meta),
-            cam:  v3.cam  ? await drive.toFile(v3.cam)  : null,
-            proj: v3.proj ? await drive.toFile(v3.proj) : null,
-          });
-        } catch (err) {
-          console.warn("3D pose load failed:", err.message);
-        }
-      }
       // Optional: glove-wrist sidecar — attached to the vision pose object
       // (or primary, if no vision). Frame timing matches the matching
       // vision cache 1:1, so the wrist-swap lens can index it directly.
