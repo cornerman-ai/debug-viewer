@@ -29,7 +29,7 @@
 // + deploy_to_repo.py. Phase-2 plan: PLAN.md in that folder.
 
 const DATA_URL =
-  "https://tradermathe.github.io/cornerman-audio-debug-viewer/data.json";
+  "https://cornerman-ai.github.io/cornerman-audio-debug-viewer/data.json";
 
 const TOL = 0.150;       // ±150 ms — matches Phase 1 / Step 5 eval
 const PHASE1_BAR_PP = 16.5;

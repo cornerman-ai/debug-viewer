@@ -2,11 +2,11 @@
 
 A static, dependency-free web app for inspecting YOLO-Pose and Apple
 Vision Drive caches against the
-[Cornerman](https://github.com/tradermathe/cornerman-backend) rules
+[Cornerman](https://github.com/cornerman-ai/cornerman-backend) rules
 engine, frame by frame. When both engines exist for a round, the
 engine-compare lens overlays them side-by-side.
 
-**Live**: https://tradermathe.github.io/cornerman-debug-viewer/
+**Live**: https://cornerman-ai.github.io/cornerman-debug-viewer/
 
 ## What it does
 
