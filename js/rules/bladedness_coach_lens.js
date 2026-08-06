@@ -61,9 +61,41 @@ const FILTERS = {
   no: (c) => c.agree === false,
   judge: (c) => c.band >= 0,
   oop: (c) => c.band < 0,
+  // The seven frames where John said outright that the hips and the shoulders
+  // are not in the same place — the only rows carrying hip-vs-shoulder signal.
+  split: (c) => c.split,
 };
 
 const shown = () => data.cards.filter(FILTERS[filter]);
+
+// His single prose verdict, split into a hip call and a shoulder call. This is
+// an INTERPRETATION of his words made offline (cornerman-backend's
+// coach_review/responses/john_parts.csv), not a second round of labelling — so
+// the rule and the exact phrase behind every split ride along on the card and
+// are rendered here. His verbatim review sits directly above, which is what
+// makes a split checkable rather than something to take on trust.
+//
+// Older data files predate the split; fall back to the single band rather than
+// rendering "undefined" if bladedness_coach.json has not been regenerated.
+function partsBlock(c) {
+  if (c.hipBand == null || c.shBand == null) {
+    return `<div class="cr-parts"><div class="cr-pbasis">no hip/shoulder split in
+      this data file — regenerate with <code>coach_review_page.py</code></div></div>`;
+  }
+  const chip = (b, name) => `<span class="cr-band b${b < 0 ? "m1" : b}">${name}</span>`;
+  return `
+    <div class="cr-parts${c.split ? " split" : ""}">
+      <div class="cr-prow"><span class="cr-plab">hips</span>
+        ${chip(c.hipBand, c.hipBandName)}
+        <span class="cr-pm">hip3D ${c.m.hip3D ?? "—"}°</span></div>
+      <div class="cr-prow"><span class="cr-plab">shoulders</span>
+        ${chip(c.shBand, c.shBandName)}
+        <span class="cr-pm">sh3D ${c.m.sh3D ?? "—"}°</span></div>
+      <div class="cr-pbasis">${c.split ? "<b>he split them</b> — " : ""}${c.basisNote}
+        ${c.hedge ? `· <i>hedged (${c.hedge})</i>` : ""}
+        <br><span class="cr-pev">from: “${c.evidence}”</span></div>
+    </div>`;
+}
 
 function metricRows(m) {
   return Object.entries(m)
@@ -102,6 +134,7 @@ function paintOne() {
               : '<span style="color:#9fb0d0">not scored</span>'
           }</span>
         <blockquote>${c.quote}</blockquote>
+        ${partsBlock(c)}
         <div class="cr-src">${c.video} · r${c.round} f${c.frame} · ${c.t}s</div>
       </div>
       <table class="cr-t">${metricRows(c.m)}</table>
@@ -208,6 +241,18 @@ function renderShell() {
     .cr-t td{padding:3px 18px 3px 0} .cr-t td:first-child{color:#5f6d8c}
     .cr-v{font-weight:700;color:#e0e0e0}
     .cr-src{margin-top:9px;font-size:11px;color:#5f6d8c;word-break:break-all}
+    /* His ONE prose verdict, split into a hip call and a shoulder call. Sits
+       directly under the quote it was derived from — the evidence line is what
+       makes the split checkable rather than asserted. Lives inside .cr-meta,
+       which scrolls on its own, so this can never push the frame off-screen. */
+    .cr-parts{margin-top:11px;padding:9px 12px;border-radius:8px;
+      background:#101728;border:1px solid #1d2740}
+    .cr-parts.split{border-color:#e94560}
+    .cr-prow{display:flex;align-items:center;gap:9px;margin:3px 0}
+    .cr-plab{display:inline-block;min-width:74px;color:#5f6d8c;font-size:13px}
+    .cr-pm{font-family:ui-monospace,monospace;font-size:12px;color:#8b9ab8}
+    .cr-pbasis{margin-top:7px;font-size:12px;color:#8b9ab8;line-height:1.5}
+    .cr-pev{color:#5f6d8c;font-style:italic}
     /* Stacked on a narrow window the meta column would squeeze the frame to
        nothing — reserve most of the height for the image. */
     @media (max-width:900px){#cr-stage{grid-template-columns:1fr;
@@ -225,6 +270,7 @@ function renderShell() {
       <button id="cr-next">next →</button>
       <select id="cr-filter">
         <option value="all">all 30</option>
+        <option value="split">hips ≠ shoulders</option>
         <option value="no">disagreements only</option>
         <option value="judge">judgeable</option>
         <option value="oop">out of position</option>
