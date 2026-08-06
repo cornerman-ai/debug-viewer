@@ -8,7 +8,7 @@
 //
 //   2. PREDICTED facing arrow  (cyan)  — computed as
 //          predicted_gt = sign * arrow_image_angle + offset
-//      with per-stance (sign, offset) fitted by boxing_ai/orientation_model/
+//      with per-stance (sign, offset) fitted by cornerman-backend ml/research/orientation_model/
 //      06_ankle_arrow.py against existing orientation labels. Only drawn when
 //      the current frame falls inside a labelled punch (stance is taken from
 //      that punch — that's the only place we know orthodox vs southpaw).
@@ -28,7 +28,7 @@ import { J } from "../skeleton.js";
 import { fetchOrientationForStem } from "../sheet-labels.js";
 
 // Per-stance fit baked here as a constant. Update by running
-// boxing_ai/orientation_model/07_punch_directions.ipynb, copying the
+// cornerman-backend ml/research/orientation_model/07_punch_directions.ipynb, copying the
 // snippet printed by its last cell, replacing this block, and pushing.
 // The fit changes infrequently — a code edit beats infra plumbing.
 //

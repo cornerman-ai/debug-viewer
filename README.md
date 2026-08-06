@@ -24,10 +24,10 @@ nothing is uploaded.
 
 ## Workflow
 
-1. **Cache folder** — pick `boxing_ai/yolo_pose_cache/`, then pick
-   again for `boxing_ai/apple_vision_pose_cache/`. The viewer indexes
-   every `<base>_<engine>_r<N>.npy + <base>_<engine>_r<N>_meta.json`
-   pair (`<engine>` is `yolo` or `vision`, `.bak.npy` backups skipped)
+1. **Cache folder** — pick `Cornerman/data/skeleton_data/blazepose/`
+   (legacy yolo/vision caches live under `Cornerman/archive/boxing_ai/`).
+   The viewer indexes every `<base>_<engine>_r<N>.npy +
+   <base>_<engine>_r<N>_meta.json` pair (`.bak.npy` backups skipped)
    and **merges picks** so both engines end up in one index. Status
    line reports counts per engine. Use *Clear index* to start over.
    Same workflow on Mac and Windows — no symlinks, no parent-folder

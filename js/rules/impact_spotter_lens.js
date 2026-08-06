@@ -3,7 +3,7 @@
 //
 // Loads ./data/impact_spotter_data.json (committed to this repo). Regenerate:
 //   cd ~/code/cornerman-backend && .venv/bin/python impact_spotter/train_impact_spotter.py
-//   cp "$HOME/Google Drive/My Drive/boxing_ai/impact_spotter/impact_spotter_viewer_latest.json" \
+//   cp "$HOME/Google Drive/My Drive/Cornerman/data/model_outputs/impact_spotter/impact_spotter_viewer_latest.json" \
 //      ~/code/cornerman-debug-viewer/data/impact_spotter_data.json
 //
 // Schema (times are SOURCE-VIDEO seconds; gt/pred/span are BlazePose cache
@@ -221,7 +221,7 @@ function buildSidebar(state) {
     host.innerHTML =
       `<div style="color:${C.bad}">impact_spotter_data.json failed to load ` +
       `(${dumpError}).<br>Deploy it with:<br>` +
-      `<code style="font-size:11px">cp "$HOME/Google Drive/My Drive/boxing_ai/` +
+      `<code style="font-size:11px">cp "$HOME/Google Drive/My Drive/Cornerman/data/model_outputs/` +
       `impact_spotter/impact_spotter_viewer_latest.json" data/impact_spotter_data.json</code></div>`;
     return;
   }
