@@ -20,7 +20,7 @@
 // (no entry) are skipped — every entry carries both pred and GT, since the OOF
 // dump only covers labelled punches.
 
-import { J, drawSkeleton } from "../skeleton.js";
+import { J, drawSkeleton } from "../../skeleton.js";
 
 const NAME_RE = /^predictions_hip_rotation_.*\.json$/i;
 

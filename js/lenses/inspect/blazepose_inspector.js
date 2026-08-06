@@ -10,7 +10,7 @@
 //   0 x   1 y   2 z   3 x_world_m   4 y_world_m   5 z_world_m   6 visibility   7 presence
 // x,y are image-normalised (0..1); we de-normalise to video px for the overlay.
 
-import { SCHEMAS, GROUPS } from "./_skeleton_schemas.js";
+import { SCHEMAS, GROUPS } from "../shared/skeleton_schemas.js";
 
 const SCH = SCHEMAS.blazepose33;
 const NAMES = SCH.names, TAGS = SCH.point_tags, EDGES = SCH.edges;

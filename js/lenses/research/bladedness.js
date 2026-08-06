@@ -35,8 +35,8 @@
 // catch. Hence the W slider, and hence the onboarding calibration pose. The
 // band thresholds are guesses pending a coach — do not read them as tuned.
 
-import { J } from "../skeleton.js";
-import { activeDetections } from "./_detections.js";
+import { J } from "../../skeleton.js";
+import { activeDetections } from "../shared/detections.js";
 
 const cfg = {
   wScale: 1.0,        // multiplies the auto W estimate (1.0 = use it as-is)

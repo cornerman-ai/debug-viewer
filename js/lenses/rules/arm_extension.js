@@ -41,15 +41,15 @@
 // Compares predicted vs the labeler's rule_extension verdict when
 // available — same agree/disagree pattern as the hip_rotation lens.
 
-import { J } from "../skeleton.js";
-import { gloveXY, gloveConf } from "../pose-loader.js";
+import { J } from "../../skeleton.js";
+import { gloveXY, gloveConf } from "../../pose-loader.js";
 // Axiality is the sideways gate: the trained temporal model's held-out
 // per-punch prediction (predictions_axiality_*.json, loaded by axiality_model.js
 // and joined by punch_uuid). 0 = flat across the image (side-on), 1 = down the
 // camera axis (foreshortened) — same scale and meaning the gate always used.
-import { ensureAxialityModel, axialityForPunch } from "./axiality_model.js";
-import { activeDetections, isStraightType } from "./_detections.js";
-import { toQuality, qualityOf } from "./_score.js";
+import { ensureAxialityModel, axialityForPunch } from "../shared/axiality_predictions.js";
+import { activeDetections, isStraightType } from "../shared/detections.js";
+import { toQuality, qualityOf } from "../shared/score.js";
 
 const DEFAULTS = {
   threshold:        0.98,     // pass if peak ratio ≥ this (geometric straightness); 0.98 ≈ 23° bend = where it starts being a mistake

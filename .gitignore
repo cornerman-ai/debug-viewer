@@ -1,2 +1,5 @@
 demo-assets/
 dist/
+.claude/
+.firebase/
+_testround/

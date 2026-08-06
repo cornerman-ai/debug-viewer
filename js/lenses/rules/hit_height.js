@@ -30,13 +30,13 @@
 // Side maps from (hand, stance) like guard_drop / arm_extension; wrist source
 // prefers the v6 glove-baked wrist, then a legacy glove sidecar, then pose.
 
-import { J } from "../skeleton.js";
-import { gloveXY, gloveConf } from "../pose-loader.js";
+import { J } from "../../skeleton.js";
+import { gloveXY, gloveConf } from "../../pose-loader.js";
 // Axiality gate (same as arm_extension): a straight down the camera axis
 // foreshortens, so the 2D landing frame + fist height can't be trusted — skip it.
-import { ensureAxialityModel, axialityForPunch } from "./axiality_model.js";
-import { activeDetections } from "./_detections.js";
-import { toQuality, qualityOf } from "./_score.js";
+import { ensureAxialityModel, axialityForPunch } from "../shared/axiality_predictions.js";
+import { activeDetections } from "../shared/detections.js";
+import { toQuality, qualityOf } from "../shared/score.js";
 
 const DEFAULTS = {
   // Head zone margins (× standing height) around the stance crown / chin.

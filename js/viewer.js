@@ -16,7 +16,7 @@ import { loadPose, loadGloveWrists, loadPtsArray, loadBlaze33 } from "./pose-loa
 import { loadPunches } from "./punches-loader.js";
 import { fetchLiveLabels } from "./sheet-labels.js";
 import { drawSkeleton } from "./skeleton.js";
-import { RULES } from "./rules/registry.js";
+import { RULES } from "./lenses/registry.js";
 import * as drive from "./drive-folder.js";
 import { Muxer, ArrayBufferTarget } from "./vendor/mp4-muxer.mjs";
 import * as firebaseSource from "./firebase-source.js";

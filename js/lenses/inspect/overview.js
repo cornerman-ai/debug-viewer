@@ -6,7 +6,7 @@
 // the current frame falls inside a labelled (or model-detected) punch window.
 // Source order: state.labels (ground truth) > state.punches (ST-GCN) > none.
 
-import { JOINT_NAMES, confColor, drawSkeleton } from "../skeleton.js";
+import { JOINT_NAMES, confColor, drawSkeleton } from "../../skeleton.js";
 
 let host;
 

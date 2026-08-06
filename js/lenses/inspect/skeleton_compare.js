@@ -12,7 +12,7 @@
 // Slot A = warm/orange, Slot B = cool/cyan. Wrists enlarged. Region toggles +
 // confidence slider manage clutter on the dense 133-point skeleton.
 
-import { SCHEMAS, GROUPS } from "./_skeleton_schemas.js";
+import { SCHEMAS, GROUPS } from "../shared/skeleton_schemas.js";
 
 const A_BONE = "rgba(255,138,60,0.65)",  A_JOINT = "#ff8a3c";
 const B_BONE = "rgba(95,209,255,0.65)",  B_JOINT = "#5fd1ff";

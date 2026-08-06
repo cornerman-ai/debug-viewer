@@ -24,8 +24,8 @@
 // that maps to `image_angle = 90° - gt`. The arrow we draw at GT or PRED
 // points in that image direction.
 
-import { J } from "../skeleton.js";
-import { fetchOrientationForStem } from "../sheet-labels.js";
+import { J } from "../../skeleton.js";
+import { fetchOrientationForStem } from "../../sheet-labels.js";
 
 // Per-stance fit baked here as a constant. Update by running
 // cornerman-backend ml/research/orientation_model/07_punch_directions.ipynb, copying the

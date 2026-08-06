@@ -50,11 +50,11 @@
 // Compares predicted vs the labeler's rule_hand_ushape verdict when
 // available — same agree/disagree pattern as arm_extension.
 
-import { J } from "../skeleton.js";
-import { gloveXY, gloveConf } from "../pose-loader.js";
-import { ensureAxialityModel, axialityForPunch } from "./axiality_model.js";
-import { activeDetections, isStraightType } from "./_detections.js";
-import { toQuality, qualityOf } from "./_score.js";
+import { J } from "../../skeleton.js";
+import { gloveXY, gloveConf } from "../../pose-loader.js";
+import { ensureAxialityModel, axialityForPunch } from "../shared/axiality_predictions.js";
+import { activeDetections, isStraightType } from "../shared/detections.js";
+import { toQuality, qualityOf } from "../shared/score.js";
 
 const DEFAULTS = {
   dropFail:     0.20,   // U-dip prominence (torsos) where it starts being a mistake (score 0 below)

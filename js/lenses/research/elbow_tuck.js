@@ -16,8 +16,8 @@
 // frontal-view gate (shoulder width / torso) is provided — default OFF so this
 // stays "just the width" until we decide how to gate.
 
-import { J } from "../skeleton.js";
-import { activeDetections } from "./_detections.js";
+import { J } from "../../skeleton.js";
+import { activeDetections } from "../shared/detections.js";
 
 // ── tunables (driven by the sidebar sliders) ────────────────────────────────
 const cfg = {

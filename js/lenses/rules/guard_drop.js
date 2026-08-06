@@ -29,8 +29,8 @@
 //   * Face landmark asymmetry (one ear visible, the other not) gives a free
 //     stance / facing-direction read.
 
-import { J, torsoHeight } from "../skeleton.js";
-import { isGlovelessVideo, gloveNote } from "./_glove_filter.js";
+import { J, torsoHeight } from "../../skeleton.js";
+import { isGlovelessVideo, gloveNote } from "../shared/glove_filter.js";
 
 // Defaults match rules_config.json → rules.guard_drop.params at the time
 // this viewer was written. The UI exposes sliders so we can re-tune without

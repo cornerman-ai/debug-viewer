@@ -17,8 +17,9 @@ manual multi-file picker is still available as a fallback.)
 
 The viewer renders the video with a skeleton overlay and a side-panel
 "lens" that re-paints the overlay and surfaces metrics for one rule at
-a time. Add a new lens by dropping a file in [js/rules/](js/rules/) and
-registering it in [js/rules/registry.js](js/rules/registry.js).
+a time. Add a new lens by dropping a file in the right [js/lenses/](js/lenses/)
+subfolder (rules / models / research / inspect) and registering it in
+[js/lenses/registry.js](js/lenses/registry.js) — see js/lenses/README.md.
 
 Files stay on the user's machine — the page uses the browser File API,
 nothing is uploaded.
@@ -54,8 +55,8 @@ Pick both files together via multi-select in the pose picker.
 ## Lenses
 
 The lens dropdown in the app is the authoritative list — one module per
-lens in [js/rules/](js/rules/), registered in
-[js/rules/registry.js](js/rules/registry.js).
+lens in [js/lenses/](js/lenses/) (foldered by kind: rules / models /
+research / inspect), registered in [js/lenses/registry.js](js/lenses/registry.js).
 
 ## Running locally
 

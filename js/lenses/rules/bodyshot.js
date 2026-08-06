@@ -47,7 +47,7 @@
 // head. The cyan line goes dashed in fallback mode so degraded behaviour
 // is visible at a glance.
 
-import { J } from "../skeleton.js";
+import { J } from "../../skeleton.js";
 
 const MIN_CONF = 0.30;
 const HEAD_THRESHOLD = -0.15;     // signal ≤ this → head (in torso units)

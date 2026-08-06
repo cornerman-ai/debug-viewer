@@ -22,7 +22,7 @@
 // torso-normalized, so thresholds land close but not identically; sweep best
 // was t_dip=0.2 t_trav=0.1 min_s=0.15 (F1 0.53, recall 0.73 on frontal).
 
-import { J } from "../skeleton.js";
+import { J } from "../../skeleton.js";
 
 const cfg = {
   tDip: 0.20,     // baseline-drop threshold, torso units

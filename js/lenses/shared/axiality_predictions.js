@@ -25,7 +25,7 @@
 //
 // This lives in its own shared module so any rule can gate on the learned
 // axiality bucket. Usage:
-//   import { ensureAxialityModel, axialityForPunch } from "./axiality_model.js";
+//   import { ensureAxialityModel, axialityForPunch } from "./axiality_predictions.js";
 //   ensureAxialityModel(state, onReady);           // idempotent; kicks async load
 //   const p = axialityForPunch(det.punch_uuid);    // sync; {predAxiality,...}|null
 

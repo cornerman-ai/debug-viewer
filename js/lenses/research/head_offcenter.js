@@ -51,10 +51,10 @@
 // Sign is image-space (+ = head right of center). The fault we flag is a SMALL
 // |head_travel| — the head stayed on the line through the punch.
 
-import { ensureAxialityModel, axialityForPunch } from "./axiality_model.js";
-import { activeDetections, isStraightType } from "./_detections.js";
-import { SCHEMAS } from "./_skeleton_schemas.js";
-import { qualityOf, qualityColor, qualityBand } from "./_score.js";
+import { ensureAxialityModel, axialityForPunch } from "../shared/axiality_predictions.js";
+import { activeDetections, isStraightType } from "../shared/detections.js";
+import { SCHEMAS } from "../shared/skeleton_schemas.js";
+import { qualityOf, qualityColor, qualityBand } from "../shared/score.js";
 
 // blaze33 channels: 0 x  1 y  2 z  3 xw  4 yw  5 zw  6 visibility  7 presence
 const CH = 8, X = 0, Y = 1, VIS = 6, NJ = 33;

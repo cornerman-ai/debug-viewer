@@ -14,8 +14,8 @@
 // Hook exclusion: during a hook the throwing hand's elbow abducts on purpose,
 // so that side's flare is excluded within the hook's frame window.
 
-import { J } from "../skeleton.js";
-import { activeDetections } from "./_detections.js";
+import { J } from "../../skeleton.js";
+import { activeDetections } from "../shared/detections.js";
 
 const cfg = {
   thresholdDeg: 35,       // shoulder within this many degrees of broadside ⇒ qualifies

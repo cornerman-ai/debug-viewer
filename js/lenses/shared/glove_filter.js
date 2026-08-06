@@ -18,7 +18,7 @@
 // If the Sheet can't be reached we fail OPEN (show everything) rather than
 // present an empty dropdown, matching bladedness_lens's manifest behaviour.
 
-import { fetchGloveByVideo, fetchRows, findSourceByBasename, normalizeName } from "../sheet-labels.js";
+import { fetchGloveByVideo, fetchRows, findSourceByBasename, normalizeName } from "../../sheet-labels.js";
 
 let gloveIndex = null;    // Map<video_name, "yes"|"no"|"mixed"|"">
 let gloveCounts = null;

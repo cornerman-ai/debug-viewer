@@ -35,9 +35,9 @@
 // so the structural read ("did it fire here, what swing was open") is
 // directly translatable.
 
-import { J } from "../skeleton.js";
-import { STANCE_FITS } from "./orientation_lens.js";
-import { qualityOf } from "./_score.js";
+import { J } from "../../skeleton.js";
+import { STANCE_FITS } from "../research/orientation.js";
+import { qualityOf } from "../shared/score.js";
 
 const MIN_ANKLE_CONF = 0.30;
 

@@ -15,7 +15,7 @@
 // while YOLO returns a low-confidence guess — so at low thresholds YOLO's
 // uptime looks inflated. Compare engines with the slider raised.
 
-import { JOINT_NAMES } from "../skeleton.js";
+import { JOINT_NAMES } from "../../skeleton.js";
 
 // Region groupings over COCO-17. Wrists/Ankles flagged as the key rows.
 const REGIONS = [

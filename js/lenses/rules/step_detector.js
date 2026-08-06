@@ -11,7 +11,7 @@
 // punches we can't run per-punch detection — the panel says so and the
 // gap track is shown unannotated.
 
-import { J, torsoHeight } from "../skeleton.js";
+import { J, torsoHeight } from "../../skeleton.js";
 
 const DEFAULTS = {
   gapSmoothSeconds: 0.083,

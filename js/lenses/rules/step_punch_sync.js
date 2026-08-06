@@ -27,8 +27,8 @@
 //   3. (no fallback)  — we no longer hallucinate punches; without a real
 //                       source we can't do per-punch step checks.
 
-import { J, torsoHeight } from "../skeleton.js";
-import { fetchLiveLabels } from "../sheet-labels.js";
+import { J, torsoHeight } from "../../skeleton.js";
+import { fetchLiveLabels } from "../../sheet-labels.js";
 
 const DEFAULTS = {
   stance: "orthodox",

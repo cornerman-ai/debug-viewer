@@ -19,14 +19,14 @@
 // No pose geometry — this lens is only the learned model's guess (vs truth when
 // a label exists).
 
-import { handForLabel } from "../sheet-labels.js";
+import { handForLabel } from "../../sheet-labels.js";
 import {
   ensureAxialityModel,
   axialityForPunch,
   axialityModelMeta,
   axialityModelError,
   axialityBucketName,
-} from "./axiality_model.js";
+} from "../shared/axiality_predictions.js";
 
 // Straight punch labels (head + body). Matches arm_extension.js. The sheet uses
 // "jab_head"/"cross_head"/…; the on-device punch classifier emits bare

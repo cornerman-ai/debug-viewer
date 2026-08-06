@@ -16,7 +16,7 @@
 //
 // New rule ports drop in here as additional sidebar sections.
 
-import { J } from "../skeleton.js";
+import { J } from "../../skeleton.js";
 
 const COLOR_PRED      = "#3ad9e0";  // cyan — on-device orientation arrow
 const COLOR_VIOLATION = "#ff5d6c";

@@ -40,9 +40,9 @@
 // the rear, so a single-side torso shifts by half that gap. It's flagged rather
 // than hidden so we can see how often it fires before deciding it matters.
 
-import { J } from "../skeleton.js";
-import { activeDetections } from "./_detections.js";
-import { isGlovelessVideo, gloveNote } from "./_glove_filter.js";
+import { J } from "../../skeleton.js";
+import { activeDetections } from "../shared/detections.js";
+import { isGlovelessVideo, gloveNote } from "../shared/glove_filter.js";
 
 const DEFAULTS = {
   targetOffset: 0.30,          // fraction of torso height below the nose
