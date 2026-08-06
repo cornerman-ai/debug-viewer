@@ -41,6 +41,7 @@ let data = null;
 let dataPromise = null;
 let dataError = null;
 let filter = "all";
+let pass = 0;      // index into data.passes
 let idx = 0;
 let onKey = null;
 
@@ -65,7 +66,8 @@ const FILTERS = {
   flip: (c) => c.flip,
 };
 
-const shown = () => data.cards.filter(FILTERS[filter]);
+const P = () => data.passes[pass];
+const shown = () => P().cards.filter(FILTERS[filter]);
 
 // Both frames' metrics in ONE table, side by side. Two separate tables would
 // make the reader hold six numbers in their head to compare them; the whole
@@ -94,7 +96,7 @@ function sideHtml(c, which) {
   const side = which === "L" ? "left" : "right";
   const you = c.won === side;
   const met = c.says === side;
-  const url = data.imgs[String(s.i)] || "";
+  const url = P().imgs[String(s.i)] || "";
   return `<figure class="bp-side${you ? " you" : ""}${met ? " met" : ""}">
     <img loading="lazy" src="${url}" alt="${side} frame">
     <figcaption>
@@ -119,8 +121,9 @@ function verdictRows(c) {
   return ["sh3D", "hip3D"]
     .map((name) => {
       const v = c.v && c.v[name];
-      if (!v) return `<tr><td class="k">${name}</td><td colspan="3">—</td></tr>`;
-      return `<tr>
+      const own = name === P().primary ? ' class="own"' : "";
+      if (!v) return `<tr${own}><td class="k">${name}</td><td colspan="3">—</td></tr>`;
+      return `<tr${own}>
         <td class="k">${name}</td>
         <td>picks <b>${v.says}</b></td>
         <td>${v.d}°</td>
@@ -157,7 +160,7 @@ function paintOne() {
         c.flip
           ? "Re-shown swapped and answered differently — no stable human answer to get right."
           : c.split
-          ? "The two torso metrics pick different frames here, so at most one can be right. These 151 pairs are where the shoulder-vs-hip question actually lives."
+          ? `The two torso metrics pick different frames here, so at most one can be right. These ${P().n_split} pairs are the only ones testing shoulders against hips.`
           : c.d < 5
           ? "A near-tie. Losing these is expected — the labeler flips on them too."
           : c.ok
@@ -170,7 +173,7 @@ function paintOne() {
   document.getElementById("bp-next").disabled = idx === list.length - 1;
   for (const j of [idx + 1, idx - 1]) {
     const n = list[j];
-    if (n) for (const s of [n.L, n.R]) { const im = new Image(); im.src = data.imgs[String(s.i)]; }
+    if (n) for (const s of [n.L, n.R]) { const im = new Image(); im.src = P().imgs[String(s.i)]; }
   }
 }
 
@@ -260,6 +263,9 @@ function renderShell() {
     .bp-v td{white-space:nowrap}
     .bp-v td.vok{color:#8ce0a3;font-weight:700}
     .bp-v td.vno{color:#ff9db0;font-weight:700}
+    .bp-v tr.own td.k{color:#e0e0e0;font-weight:700}
+    #bp-asks{padding:5px 18px;background:#171f38;color:#9fb0d0;font-size:12.5px}
+    #bp-asks b{color:#e0e0e0}
     .bp-gap{margin-top:9px;font-family:ui-monospace,monospace;font-size:13px;color:#8ea2c8}
     .bp-t{border-collapse:collapse;font-family:ui-monospace,monospace;font-size:13px;width:100%}
     .bp-t th{color:#5f6d8c;font-weight:400;font-size:11px;text-align:right;padding:0 0 4px}
@@ -273,38 +279,55 @@ function renderShell() {
   `;
   slot.appendChild(takeover);
 
-  const tal = (k) => {
-    const t = data.tally && data.tally[k];
-    return t ? `${((t.ok / Math.max(t.n, 1)) * 100).toFixed(1)}%` : "—";
-  };
   const panel = document.createElement("div");
   panel.id = "bp-panel";
   panel.innerHTML = `
     <div id="bp-top">
-      <h2>Bladedness pairs — human vs <code>${data.metric}</code></h2>
+      <h2>Bladedness pairs</h2>
+      <select id="bp-pass">${data.passes
+        .map((p, i) => `<option value="${i}">${p.attribute} pass (${p.n})</option>`)
+        .join("")}</select>
       <button id="bp-prev">← prev</button>
       <span id="bp-pos"></span>
       <button id="bp-next">next →</button>
-      <select id="bp-filter">
-        <option value="all">all ${data.n}</option>
-        <option value="bad">disagreements (${data.n - data.agree})</option>
-        <option value="ok">agreements</option>
-        <option value="split">shoulders vs hips split (${data.n_split ?? 0})</option>
-        <option value="flip">no stable answer (${data.flipped})</option>
-      </select>
-      <span class="s">sh3D <b>${tal("sh3D")}</b> · hip3D <b>${tal("hip3D")}</b></span>
-      ${
-        data.n_split
-          ? `<span class="s">on the ${data.n_split} they split:
-             sh3D <b>${data.split_sh}</b> vs hip3D <b>${data.split_hip}</b></span>`
-          : ""
-      }
+      <select id="bp-filter"></select>
+      <span class="s" id="bp-tally"></span>
       <span style="flex:1"></span>
       <span class="s">worst disagreements first · ← → to page</span>
     </div>
+    <div id="bp-asks"></div>
     <div id="bp-stage"></div>`;
   slot.appendChild(panel);
 
+  // Everything that depends on WHICH pass is being viewed. The two passes are
+  // different questions over different pair sets, so the counts, the filter
+  // options and the tally all change when you switch.
+  function chrome() {
+    const p = P(), t = p.tally;
+    const pct = (k) => ((t[k].ok / Math.max(t[k].n, 1)) * 100).toFixed(1) + "%";
+    panel.querySelector("#bp-asks").innerHTML =
+      `the human was asked: <b>${p.asks}</b> — ${p.n} comparisons`;
+    panel.querySelector("#bp-tally").innerHTML =
+      `sh3D <b>${pct("sh3D")}</b> · hip3D <b>${pct("hip3D")}</b>` +
+      (p.n_split
+        ? ` · on the ${p.n_split} they split: sh3D <b>${p.split_sh}</b> vs hip3D <b>${p.split_hip}</b>`
+        : "");
+    const f = panel.querySelector("#bp-filter");
+    f.innerHTML = `
+      <option value="all">all ${p.n}</option>
+      <option value="bad">disagreements (${p.n - p.agree})</option>
+      <option value="ok">agreements</option>
+      <option value="split">shoulders vs hips split (${p.n_split})</option>
+      <option value="flip">no stable answer (${p.flipped})</option>`;
+    f.value = filter;
+  }
+
+  panel.querySelector("#bp-pass").onchange = (e) => {
+    pass = +e.target.value;
+    idx = 0;
+    chrome();
+    paintOne();
+  };
   panel.querySelector("#bp-prev").onclick = () => step(-1);
   panel.querySelector("#bp-next").onclick = () => step(1);
   panel.querySelector("#bp-filter").onchange = (e) => {
@@ -312,6 +335,7 @@ function renderShell() {
     idx = 0;
     paintOne();
   };
+  chrome();
 
   // The viewer has no unmount hook, so this listener manages itself: drop the
   // one from a previous mount (or switching away and back doubles every
@@ -338,6 +362,7 @@ export const BladednessPairsRule = {
   mount(_host) {
     host = _host;
     idx = 0;
+    pass = 0;
     host.innerHTML = `<h2>Bladedness pairs</h2><p class="hint">Loading…</p>`;
     (dataPromise || loadData()).then(renderShell);
   },
