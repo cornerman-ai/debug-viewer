@@ -1076,14 +1076,14 @@ function mountStageTimeline() {
     <span style="color:${C_B_BLADED}">bladed</span>),
     <span style="color:${C_TIGHT}">tr</span> as a magnitude ramp
     (<span style="color:${C_TR_CROSS}">crossed feet</span>, no bands fit it),
-    <span style="color:${C_SH}">sh2D</span> / <span style="color:${C_FT}">ft</span> on the
-    placeholder edges · <span style="color:${C_PUNCH}">punch</span> ·
+    <span style="color:${C_FT}">ft</span> on the placeholder edges ·
+    <span style="color:${C_PUNCH}">punch</span> ·
     faded = outside a curated span · click to seek`;
   wrap.appendChild(label);
   const canvas = document.createElement("canvas");
   canvas.id = "bl-timeline";
-  canvas.style.cssText = "display:block;width:100%;height:142px";
-  canvas.width = 800; canvas.height = 142;
+  canvas.style.cssText = "display:block;width:100%;height:118px";
+  canvas.width = 800; canvas.height = 118;
   wrap.appendChild(canvas);
   slot.appendChild(wrap);
   canvas.addEventListener("click", e => {
@@ -1124,7 +1124,9 @@ function drawTimeline(canvas, c, cur, frame) {
     { label: "hip3D", accent: C_HIP3, color: f => band3Color(c.hip3[f], cfg.hipCuts) },
     { label: "sh3D",  accent: C_SH3,  color: f => band3Color(c.sh3[f], cfg.shCuts) },
     { label: "tr",    accent: C_TIGHT, color: f => tightColor(c.tight[f]) },
-    { label: "sh2D",  accent: C_SH,   color: f => bandColor(shoulderDeg(c, f)) },
+    // No sh2D track. The 3D shoulder angle answers the same question without
+    // W, so the 2D one is only kept as a number in the panel + trace, where the
+    // W slider can still be used to see what the estimate does to it.
     { label: "ft",    accent: C_FT,   color: f => bandColor(footDeg(c, f)) },
   ];
   const gap = 6, top = 4;
