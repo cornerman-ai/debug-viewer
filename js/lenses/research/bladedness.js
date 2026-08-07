@@ -35,6 +35,9 @@
 
 import { J } from "../../skeleton.js";
 import { activeDetections } from "../shared/punch_detections.js";
+import {
+  frontalSetReady, getManifest, isCuratedVideo, matchEntry,
+} from "../shared/frontal_set.js";
 
 // ── the 3D bands ────────────────────────────────────────────────────────────
 //
@@ -228,12 +231,10 @@ const pickPose = s => s.poseV6 || s.pose;
 
 // ── curated frontal set (merged in from the retired frontal_segments lens) ──
 //
-// Data: ./lens_data/frontal_segments.json — a copy of the backend's source of truth,
-// plus ./lens_data/clip_windows.json, the slices make_clips.py actually cut for the
-// coach reel. Refresh both with:
-//   cp ~/code/cornerman-backend/bladedness/frontal_segments.json \
-//      ~/code/cornerman-debug-viewer/lens_data/frontal_segments.json
-//   cp ~/code/cornerman-backend/bladedness/clip_windows.json \
+// The set itself comes from ../shared/frontal_set.js (which owns the fetch and
+// documents how to refresh it). Bladedness adds ./lens_data/clip_windows.json,
+// the slices make_clips.py actually cut for the coach reel:
+//   cp ~/code/cornerman-backend/ml/research/bladedness/clip_windows.json \
 //      ~/code/cornerman-debug-viewer/lens_data/clip_windows.json
 //
 // TIME BASE (the thing that silently breaks): manifest times are SOURCE-VIDEO
@@ -244,65 +245,19 @@ const pickPose = s => s.poseV6 || s.pose;
 // clock, which is authoritative when pts is non-uniform; if a span ever looks a
 // frame or two off here, that is why.
 
-const DATA_URL = "./lens_data/frontal_segments.json";
+// The set itself (fetch, stem matching, the video filter) lives in
+// ../shared/frontal_set.js — every lens that needs the opponent axis shares it.
+// Only the reel windows are bladedness's own.
 const WINDOWS_URL = "./lens_data/clip_windows.json";
 
-let manifest = null;
-let manifestError = null;
-let manifestPromise = null;
 let windows = null;
 
-async function loadManifest() {
-  if (manifest || manifestError) return;
-  try {
-    const res = await fetch(DATA_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    manifest = await res.json();
-  } catch (err) {
-    manifestError = err.message || String(err);
-  }
+(async () => {
   try {
     const res = await fetch(WINDOWS_URL, { cache: "no-store" });
     if (res.ok) windows = (await res.json()).windows || null;
   } catch { /* reel windows are optional */ }
-  // The video dropdown filters on requiresVideo(), which can't answer until
-  // this lands — tell the viewer to re-filter now that it can.
-  window.dispatchEvent(new Event("lens-filter-changed"));
-}
-
-// Kick the fetch off at module load (registry.js imports every lens on page
-// load) so the dropdown filters correctly on the first paint.
-manifestPromise = loadManifest();
-
-// Stems in the wild pick up `_prepared` / `_h264` re-encode tails, and these
-// YouTube titles contain double spaces that are easy to lose in a copy-paste.
-function normStem(s) {
-  return String(s || "")
-    .replace(/_(prepared|h264)$/i, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function matchEntry(basename) {
-  if (!manifest || !basename) return null;
-  const segs = manifest.segments || {};
-  if (segs[basename]) return { stem: basename, spans: segs[basename] };
-  const want = normStem(basename);
-  for (const [stem, spans] of Object.entries(segs)) {
-    if (normStem(stem) === want) return { stem, spans };
-  }
-  return null;
-}
-
-// Video filter. Pending ⇒ hide (loadManifest re-fires the filter once the data
-// lands). Failed ⇒ show everything, because an unexplained empty dropdown is a
-// dead end when the error message lives in a panel you can't reach.
-function isCuratedVideo(base) {
-  if (manifestError) return true;
-  if (!manifest) return false;
-  return !!matchEntry(base);
-}
+})();
 
 let spanCache = { pose: null, basename: null };
 
@@ -925,9 +880,10 @@ function renderSetList() {
   const el = host?.querySelector("#bl-set");
   const cnt = host?.querySelector("#bl-set-count");
   if (!el) return;
+  const manifest = getManifest();
   if (!manifest) {
     el.innerHTML = `<span class="muted">loading…</span>`;
-    manifestPromise?.then(() => renderSetList());
+    frontalSetReady?.then(() => renderSetList());
     return;
   }
   const segs = manifest.segments || {};

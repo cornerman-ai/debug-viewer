@@ -55,6 +55,7 @@ import { ensureAxialityModel, axialityForPunch } from "../shared/axiality_predic
 import { activeDetections, isStraightType } from "../shared/punch_detections.js";
 import { SCHEMAS } from "../shared/skeleton_schemas.js";
 import { qualityOf, qualityColor, qualityBand } from "../shared/rules_score.js";
+import { isCuratedVideo } from "../shared/frontal_set.js";
 
 // blaze33 channels: 0 x  1 y  2 z  3 xw  4 yw  5 zw  6 visibility  7 presence
 const CH = 8, X = 0, Y = 1, VIS = 6, NJ = 33;
@@ -339,6 +340,14 @@ export const HeadOffCenterLensRule = {
 
   // Needs the full 33-joint cache — mouth/eye landmarks aren't in the COCO-17 remap.
   requires(slot) { return !!(slot && slot.blazepose); },
+
+  // Curated frontal videos only. This lens reads LATERAL (screen-x) head travel,
+  // which only means "off the center line" when the camera stands where the
+  // opponent does. The per-punch axiality gate below already drops side-on
+  // punches, but on footage shot from the side it drops nearly all of them —
+  // leaving an empty lens that looks broken rather than out of scope. Filtering
+  // the video list says so up front. See ../shared/frontal_set.js.
+  requiresVideo: isCuratedVideo,
 
   // Hide the base COCO-17 head joints (nose + eyes + ears) so the head shows ONLY
   // the two extreme landmarks this lens actually uses.

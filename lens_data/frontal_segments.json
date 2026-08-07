@@ -1,6 +1,6 @@
 {
-  "_about": "Hand-curated segments where the boxer is working TOWARD the camera, i.e. the camera stands where the opponent would be. Selection criterion is gaze/punch direction, NOT shoulder-line squareness -- selecting on squareness would produce a set with no bladed boxers in it. Times are SOURCE-VIDEO seconds; index the blazepose caches via the cache's _pts.npy (searchsorted), never actual_start + i/fps. See spans_from_rows() in roll_duck_experiment.py.",
-  "_schema": "stem -> [ {label, round, start_sec, end_sec} ]. start_sec null = from the beginning of the round named by `round`. In the hand-written notes \"start\" always means the START OF r0, never video time 0 — so a bare \"start - X\" entry carries round 0; end_sec null = runs to the end. `round` binds a span to one cache round and MUST be set whenever start_sec is null and the video has several rounds, otherwise the span leaks into every round. Optional `clip_window: [a, b]` pins which slice make_clips.py cuts for the coach reel instead of sampling one at random -- it does NOT narrow the span used for analysis. Stems match video_wh.json exactly (beware double spaces in titles).",
+  "_about": "Hand-curated segments where the boxer is working TOWARD the camera, i.e. the camera stands where the opponent would be. Selection criterion is gaze/punch direction, NOT shoulder-line squareness -- selecting on squareness would produce a set with no bladed boxers in it. Shared across research topics, not bladedness-specific.",
+  "_schema": "stem -> [ {label, round, start_sec, end_sec} ]. DO NOT re-derive the span semantics -- ml/frontal_spans.py is the one reader, and its docstring is the spec (null starts/ends, the `round` binding, the _pts.npy indexing rule). `exclude_from_reel` keeps a span for analysis but out of review reels; it does NOT narrow the span used for analysis. `clip_window: [a, b]` is INERT -- nothing reads it (see the one entry that carries it). Stems match ml/video_wh.json exactly (beware double spaces in titles).",
   "_curated": "2026-08-03 initial 13; 2026-08-05 +6, +6",
   "segments": {
     "10 mins Shadow Boxing Workout ⧸ No Equipment (follow along)": [
@@ -13,7 +13,7 @@
           41.294,
           120.219
         ],
-        "clip_window_why": "This video is a CIRCUIT -- boxing combos alternating with sumo squats, good mornings, jumping jacks, shoulder presses. A random window straddles both (three seeds tried, all landed on conditioning). This window was eyeballed and is continuous boxing. The curated span for ANALYSIS is still the whole video; this only pins the coach-reel clip."
+        "clip_window_why": "SUPERSEDED and INERT -- no code reads clip_window. Kept as curation history. This video is a CIRCUIT -- boxing combos alternating with sumo squats, good mornings, jumping jacks, shoulder presses. A random window straddled both (three seeds tried, all landed on conditioning), so this window was eyeballed by hand. pick_windows.py's punch-gated objective solved the same problem generically and picks 171.797-186.77 (9 punch events). The curated span for ANALYSIS was always the whole video."
       }
     ],
     "10 Minute Shadow Boxing Workout At Home": [
