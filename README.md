@@ -7,7 +7,7 @@ engine, frame by frame. Legacy YOLO-Pose / Apple Vision caches (from
 `Cornerman/archive/`) still open with the generic lenses; the
 engine-era comparison lenses live in `cornerman-archive/legacy-pose/`.
 
-**Live**: https://cornerman-ai.github.io/cornerman-debug-viewer/
+**Live**: https://cornerman-ai.github.io/debug-viewer/
 
 ## What it does
 
