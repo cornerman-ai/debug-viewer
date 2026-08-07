@@ -2,7 +2,7 @@
 
 A static, dependency-free web app for inspecting BlazePose Drive caches
 against the
-[Cornerman](https://github.com/cornerman-ai/cornerman-backend) rules
+[Cornerman](https://github.com/cornerman-ai/backend) rules
 engine, frame by frame. Legacy YOLO-Pose / Apple Vision caches (from
 `Cornerman/archive/`) still open with the generic lenses; the
 engine-era comparison lenses live in `cornerman-archive/legacy-pose/`.
