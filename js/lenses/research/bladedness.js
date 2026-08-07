@@ -6,34 +6,32 @@
 // 90° = fully side-on. The curated frontal set exists so the camera can stand
 // in for the opponent — the curated set is defined below.
 //
-// NO DEPTH IS USED. BlazePose z is not reliable enough, so both angles come
-// from foreshortening instead:
-//
-//   SHOULDERS   gap = |L_sh.x − R_sh.x| / torso_height
-//               bladed° = arccos(gap / W)          W = their true shoulder
-//                                                  width in torso units
-//     A shoulder line pointing at the camera looks narrow; one across your
-//     view looks full width. Dividing by W recovers the turn. Same machinery
-//     hip_rotation already uses on the hips, expressed as the complement
-//     (arccos instead of arcsin) because we want the absolute angle, not a
-//     peak-minus-trough difference.
+// THE TORSO ANGLES COME FROM THE WORLD LANDMARKS (see "the 3D bands" below):
+// hip line and shoulder line, each atan2(|dz|, |dx|). They need no reference
+// width, which is why they survive where the foreshortening approach did not.
 //
 //   FEET        bladed° = atan2(|dy| · k, |dx|)
-//     Stance WIDTH is not anatomically fixed — the boxer changes it at will —
-//     so the arccos(gap/W) trick can't work on the ankles. Instead we use the
-//     ground-plane trick stance_width v5 already relies on: with the camera
-//     above ankle height, image-vertical IS the depth axis, so the ankle
-//     vector's (dx, dy) is the stance direction seen from above, up to an
-//     unknown scale k set by camera pitch/height. k is a SLIDER, not a
-//     constant — read it off the footage.
+//     No world-landmark equivalent here — stance WIDTH is not anatomically
+//     fixed, so nothing normalises it. Instead the ground-plane trick
+//     stance_width v5 relies on: with the camera above ankle height,
+//     image-vertical IS the depth axis, so the ankle vector's (dx, dy) is the
+//     stance direction seen from above, up to an unknown scale k set by camera
+//     pitch/height. k is a SLIDER, not a constant — read it off the footage,
+//     and treat the foot band edges as the guesses they are.
 //
-// ── everything here is uncalibrated ────────────────────────────────────────
-// W is estimated per-round as the 99th percentile of |gap| — i.e. "they went
-// broadside at some point". An over-bladed boxer NEVER does, so W comes out
-// too small, gap/W too large, and they measure as MORE SQUARE than they are.
-// The bias points the wrong way for exactly the people this rule is meant to
-// catch. Hence the W slider, and hence the onboarding calibration pose. The
-// band thresholds are guesses pending a coach — do not read them as tuned.
+//   TIGHTROPE   signed rear-heel offset from the lead-toe line, over torso.
+//     The cue John actually gives; target is zero. Deliberately unbanded —
+//     his own verdicts do not separate on it (see computeMetrics).
+//
+// ── removed 2026-08-07: the 2D shoulder angle ──────────────────────────────
+// It was arccos(gap/W) with gap = |L_sh.x − R_sh.x| / torso_height and W the
+// 95th percentile of gap over the round — "they went broadside at some point".
+// An over-bladed boxer never does, so W came out too small and they measured
+// as MORE SQUARE than they are: the bias pointed the wrong way for exactly the
+// people the rule is meant to catch, and 12 of the 100 labelled frames sat
+// pinned at exactly 0.0°. The 3D shoulder angle answers the same question with
+// no W at all, so the whole path — W slider, lean fix, full-width ghost — is
+// gone. Recover from git history if the foreshortening question ever returns.
 
 import { J } from "../../skeleton.js";
 import { activeDetections } from "../shared/punch_detections.js";
@@ -60,38 +58,20 @@ import { activeDetections } from "../shared/punch_detections.js";
 const COACH_CUTS = { hip: [18.2, 27.9], sh: [12.7, 17.6] };
 
 const cfg = {
-  wScale: 1.0,        // multiplies the auto W estimate (1.0 = use it as-is)
   footK: 1.0,         // image-y → ground-depth scale for the ankle vector
-  squaredBelow: 25,   // GUESS — below this = too squared      (2D tracks only)
-  bladedAbove: 65,    // GUESS — above this = too bladed       (2D tracks only)
+  squaredBelow: 25,   // GUESS — below this = too squared      (feet only)
+  bladedAbove: 65,    // GUESS — above this = too bladed       (feet only)
   hipCuts: [...COACH_CUTS.hip],
   shCuts: [...COACH_CUTS.sh],
   minConfidence: 0.5,
   spansOnly: false,   // false = band the whole round, not just the curated spans
   excludePunches: true,
-  leanFix: true,      // correct gap on frames where the torso is foreshortened
 };
 
-// Lean gate. gap = shoulder_width / torso_height, and a forward lean rotates
-// the torso about the HIP axis: it foreshortens the torso while leaving the
-// shoulder line's horizontal extent alone. So gap inflates without the boxer
-// being any wider, the frame reads as squarer than it is, and — worse — those
-// frames set W, corrupting every angle in the round.
-//
-// Below this fraction of the round's own median torso, gap is rescaled as if
-// the torso were its median length:
-//     gap_fixed = shoulder_px / torso_median = gap * (torso / torso_median)
-// which is the geometrically correct undo, not a fudge. Clamped so it can only
-// ever shrink gap, never inflate it.
-const LEAN_GATE = 0.90;
+// The camera-as-opponent assumption is what makes these angles mean anything,
+// and it only holds where the curated spans say it does — so a video outside
+// the set is refused outright, and frames outside a span are drawn faded.
 
-// Curated-only is NOT a toggle. The camera-as-opponent assumption is what makes
-// these angles mean anything, and it only holds inside the curated spans — a
-// number measured outside them is not a worse measurement, it's a meaningless
-// one. So frames outside a span are excluded, and a video that isn't in the set
-// gets refused outright rather than silently measured.
-
-const REQ_SH = [J.L_SHOULDER, J.R_SHOULDER, J.L_HIP, J.R_HIP];
 const REQ_FT = [J.L_ANKLE, J.R_ANKLE];
 
 const C_SQUARE  = "#ff9e64";   // orange — too squared
@@ -109,7 +89,6 @@ const C_B_BETWEEN = "#ffcc4d";   // yellow — between the cuts
 const C_B_BLADED  = "#7adf7a";   // green  — bladed enough
 const C_HIP3      = "#ff9ad5";   // hip-3D accent
 const C_SH3       = "#a78bfa";   // shoulder-3D accent (distinct from the 2D shoulder blue)
-const C_SH      = "#7ec8ff";   // shoulder accent
 const C_FT      = "#ffd95c";   // foot accent
 const C_FRAME   = "#3ad9e0";
 const C_REEL    = "#ffd95c";   // the slice cut for the coach reel
@@ -422,24 +401,19 @@ function computeMetrics(state) {
   const dets = activeDetections(state);
   const b33 = state.blaze33 || null;
   if (mc.pose === pose && mc.dets === dets && mc.b33 === b33
-      && mc.minConf === cfg.minConfidence && mc.leanFix === cfg.leanFix) return mc;
+      && mc.minConf === cfg.minConfidence) return mc;
 
   const n = pose.n_frames, sk = pose.skeleton, conf = pose.conf;
-  const gapRaw = new Float64Array(n).fill(NaN);   // |shoulder width| / torso
   const tor = new Float64Array(n).fill(NaN);      // torso height, px
   const fdx = new Float64Array(n).fill(NaN);      // ankle |dx| / torso
   const fdy = new Float64Array(n).fill(NaN);      // ankle |dy| / torso
-  const validSh = new Uint8Array(n), validFt = new Uint8Array(n);
+  const validFt = new Uint8Array(n);
 
   for (let f = 0; f < n; f++) {
     const th = torso(sk, f);
     if (!(th > 1e-6)) continue;
     tor[f] = th;
     const b = f * 17;
-    if (ok(conf, f, REQ_SH, cfg.minConfidence)) {
-      const d = Math.abs(sk[(b + J.L_SHOULDER) * 2] - sk[(b + J.R_SHOULDER) * 2]) / th;
-      if (Number.isFinite(d)) { gapRaw[f] = d; validSh[f] = 1; }
-    }
     if (ok(conf, f, REQ_FT, cfg.minConfidence)) {
       const dx = Math.abs(sk[(b + J.L_ANKLE) * 2]     - sk[(b + J.R_ANKLE) * 2]) / th;
       const dy = Math.abs(sk[(b + J.L_ANKLE) * 2 + 1] - sk[(b + J.R_ANKLE) * 2 + 1]) / th;
@@ -496,45 +470,13 @@ function computeMetrics(state) {
   const tv = [...tor].filter(Number.isFinite).sort((a, b) => a - b);
   const torMed = tv.length ? tv[tv.length >> 1] : NaN;
 
-  // Lean correction, applied BEFORE W is estimated so a leaning frame can't
-  // set the reference.
-  const gap = new Float64Array(n).fill(NaN);
-  const leaned = new Uint8Array(n);
-  for (let f = 0; f < n; f++) {
-    if (!Number.isFinite(gapRaw[f])) continue;
-    const ratio = torMed > 1e-6 ? tor[f] / torMed : 1;
-    if (cfg.leanFix && Number.isFinite(ratio) && ratio < LEAN_GATE) {
-      gap[f] = gapRaw[f] * Math.min(1, ratio);
-      leaned[f] = 1;
-    } else {
-      gap[f] = gapRaw[f];
-    }
-  }
-
-  // W: 99th percentile of |gap| over the round — "they went broadside once".
-  // See the header for why this is the weakest link in the whole lens.
-  const finite = [...gap].filter(Number.isFinite).sort((a, b) => a - b);
-  const wAuto = finite.length ? finite[Math.min(finite.length - 1,
-                  Math.floor(0.99 * finite.length))] : NaN;
-
-  let nLeaned = 0;
-  for (let f = 0; f < n; f++) if (leaned[f]) nLeaned++;
-
-  mc = { pose, dets, b33, minConf: cfg.minConfidence, leanFix: cfg.leanFix,
-         n, gap, gapRaw, tor, torMed,
-         leaned, nLeaned, fdx, fdy, validSh, validFt, punch, wAuto,
+  mc = { pose, dets, b33, minConf: cfg.minConfidence,
+         n, tor, torMed, fdx, fdy, validFt, punch,
          hip3, sh3, n3d, tight, stance };
   return mc;
 }
 
 const DEG = 180 / Math.PI;
-
-// Shoulder bladedness: 0° = squared (line across view), 90° = side-on.
-function shoulderDeg(c, f) {
-  const W = c.wAuto * cfg.wScale;
-  if (!c.validSh[f] || !(W > 1e-6) || !Number.isFinite(c.gap[f])) return NaN;
-  return Math.acos(Math.max(0, Math.min(1, c.gap[f] / W))) * DEG;
-}
 
 // Foot bladedness: 0° = ankle line across view, 90° = pointing at the camera.
 function footDeg(c, f) {
@@ -544,8 +486,6 @@ function footDeg(c, f) {
   return Math.atan2(dy, dx) * DEG;
 }
 
-// A frame counts toward the round stats only if it's measurable, inside the
-// curated span (when that filter is on), and not mid-punch.
 // A frame counts if it's measurable and not mid-punch. `spansOnly` narrows that
 // to the curated spans — the stretches where the camera is verified to stand in
 // for the opponent. Off by default: on a frontal video the whole round is worth
@@ -581,19 +521,15 @@ function iqr(xs) {
 }
 
 function rollup(c, cur) {
-  const sh = [], ft = [], diff = [];
+  const ft = [];
   let nCounted = 0;
   for (let f = 0; f < c.n; f++) {
     if (!counted(c, cur, f)) continue;
     nCounted++;
-    const s = shoulderDeg(c, f), t = footDeg(c, f);
-    if (Number.isFinite(s)) sh.push(s);
+    const t = footDeg(c, f);
     if (Number.isFinite(t)) ft.push(t);
-    if (Number.isFinite(s) && Number.isFinite(t)) diff.push(s - t);
   }
-  return { nCounted, sh, ft,
-           medSh: median(sh), medFt: median(ft), medDiff: median(diff),
-           iqrSh: iqr(sh), iqrFt: iqr(ft) };
+  return { nCounted, ft, medFt: median(ft), iqrFt: iqr(ft) };
 }
 
 const fmt = (n, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : "—");
@@ -628,35 +564,14 @@ export const BladednessRule = {
       <h2>Bladedness</h2>
       <p class="hint">
         Turn about the vertical axis: <strong>0° = squared</strong> (chest to
-        camera), <strong>90° = side-on</strong>. Two families here —
-        <strong>3D</strong> (world landmarks, coach-cut bands, on the torso
-        lines and the top two timeline tracks) and <strong>2D</strong>
-        (foreshortening <code>arccos(gap/W)</code> for shoulders, the ankle
-        vector for feet, placeholder edges).
-        Below, the 2D scheme: <span style="color:${C_SQUARE}">too squared</span> ·
+        camera), <strong>90° = side-on</strong>. Hips and shoulders are
+        world-landmark angles on the coach cuts; the tightrope is unbanded; the
+        feet keep their own placeholder edges —
+        <span style="color:${C_SQUARE}">too squared</span> ·
         <span style="color:${C_OK}">ok</span> ·
         <span style="color:${C_BLADED}">too bladed</span> ·
         <span style="color:${C_PUNCH}">punch (excluded)</span>.
       </p>
-      <p class="hint" style="border-left:2px solid ${C_BLADED}; padding-left:6px">
-        <strong>Uncalibrated.</strong> W is guessed as the 99th percentile of
-        |gap| — assumes they go broadside at some point. An over-bladed boxer
-        never does, so W lands too small and they read as <em>more square than
-        they are</em>. Band edges are placeholders, not coach-tuned.
-      </p>
-
-      <label class="slider-row" style="display:block; font-size:12px; margin-top:6px">
-        W scale = <output id="bl-w-out">1.00</output> <span class="muted" id="bl-w-eff"></span>
-        <input type="range" id="bl-w" min="0.6" max="1.6" step="0.01" value="1.0"></label>
-      <label class="slider-row" style="display:block; font-size:12px">
-        foot depth scale k = <output id="bl-k-out">1.00</output>
-        <input type="range" id="bl-k" min="0.2" max="4.0" step="0.05" value="1.0"></label>
-      <label class="slider-row" style="display:block; font-size:12px">
-        2D too squared below = <output id="bl-sq-out">25</output>°
-        <input type="range" id="bl-sq" min="0" max="60" step="1" value="25"></label>
-      <label class="slider-row" style="display:block; font-size:12px">
-        2D too bladed above = <output id="bl-bd-out">65</output>°
-        <input type="range" id="bl-bd" min="30" max="90" step="1" value="65"></label>
 
       <h3 style="margin-bottom:2px">3D bands <span class="muted small">(coach cuts)</span></h3>
       <p class="hint" style="margin:2px 0 6px">
@@ -683,15 +598,23 @@ export const BladednessRule = {
       <button id="bl-reset-cuts" style="margin-top:5px; font-size:11px; cursor:pointer">
         reset to coach fit (${COACH_CUTS.hip.join("/")}° · ${COACH_CUTS.sh.join("/")}°)</button>
 
+      <h3 style="margin-bottom:2px">Feet <span class="muted small">(no coach fit)</span></h3>
+      <label class="slider-row" style="display:block; font-size:12px">
+        depth scale k = <output id="bl-k-out">1.00</output>
+        <input type="range" id="bl-k" min="0.2" max="4.0" step="0.05" value="1.0"></label>
+      <label class="slider-row" style="display:block; font-size:12px">
+        too squared below = <output id="bl-sq-out">25</output>°
+        <input type="range" id="bl-sq" min="0" max="60" step="1" value="25"></label>
+      <label class="slider-row" style="display:block; font-size:12px">
+        too bladed above = <output id="bl-bd-out">65</output>°
+        <input type="range" id="bl-bd" min="30" max="90" step="1" value="65"></label>
+
       <label style="display:block; font-size:12px; margin-top:8px">
         <input type="checkbox" id="bl-pun" checked> exclude punch frames
         <span class="muted small">(greyed on the timeline)</span></label>
       <label style="display:block; font-size:12px">
         <input type="checkbox" id="bl-spans"> curated spans only
         <span class="muted small">(off = band the whole round)</span></label>
-      <label style="display:block; font-size:12px">
-        <input type="checkbox" id="bl-lean" checked> lean fix
-        <span class="muted small">(rescale gap where torso &lt; 90% of median)</span></label>
 
       <h3>Round</h3>
       <div id="bl-round" style="font-size:13px; line-height:1.6"></div>
@@ -707,7 +630,6 @@ export const BladednessRule = {
 
       <h3><span style="color:${C_HIP3}">hip3D</span> /
           <span style="color:${C_SH3}">sh3D</span> /
-          <span style="color:${C_SH}">sh2D</span> /
           <span style="color:${C_FT}">feet</span> over time</h3>
       <canvas id="bl-trace" width="320" height="130"></canvas>
 
@@ -725,7 +647,6 @@ export const BladednessRule = {
         refresh();
       });
     };
-    wire("#bl-w", "wScale", 2, "#bl-w-out");
     wire("#bl-k", "footK", 2, "#bl-k-out");
     wire("#bl-sq", "squaredBelow", 0, "#bl-sq-out");
     wire("#bl-bd", "bladedAbove", 0, "#bl-bd-out");
@@ -752,9 +673,6 @@ export const BladednessRule = {
     });
     host.querySelector("#bl-spans").addEventListener("change", e => {
       cfg.spansOnly = e.target.checked; refresh();
-    });
-    host.querySelector("#bl-lean").addEventListener("change", e => {
-      cfg.leanFix = e.target.checked; refresh();
     });
   },
 
@@ -788,32 +706,22 @@ export const BladednessRule = {
     const r = rollup(c, cur);
     const f = state.frame;
 
-    host.querySelector("#bl-w-eff").textContent =
-      Number.isFinite(c.wAuto) ? `(auto ${c.wAuto.toFixed(3)} → ${(c.wAuto * cfg.wScale).toFixed(3)})` : "";
-
-    const curNote = `curated spans only`;
-
     roundEl.innerHTML = `
       ${c.n3d ? "" : `<div style="color:${C_B_SQUARED}">No BlazePose-33 cache —
          the 3D bands are blank. Load the round from a Drive folder that carries
          the <code>_blazepose_r&lt;N&gt;.npy</code> cache; the COCO-17 remap has no
          world landmarks.</div>`}
-      <div><span style="color:${C_SH}">shoulders</span>
-        median <code style="color:${bandColor(r.medSh)}">${fmt(r.medSh)}°</code>
-        <span class="muted">IQR ${fmt(r.iqrSh)}° · n=${r.sh.length}</span></div>
       <div><span style="color:${C_FT}">feet</span>
         median <code style="color:${bandColor(r.medFt)}">${fmt(r.medFt)}°</code>
         <span class="muted">IQR ${fmt(r.iqrFt)}° · n=${r.ft.length}</span></div>
-      <div style="margin-top:3px">shoulders − feet
-        <code>${fmt(r.medDiff)}°</code>
-        <span class="muted">(&gt;0 = chest turned further than the feet)</span></div>
-      <div class="muted small" style="margin-top:3px">${curNote} · ${r.nCounted} frames counted</div>
-      <div class="muted small">stance <code>${(() => { const st = roundStance(state);
-          return st ? `${st.stance} (${st.orthodox}o/${st.southpaw}s)` : "no labels — assuming orthodox"; })()}</code>
+      <div class="muted small" style="margin-top:3px">
+        ${cfg.spansOnly ? "curated spans only" : "whole round"} ·
+        ${r.nCounted} frames counted · ${c.n3d} with world landmarks</div>
+      <div class="muted small">stance <code>${
+          c.stance ? `${c.stance.stance} (${c.stance.orthodox}o/${c.stance.southpaw}s)`
+                   : "no labels — assuming orthodox"}</code>
         <span class="muted">→ lead foot</span></div>
-      <div class="muted small">torso median <code>${fmt(c.torMed, 0)}px</code> ·
-        lean-corrected <code>${c.nLeaned}</code> frames
-        ${cfg.leanFix ? "" : `<span style="color:${C_SQUARE}">(fix OFF)</span>`}</div>`;
+      <div class="muted small">torso median <code>${fmt(c.torMed, 0)}px</code></div>`;
 
     const spansEl = host.querySelector("#bl-spans");
     if (spansEl) {
@@ -858,7 +766,7 @@ export const BladednessRule = {
     // The three readings side by side — hips, shoulders, tightrope — because
     // the interesting frames are the ones where they disagree, and that is
     // invisible if you have to step away to read the third.
-    const s = shoulderDeg(c, f), t = footDeg(c, f), tr = c.tight[f];
+    const t = footDeg(c, f), tr = c.tight[f];
     const bandCell = (v, cuts) => {
       const b = band3(v, cuts);
       return `<code style="color:${band3Color(v, cuts)}">${fmt(v)}°</code>
@@ -873,18 +781,14 @@ export const BladednessRule = {
         <span style="color:${C_HIP3}">hips</span>
         <span>${bandCell(c.hip3[f], cfg.hipCuts)}</span>
         <span style="color:${C_SH3}">shoulders</span>
-        <span>${bandCell(c.sh3[f], cfg.shCuts)}
-          <span class="muted">· 2D <span style="color:${bandColor(s)}">${fmt(s)}°</span>
-          gap ${fmt(c.gap[f], 3)}${
-            c.leaned[f] ? ` <span style="color:${C_SQUARE}">(lean: raw ${fmt(c.gapRaw[f], 3)}, torso ${
-              fmt(100 * c.tor[f] / c.torMed, 0)}%)</span>` : ""}</span></span>
+        <span>${bandCell(c.sh3[f], cfg.shCuts)}</span>
         <span style="color:${C_TIGHT}">tightrope</span>
         <span><code style="color:${tightColor(tr)}">${fmt(tr, 2)}</code>
           <span class="muted">${Number.isFinite(tr)
             ? (tr < 0 ? `<span style="color:${C_TR_CROSS}">feet crossed</span>`
                       : "torso units off the lead-toe line — 0 is the target, unbanded")
             : "no heel/toe"}</span></span>
-        <span style="color:${C_FT}">feet 2D</span>
+        <span style="color:${C_FT}">feet</span>
         <span><code style="color:${bandColor(t)}">${fmt(t)}°</code>
           <span class="muted">dx ${fmt(c.fdx[f], 3)} dy ${fmt(c.fdy[f], 3)}</span></span>
       </div>`;
@@ -936,29 +840,13 @@ export const BladednessRule = {
       ctx.restore();
     };
 
-    // The two torso lines carry their 3D band — that is the reading with
-    // thresholds behind it. Shoulders fall back to the 2D band when there is no
-    // BlazePose-33 cache to measure the world angle from. Ankles stay on the
-    // foot metric, which has no 3D counterpart here.
-    const sDeg = shoulderDeg(c, f), tDeg = footDeg(c, f);
-    seg(J.L_SHOULDER, J.R_SHOULDER,
-        Number.isFinite(c.sh3[f]) ? band3Color(c.sh3[f], cfg.shCuts) : bandColor(sDeg));
+    // Both torso lines carry their 3D band; the ankles carry the foot metric,
+    // which has no 3D counterpart here. Grey means the world landmarks for that
+    // line were below the visibility gate on this frame.
+    const tDeg = footDeg(c, f);
+    seg(J.L_SHOULDER, J.R_SHOULDER, band3Color(c.sh3[f], cfg.shCuts));
     seg(J.L_HIP, J.R_HIP, band3Color(c.hip3[f], cfg.hipCuts));
     seg(J.L_ANKLE, J.R_ANKLE, bandColor(tDeg));
-
-    // Ghost of the shoulder line at full width W, centred on the real one —
-    // the gap between ghost and real IS the foreshortening the angle reads.
-    const [lx, ly] = P(J.L_SHOULDER), [rx, ry] = P(J.R_SHOULDER);
-    const W = c.wAuto * cfg.wScale;
-    if ([lx, ly, rx, ry].every(Number.isFinite) && W > 1e-6) {
-      const th = torso(pose.skeleton, f);
-      const half = (W * th) / 2, cx = (lx + rx) / 2, cy = (ly + ry) / 2;
-      ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.45)";
-      ctx.lineWidth = 1.5 * sc; ctx.setLineDash([5 * sc, 5 * sc]);
-      ctx.beginPath(); ctx.moveTo(cx - half, cy); ctx.lineTo(cx + half, cy); ctx.stroke();
-      ctx.restore();
-    }
 
     // Tightrope: vertical through the lead toe, horizontal to the rear heel.
     const tr = tightrope(state, torso(pose.skeleton, f));
@@ -979,19 +867,15 @@ export const BladednessRule = {
 
     const fsz = Math.round(13 * sc), lh = fsz + 4 * sc;
     const b3 = (v, cuts) => `${fmt(v)}° ${band3(v, cuts) || "—"}`;
-    // Hips, shoulders and tightrope in the top three lines, always together —
-    // the 2D pair and the constants sit underneath.
+    // Hips, shoulders and tightrope always together — the feet sit underneath.
     const lines = [
-      [`hips  3D  ${b3(c.hip3[f], cfg.hipCuts)}`, band3Color(c.hip3[f], cfg.hipCuts)],
-      [`sh    3D  ${b3(c.sh3[f], cfg.shCuts)}`, band3Color(c.sh3[f], cfg.shCuts)],
+      [`hips  ${b3(c.hip3[f], cfg.hipCuts)}`, band3Color(c.hip3[f], cfg.hipCuts)],
+      [`sh    ${b3(c.sh3[f], cfg.shCuts)}`, band3Color(c.sh3[f], cfg.shCuts)],
       [tr ? `tightrope ${fmt(tr.dist, 2)}${tr.dist < 0 ? " crossed" : ""}` : `tightrope —`,
        tr ? tightColor(tr.dist) : C_INVALID],
-      [`sh    2D  ${fmt(sDeg)}°`, bandColor(sDeg)],
-      [`feet  2D  ${fmt(tDeg)}°`, bandColor(tDeg)],
-      [`W ${fmt(W, 3)}  k ${cfg.footK.toFixed(2)}`, "#fff"],
+      [`feet  ${fmt(tDeg)}°  k ${cfg.footK.toFixed(2)}`, bandColor(tDeg)],
     ];
     if (c.punch[f]) lines.push([`punch — excluded`, C_PUNCH]);
-    if (c.leaned[f]) lines.push([`lean ${fmt(100 * c.tor[f] / c.torMed, 0)}% torso`, C_SQUARE]);
     const padX = 10 * sc, padY = 8 * sc, boxW = 210 * sc;
     const boxH = lines.length * lh + padY * 2 - 4 * sc;
     ctx.save();
@@ -1194,7 +1078,6 @@ function drawTrace(canvas, c, cur, frame) {
       ctx.fillRect(xOf(f) - 0.5, yOf(v) - 1, 2, 2);
     }
   };
-  dots(f => shoulderDeg(c, f), C_SH);
   dots(f => footDeg(c, f), C_FT);
   dots(f => c.hip3[f], C_HIP3);
   dots(f => c.sh3[f], C_SH3);
