@@ -102,10 +102,7 @@ function sideHtml(c, which) {
     <figcaption>
       <div class="bp-picks">
         ${you ? '<span class="p-you">● human</span>' : ""}
-        ${["sh3D", "hip3D"]
-          .filter((k) => c.v && c.v[k] && c.v[k].says === side)
-          .map((k) => `<span class="p-met">● ${k}</span>`)
-          .join("")}
+        ${met ? `<span class="p-met">● ${P().primary}</span>` : ""}
       </div>
       <div class="bp-src">${s.v} · r${s.r} f${s.f}</div>
     </figcaption>
