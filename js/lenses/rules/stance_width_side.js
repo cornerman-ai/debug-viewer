@@ -1,28 +1,62 @@
-// Foot stagger on the SIDE set — HORIZONTAL ankle distance in torso lengths.
+// Foot stagger on the SIDE set — HORIZONTAL ankle distance, in torso lengths
+// OR leg lengths.
 //
-// The question is how far in FRONT of the other one foot is, so the metric is
-// strictly the horizontal component:
+// The question is how far in FRONT of the other one foot is, so the numerator is
+// strictly the horizontal component, |ankle_L.x − ankle_R.x|. Horizontal only,
+// on purpose: side-on, the boxer's fore-aft axis lies along image-x, so Δx is
+// the stagger and Δy is just one foot sitting lower in frame (ground plane,
+// perspective, a heel lifting). The shipped stance_width rule takes the full
+// euclidean ankle distance, which folds that Δy in; here it is dropped rather
+// than measured, and both are shown per frame so the difference stays visible.
 //
-//     |ankle_L.x − ankle_R.x| / torso height     (shoulder mid → hip mid)
+// TWO DENOMINATORS, switchable, both always reported:
 //
-// Horizontal only, on purpose. Side-on, the boxer's fore-aft axis lies along
-// image-x, so Δx is the stagger and Δy is just one foot sitting lower in frame
-// (ground plane, perspective, a heel lifting). The shipped stance_width rule
-// takes the full euclidean ankle distance, which folds that Δy in; here it is
-// dropped rather than measured. Both numbers are shown per frame so the
-// difference is visible.
+//   torso height   shoulder midpoint → hip midpoint. What the rule ships.
+//   leg length     |hip−knee| + |knee−ankle|, averaged over whichever legs
+//                  pass the confidence gate. Summed per segment, so knee bend
+//                  does not shorten it in 3D.
 //
-// Not re-derived: the torso denominator and the horizontal component both come
-// from ./stance_width.js (`computeDxDy`), and the frame-validity pipeline is
-// that lens's shipped one — confidence gate → temporal cleanup → knee/ankle
-// sanity. Only the choice of numerator is this lens's own.
+// Leg length is the better denominator in principle — stance width is set by
+// the legs, and torso/leg proportion varies enough between people that a
+// torso-normalized width mislabels the long-legged. What it costs:
 //
-// The v5 foreshortening correction is not applied and could not be: it exists
-// because a stance line pointing AT the camera is seen end-on and undercounts,
-// and the fix for that is to stop measuring such footage, not to scale it. The
-// panel still reports how many counted frames the v5 gate WOULD have flagged as
-// depth-aligned — on genuinely side-on footage that should be ~0, and if it is
-// not, Δx is undercounting the stagger and the numbers are not trustworthy.
+//  1. The ankles move into the DENOMINATOR. Torso height is independent of the
+//     ankles, so numerator and denominator carry independent errors. With leg
+//     length a bad ankle keypoint moves both at once — the ratio can sit still
+//     while both are wrong, or jump when the ankle jumps.
+//  2. It is articulated, and 2D projection does not care that the segments are
+//     rigid. A knee driving toward the camera foreshortens the thigh; the
+//     torso, held upright, is far more stable frame to frame. Expect a noisier
+//     denominator, especially through steps.
+//  3. Left and right legs project differently (different depth, different
+//     flexion), so the two legs disagree. Averaging halves the noise but
+//     hides the disagreement; `legs` on the frame row says how many
+//     contributed.
+//  4. Knees are noisier keypoints than hips and shoulders — loose shorts, fast
+//     steps — and requiring them drops frames the torso metric would keep.
+//  5. Every tuned number in the project (narrow_threshold 0.5, the severity
+//     bands, the Swift port, the labeled evaluations) is on the torso ratio.
+//     These two do not differ by a constant across people — that is the whole
+//     point — so switching is a re-tune, not a rescale.
+//  6. It relocates the anthropometric problem rather than removing it: femur
+//     and tibia proportions vary too. Coaches usually teach stance width
+//     against SHOULDER width, which would be the natural third denominator —
+//     and is exactly the one this set cannot supply, because side-on the
+//     shoulders are foreshortened to nearly nothing.
+//
+// One thing genuinely in leg length's favor beyond proportions: with the camera
+// above ankle height, the legs sit at roughly the same depth as the ankle gap
+// they normalize, while the torso is further away — so the leg ratio has less
+// residual perspective bias in it.
+//
+// The `leg / torso` row is the thing to actually watch: it is this boxer's
+// proportion, measured. If it swings clip to clip, that is the variation the
+// torso denominator is silently pushing into the metric.
+//
+// Not re-derived: the torso denominator, the horizontal component and the
+// frame-validity pipeline (confidence gate → temporal cleanup → knee/ankle
+// sanity) all come from ./stance_width.js. The leg denominator and the choice
+// of numerator are this lens's own.
 //
 // Video list is gated to the side set (../shared/side_set.js).
 
@@ -34,18 +68,67 @@ import {
 } from "./stance_width.js";
 
 const C_SEP    = "#7adf7a";  // the metric
-const C_NARROW = "#ff5d6c";  // below the rule's narrow threshold
-const C_TORSO  = "#7ec8ff";  // torso segment (the denominator)
+const C_NARROW = "#ff5d6c";  // below the threshold
+const C_TORSO  = "#7ec8ff";  // torso segment (denominator)
+const C_LEG    = "#ffd95c";  // leg chain (denominator)
 const C_SPAN   = "#b48cff";  // curated span
 const C_OUT    = "#888";
 const C_FRAME  = "#3ad9e0";
-const C_BOOST  = "#e08aff";  // frames the v5 gate would have boosted
+const C_BOOST  = "#e08aff";  // frames the v5 gate calls depth-aligned
+
+// Per-denominator axis + threshold. The leg ratio lives on a smaller scale than
+// the torso one (legs are the longer segment), so it gets its own full-scale
+// rather than being squeezed into the bottom third of the torso axis.
+const DENOMS = {
+  torso: {
+    label: "torso height", short: "torso", color: C_TORSO,
+    axisMax: 1.5, tick: 0.25,
+    // What the rule ships, and what every tuned number in the project is on.
+    defaultThreshold: DEFAULT_CONFIG.narrowThreshold,
+  },
+  leg: {
+    label: "leg length", short: "leg", color: C_LEG,
+    axisMax: 1.0, tick: 0.25,
+    // 0.33 is only a STARTING POINT: it is torso-0.5 rescaled by a leg/torso
+    // ratio of ~1.5. Nothing has been tuned or labeled on this axis — read the
+    // measured `leg / torso` row for this boxer and move the slider.
+    defaultThreshold: 0.33,
+  },
+};
+
+// Settings survive a video change, a round change and a page reload — this lens
+// is for sweeping a threshold across the set, and re-dialing it every time the
+// footage changes would defeat that.
+const STORE_KEY = "cornerman.lens.stance_width_side";
 
 const cfg = {
+  denom: "torso",
   minConfidence: DEFAULT_CONFIG.minConfidence,
   spansOnly: true,
-  narrowThreshold: DEFAULT_CONFIG.narrowThreshold,
+  // Per denominator: the two axes are not interchangeable, so a threshold set
+  // on one must not follow you onto the other.
+  thresholds: { torso: DENOMS.torso.defaultThreshold, leg: DENOMS.leg.defaultThreshold },
 };
+
+(function restore() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    if (!saved) return;
+    if (saved.denom in DENOMS) cfg.denom = saved.denom;
+    if (Number.isFinite(saved.minConfidence)) cfg.minConfidence = saved.minConfidence;
+    if (typeof saved.spansOnly === "boolean") cfg.spansOnly = saved.spansOnly;
+    for (const k of Object.keys(cfg.thresholds)) {
+      if (Number.isFinite(saved.thresholds?.[k])) cfg.thresholds[k] = saved.thresholds[k];
+    }
+  } catch { /* corrupt or unavailable storage ⇒ defaults, never a broken lens */ }
+})();
+
+function persist() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch { /* private mode */ }
+}
+
+const denomCfg = () => DENOMS[cfg.denom];
+const threshold = () => cfg.thresholds[cfg.denom];
 
 const pickPose = state => state.poseV6 || state.pose;
 
@@ -53,6 +136,11 @@ let host;
 let mc = { pose: null };
 
 // ── metrics ─────────────────────────────────────────────────────────────────
+
+const LEGS = [
+  [J.L_HIP, J.L_KNEE, J.L_ANKLE],
+  [J.R_HIP, J.R_KNEE, J.R_ANKLE],
+];
 
 function computeMetrics(state) {
   const pose = pickPose(state);
@@ -63,26 +151,60 @@ function computeMetrics(state) {
 
   const n = pose.n_frames;
   const fps = pose.fps || state.fps || 30;
+  const sk = pose.skeleton, conf = pose.conf;
 
-  // The shipped pipeline, run for its frame-validity mask (confidence gate →
+  // The shipped pipeline, for its frame-validity mask (confidence gate →
   // temporal cleanup → knee/ankle sanity) and, for comparison only, its full
   // euclidean ankle ratio.
-  const out = detectStanceWidth(pose.skeleton, pose.conf, n, fps,
+  const out = detectStanceWidth(sk, conf, n, fps,
                                 { ...DEFAULT_CONFIG, minConfidence: cfg.minConfidence });
   const valid = out.debug.validMask;
   const euclid = out.debug.sepRatios;
 
-  // dx / dy are the ankle line's components, already divided by the same torso
-  // height. dx IS this lens's metric — the horizontal stagger.
+  // dx / dy are the ankle line's components over torso height, from the same
+  // lens. dx IS the torso-normalized stagger.
   const { dx, dy } = computeDxDy(pose);
-  const sep = dx;
+
+  const dxPx = new Array(n).fill(NaN);
+  const torsoPx = new Array(n).fill(NaN);
+  const legPx = new Array(n).fill(NaN);
+  const legN = new Array(n).fill(0);
+  const legRatio = new Array(n).fill(NaN);
+  const legOverTorso = new Array(n).fill(NaN);
+
+  for (let f = 0; f < n; f++) {
+    const base = f * 17;
+    const at = j => [sk[(base + j) * 2], sk[(base + j) * 2 + 1]];
+    const cAt = j => conf[base + j];
+
+    dxPx[f] = Math.abs(sk[(base + J.L_ANKLE) * 2] - sk[(base + J.R_ANKLE) * 2]);
+    torsoPx[f] = frameTorsoPx(pose, f);
+
+    // Sum the segments rather than measuring hip→ankle: a bent knee shortens
+    // the straight line but not the leg.
+    let sum = 0, k = 0;
+    for (const [hip, knee, ank] of LEGS) {
+      if (!(cAt(hip) > cfg.minConfidence && cAt(knee) > cfg.minConfidence
+            && cAt(ank) > cfg.minConfidence)) continue;
+      const [hx, hy] = at(hip), [kx, ky] = at(knee), [ax, ay] = at(ank);
+      const d = Math.hypot(hx - kx, hy - ky) + Math.hypot(kx - ax, ky - ay);
+      if (d > 1e-6) { sum += d; k++; }
+    }
+    if (k) {
+      legPx[f] = sum / k;
+      legN[f] = k;
+      legRatio[f] = dxPx[f] / legPx[f];
+      if (torsoPx[f] > 1e-6) legOverTorso[f] = legPx[f] / torsoPx[f];
+    }
+  }
+
+  // Δy/Δx of the ankle line, smoothed exactly as v5 smooths it, and used only
+  // to warn that a stretch is depth-aligned. It never changes the metric.
   const rawRatio = dx.map((v, f) =>
     Number.isFinite(v) && Number.isFinite(dy[f])
       ? Math.min(dy[f] / Math.max(v, 1e-6), CORR.ratioCap) : NaN);
   const axisRatio = rollingMedian(rawRatio, Math.max(1, Math.round(CORR.smoothSeconds * fps)),
                                   CORR.minWindowValid);
-  // ^ smoothed exactly as v5 smooths it, and used only to warn that a stretch
-  //   is depth-aligned. It never changes `sep`.
 
   const entry = matchEntry(basename);
   const { inSpan, ranges, nIn } = entry
@@ -91,14 +213,19 @@ function computeMetrics(state) {
     : { inSpan: new Uint8Array(n), ranges: [], nIn: 0 };
 
   mc = { pose, basename, round: state.cacheRound, fps, minConf: cfg.minConfidence,
-         n, sep, euclid, valid, dx, dy, axisRatio, entry, inSpan, ranges, nIn };
+         n, valid, euclid, dx, dy, dxPx, torsoPx, legPx, legN, legRatio, legOverTorso,
+         axisRatio, entry, inSpan, ranges, nIn };
   return mc;
 }
 
-// A frame counts when the pose is trustworthy AND (spans-only) it is inside a
-// curated span. Everything the panel reports is over counted frames.
+// The active series — what the charts, the threshold and the overlay read.
+const series = c => (cfg.denom === "leg" ? c.legRatio : c.dx);
+
+// A frame counts when the pose is trustworthy, the active metric exists (leg
+// needs knees the torso metric does not), and — with spans-only — it sits
+// inside a curated span. Everything the panel reports is over counted frames.
 function counted(c, f) {
-  if (!c.valid[f] || !Number.isFinite(c.sep[f])) return false;
+  if (!c.valid[f] || !Number.isFinite(series(c)[f])) return false;
   if (cfg.spansOnly && !(c.entry && c.inSpan[f])) return false;
   return true;
 }
@@ -110,20 +237,29 @@ function quantile(sorted, q) {
   return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
 }
 
-function rollup(c) {
-  const vals = [];
-  let nBoost = 0;
-  for (let f = 0; f < c.n; f++) {
-    if (!counted(c, f)) continue;
-    vals.push(c.sep[f]);
-    if (c.axisRatio[f] > CORR.ratioGate) nBoost++;
-  }
-  const sorted = [...vals].sort((a, b) => a - b);
-  const nNarrow = vals.filter(v => v < cfg.narrowThreshold).length;
+function stats(values) {
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   return {
-    n: vals.length, sorted, nBoost, nNarrow,
+    n: sorted.length, sorted,
     med: quantile(sorted, 0.5), p25: quantile(sorted, 0.25), p75: quantile(sorted, 0.75),
     min: sorted[0], max: sorted[sorted.length - 1],
+  };
+}
+
+function rollup(c) {
+  const act = series(c);
+  const frames = [];
+  for (let f = 0; f < c.n; f++) if (counted(c, f)) frames.push(f);
+  const active = stats(frames.map(f => act[f]));
+  return {
+    frames, active,
+    // Both denominators over the SAME frames, so the comparison is like for
+    // like rather than two different samples.
+    leg: stats(frames.map(f => c.legRatio[f])),
+    torso: stats(frames.map(f => c.dx[f])),
+    ratio: stats(frames.map(f => c.legOverTorso[f])),
+    nNarrow: frames.filter(f => act[f] < threshold()).length,
+    nBoost: frames.filter(f => c.axisRatio[f] > CORR.ratioGate).length,
   };
 }
 
@@ -146,7 +282,7 @@ export const StanceWidthSideRule = {
       boneWidth: 1.5,
       jointRadius: 3,
       highlightJoints: new Set([J.L_SHOULDER, J.R_SHOULDER, J.L_HIP, J.R_HIP,
-                                J.L_ANKLE, J.R_ANKLE]),
+                                J.L_KNEE, J.R_KNEE, J.L_ANKLE, J.R_ANKLE]),
     };
   },
 
@@ -156,22 +292,27 @@ export const StanceWidthSideRule = {
     host.innerHTML = `
       <h2>Foot stagger — side set</h2>
       <p class="hint">
-        <code>|Δx ankles| / torso height</code> — <strong>horizontal only</strong>:
-        how far in front of the other one foot is, in torso lengths. Side-on the
-        fore-aft axis lies along image-x, so Δy is just one foot lower in frame
-        and is dropped, not measured. The shipped <code>stance_width</code> rule
-        uses the full euclidean distance instead; both are shown per frame. The
-        torso denominator and Δx come from that lens, so they cannot drift.
+        <code>|Δx ankles| / denominator</code> — <strong>horizontal only</strong>:
+        how far in front of the other one foot is. Side-on the fore-aft axis lies
+        along image-x, so Δy is just one foot lower in frame and is dropped, not
+        measured. Both denominators are always reported; the selected one drives
+        the charts, the threshold and the overlay.
         <span style="color:${C_SEP}">wide</span> ·
         <span style="color:${C_NARROW}">below the threshold</span> ·
-        <span style="color:${C_TORSO}">torso (the denominator)</span>.
+        <span style="color:${C_LEG}">leg chain</span> ·
+        <span style="color:${C_TORSO}">torso</span>.
       </p>
 
-      <label class="slider-row" style="display:block; font-size:12px">
-        narrow below = <output id="sws-thr-out">${cfg.narrowThreshold.toFixed(2)}</output>
-        <span class="muted">torso lengths (rule ships ${DEFAULT_CONFIG.narrowThreshold})</span>
-        <input type="range" id="sws-thr" min="0.10" max="1.20" step="0.01"
-               value="${cfg.narrowThreshold}"></label>
+      <label style="display:block; font-size:12px">normalize by
+        <select id="sws-denom" style="margin-left:4px">
+          <option value="leg">leg length (hip→knee→ankle)</option>
+          <option value="torso">torso height (what the rule ships)</option>
+        </select></label>
+
+      <label class="slider-row" style="display:block; font-size:12px; margin-top:5px">
+        narrow below = <output id="sws-thr-out"></output>
+        <span class="muted" id="sws-thr-unit"></span>
+        <input type="range" id="sws-thr" min="0.05" max="1.20" step="0.01"></label>
       <label class="slider-row" style="display:block; font-size:12px">
         min confidence = <output id="sws-conf-out">${cfg.minConfidence.toFixed(2)}</output>
         <input type="range" id="sws-conf" min="0" max="0.95" step="0.05"
@@ -191,24 +332,36 @@ export const StanceWidthSideRule = {
 
     mountStageTimeline();
 
-    // The threshold is display-only — it recolors and recounts, it never feeds
-    // the metric — so nothing needs recomputing when it moves.
-    host.querySelector("#sws-thr").addEventListener("input", e => {
-      cfg.narrowThreshold = parseFloat(e.target.value);
-      host.querySelector("#sws-thr-out").textContent = cfg.narrowThreshold.toFixed(2);
+    const denomSel = host.querySelector("#sws-denom");
+    denomSel.value = cfg.denom;
+    denomSel.addEventListener("change", e => {
+      cfg.denom = e.target.value;
+      persist();
+      syncThresholdControl();
       updateTimelineLegend();
       refresh();
     });
 
-    const slider = host.querySelector("#sws-conf");
-    slider.addEventListener("input", e => {
+    // The threshold is display-only — it recolors and recounts, it never feeds
+    // the metric — so nothing needs recomputing when it moves.
+    host.querySelector("#sws-thr").addEventListener("input", e => {
+      cfg.thresholds[cfg.denom] = parseFloat(e.target.value);
+      persist();
+      syncThresholdControl();
+      updateTimelineLegend();
+      refresh();
+    });
+    syncThresholdControl();
+
+    host.querySelector("#sws-conf").addEventListener("input", e => {
       cfg.minConfidence = parseFloat(e.target.value);
       host.querySelector("#sws-conf-out").textContent = cfg.minConfidence.toFixed(2);
-      mc = { pose: null };            // gate changed ⇒ the valid mask changed
+      persist();
+      mc = { pose: null };            // gate changed ⇒ valid mask and legs changed
       refresh();
     });
     host.querySelector("#sws-spans").addEventListener("change", e => {
-      cfg.spansOnly = e.target.checked; refresh();
+      cfg.spansOnly = e.target.checked; persist(); refresh();
     });
 
     sideSetReady.then(() => { mc = { pose: null }; refresh(); });
@@ -236,21 +389,35 @@ export const StanceWidthSideRule = {
     }
 
     const r = rollup(c);
-    roundEl.innerHTML = r.n === 0
+    const D = denomCfg();
+    const row = (key, s) => {
+      const on = cfg.denom === key;
+      const d = DENOMS[key];
+      return `<div style="${on ? "" : "opacity:.72"}">
+        <span style="color:${d.color}">${on ? "▸" : " "} ${d.short}</span>
+        <code style="color:${on && s.med < threshold() ? C_NARROW : C_SEP}">${fmt(s.med)}</code>
+        <span class="muted small">IQR ${fmt(s.p25, 2)}–${fmt(s.p75, 2)} ·
+          range ${fmt(s.min, 2)}–${fmt(s.max, 2)}${s.n !== r.frames.length ? ` · n=${s.n}` : ""}</span>
+      </div>`;
+    };
+
+    roundEl.innerHTML = r.frames.length === 0
       ? `<span class="muted">No frames counted — ${cfg.spansOnly
            ? "no curated span falls in this round (try another round, or untick spans-only)"
-           : "the confidence gate rejected every frame"}.</span>`
-      : `<div>median <code style="color:${r.med < cfg.narrowThreshold ? C_NARROW : C_SEP}">
-           ${fmt(r.med)}</code>
-           <span class="muted">torso lengths</span></div>
-         <div class="muted small">IQR ${fmt(r.p25)}–${fmt(r.p75)} ·
-           range ${fmt(r.min)}–${fmt(r.max)}</div>
-         <div class="muted small">${r.n} frames counted
-           (${(100 * r.n / c.n).toFixed(1)}% of the round) ·
+           : "the confidence gate rejected every frame"
+         }${cfg.denom === "leg" ? ", or the knees never passed the gate" : ""}.</span>`
+      : `${row("leg", r.leg)}
+         ${row("torso", r.torso)}
+         <div class="muted small" style="margin-top:2px">
+           leg / torso <code>${fmt(r.ratio.med, 2)}</code>
+           <span class="muted">this boxer's proportion — the thing the torso
+             denominator varies with (IQR ${fmt(r.ratio.p25, 2)}–${fmt(r.ratio.p75, 2)})</span></div>
+         <div class="muted small" style="margin-top:4px">${r.frames.length} frames counted
+           (${(100 * r.frames.length / c.n).toFixed(1)}% of the round) ·
            ${cfg.spansOnly ? `${c.nIn} in span` : "whole round"}</div>
          <div class="muted small">
            <code style="color:${r.nNarrow ? C_NARROW : "inherit"}">${r.nNarrow}</code>
-           below ${cfg.narrowThreshold.toFixed(2)}
+           below ${threshold().toFixed(2)} ${D.short}
            <span class="muted">(raw frames — no sustained-duration logic here)</span></div>
          <div class="muted small" style="margin-top:3px">
            depth-aligned (v5 gate)
@@ -260,19 +427,27 @@ export const StanceWidthSideRule = {
                  Δx is undercounting the stagger there</span>`
              : " — as expected: nothing here is pointing at the camera"}</div>`;
 
-    drawHistogram(host.querySelector("#sws-hist"), r);
+    drawHistogram(host.querySelector("#sws-hist"), r.active);
 
     const f = state.frame;
     if (frameEl) {
       const inSpan = !!c.inSpan[f];
       const on = counted(c, f);
-      const th = frameTorsoPx(c.pose, f);
+      const val = series(c)[f];
+      const frameRow = (key, v, denomPx) => {
+        const d = DENOMS[key];
+        const sel = cfg.denom === key;
+        return `<div style="${sel ? "" : "opacity:.72"}">
+          <span style="color:${d.color}">${sel ? "▸" : " "} ${d.short}</span>
+          <code style="color:${!Number.isFinite(v) ? C_OUT
+                             : sel && v < threshold() ? C_NARROW : C_SEP}">${fmt(v)}</code>
+          <span class="muted">= Δx ${fmt(c.dxPx[f], 0)}px / ${fmt(denomPx, 0)}px</span></div>`;
+      };
       frameEl.innerHTML = `
-        <div><strong>stagger</strong>
-          <code style="color:${!Number.isFinite(c.sep[f]) ? C_OUT
-                             : c.sep[f] < cfg.narrowThreshold ? C_NARROW : C_SEP}">
-            ${fmt(c.sep[f])}</code>
-          <span class="muted">= Δx ${fmt(c.sep[f] * th, 0)}px / torso ${fmt(th, 0)}px</span></div>
+        ${frameRow("leg", c.legRatio[f], c.legPx[f])}
+        ${frameRow("torso", c.dx[f], c.torsoPx[f])}
+        <div class="muted small">legs used <code>${c.legN[f]}</code>/2 ·
+          leg / torso <code>${fmt(c.legOverTorso[f], 2)}</code></div>
         <div class="muted small">dropped Δy <code>${fmt(c.dy[f], 2)}</code>
           <span class="muted">(one foot lower in frame)</span> ·
           full euclidean <code>${fmt(c.euclid[f], 2)}</code>
@@ -284,7 +459,8 @@ export const StanceWidthSideRule = {
         <div class="muted small">
           <span style="color:${inSpan ? C_SPAN : C_OUT}">${inSpan ? "in span" : "outside span"}</span> ·
           <span style="color:${c.valid[f] ? C_SEP : C_OUT}">${c.valid[f] ? "pose valid" : "gated out"}</span> ·
-          ${on ? "counted" : "not counted"}</div>`;
+          ${on ? "counted" : "not counted"}
+          <span class="muted">· ${fmt(val)} ${denomCfg().short}</span></div>`;
     }
 
     drawTimeline(document.getElementById("sws-timeline"), c, f);
@@ -293,7 +469,8 @@ export const StanceWidthSideRule = {
   // Draw what the ratio is made of, so the number is checkable against the
   // picture: the HORIZONTAL gap between the ankles (the numerator) with its
   // value over it, the direct ankle line behind it so the dropped Δy is
-  // visible, and the torso segment (the denominator).
+  // visible, and the active denominator — the torso segment, or the hip→knee→
+  // ankle chain.
   //
   // Drawn on EVERY frame of a side-set video, spans or not. The spans decide
   // what gets counted into the statistics, not what you are allowed to look at
@@ -303,24 +480,39 @@ export const StanceWidthSideRule = {
     const c = computeMetrics(state);
     if (!c || !c.entry) return;
     const f = state.frame;
-    if (!Number.isFinite(c.sep[f])) return;
+    // The gap is drawn whenever the ankles exist. The active DENOMINATOR may
+    // still be missing (leg length needs knees the torso metric does not) — in
+    // that case the line stays, with a dash where the number would be, rather
+    // than the overlay vanishing on you mid-scrub.
+    if (!Number.isFinite(c.dxPx[f])) return;
+    const val = series(c)[f];
+    const hasVal = Number.isFinite(val);
     const s = state.renderScale || 1;
     const sk = c.pose.skeleton, base = f * 17;
     const px = j => [sk[(base + j) * 2] * s, sk[(base + j) * 2 + 1] * s];
 
     const [lax, lay] = px(J.L_ANKLE), [rax, ray] = px(J.R_ANKLE);
-    const [lsx, lsy] = px(J.L_SHOULDER), [rsx, rsy] = px(J.R_SHOULDER);
-    const [lhx, lhy] = px(J.L_HIP), [rhx, rhy] = px(J.R_HIP);
-    const shx = (lsx + rsx) / 2, shy = (lsy + rsy) / 2;
-    const hpx = (lhx + rhx) / 2, hpy = (lhy + rhy) / 2;
-    const color = c.sep[f] < cfg.narrowThreshold ? C_NARROW : C_SEP;
+    const color = !hasVal ? C_OUT : val < threshold() ? C_NARROW : C_SEP;
 
     ctx.save();
 
-    // denominator
-    ctx.strokeStyle = C_TORSO;
+    // the active denominator, drawn so it is obvious which one the number is on
     ctx.lineWidth = 3 * s;
-    ctx.beginPath(); ctx.moveTo(shx, shy); ctx.lineTo(hpx, hpy); ctx.stroke();
+    if (cfg.denom === "leg") {
+      ctx.strokeStyle = C_LEG;
+      for (const [hip, knee, ank] of LEGS) {
+        const [hx, hy] = px(hip), [kx, ky] = px(knee), [ax, ay] = px(ank);
+        ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.lineTo(ax, ay); ctx.stroke();
+      }
+    } else {
+      const [lsx, lsy] = px(J.L_SHOULDER), [rsx, rsy] = px(J.R_SHOULDER);
+      const [lhx, lhy] = px(J.L_HIP), [rhx, rhy] = px(J.R_HIP);
+      ctx.strokeStyle = C_TORSO;
+      ctx.beginPath();
+      ctx.moveTo((lsx + rsx) / 2, (lsy + rsy) / 2);
+      ctx.lineTo((lhx + rhx) / 2, (lhy + rhy) / 2);
+      ctx.stroke();
+    }
 
     // the ankle-to-ankle line the rule would measure — faint, because the Δy
     // in it is exactly what this lens throws away
@@ -347,8 +539,9 @@ export const StanceWidthSideRule = {
       ctx.beginPath(); ctx.moveTo(x, gy - 5 * s); ctx.lineTo(x, gy + 5 * s); ctx.stroke();
     }
 
-    // value over the gap
-    const label = `${c.sep[f].toFixed(2)} torso`;
+    // value over the gap, naming its denominator — two numbers are in play and
+    // an unlabeled one is a number you cannot use
+    const label = `${hasVal ? val.toFixed(2) : "—"} ${denomCfg().short}`;
     const fsz = Math.round(13 * s);
     ctx.font = `600 ${fsz}px ui-monospace, monospace`;
     ctx.textBaseline = "top";
@@ -361,7 +554,8 @@ export const StanceWidthSideRule = {
 
     // why this frame is not in the stats, said plainly rather than by fading
     if (!counted(c, f)) {
-      const why = !c.valid[f] ? "below confidence gate"
+      const why = !hasVal ? `no ${denomCfg().short} denominator`
+                : !c.valid[f] ? "below confidence gate"
                 : (cfg.spansOnly && !c.inSpan[f]) ? "outside curated span" : "not counted";
       const sm = Math.round(10 * s);
       ctx.font = `${sm}px ui-monospace, monospace`;
@@ -382,6 +576,21 @@ function frameTorsoPx(pose, f) {
   const hx = 0.5 * (sk[(base + J.L_HIP) * 2]          + sk[(base + J.R_HIP) * 2]);
   const hy = 0.5 * (sk[(base + J.L_HIP) * 2 + 1]      + sk[(base + J.R_HIP) * 2 + 1]);
   return Math.hypot(sx - hx, sy - hy);
+}
+
+function syncThresholdControl() {
+  if (!host) return;
+  const D = denomCfg();
+  const sl = host.querySelector("#sws-thr");
+  if (sl) { sl.max = D.axisMax.toFixed(2); sl.value = threshold(); }
+  const out = host.querySelector("#sws-thr-out");
+  if (out) out.textContent = threshold().toFixed(2);
+  const unit = host.querySelector("#sws-thr-unit");
+  if (unit) {
+    unit.textContent = cfg.denom === "leg"
+      ? `${D.short} lengths (nothing is tuned on this axis yet)`
+      : `${D.short} lengths (rule ships ${DENOMS.torso.defaultThreshold})`;
+  }
 }
 
 function refresh() {
@@ -409,49 +618,45 @@ function fitCanvas(canvas) {
 
 // ── distribution ────────────────────────────────────────────────────────────
 
-// Shared full-scale for both charts, so a height on the timeline and a position
-// on the histogram mean the same separation. Beyond 1.5 torso lengths is a pose
-// failure rather than a stance, so it is the top of the axis.
-const SEP_MAX = 1.5;
 const HIST_BINS = 30;
 
-function drawHistogram(canvas, r) {
+function drawHistogram(canvas, s) {
   if (!canvas) return;
   const { ctx, W, H } = fitCanvas(canvas);
-  if (!r || !r.n) {
+  if (!s || !s.n) {
     ctx.fillStyle = C_OUT;
     ctx.font = "11px ui-monospace, monospace";
     ctx.fillText("no counted frames", 4, H / 2);
     return;
   }
+  const D = denomCfg();
   const bins = new Array(HIST_BINS).fill(0);
-  for (const v of r.sorted) {
-    const i = Math.min(HIST_BINS - 1, Math.max(0, Math.floor(v / SEP_MAX * HIST_BINS)));
+  for (const v of s.sorted) {
+    const i = Math.min(HIST_BINS - 1, Math.max(0, Math.floor(v / D.axisMax * HIST_BINS)));
     bins[i]++;
   }
   const peak = Math.max(...bins);
   const bw = W / HIST_BINS;
   const axisH = 13;
-  const xOf = v => (v / SEP_MAX) * W;
+  const xOf = v => (v / D.axisMax) * W;
 
-  // same quarter-torso ticks as the timeline's y axis, so the two charts read
-  // against one scale
+  // same ticks as the timeline's y axis, so the two charts read against one
+  // scale
   ctx.font = "10px ui-monospace, monospace";
   ctx.textAlign = "center";
-  for (let v = 0; v <= SEP_MAX + 1e-9; v += TICK_STEP) {
+  for (let v = 0; v <= D.axisMax + 1e-9; v += D.tick) {
     ctx.strokeStyle = "rgba(255,255,255,0.13)";
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(xOf(v), 0); ctx.lineTo(xOf(v), H - axisH); ctx.stroke();
     ctx.fillStyle = C_OUT;
-    const x = Math.min(W - 12, Math.max(12, xOf(v)));
-    ctx.fillText(v.toFixed(2), x, H - 2);
+    ctx.fillText(v.toFixed(2), Math.min(W - 12, Math.max(12, xOf(v))), H - 2);
   }
   ctx.textAlign = "left";
 
   for (let i = 0; i < HIST_BINS; i++) {
-    const v = (i + 0.5) / HIST_BINS * SEP_MAX;
+    const v = (i + 0.5) / HIST_BINS * D.axisMax;
     const h = peak ? (bins[i] / peak) * (H - axisH) : 0;
-    ctx.fillStyle = v < cfg.narrowThreshold ? C_NARROW : C_SEP;
+    ctx.fillStyle = v < threshold() ? C_NARROW : C_SEP;
     ctx.globalAlpha = 0.85;
     ctx.fillRect(i * bw, H - axisH - h, Math.max(1, bw - 1), h);
   }
@@ -459,14 +664,13 @@ function drawHistogram(canvas, r) {
 
   ctx.strokeStyle = C_NARROW;
   ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(xOf(cfg.narrowThreshold), 0);
-  ctx.lineTo(xOf(cfg.narrowThreshold), H - axisH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(xOf(threshold()), 0); ctx.lineTo(xOf(threshold()), H - axisH); ctx.stroke();
   ctx.setLineDash([]);
 
   ctx.strokeStyle = "#fff";
-  ctx.beginPath(); ctx.moveTo(xOf(r.med), 0); ctx.lineTo(xOf(r.med), H - axisH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(xOf(s.med), 0); ctx.lineTo(xOf(s.med), H - axisH); ctx.stroke();
   ctx.fillStyle = "#fff";
-  ctx.fillText(`med ${fmt(r.med, 2)}`, Math.min(W - 54, xOf(r.med) + 3), 9);
+  ctx.fillText(`med ${fmt(s.med, 2)}`, Math.min(W - 54, xOf(s.med) + 3), 9);
 }
 
 // ── below-video timeline ────────────────────────────────────────────────────
@@ -476,16 +680,13 @@ const TL_LABEL_W = 46;
 // Tall enough that the gridlines are far enough apart to read a value off the
 // trace by eye — the point of the axis.
 const TL_HEIGHT = 170;
-// Gridline every quarter torso length: the granularity you can actually judge
-// a stance at, and it puts a line on the shipped 0.5 threshold.
-const TICK_STEP = 0.25;
 
 function updateTimelineLegend() {
   const el = document.getElementById("sws-tl-legend");
   if (!el) return;
   el.innerHTML = `Foot stagger (horizontal Δx) —
-    <span style="color:${C_SEP}">torso lengths</span> on the y axis,
-    <span style="color:${C_NARROW}">below ${cfg.narrowThreshold.toFixed(2)}</span>,
+    <span style="color:${denomCfg().color}">${denomCfg().label}</span> on the y axis,
+    <span style="color:${C_NARROW}">below ${threshold().toFixed(2)}</span>,
     faded outside a <span style="color:${C_SPAN}">curated span</span> · click to seek`;
 }
 
@@ -507,6 +708,7 @@ function mountStageTimeline() {
   wrap.appendChild(canvas);
   slot.appendChild(wrap);
   updateTimelineLegend();
+
   canvas.addEventListener("click", e => {
     const N = mc?.n;
     if (!N) return;
@@ -521,20 +723,22 @@ function drawTimeline(canvas, c, frame) {
   const { ctx, W, H } = fitCanvas(canvas);
   const N = c.n;
   if (!N) return;
+  const D = denomCfg();
+  const act = series(c);
 
   const xOf = f => TL_LABEL_W + (f / Math.max(1, N - 1)) * (W - TL_LABEL_W - 4);
   const colW = Math.max(1, (W - TL_LABEL_W - 4) / Math.max(1, N - 1));
   const spanH = 6;
   const top = 8, barH = H - 16 - spanH;
-  const yOf = v => top + barH - Math.min(1, v / SEP_MAX) * barH;
+  const yOf = v => top + barH - Math.min(1, v / D.axisMax) * barH;
 
   ctx.font = "10px ui-monospace, monospace";
 
-  // y axis FIRST, under the trace: a gridline + value every quarter torso
-  // length, so a bar's height reads straight off as a separation.
+  // y axis FIRST, under the trace: a gridline + value every tick, so a bar's
+  // height reads straight off as a separation.
   ctx.textBaseline = "middle";
   ctx.textAlign = "right";
-  for (let v = 0; v <= SEP_MAX + 1e-9; v += TICK_STEP) {
+  for (let v = 0; v <= D.axisMax + 1e-9; v += D.tick) {
     const y = yOf(v);
     ctx.strokeStyle = "rgba(255,255,255,0.13)";
     ctx.lineWidth = 1;
@@ -546,10 +750,10 @@ function drawTimeline(canvas, c, frame) {
   ctx.textBaseline = "alphabetic";
 
   for (let f = 0; f < N; f++) {
-    const v = c.sep[f];
+    const v = act[f];
     if (!Number.isFinite(v)) continue;
     const on = counted(c, f);
-    ctx.fillStyle = v < cfg.narrowThreshold ? C_NARROW : C_SEP;
+    ctx.fillStyle = v < threshold() ? C_NARROW : C_SEP;
     ctx.globalAlpha = on ? 0.9 : 0.18;
     ctx.fillRect(xOf(f), yOf(v), colW + 0.5, top + barH - yOf(v));
   }
@@ -557,12 +761,12 @@ function drawTimeline(canvas, c, frame) {
 
   // threshold line, drawn over the trace and labelled, so "narrow" is readable
   // without counting gridlines
-  const ty = yOf(cfg.narrowThreshold);
+  const ty = yOf(threshold());
   ctx.strokeStyle = C_NARROW;
   ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(TL_LABEL_W, ty); ctx.lineTo(W - 4, ty); ctx.stroke();
   ctx.setLineDash([]);
-  const tLabel = `narrow < ${cfg.narrowThreshold.toFixed(2)}`;
+  const tLabel = `narrow < ${threshold().toFixed(2)} ${D.short}`;
   ctx.font = "600 10px ui-monospace, monospace";
   const tw = ctx.measureText(tLabel).width;
   ctx.fillStyle = "rgba(0,0,0,0.65)";
@@ -573,7 +777,7 @@ function drawTimeline(canvas, c, frame) {
 
   // current value as a dot on the trace — the anchor between the picture on
   // screen and a height on this axis
-  const cv = c.sep[frame];
+  const cv = act[frame];
   if (Number.isFinite(cv)) {
     ctx.fillStyle = C_FRAME;
     ctx.beginPath(); ctx.arc(xOf(frame), yOf(cv), 3, 0, Math.PI * 2); ctx.fill();
