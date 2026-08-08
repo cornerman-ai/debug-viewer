@@ -292,7 +292,7 @@ const COLOR_FINAL      = "#ffb347";  // corrected + sustained-duration variant
 // width — boost it before the rule logic runs. Ratio is smoothed with a
 // rolling MEDIAN so single-frame spikes (heel raises, steps) can't flip the
 // gate; only sustained depth-alignment does.
-const CORR = {
+export const CORR = {
   smoothSeconds: 0.5,  // half-window of the rolling median
   // 0.75 = knee of the label-eval sweep: fixes 26/54 foreshortened false
   // flags while erasing only 2/27 genuine side-on flags. (2.0 was near-zero
@@ -327,7 +327,7 @@ function pickPose(state) {
 // normalized, same scale as sep ratio). With the camera above ankle
 // height, depth maps to image-vertical — so a vertical-leaning ankle
 // line suggests the stance is depth-aligned and sep ratio undercounts.
-function computeDxDy(pose) {
+export function computeDxDy(pose) {
   const n = pose.n_frames;
   const dx = new Array(n).fill(NaN);
   const dy = new Array(n).fill(NaN);
@@ -342,7 +342,7 @@ function computeDxDy(pose) {
 }
 
 // NaN-aware rolling median; windows with too few finite values stay NaN.
-function rollingMedian(xs, halfWin, minValid) {
+export function rollingMedian(xs, halfWin, minValid) {
   const n = xs.length;
   const out = new Array(n).fill(NaN);
   for (let i = 0; i < n; i++) {

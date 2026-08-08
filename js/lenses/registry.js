@@ -35,6 +35,7 @@ import { OnDeviceLensRule } from "./inspect/ondevice.js";
 import { PoseCoverageLensRule } from "./inspect/pose_coverage.js";
 import { SkeletonCompareRule } from "./inspect/skeleton_compare.js";
 import { StanceWidthLensRule } from "./rules/stance_width.js";
+import { StanceWidthSideRule } from "./rules/stance_width_side.js";
 import { AudioImpactLensRule } from "./models/audio_impact.js";
 import { ImpactSpotterLensRule } from "./models/impact_spotter.js";
 import { PunchPredictionsRule } from "./models/punch_predictions.js";
@@ -69,6 +70,7 @@ export const RULES = [
   SideSetRule,
   SkeletonCompareRule,
   StanceWidthLensRule,
+  StanceWidthSideRule,
   StepPunchSyncRule,
   StepDetectorRule,
 ];
