@@ -1,10 +1,20 @@
-// Foot stagger on the SIDE set — HORIZONTAL ankle distance, in torso lengths
-// OR leg lengths.
+// Stance DEPTH on the side set — how deep the stance is front-to-back, i.e. how
+// far in front of the other one foot is, measured as HORIZONTAL ankle distance
+// in leg lengths (default) or torso lengths.
+//
+// Named for the coaching sense of depth (fore-aft extent of the stance), which
+// is the opposite axis from stance WIDTH — the shipped rule measures the full
+// euclidean ankle distance and calls it width. Do not confuse either with
+// "camera-aligned" below, which is about the stance line pointing AT the lens.
+//
+// It lives in rules/ rather than research/ because it is built on the
+// stance_width port and is a workbench for that family; there is no
+// ml/research/ topic behind it.
 //
 // The question is how far in FRONT of the other one foot is, so the numerator is
 // strictly the horizontal component, |ankle_L.x − ankle_R.x|. Horizontal only,
 // on purpose: side-on, the boxer's fore-aft axis lies along image-x, so Δx is
-// the stagger and Δy is just one foot sitting lower in frame (ground plane,
+// the depth and Δy is just one foot sitting lower in frame (ground plane,
 // perspective, a heel lifting). The shipped stance_width rule takes the full
 // euclidean ankle distance, which folds that Δy in; here it is dropped rather
 // than measured, and both are shown per frame so the difference stays visible.
@@ -16,9 +26,10 @@
 //                  pass the confidence gate. Summed per segment, so knee bend
 //                  does not shorten it in 3D.
 //
-// Leg length is the better denominator in principle — stance width is set by
-// the legs, and torso/leg proportion varies enough between people that a
-// torso-normalized width mislabels the long-legged. What it costs:
+// Leg length is the DEFAULT (0.50, 2026-08-08) and the better denominator in
+// principle — the stance is set by the legs, and torso/leg proportion varies
+// enough between people that a torso-normalized depth mislabels the
+// long-legged. What that choice costs, and none of it is fixed by picking it:
 //
 //  1. The ankles move into the DENOMINATOR. Torso height is independent of the
 //     ankles, so numerator and denominator carry independent errors. With leg
@@ -74,7 +85,7 @@ const C_LEG    = "#ffd95c";  // leg chain (denominator)
 const C_SPAN   = "#b48cff";  // curated span
 const C_OUT    = "#888";
 const C_FRAME  = "#3ad9e0";
-const C_BOOST  = "#e08aff";  // frames the v5 gate calls depth-aligned
+const C_BOOST  = "#e08aff";  // frames the v5 gate calls camera-aligned
 
 // Per-denominator axis + threshold. The leg ratio lives on a smaller scale than
 // the torso one (legs are the longer segment), so it gets its own full-scale
@@ -89,20 +100,24 @@ const DENOMS = {
   leg: {
     label: "leg length", short: "leg", color: C_LEG,
     axisMax: 1.0, tick: 0.25,
-    // 0.33 is only a STARTING POINT: it is torso-0.5 rescaled by a leg/torso
-    // ratio of ~1.5. Nothing has been tuned or labeled on this axis — read the
-    // measured `leg / torso` row for this boxer and move the slider.
-    defaultThreshold: 0.33,
+    // The working default as of 2026-08-08, chosen by eye off this lens — NOT
+    // a calibration. Nothing has been labeled or tuned on the leg axis, and
+    // 0.5 leg is a markedly deeper stance than the rule's 0.5 torso (leg runs
+    // ~1.5-2x torso height, so it is a much larger denominator). Read the
+    // measured `leg / torso` row before carrying this number anywhere else.
+    defaultThreshold: 0.5,
   },
 };
 
 // Settings survive a video change, a round change and a page reload — this lens
 // is for sweeping a threshold across the set, and re-dialing it every time the
 // footage changes would defeat that.
-const STORE_KEY = "cornerman.lens.stance_width_side";
+const STORE_KEY = "cornerman.lens.stance_depth_side.v2";
 
 const cfg = {
-  denom: "torso",
+  // Leg length is the working denominator (2026-08-08). Torso stays one click
+  // away because it is what the shipped rule and every tuned number use.
+  denom: "leg",
   minConfidence: DEFAULT_CONFIG.minConfidence,
   spansOnly: true,
   // Per denominator: the two axes are not interchangeable, so a threshold set
@@ -162,7 +177,7 @@ function computeMetrics(state) {
   const euclid = out.debug.sepRatios;
 
   // dx / dy are the ankle line's components over torso height, from the same
-  // lens. dx IS the torso-normalized stagger.
+  // lens. dx IS the torso-normalized depth.
   const { dx, dy } = computeDxDy(pose);
 
   const dxPx = new Array(n).fill(NaN);
@@ -199,7 +214,7 @@ function computeMetrics(state) {
   }
 
   // Δy/Δx of the ankle line, smoothed exactly as v5 smooths it, and used only
-  // to warn that a stretch is depth-aligned. It never changes the metric.
+  // to warn that a stretch is camera-aligned. It never changes the metric.
   const rawRatio = dx.map((v, f) =>
     Number.isFinite(v) && Number.isFinite(dy[f])
       ? Math.min(dy[f] / Math.max(v, 1e-6), CORR.ratioCap) : NaN);
@@ -267,9 +282,9 @@ const fmt = (v, d = 3) => (Number.isFinite(v) ? v.toFixed(d) : "—");
 
 // ── lens ────────────────────────────────────────────────────────────────────
 
-export const StanceWidthSideRule = {
-  id: "stance_width_side",
-  label: "Foot stagger — side set (horizontal)",
+export const StanceDepthSideRule = {
+  id: "stance_depth_side",
+  label: "Stance depth — side set",
 
   // Only the curated side videos are selectable. The manual picker and the
   // Firebase path bypass the dropdown, so update() refuses those too: the whole
@@ -290,7 +305,7 @@ export const StanceWidthSideRule = {
     host = _host;
     mc = { pose: null };
     host.innerHTML = `
-      <h2>Foot stagger — side set</h2>
+      <h2>Stance depth — side set</h2>
       <p class="hint">
         <code>|Δx ankles| / denominator</code> — <strong>horizontal only</strong>:
         how far in front of the other one foot is. Side-on the fore-aft axis lies
@@ -304,35 +319,35 @@ export const StanceWidthSideRule = {
       </p>
 
       <label style="display:block; font-size:12px">normalize by
-        <select id="sws-denom" style="margin-left:4px">
+        <select id="sds-denom" style="margin-left:4px">
           <option value="leg">leg length (hip→knee→ankle)</option>
           <option value="torso">torso height (what the rule ships)</option>
         </select></label>
 
       <label class="slider-row" style="display:block; font-size:12px; margin-top:5px">
-        narrow below = <output id="sws-thr-out"></output>
-        <span class="muted" id="sws-thr-unit"></span>
-        <input type="range" id="sws-thr" min="0.05" max="1.20" step="0.01"></label>
+        narrow below = <output id="sds-thr-out"></output>
+        <span class="muted" id="sds-thr-unit"></span>
+        <input type="range" id="sds-thr" min="0.05" max="1.20" step="0.01"></label>
       <label class="slider-row" style="display:block; font-size:12px">
-        min confidence = <output id="sws-conf-out">${cfg.minConfidence.toFixed(2)}</output>
-        <input type="range" id="sws-conf" min="0" max="0.95" step="0.05"
+        min confidence = <output id="sds-conf-out">${cfg.minConfidence.toFixed(2)}</output>
+        <input type="range" id="sds-conf" min="0" max="0.95" step="0.05"
                value="${cfg.minConfidence}"></label>
       <label style="display:block; font-size:12px; margin-top:4px">
-        <input type="checkbox" id="sws-spans" ${cfg.spansOnly ? "checked" : ""}>
+        <input type="checkbox" id="sds-spans" ${cfg.spansOnly ? "checked" : ""}>
         curated spans only</label>
 
       <h3>This round</h3>
-      <div id="sws-round" style="font-size:13px; line-height:1.6"></div>
+      <div id="sds-round" style="font-size:13px; line-height:1.6"></div>
 
       <h3>Distribution <span class="muted small">(counted frames)</span></h3>
-      <canvas id="sws-hist" style="display:block; width:100%; height:120px"></canvas>
+      <canvas id="sds-hist" style="display:block; width:100%; height:120px"></canvas>
 
       <h3>Current frame</h3>
-      <div id="sws-frame" style="font-size:13px; line-height:1.7"></div>`;
+      <div id="sds-frame" style="font-size:13px; line-height:1.7"></div>`;
 
     mountStageTimeline();
 
-    const denomSel = host.querySelector("#sws-denom");
+    const denomSel = host.querySelector("#sds-denom");
     denomSel.value = cfg.denom;
     denomSel.addEventListener("change", e => {
       cfg.denom = e.target.value;
@@ -344,7 +359,7 @@ export const StanceWidthSideRule = {
 
     // The threshold is display-only — it recolors and recounts, it never feeds
     // the metric — so nothing needs recomputing when it moves.
-    host.querySelector("#sws-thr").addEventListener("input", e => {
+    host.querySelector("#sds-thr").addEventListener("input", e => {
       cfg.thresholds[cfg.denom] = parseFloat(e.target.value);
       persist();
       syncThresholdControl();
@@ -353,14 +368,14 @@ export const StanceWidthSideRule = {
     });
     syncThresholdControl();
 
-    host.querySelector("#sws-conf").addEventListener("input", e => {
+    host.querySelector("#sds-conf").addEventListener("input", e => {
       cfg.minConfidence = parseFloat(e.target.value);
-      host.querySelector("#sws-conf-out").textContent = cfg.minConfidence.toFixed(2);
+      host.querySelector("#sds-conf-out").textContent = cfg.minConfidence.toFixed(2);
       persist();
       mc = { pose: null };            // gate changed ⇒ valid mask and legs changed
       refresh();
     });
-    host.querySelector("#sws-spans").addEventListener("change", e => {
+    host.querySelector("#sds-spans").addEventListener("change", e => {
       cfg.spansOnly = e.target.checked; persist(); refresh();
     });
 
@@ -370,8 +385,8 @@ export const StanceWidthSideRule = {
   update(state) {
     if (!host || !state) return;
     const c = computeMetrics(state);
-    const roundEl = host.querySelector("#sws-round");
-    const frameEl = host.querySelector("#sws-frame");
+    const roundEl = host.querySelector("#sds-round");
+    const frameEl = host.querySelector("#sds-frame");
     if (!roundEl) return;
     if (!c) { roundEl.innerHTML = `<p class="muted">No pose cache loaded.</p>`; return; }
 
@@ -379,12 +394,12 @@ export const StanceWidthSideRule = {
       roundEl.innerHTML =
         `<div style="color:${C_NARROW}; font-weight:600">Not in the side set</div>
          <div class="muted small" style="margin-top:3px">
-           Horizontal distance is only the stagger when the camera is side-on.
+           Horizontal distance is only stance depth when the camera is side-on.
            <code>${c.basename || "this video"}</code> isn't in
            <code>side_segments.json</code>, so nothing is measured.</div>`;
       if (frameEl) frameEl.innerHTML = `<span class="muted">—</span>`;
-      drawHistogram(host.querySelector("#sws-hist"), null);
-      drawTimeline(document.getElementById("sws-timeline"), c, state.frame);
+      drawHistogram(host.querySelector("#sds-hist"), null);
+      drawTimeline(document.getElementById("sds-timeline"), c, state.frame);
       return;
     }
 
@@ -420,14 +435,14 @@ export const StanceWidthSideRule = {
            below ${threshold().toFixed(2)} ${D.short}
            <span class="muted">(raw frames — no sustained-duration logic here)</span></div>
          <div class="muted small" style="margin-top:3px">
-           depth-aligned (v5 gate)
+           camera-aligned (v5 gate)
            <code style="color:${r.nBoost ? C_BOOST : "inherit"}">${r.nBoost}</code>
            of them${r.nBoost
              ? ` — <span style="color:${C_BOOST}">expected ~0 on side-on footage;
-                 Δx is undercounting the stagger there</span>`
+                 Δx is undercounting the depth there</span>`
              : " — as expected: nothing here is pointing at the camera"}</div>`;
 
-    drawHistogram(host.querySelector("#sws-hist"), r.active);
+    drawHistogram(host.querySelector("#sds-hist"), r.active);
 
     const f = state.frame;
     if (frameEl) {
@@ -455,7 +470,7 @@ export const StanceWidthSideRule = {
         <div class="muted small">smoothed Δy/Δx
           <code style="color:${c.axisRatio[f] > CORR.ratioGate ? C_BOOST : "inherit"}">
             ${fmt(c.axisRatio[f], 2)}</code>
-          <span class="muted">(above ${CORR.ratioGate} ⇒ depth-aligned, Δx undercounts)</span></div>
+          <span class="muted">(above ${CORR.ratioGate} ⇒ pointing at the camera, Δx undercounts)</span></div>
         <div class="muted small">
           <span style="color:${inSpan ? C_SPAN : C_OUT}">${inSpan ? "in span" : "outside span"}</span> ·
           <span style="color:${c.valid[f] ? C_SEP : C_OUT}">${c.valid[f] ? "pose valid" : "gated out"}</span> ·
@@ -463,7 +478,7 @@ export const StanceWidthSideRule = {
           <span class="muted">· ${fmt(val)} ${denomCfg().short}</span></div>`;
     }
 
-    drawTimeline(document.getElementById("sws-timeline"), c, f);
+    drawTimeline(document.getElementById("sds-timeline"), c, f);
   },
 
   // Draw what the ratio is made of, so the number is checkable against the
@@ -581,14 +596,14 @@ function frameTorsoPx(pose, f) {
 function syncThresholdControl() {
   if (!host) return;
   const D = denomCfg();
-  const sl = host.querySelector("#sws-thr");
+  const sl = host.querySelector("#sds-thr");
   if (sl) { sl.max = D.axisMax.toFixed(2); sl.value = threshold(); }
-  const out = host.querySelector("#sws-thr-out");
+  const out = host.querySelector("#sds-thr-out");
   if (out) out.textContent = threshold().toFixed(2);
-  const unit = host.querySelector("#sws-thr-unit");
+  const unit = host.querySelector("#sds-thr-unit");
   if (unit) {
     unit.textContent = cfg.denom === "leg"
-      ? `${D.short} lengths (nothing is tuned on this axis yet)`
+      ? `${D.short} lengths (working default ${DENOMS.leg.defaultThreshold}, by eye — nothing tuned on this axis)`
       : `${D.short} lengths (rule ships ${DENOMS.torso.defaultThreshold})`;
   }
 }
@@ -682,9 +697,9 @@ const TL_LABEL_W = 46;
 const TL_HEIGHT = 170;
 
 function updateTimelineLegend() {
-  const el = document.getElementById("sws-tl-legend");
+  const el = document.getElementById("sds-tl-legend");
   if (!el) return;
-  el.innerHTML = `Foot stagger (horizontal Δx) —
+  el.innerHTML = `Stance depth (horizontal Δx) —
     <span style="color:${denomCfg().color}">${denomCfg().label}</span> on the y axis,
     <span style="color:${C_NARROW}">below ${threshold().toFixed(2)}</span>,
     faded outside a <span style="color:${C_SPAN}">curated span</span> · click to seek`;
@@ -698,11 +713,11 @@ function mountStageTimeline() {
   wrap.style.cssText = "margin-top:12px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px";
   const label = document.createElement("div");
   label.className = "muted small";
-  label.id = "sws-tl-legend";
+  label.id = "sds-tl-legend";
   label.style.cssText = "margin-bottom:6px";
   wrap.appendChild(label);
   const canvas = document.createElement("canvas");
-  canvas.id = "sws-timeline";
+  canvas.id = "sds-timeline";
   canvas.style.cssText = `display:block;width:100%;height:${TL_HEIGHT}px`;
   canvas.width = 800; canvas.height = TL_HEIGHT;
   wrap.appendChild(canvas);
