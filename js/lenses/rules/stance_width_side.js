@@ -1,22 +1,28 @@
-// Stance width on the SIDE set — the raw, uncorrected metric.
+// Foot stagger on the SIDE set — HORIZONTAL ankle distance in torso lengths.
 //
-// Same measurement the shipped stance_width rule makes: the ankle-to-ankle
-// line, divided by torso height (shoulder midpoint → hip midpoint). Not a
-// re-implementation — it imports the rule port from ./stance_width.js, so the
-// number here IS the rule's number and cannot drift from it.
+// The question is how far in FRONT of the other one foot is, so the metric is
+// strictly the horizontal component:
 //
-// What is deliberately NOT here is the v5 foreshortening correction. That boost
-// exists because a stance line pointing AT the camera is seen end-on and its 2D
-// length undercounts the real width. On this set the camera is side-on: the
-// stance line lies across the image plane, at full length, so there is nothing
-// to correct — the raw ratio is the true ratio. That is exactly what makes this
-// set worth measuring: it is the reference distribution the correction is
-// trying to recover on frontal footage.
+//     |ankle_L.x − ankle_R.x| / torso height     (shoulder mid → hip mid)
 //
-// The panel reports how many counted frames the v5 gate WOULD have boosted, as
-// a check rather than an assertion — if that number is not ~0, either the clip
-// is not as side-on as curated or the gate is mis-tuned, and both are worth
-// knowing before trusting the numbers.
+// Horizontal only, on purpose. Side-on, the boxer's fore-aft axis lies along
+// image-x, so Δx is the stagger and Δy is just one foot sitting lower in frame
+// (ground plane, perspective, a heel lifting). The shipped stance_width rule
+// takes the full euclidean ankle distance, which folds that Δy in; here it is
+// dropped rather than measured. Both numbers are shown per frame so the
+// difference is visible.
+//
+// Not re-derived: the torso denominator and the horizontal component both come
+// from ./stance_width.js (`computeDxDy`), and the frame-validity pipeline is
+// that lens's shipped one — confidence gate → temporal cleanup → knee/ankle
+// sanity. Only the choice of numerator is this lens's own.
+//
+// The v5 foreshortening correction is not applied and could not be: it exists
+// because a stance line pointing AT the camera is seen end-on and undercounts,
+// and the fix for that is to stop measuring such footage, not to scale it. The
+// panel still reports how many counted frames the v5 gate WOULD have flagged as
+// depth-aligned — on genuinely side-on footage that should be ~0, and if it is
+// not, Δx is undercounting the stagger and the numbers are not trustworthy.
 //
 // Video list is gated to the side set (../shared/side_set.js).
 
@@ -58,23 +64,25 @@ function computeMetrics(state) {
   const n = pose.n_frames;
   const fps = pose.fps || state.fps || 30;
 
-  // The shipped pipeline, run for its RAW sep ratios and its valid mask:
-  // confidence gate → temporal cleanup → knee/ankle sanity. `out.debug.sepRatios`
-  // is the uncorrected metric — the correction is applied downstream of this
-  // call in stance_width.js, and we simply never apply it.
+  // The shipped pipeline, run for its frame-validity mask (confidence gate →
+  // temporal cleanup → knee/ankle sanity) and, for comparison only, its full
+  // euclidean ankle ratio.
   const out = detectStanceWidth(pose.skeleton, pose.conf, n, fps,
                                 { ...DEFAULT_CONFIG, minConfidence: cfg.minConfidence });
-  const sep = out.debug.sepRatios;
   const valid = out.debug.validMask;
+  const euclid = out.debug.sepRatios;
 
-  // Δy/Δx of the ankle line, smoothed exactly as v5 smooths it. Only used to
-  // report what the correction would have done — never to change `sep`.
+  // dx / dy are the ankle line's components, already divided by the same torso
+  // height. dx IS this lens's metric — the horizontal stagger.
   const { dx, dy } = computeDxDy(pose);
+  const sep = dx;
   const rawRatio = dx.map((v, f) =>
     Number.isFinite(v) && Number.isFinite(dy[f])
       ? Math.min(dy[f] / Math.max(v, 1e-6), CORR.ratioCap) : NaN);
   const axisRatio = rollingMedian(rawRatio, Math.max(1, Math.round(CORR.smoothSeconds * fps)),
                                   CORR.minWindowValid);
+  // ^ smoothed exactly as v5 smooths it, and used only to warn that a stretch
+  //   is depth-aligned. It never changes `sep`.
 
   const entry = matchEntry(basename);
   const { inSpan, ranges, nIn } = entry
@@ -83,7 +91,7 @@ function computeMetrics(state) {
     : { inSpan: new Uint8Array(n), ranges: [], nIn: 0 };
 
   mc = { pose, basename, round: state.cacheRound, fps, minConf: cfg.minConfidence,
-         n, sep, valid, dx, dy, axisRatio, entry, inSpan, ranges, nIn };
+         n, sep, euclid, valid, dx, dy, axisRatio, entry, inSpan, ranges, nIn };
   return mc;
 }
 
@@ -125,7 +133,7 @@ const fmt = (v, d = 3) => (Number.isFinite(v) ? v.toFixed(d) : "—");
 
 export const StanceWidthSideRule = {
   id: "stance_width_side",
-  label: "Stance width — side set (uncorrected)",
+  label: "Foot stagger — side set (horizontal)",
 
   // Only the curated side videos are selectable. The manual picker and the
   // Firebase path bypass the dropdown, so update() refuses those too: the whole
@@ -146,18 +154,24 @@ export const StanceWidthSideRule = {
     host = _host;
     mc = { pose: null };
     host.innerHTML = `
-      <h2>Stance width — side set</h2>
+      <h2>Foot stagger — side set</h2>
       <p class="hint">
-        <code>‖ankle − ankle‖ / torso height</code>, the shipped
-        <code>stance_width</code> metric, imported from that lens so the two
-        cannot drift. The v5 foreshortening boost is <strong>off</strong>: on
-        side-on footage the stance line lies across the image plane at full
-        length, so there is nothing to correct and this is the true ratio.
+        <code>|Δx ankles| / torso height</code> — <strong>horizontal only</strong>:
+        how far in front of the other one foot is, in torso lengths. Side-on the
+        fore-aft axis lies along image-x, so Δy is just one foot lower in frame
+        and is dropped, not measured. The shipped <code>stance_width</code> rule
+        uses the full euclidean distance instead; both are shown per frame. The
+        torso denominator and Δx come from that lens, so they cannot drift.
         <span style="color:${C_SEP}">wide</span> ·
-        <span style="color:${C_NARROW}">below ${cfg.narrowThreshold}</span> ·
+        <span style="color:${C_NARROW}">below the threshold</span> ·
         <span style="color:${C_TORSO}">torso (the denominator)</span>.
       </p>
 
+      <label class="slider-row" style="display:block; font-size:12px">
+        narrow below = <output id="sws-thr-out">${cfg.narrowThreshold.toFixed(2)}</output>
+        <span class="muted">torso lengths (rule ships ${DEFAULT_CONFIG.narrowThreshold})</span>
+        <input type="range" id="sws-thr" min="0.10" max="1.20" step="0.01"
+               value="${cfg.narrowThreshold}"></label>
       <label class="slider-row" style="display:block; font-size:12px">
         min confidence = <output id="sws-conf-out">${cfg.minConfidence.toFixed(2)}</output>
         <input type="range" id="sws-conf" min="0" max="0.95" step="0.05"
@@ -170,12 +184,21 @@ export const StanceWidthSideRule = {
       <div id="sws-round" style="font-size:13px; line-height:1.6"></div>
 
       <h3>Distribution <span class="muted small">(counted frames)</span></h3>
-      <canvas id="sws-hist" style="display:block; width:100%; height:90px"></canvas>
+      <canvas id="sws-hist" style="display:block; width:100%; height:120px"></canvas>
 
       <h3>Current frame</h3>
       <div id="sws-frame" style="font-size:13px; line-height:1.7"></div>`;
 
     mountStageTimeline();
+
+    // The threshold is display-only — it recolors and recounts, it never feeds
+    // the metric — so nothing needs recomputing when it moves.
+    host.querySelector("#sws-thr").addEventListener("input", e => {
+      cfg.narrowThreshold = parseFloat(e.target.value);
+      host.querySelector("#sws-thr-out").textContent = cfg.narrowThreshold.toFixed(2);
+      updateTimelineLegend();
+      refresh();
+    });
 
     const slider = host.querySelector("#sws-conf");
     slider.addEventListener("input", e => {
@@ -203,7 +226,7 @@ export const StanceWidthSideRule = {
       roundEl.innerHTML =
         `<div style="color:${C_NARROW}; font-weight:600">Not in the side set</div>
          <div class="muted small" style="margin-top:3px">
-           Leaving the correction off is only safe when the camera is side-on.
+           Horizontal distance is only the stagger when the camera is side-on.
            <code>${c.basename || "this video"}</code> isn't in
            <code>side_segments.json</code>, so nothing is measured.</div>`;
       if (frameEl) frameEl.innerHTML = `<span class="muted">—</span>`;
@@ -227,15 +250,15 @@ export const StanceWidthSideRule = {
            ${cfg.spansOnly ? `${c.nIn} in span` : "whole round"}</div>
          <div class="muted small">
            <code style="color:${r.nNarrow ? C_NARROW : "inherit"}">${r.nNarrow}</code>
-           below ${cfg.narrowThreshold}
+           below ${cfg.narrowThreshold.toFixed(2)}
            <span class="muted">(raw frames — no sustained-duration logic here)</span></div>
          <div class="muted small" style="margin-top:3px">
-           v5 gate would have boosted
+           depth-aligned (v5 gate)
            <code style="color:${r.nBoost ? C_BOOST : "inherit"}">${r.nBoost}</code>
            of them${r.nBoost
              ? ` — <span style="color:${C_BOOST}">expected ~0 on side-on footage;
-                 check the clip really is side-on</span>`
-             : " — as expected: nothing here is depth-aligned"}</div>`;
+                 Δx is undercounting the stagger there</span>`
+             : " — as expected: nothing here is pointing at the camera"}</div>`;
 
     drawHistogram(host.querySelector("#sws-hist"), r);
 
@@ -245,16 +268,19 @@ export const StanceWidthSideRule = {
       const on = counted(c, f);
       const th = frameTorsoPx(c.pose, f);
       frameEl.innerHTML = `
-        <div><strong>sep</strong>
+        <div><strong>stagger</strong>
           <code style="color:${!Number.isFinite(c.sep[f]) ? C_OUT
                              : c.sep[f] < cfg.narrowThreshold ? C_NARROW : C_SEP}">
             ${fmt(c.sep[f])}</code>
-          <span class="muted">= ankles ${fmt(c.sep[f] * th, 0)}px / torso ${fmt(th, 0)}px</span></div>
-        <div class="muted small">Δx <code>${fmt(c.dx[f], 2)}</code> ·
-          Δy <code>${fmt(c.dy[f], 2)}</code> ·
-          smoothed Δy/Δx <code style="color:${c.axisRatio[f] > CORR.ratioGate ? C_BOOST : "inherit"}">
+          <span class="muted">= Δx ${fmt(c.sep[f] * th, 0)}px / torso ${fmt(th, 0)}px</span></div>
+        <div class="muted small">dropped Δy <code>${fmt(c.dy[f], 2)}</code>
+          <span class="muted">(one foot lower in frame)</span> ·
+          full euclidean <code>${fmt(c.euclid[f], 2)}</code>
+          <span class="muted">= what the rule uses</span></div>
+        <div class="muted small">smoothed Δy/Δx
+          <code style="color:${c.axisRatio[f] > CORR.ratioGate ? C_BOOST : "inherit"}">
             ${fmt(c.axisRatio[f], 2)}</code>
-          <span class="muted">(v5 gate ${CORR.ratioGate})</span></div>
+          <span class="muted">(above ${CORR.ratioGate} ⇒ depth-aligned, Δx undercounts)</span></div>
         <div class="muted small">
           <span style="color:${inSpan ? C_SPAN : C_OUT}">${inSpan ? "in span" : "outside span"}</span> ·
           <span style="color:${c.valid[f] ? C_SEP : C_OUT}">${c.valid[f] ? "pose valid" : "gated out"}</span> ·
@@ -264,9 +290,15 @@ export const StanceWidthSideRule = {
     drawTimeline(document.getElementById("sws-timeline"), c, f);
   },
 
-  // Draw the two things the ratio is made of, so the number is checkable
-  // against the picture: the ankle line (numerator) and the torso segment
-  // (denominator).
+  // Draw what the ratio is made of, so the number is checkable against the
+  // picture: the HORIZONTAL gap between the ankles (the numerator) with its
+  // value over it, the direct ankle line behind it so the dropped Δy is
+  // visible, and the torso segment (the denominator).
+  //
+  // Drawn on EVERY frame of a side-set video, spans or not. The spans decide
+  // what gets counted into the statistics, not what you are allowed to look at
+  // — a frame you cannot see a number on is a frame you cannot judge. Frames
+  // outside a span (or below the confidence gate) are tagged instead of hidden.
   draw(ctx, state) {
     const c = computeMetrics(state);
     if (!c || !c.entry) return;
@@ -281,29 +313,64 @@ export const StanceWidthSideRule = {
     const [lhx, lhy] = px(J.L_HIP), [rhx, rhy] = px(J.R_HIP);
     const shx = (lsx + rsx) / 2, shy = (lsy + rsy) / 2;
     const hpx = (lhx + rhx) / 2, hpy = (lhy + rhy) / 2;
+    const color = c.sep[f] < cfg.narrowThreshold ? C_NARROW : C_SEP;
 
-    const dim = !counted(c, f);
     ctx.save();
-    ctx.globalAlpha = dim ? 0.3 : 1;
 
+    // denominator
     ctx.strokeStyle = C_TORSO;
     ctx.lineWidth = 3 * s;
     ctx.beginPath(); ctx.moveTo(shx, shy); ctx.lineTo(hpx, hpy); ctx.stroke();
 
-    ctx.strokeStyle = c.sep[f] < cfg.narrowThreshold ? C_NARROW : C_SEP;
-    ctx.lineWidth = 3 * s;
+    // the ankle-to-ankle line the rule would measure — faint, because the Δy
+    // in it is exactly what this lens throws away
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.lineWidth = 1.5 * s;
+    ctx.setLineDash([4 * s, 3 * s]);
     ctx.beginPath(); ctx.moveTo(lax, lay); ctx.lineTo(rax, ray); ctx.stroke();
+    ctx.setLineDash([]);
 
+    // the horizontal gap: a baseline under the lower foot, with drop lines from
+    // each ankle so the projection onto image-x is explicit
+    const gy = Math.max(lay, ray) + 22 * s;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1 * s;
+    ctx.setLineDash([3 * s, 3 * s]);
+    ctx.beginPath(); ctx.moveTo(lax, lay); ctx.lineTo(lax, gy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rax, ray); ctx.lineTo(rax, gy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.lineWidth = 3 * s;
+    ctx.beginPath(); ctx.moveTo(lax, gy); ctx.lineTo(rax, gy); ctx.stroke();
+    ctx.lineWidth = 2 * s;
+    for (const x of [lax, rax]) {
+      ctx.beginPath(); ctx.moveTo(x, gy - 5 * s); ctx.lineTo(x, gy + 5 * s); ctx.stroke();
+    }
+
+    // value over the gap
     const label = `${c.sep[f].toFixed(2)} torso`;
     const fsz = Math.round(13 * s);
     ctx.font = `600 ${fsz}px ui-monospace, monospace`;
     ctx.textBaseline = "top";
     const w = ctx.measureText(label).width + 12 * s;
-    const lx = (lax + rax) / 2 - w / 2, ly = (lay + ray) / 2 + 8 * s;
+    const lx = (lax + rax) / 2 - w / 2, ly = gy - fsz - 16 * s;
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.beginPath(); ctx.roundRect(lx, ly, w, fsz + 10 * s, 5 * s); ctx.fill();
-    ctx.fillStyle = c.sep[f] < cfg.narrowThreshold ? C_NARROW : C_SEP;
+    ctx.fillStyle = color;
     ctx.fillText(label, lx + 6 * s, ly + 5 * s);
+
+    // why this frame is not in the stats, said plainly rather than by fading
+    if (!counted(c, f)) {
+      const why = !c.valid[f] ? "below confidence gate"
+                : (cfg.spansOnly && !c.inSpan[f]) ? "outside curated span" : "not counted";
+      const sm = Math.round(10 * s);
+      ctx.font = `${sm}px ui-monospace, monospace`;
+      const ww = ctx.measureText(why).width + 10 * s;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.beginPath(); ctx.roundRect((lax + rax) / 2 - ww / 2, gy + 8 * s, ww, sm + 8 * s, 4 * s); ctx.fill();
+      ctx.fillStyle = C_OUT;
+      ctx.fillText(why, (lax + rax) / 2 - ww / 2 + 5 * s, gy + 12 * s);
+    }
     ctx.restore();
   },
 };
@@ -342,7 +409,10 @@ function fitCanvas(canvas) {
 
 // ── distribution ────────────────────────────────────────────────────────────
 
-const HIST_MAX = 1.5;   // sep beyond 1.5 torso lengths is a pose failure, not a stance
+// Shared full-scale for both charts, so a height on the timeline and a position
+// on the histogram mean the same separation. Beyond 1.5 torso lengths is a pose
+// failure rather than a stance, so it is the top of the axis.
+const SEP_MAX = 1.5;
 const HIST_BINS = 30;
 
 function drawHistogram(canvas, r) {
@@ -356,14 +426,30 @@ function drawHistogram(canvas, r) {
   }
   const bins = new Array(HIST_BINS).fill(0);
   for (const v of r.sorted) {
-    const i = Math.min(HIST_BINS - 1, Math.max(0, Math.floor(v / HIST_MAX * HIST_BINS)));
+    const i = Math.min(HIST_BINS - 1, Math.max(0, Math.floor(v / SEP_MAX * HIST_BINS)));
     bins[i]++;
   }
   const peak = Math.max(...bins);
   const bw = W / HIST_BINS;
-  const axisH = 12;
+  const axisH = 13;
+  const xOf = v => (v / SEP_MAX) * W;
+
+  // same quarter-torso ticks as the timeline's y axis, so the two charts read
+  // against one scale
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  for (let v = 0; v <= SEP_MAX + 1e-9; v += TICK_STEP) {
+    ctx.strokeStyle = "rgba(255,255,255,0.13)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xOf(v), 0); ctx.lineTo(xOf(v), H - axisH); ctx.stroke();
+    ctx.fillStyle = C_OUT;
+    const x = Math.min(W - 12, Math.max(12, xOf(v)));
+    ctx.fillText(v.toFixed(2), x, H - 2);
+  }
+  ctx.textAlign = "left";
+
   for (let i = 0; i < HIST_BINS; i++) {
-    const v = (i + 0.5) / HIST_BINS * HIST_MAX;
+    const v = (i + 0.5) / HIST_BINS * SEP_MAX;
     const h = peak ? (bins[i] / peak) * (H - axisH) : 0;
     ctx.fillStyle = v < cfg.narrowThreshold ? C_NARROW : C_SEP;
     ctx.globalAlpha = 0.85;
@@ -371,7 +457,6 @@ function drawHistogram(canvas, r) {
   }
   ctx.globalAlpha = 1;
 
-  const xOf = v => (v / HIST_MAX) * W;
   ctx.strokeStyle = C_NARROW;
   ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(xOf(cfg.narrowThreshold), 0);
@@ -380,19 +465,29 @@ function drawHistogram(canvas, r) {
 
   ctx.strokeStyle = "#fff";
   ctx.beginPath(); ctx.moveTo(xOf(r.med), 0); ctx.lineTo(xOf(r.med), H - axisH); ctx.stroke();
-
-  ctx.fillStyle = C_OUT;
-  ctx.font = "10px ui-monospace, monospace";
-  ctx.fillText("0", 1, H - 2);
-  ctx.fillText(`${cfg.narrowThreshold}`, Math.max(8, xOf(cfg.narrowThreshold) - 8), H - 2);
-  ctx.fillText(`${HIST_MAX}`, W - 18, H - 2);
   ctx.fillStyle = "#fff";
   ctx.fillText(`med ${fmt(r.med, 2)}`, Math.min(W - 54, xOf(r.med) + 3), 9);
 }
 
 // ── below-video timeline ────────────────────────────────────────────────────
 
-const TL_LABEL_W = 44;
+// Wide enough for a "1.25" tick label plus its tick mark.
+const TL_LABEL_W = 46;
+// Tall enough that the gridlines are far enough apart to read a value off the
+// trace by eye — the point of the axis.
+const TL_HEIGHT = 170;
+// Gridline every quarter torso length: the granularity you can actually judge
+// a stance at, and it puts a line on the shipped 0.5 threshold.
+const TICK_STEP = 0.25;
+
+function updateTimelineLegend() {
+  const el = document.getElementById("sws-tl-legend");
+  if (!el) return;
+  el.innerHTML = `Foot stagger (horizontal Δx) —
+    <span style="color:${C_SEP}">torso lengths</span> on the y axis,
+    <span style="color:${C_NARROW}">below ${cfg.narrowThreshold.toFixed(2)}</span>,
+    faded outside a <span style="color:${C_SPAN}">curated span</span> · click to seek`;
+}
 
 function mountStageTimeline() {
   const slot = document.getElementById("stage-extras");
@@ -402,18 +497,16 @@ function mountStageTimeline() {
   wrap.style.cssText = "margin-top:12px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px";
   const label = document.createElement("div");
   label.className = "muted small";
+  label.id = "sws-tl-legend";
   label.style.cssText = "margin-bottom:6px";
-  label.innerHTML = `Stance width (uncorrected) —
-    <span style="color:${C_SEP}">sep</span> as a height,
-    <span style="color:${C_NARROW}">below ${cfg.narrowThreshold}</span>,
-    faded outside a <span style="color:${C_SPAN}">curated span</span> · click to seek`;
   wrap.appendChild(label);
   const canvas = document.createElement("canvas");
   canvas.id = "sws-timeline";
-  canvas.style.cssText = "display:block;width:100%;height:70px";
-  canvas.width = 800; canvas.height = 70;
+  canvas.style.cssText = `display:block;width:100%;height:${TL_HEIGHT}px`;
+  canvas.width = 800; canvas.height = TL_HEIGHT;
   wrap.appendChild(canvas);
   slot.appendChild(wrap);
+  updateTimelineLegend();
   canvas.addEventListener("click", e => {
     const N = mc?.n;
     if (!N) return;
@@ -432,12 +525,25 @@ function drawTimeline(canvas, c, frame) {
   const xOf = f => TL_LABEL_W + (f / Math.max(1, N - 1)) * (W - TL_LABEL_W - 4);
   const colW = Math.max(1, (W - TL_LABEL_W - 4) / Math.max(1, N - 1));
   const spanH = 6;
-  const top = 4, barH = H - 12 - spanH;
-  const yOf = v => top + barH - Math.min(1, v / HIST_MAX) * barH;
+  const top = 8, barH = H - 16 - spanH;
+  const yOf = v => top + barH - Math.min(1, v / SEP_MAX) * barH;
 
   ctx.font = "10px ui-monospace, monospace";
-  ctx.fillStyle = C_SEP;
-  ctx.fillText("sep", 6, top + barH / 2);
+
+  // y axis FIRST, under the trace: a gridline + value every quarter torso
+  // length, so a bar's height reads straight off as a separation.
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "right";
+  for (let v = 0; v <= SEP_MAX + 1e-9; v += TICK_STEP) {
+    const y = yOf(v);
+    ctx.strokeStyle = "rgba(255,255,255,0.13)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(TL_LABEL_W, y); ctx.lineTo(W - 4, y); ctx.stroke();
+    ctx.fillStyle = C_OUT;
+    ctx.fillText(v.toFixed(2), TL_LABEL_W - 5, y);
+  }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
 
   for (let f = 0; f < N; f++) {
     const v = c.sep[f];
@@ -449,14 +555,36 @@ function drawTimeline(canvas, c, frame) {
   }
   ctx.globalAlpha = 1;
 
-  // threshold line, so "narrow" is readable without reading numbers
+  // threshold line, drawn over the trace and labelled, so "narrow" is readable
+  // without counting gridlines
+  const ty = yOf(cfg.narrowThreshold);
   ctx.strokeStyle = C_NARROW;
   ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(TL_LABEL_W, yOf(cfg.narrowThreshold));
-  ctx.lineTo(W - 4, yOf(cfg.narrowThreshold));
-  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(TL_LABEL_W, ty); ctx.lineTo(W - 4, ty); ctx.stroke();
   ctx.setLineDash([]);
+  const tLabel = `narrow < ${cfg.narrowThreshold.toFixed(2)}`;
+  ctx.font = "600 10px ui-monospace, monospace";
+  const tw = ctx.measureText(tLabel).width;
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillRect(W - 8 - tw - 4, ty - 11, tw + 6, 12);
+  ctx.fillStyle = C_NARROW;
+  ctx.fillText(tLabel, W - 8 - tw - 1, ty - 2);
+  ctx.font = "10px ui-monospace, monospace";
+
+  // current value as a dot on the trace — the anchor between the picture on
+  // screen and a height on this axis
+  const cv = c.sep[frame];
+  if (Number.isFinite(cv)) {
+    ctx.fillStyle = C_FRAME;
+    ctx.beginPath(); ctx.arc(xOf(frame), yOf(cv), 3, 0, Math.PI * 2); ctx.fill();
+    const lbl = cv.toFixed(2);
+    const lw = ctx.measureText(lbl).width;
+    const lx = Math.min(W - lw - 6, Math.max(TL_LABEL_W + 2, xOf(frame) + 6));
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.fillRect(lx - 2, yOf(cv) - 13, lw + 4, 12);
+    ctx.fillStyle = C_FRAME;
+    ctx.fillText(lbl, lx, yOf(cv) - 4);
+  }
 
   // curated spans as a band under the trace
   const sy = top + barH + 3;
