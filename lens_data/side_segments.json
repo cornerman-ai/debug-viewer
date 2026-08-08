@@ -1,0 +1,163 @@
+{
+  "_about": "Hand-curated segments shot COMPLETELY FROM THE SIDE -- the camera looks along the boxer's frontal plane, so what it sees is the sagittal plane and the opponent axis runs left-right across the frame, perpendicular to the camera. The sibling of ml/frontal_segments.json (camera standing in for the opponent), and the right sample for anything measured fore-aft: reach/extension along the punch line, hand return path, head travel off the vertical, weight transfer, chin over the lead knee. Selection is on CAMERA ANGLE, not on what the boxer does -- it is not a balanced sample of anything else.",
+  "_schema": "stem -> [ {label, round, start_sec, end_sec} ]. Identical to ml/frontal_segments.json; ml/side_spans.py is the one reader and it reuses ml/frontal_spans.py's resolvers, whose docstring is THE spec for the span semantics (null starts/ends, the `round` binding, the _pts.npy indexing rule). Stems match ml/video_wh.json exactly (beware double spaces in titles).",
+  "_curated": "2026-08-08 batch 1 of an ongoing pass: 19 videos, covering the source list alphabetically as far as '4 EFFECTIVE BOXING COMBOS...'. Later batches append -- nothing downstream needs changing when they do.",
+  "_overlap_with_frontal": "Two stems appear in BOTH sets, at disjoint times -- these videos change camera angle partway through, so a frontal span and a side span of the same video are different footage, not a contradiction. Never merge the two manifests on stem alone. See the _note on each entry.",
+  "segments": {
+    "10 Combos in 10 Minutes ｜ Boxing Workout": [
+      {
+        "label": "R2",
+        "round": 2,
+        "start_sec": null,
+        "end_sec": 396.502
+      }
+    ],
+    "10 Minute Shadow Boxing Workout At Home": [
+      {
+        "label": "span",
+        "round": 1,
+        "start_sec": 196.098,
+        "end_sec": 199.431,
+        "_note": "Also in the FRONTAL set (R0 and R1 there). Disjoint: frontal r1 runs to 188.131, this side span starts at 196.098 -- the camera moves partway through r1."
+      }
+    ],
+    "10 Rounds 10 Combos ｜ Boxing Training ｜ jabs, hooks, crosses, uppercuts, overhands, shovel hooks": [
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": null
+      }
+    ],
+    "10 min FAT LOSS Shadowboxing Workout for Beginners at Home (Follow Along!) (2020)": [
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 13.0
+      }
+    ],
+    "11 minute Aqua Bag 3 rounds Fundamentals Workout [z6B7OIK6LO4]": [
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": 16.017,
+        "end_sec": 114.317
+      }
+    ],
+    "12 Mins Boxing Heavy Bag Workout Complete Beginner (Follow Along)": [
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 43.13,
+        "_note": "The curation note read `r1 start - t=00:43.130`, but 43.13s in source-video seconds falls inside r0 (17.73-563.37), not r1 (588.50-619.97), and as an offset into r1 it would overrun that round's end. Confirmed 2026-08-08: r0 was meant. Kept written down so the r1 in the original notes doesn't get 'restored' later."
+      }
+    ],
+    "15 Mins Beginner Boxing Fitness HIIT Bag Workout (Follow Along)": [
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": null
+      }
+    ],
+    "15 Minute Shadowboxing Workout for Beginners with Justin Blackwell ｜ Get Fit ｜ Livestrong.com": [
+      {
+        "label": "span",
+        "round": 1,
+        "start_sec": 501.999,
+        "end_sec": 507.38
+      }
+    ],
+    "20 Minute Boxing Footwork Heavy bag Workout - Follow along": [
+      {
+        "label": "span",
+        "round": 1,
+        "start_sec": 134.787,
+        "end_sec": 136.672
+      }
+    ],
+    "20 Minute Punching Bag Workout For A Total Body Workout!": [
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 472.403
+      }
+    ],
+    "20 Minute Shadowboxing for Beginners ｜ Trainer of the Month Club ｜ Well+Good": [
+      {
+        "label": "span",
+        "round": 2,
+        "start_sec": 1172.664,
+        "end_sec": 1174.624
+      }
+    ],
+    "2f3b13e1-d4c7-44ae-abe2-6245b771f240": [
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": null
+      }
+    ],
+    "3 Basic Boxing Combos For Southpaws #boxing #combos #viral": [
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": null
+      }
+    ],
+    "30 Days of Basic Boxing at Home for Beginners #DAY10 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [UJyeAXZjwVk]": [
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": 12.817,
+        "end_sec": 20.617,
+        "_note": "Also in the FRONTAL set (r0, 45.85-53.45). Disjoint: this side span is the earlier part of the same round."
+      }
+    ],
+    "30 MIN SHADOWBOXING FOR FAT LOSS ⧸ Equipment Optional ｜ Jeremy Sry": [
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": 756.598,
+        "end_sec": 771.88
+      }
+    ],
+    "30 Minute Follow Along Boxing Workout": [
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": null
+      }
+    ],
+    "30 Minute Heavy Bag Boxing Workout at Home ｜ 10 Round Follow Along": [
+      {
+        "label": "R0",
+        "round": 0,
+        "start_sec": null,
+        "end_sec": 340.197
+      }
+    ],
+    "4 EFFECTIVE BOXING COMBOS BEGINNER BOXERS SHOULD LEARN! 🥊 #boxing #boxingtraining #boxingworkout": [
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": 3.067,
+        "end_sec": null
+      }
+    ],
+    "{Stream For Free} Boxing Workout For Beginners 4 Rounds": [
+      {
+        "label": "span",
+        "round": 0,
+        "start_sec": 272.062,
+        "end_sec": 319.985
+      }
+    ]
+  }
+}

@@ -13,7 +13,10 @@ Folders (the folder is the type — filenames carry no `_lens`/`_model` suffix):
 - `shared/`    — helpers lenses import (punch_detections = which punches a lens
                  analyzes: GT labels else classifier predictions; rules_score =
                  mistake→quality mapping mirroring rules_config.json scoring.bands;
-                 glove_filter, skeleton_schemas, axiality_predictions); not lenses,
+                 glove_filter, skeleton_schemas, axiality_predictions;
+                 segment_set = the curated-set machinery behind frontal_set
+                 (camera as opponent) and side_set (camera side-on), including
+                 the source-second → cache-frame conversion); not lenses,
                  never in the registry
 
 Data a lens fetches lives in `/lens_data/` (fetch paths resolve against the
