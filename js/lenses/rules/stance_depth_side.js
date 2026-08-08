@@ -284,7 +284,7 @@ const fmt = (v, d = 3) => (Number.isFinite(v) ? v.toFixed(d) : "—");
 
 export const StanceDepthSideRule = {
   id: "stance_depth_side",
-  label: "Stance depth — side set",
+  label: "Stance depth",
 
   // Only the curated side videos are selectable. The manual picker and the
   // Firebase path bypass the dropdown, so update() refuses those too: the whole
@@ -305,7 +305,7 @@ export const StanceDepthSideRule = {
     host = _host;
     mc = { pose: null };
     host.innerHTML = `
-      <h2>Stance depth — side set</h2>
+      <h2>Stance depth</h2>
       <p class="hint">
         <code>|Δx ankles| / denominator</code> — <strong>horizontal only</strong>:
         how far in front of the other one foot is. Side-on the fore-aft axis lies
