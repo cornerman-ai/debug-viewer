@@ -179,16 +179,18 @@ function toggleLoop() {
 function ensureKeys() {
   if (keysBound) return;
   keysBound = true;
-  // capture phase so loop-mode arrows beat the viewer's frame-step binding;
-  // inert unless this lens is selected AND loop mode is on
+  // ↑/↓ switch punch in loop mode — ←/→ stay with the viewer's frame stepping
+  // (they used to be intercepted here, which made frame-nudging around the
+  // impact impossible). Capture phase; inert unless this lens is selected AND
+  // loop mode is on.
   document.addEventListener("keydown", (e) => {
     if (!loopOn || !activeRound) return;
     const sel = document.getElementById("rule-select");
     if (sel && sel.value !== "impact_spotter") return;
     if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-    if (e.key === "ArrowRight") {
+    if (e.key === "ArrowDown") {
       e.preventDefault(); e.stopPropagation(); setLoopIdx(loopIdx + 1);
-    } else if (e.key === "ArrowLeft") {
+    } else if (e.key === "ArrowUp") {
       e.preventDefault(); e.stopPropagation(); setLoopIdx(loopIdx - 1);
     }
   }, true);
@@ -278,12 +280,13 @@ function buildSidebar(state) {
     </label>
     <div id="is-loop-bar" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
       <button id="is-loop" style="cursor:pointer">⟲ loop punches</button>
-      <button id="is-prev" title="previous punch (←)" style="cursor:pointer">◀</button>
-      <button id="is-next" title="next punch (→)" style="cursor:pointer">▶</button>
+      <button id="is-prev" title="previous punch (↑)" style="cursor:pointer">◀</button>
+      <button id="is-next" title="next punch (↓)" style="cursor:pointer">▶</button>
       <span id="is-loop-count" style="font-size:11px;color:#888"></span>
     </div>
     <div style="font-size:10px;color:#666;margin:-4px 0 8px">
-      loop mode: ←/→ switch punch · viewer speed dropdown sets loop speed</div>
+      loop mode: ↑/↓ switch punch · ←/→ step frames · pause to inspect
+      (loop only wraps while playing)</div>
     <div id="is-current" style="border:1px solid #333;border-radius:6px;
          padding:8px;margin-bottom:8px;min-height:52px;font-size:12px"></div>
     <canvas id="is-conf" style="display:block;width:100%;height:90px;
@@ -343,11 +346,14 @@ function update(state) {
   if (!dump) return;
   matchRound(state);
 
-  // labeler-style loop: when the playhead runs past the punch window, wrap
+  // labeler-style loop: when the playhead runs past the punch window, wrap —
+  // but only while PLAYING. Paused = the user is frame-stepping; snapping the
+  // playhead back would fight the arrow keys.
   if (loopOn && activeRound && loopIdx >= 0) {
     const ps = chronoPunches();
     const p = ps[loopIdx];
-    if (p) {
+    const vid = document.getElementById("video");
+    if (p && vid && !vid.paused) {
       const [lo, hi] = loopWindow(state, p);
       if (state.frame > hi || state.frame < lo - 2) seekFrame(lo);
     }
