@@ -1,10 +1,14 @@
 // Impact spotter — GT vs predicted impact (turnaround) frames per punch, from
 // the two-head TCN trained on the "Impact Frames" sheet labels.
 //
-// Loads ./lens_data/impact_spotter_data.json (committed to this repo). Regenerate:
-//   cd ~/code/cornerman-backend && .venv/bin/python impact_spotter/train_impact_spotter.py
-//   cp "$HOME/Google Drive/My Drive/Cornerman/data/model_outputs/impact_spotter/impact_spotter_viewer_latest.json" \
-//      ~/code/cornerman-debug-viewer/lens_data/impact_spotter_data.json
+// TWO data sources, toggled in the sidebar:
+//   labeled  — OOF CV predictions on the human-labeled punch spans (has GT).
+//     cd ~/code/cornerman-backend && .venv/bin/python ml/research/impact_spotter/train_impact_spotter.py
+//     cp ".../model_outputs/impact_spotter/impact_spotter_viewer_latest.json" lens_data/impact_spotter_data.json
+//   detector — the production condition: stage-1 detector events on EVERY
+//     cached video, spotter run on those spans. NO ground truth; pred-only.
+//     cd ~/code/cornerman-backend && .venv/bin/python ml/research/impact_spotter/detector_span_run.py
+//     cp ".../model_outputs/impact_spotter/impact_spotter_detector_latest.json" lens_data/impact_spotter_detector_data.json
 //
 // Schema (times are SOURCE-VIDEO seconds; gt/pred/span are BlazePose cache
 // frame indices — the lens maps via *_sec + the viewer's start_sec/fps, so it
@@ -13,11 +17,16 @@
 //     videos: { <base>: { mode, rounds: { <ri>: { fps, punches: [
 //       { uuid, ptype, hand, gt_sec, pred_sec, gt, pred, base_pred,
 //         err_ms, base_err_ms, span:[lo,hi], conf_t0, conf_dt, conf:[...] } ] } } } } }
+// Detector-source punches carry only uuid/ptype/hand/pred/pred_sec/span/conf_* —
+// every gt/err field is absent, and the lens must render without them.
 //
 // Tolerance convention (matches the trainer): |err| <= 50 ms counts as +-1
 // frame @30fps, <= 83 ms as +-2 (quantization-fair).
 
-const DATA_URL = "./lens_data/impact_spotter_data.json";
+const DATA_URLS = {
+  labeled:  "./lens_data/impact_spotter_data.json",
+  detector: "./lens_data/impact_spotter_detector_data.json",
+};
 
 const TOL1_MS = 50, TOL2_MS = 83.3;
 const C = {
@@ -32,8 +41,10 @@ const C = {
 };
 
 let host = null;
-let dump = null;
-let dumpError = null;
+let source = "labeled";   // "labeled" | "detector" — which DATA_URLS entry
+let dumps = {};           // source -> parsed JSON
+let dumpErrors = {};      // source -> fetch error string
+let dump = null;          // dumps[source]
 let latestState = null;
 let activeVideo = null;   // dump.videos[base] for the scoped cache
 let activeBase = null;
@@ -72,6 +83,11 @@ function errClass(errMs) {
 }
 const ERR_COLOR = { ok1: C.gt, ok2: "#d3b136", bad: C.bad };
 
+// Detector-source punches have no labels: every gt/err field is absent.
+function hasGt(p) { return p.gt_sec != null; }
+function refSec(p) { return p.gt_sec != null ? p.gt_sec : p.pred_sec; }
+function predColor(p) { return hasGt(p) ? ERR_COLOR[errClass(p.err_ms)] : C.pred; }
+
 function seekFrame(f) {
   const slider = document.getElementById("scrubber");
   if (!slider) return;
@@ -93,21 +109,25 @@ function matchRound(state) {
 
 function punchesSorted() {
   if (!activeRound) return [];
-  return [...activeRound.punches].sort((a, b) => Math.abs(b.err_ms) - Math.abs(a.err_ms));
+  // worst error first when GT exists; chronological on the detector source
+  return [...activeRound.punches].sort((a, b) =>
+    hasGt(a) && hasGt(b) ? Math.abs(b.err_ms) - Math.abs(a.err_ms)
+                         : refSec(a) - refSec(b));
 }
 
 function chronoPunches() {
   if (!activeRound) return [];
-  return [...activeRound.punches].sort((a, b) => a.gt_sec - b.gt_sec);
+  return [...activeRound.punches].sort((a, b) => refSec(a) - refSec(b));
 }
 
 // Loop window in VIEWER frames: anchor on the viewer-clock gt frame, then
 // apply the punch-span extent as BlazePose-clock-relative offsets (the
 // offsets cancel any one-frame cross-clock drift), +-3 frames of margin.
 function loopWindow(state, p) {
-  const gtF = secToFrame(state, p.gt_sec);
-  const lo = gtF + (p.span[0] - p.gt) - 3;
-  const hi = gtF + (p.span[1] - p.gt) + 3;
+  const anchor = p.gt != null ? p.gt : p.pred;
+  const gtF = secToFrame(state, refSec(p));
+  const lo = gtF + (p.span[0] - anchor) - 3;
+  const hi = gtF + (p.span[1] - anchor) + 3;
   const n = poseOf(state) ? poseOf(state).n_frames : Infinity;
   return [Math.max(0, lo), Math.min(n - 1, Math.max(hi, lo + 6))];
 }
@@ -146,7 +166,7 @@ function toggleLoop() {
       const t = frameToSec(latestState, latestState.frame);
       let bd = Infinity;
       ps.forEach((p, k) => {
-        const d = Math.abs(p.gt_sec - t);
+        const d = Math.abs(refSec(p) - t);
         if (d < bd) { bd = d; i = k; }
       });
     }
@@ -179,8 +199,8 @@ function currentPunch(state) {
   const t = frameToSec(state, state.frame);
   let best = null, bestD = Infinity;
   for (const p of activeRound.punches) {
-    const lo = Math.min(p.gt_sec, p.pred_sec) - 0.4;
-    const hi = Math.max(p.gt_sec, p.pred_sec) + 0.4;
+    const lo = Math.min(refSec(p), p.pred_sec) - 0.4;
+    const hi = Math.max(refSec(p), p.pred_sec) + 0.4;
     const d = t < lo ? lo - t : t > hi ? t - hi : 0;
     if (d < bestD) { bestD = d; best = p; }
   }
@@ -188,44 +208,69 @@ function currentPunch(state) {
 }
 
 // ---------------------------------------------------------------- data load
-async function ensureData() {
-  if (dump || dumpError) return;
+async function ensureData(src) {
+  if (dumps[src] || dumpErrors[src]) return;
   try {
-    const res = await fetch(DATA_URL, { cache: "no-store" });
+    const res = await fetch(DATA_URLS[src], { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    dump = await res.json();
+    dumps[src] = await res.json();
   } catch (e) {
-    dumpError = String(e);
+    dumpErrors[src] = String(e);
   }
+}
+
+function activateSource(src) {
+  source = src;
+  delete dumpErrors[src];                       // switching retries the fetch
+  dump = dumps[src] || null;
+  host.innerHTML = `<div style="color:#888">loading impact spotter data…</div>`;
+  ensureData(src).then(() => {
+    const sel = document.getElementById("rule-select");
+    if (sel && sel.value !== "impact_spotter") return;
+    dump = dumps[source] || null;
+    buildSidebar(latestState);
+    update(latestState);
+    document.getElementById("video")?.dispatchEvent(new Event("seeked"));
+  });
 }
 
 // ---------------------------------------------------------------- mount
 function mount(hostEl, state) {
   host = hostEl;
   latestState = state;
-  if (dumpError) { dumpError = null; dump = null; }   // re-mount retries the fetch
-  host.innerHTML = `<div style="color:#888">loading impact spotter data…</div>`;
   buildTimelineSlot();
-  ensureData().then(() => {
-    // if the user switched lenses while the fetch was in flight, don't
-    // clobber the other lens's sidebar
-    const sel = document.getElementById("rule-select");
-    if (sel && sel.value !== "impact_spotter") return;
-    buildSidebar(latestState);
-    update(latestState);
-  });
+  activateSource(source);
+}
+
+function sourceToggleHtml() {
+  const opt = (v, lbl) => `<label style="margin-right:10px;cursor:pointer">
+      <input type="radio" name="is-source" value="${v}"
+             ${source === v ? "checked" : ""}> ${lbl}</label>`;
+  return `<div id="is-source-bar" style="font-size:12px;color:#aaa;margin-bottom:8px">
+      ${opt("labeled", "labeled spans (CV)")}${opt("detector", "detector spans")}</div>`;
+}
+
+function wireSourceToggle() {
+  host.querySelectorAll('input[name="is-source"]').forEach((r) =>
+    r.addEventListener("change", () => activateSource(r.value)));
 }
 
 function buildSidebar(state) {
-  if (dumpError) {
-    host.innerHTML =
-      `<div style="color:${C.bad}">impact_spotter_data.json failed to load ` +
-      `(${dumpError}).<br>Deploy it with:<br>` +
-      `<code style="font-size:11px">cp "$HOME/Google Drive/My Drive/Cornerman/data/model_outputs/` +
-      `impact_spotter/impact_spotter_viewer_latest.json" lens_data/impact_spotter_data.json</code></div>`;
+  if (dumpErrors[source]) {
+    const fix = source === "detector"
+      ? `.venv/bin/python ml/research/impact_spotter/detector_span_run.py<br>` +
+        `cp ".../model_outputs/impact_spotter/impact_spotter_detector_latest.json" ` +
+        `lens_data/impact_spotter_detector_data.json`
+      : `cp "$HOME/Google Drive/My Drive/Cornerman/data/model_outputs/` +
+        `impact_spotter/impact_spotter_viewer_latest.json" lens_data/impact_spotter_data.json`;
+    host.innerHTML = sourceToggleHtml() +
+      `<div style="color:${C.bad}">${DATA_URLS[source]} failed to load ` +
+      `(${dumpErrors[source]}).<br>Deploy it with:<br>` +
+      `<code style="font-size:11px">${fix}</code></div>`;
+    wireSourceToggle();
     return;
   }
-  host.innerHTML = `
+  host.innerHTML = sourceToggleHtml() + `
     <div id="is-scope" style="font-size:12px;color:#888;margin-bottom:6px"></div>
     <div id="is-metrics" style="font-size:12px;margin-bottom:8px"></div>
     <label style="font-size:12px;color:#aaa;display:block;margin-bottom:8px">
@@ -261,6 +306,7 @@ function buildSidebar(state) {
   });
   ensureKeys();
   renderLoopBar();
+  wireSourceToggle();
 }
 
 function buildTimelineSlot() {
@@ -310,11 +356,12 @@ function update(state) {
 
   const scope = host.querySelector("#is-scope");
   if (scope) {
+    const kind = source === "detector" ? "detected" : "labeled";
     scope.innerHTML = activeRound
       ? `scoped: <code>${activeBase}</code> · r${state.cacheRound} · ` +
-        `${activeRound.punches.length} labeled punches`
-      : `no impact data for <code>${state.cacheBasename || "?"}</code> ` +
-        `r${state.cacheRound} — train/deploy first`;
+        `${activeRound.punches.length} ${kind} punches`
+      : `no ${source}-source impact data for <code>${state.cacheBasename || "?"}</code> ` +
+        `r${state.cacheRound}`;
   }
   renderMetrics();
   renderCurrent(state);
@@ -332,6 +379,12 @@ function fmtM(m) {
 function renderMetrics() {
   const el = host.querySelector("#is-metrics");
   if (!el) return;
+  if (source === "detector") {
+    el.innerHTML = `<div style="color:#d3b136">detector spans — no ground truth;
+      the published CV numbers do not apply here</div>` +
+      (dump.generated ? `<div style="color:#666">run: ${dump.generated.slice(0, 10)}</div>` : "");
+    return;
+  }
   const M = dump.metrics || {};
   const model = M.model || M;            // tolerate old single-block shape
   const bl = M.baseline || null;
@@ -354,9 +407,17 @@ function renderCurrent(state) {
   }
   // all frame numbers go through the VIEWER's clock (secToFrame) so the card,
   // the list seeks, and the on-video flash agree whichever cache is loaded
+  const predF = secToFrame(state, p.pred_sec);
+  if (!hasGt(p)) {
+    el.innerHTML =
+      `<b>${p.ptype}</b> <span style="color:#888">(${p.hand})</span><br>` +
+      `pred <span style="color:${C.pred}">f${predF}</span> · ` +
+      `span f${secToFrame(state, frameSecSpan(state, p)[0])}–` +
+      `f${secToFrame(state, frameSecSpan(state, p)[1])} · no GT`;
+    return;
+  }
   const cls = errClass(p.err_ms);
   const gtF = secToFrame(state, p.gt_sec);
-  const predF = secToFrame(state, p.pred_sec);
   const baseF = secToFrame(state, p.gt_sec + p.base_err_ms / 1000);
   el.innerHTML =
     `<b>${p.ptype}</b> <span style="color:#888">(${p.hand})</span><br>` +
@@ -374,20 +435,22 @@ function renderList(state) {
   if (!el) return;
   if (!activeRound) { el.innerHTML = ""; return; }
   el.innerHTML = punchesSorted().map((p) => {
-    const cls = errClass(p.err_ms);
-    const gtF = secToFrame(state, p.gt_sec);
-    return `<div data-sec="${p.gt_sec}" style="display:flex;gap:6px;padding:2px 4px;
-        cursor:pointer;border-left:3px solid ${ERR_COLOR[cls]}">
-      <span style="width:34px;color:#888">f${gtF}</span>
+    const refF = secToFrame(state, refSec(p));
+    const right = hasGt(p)
+      ? `<span style="color:${predColor(p)}">${p.err_ms > 0 ? "+" : ""}${p.err_ms}ms</span>`
+      : `<span style="color:#888">${p.hand}</span>`;
+    return `<div data-sec="${refSec(p)}" style="display:flex;gap:6px;padding:2px 4px;
+        cursor:pointer;border-left:3px solid ${predColor(p)}">
+      <span style="width:34px;color:#888">f${refF}</span>
       <span style="flex:1">${p.ptype}</span>
-      <span style="color:${ERR_COLOR[cls]}">${p.err_ms > 0 ? "+" : ""}${p.err_ms}ms</span>
+      ${right}
     </div>`;
   }).join("");
   el.querySelectorAll("[data-sec]").forEach((row) => {
     row.addEventListener("click", () => {
       const sec = parseFloat(row.dataset.sec);
       if (loopOn) {
-        const i = chronoPunches().findIndex((p) => p.gt_sec === sec);
+        const i = chronoPunches().findIndex((p) => refSec(p) === sec);
         if (i >= 0) { setLoopIdx(i); return; }
       }
       seekFrame(secToFrame(latestState, sec));
@@ -433,13 +496,15 @@ function drawTimeline(state) {
     const sLo = frameSecSpan(state, p)[0], sHi = frameSecSpan(state, p)[1];
     ctx.fillStyle = C.span;
     ctx.fillRect(x(sLo), y, Math.max(2, x(sHi) - x(sLo)), rowH);
-    // GT tick
-    ctx.strokeStyle = C.gt; ctx.lineWidth = 2 * dpr;
-    line(ctx, x(p.gt_sec), y - 2 * dpr, x(p.gt_sec), y + rowH + 2 * dpr);
-    // pred tick, colored by correctness
-    ctx.strokeStyle = ERR_COLOR[errClass(p.err_ms)];
+    if (hasGt(p)) {
+      // GT tick
+      ctx.strokeStyle = C.gt; ctx.lineWidth = 2 * dpr;
+      line(ctx, x(p.gt_sec), y - 2 * dpr, x(p.gt_sec), y + rowH + 2 * dpr);
+    }
+    // pred tick — colored by correctness when GT exists, plain orange otherwise
+    ctx.strokeStyle = predColor(p); ctx.lineWidth = 2 * dpr;
     line(ctx, x(p.pred_sec), y, x(p.pred_sec), y + rowH);
-    if (showBaseline) {
+    if (showBaseline && hasGt(p)) {
       const bSec = p.gt_sec + p.base_err_ms / 1000;
       ctx.strokeStyle = C.base; ctx.lineWidth = 1 * dpr;
       line(ctx, x(bSec), y + rowH * 0.5, x(bSec), y + rowH + 2 * dpr);
@@ -487,9 +552,11 @@ function drawConf(state) {
     i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
   }
   ctx.stroke();
-  ctx.strokeStyle = C.gt; ctx.lineWidth = 2 * dpr;
-  line(ctx, x(p.gt_sec), 0, x(p.gt_sec), H);
-  ctx.strokeStyle = C.pred;
+  if (hasGt(p)) {
+    ctx.strokeStyle = C.gt; ctx.lineWidth = 2 * dpr;
+    line(ctx, x(p.gt_sec), 0, x(p.gt_sec), H);
+  }
+  ctx.strokeStyle = C.pred; ctx.lineWidth = 2 * dpr;
   line(ctx, x(p.pred_sec), 0, x(p.pred_sec), H);
   const tNow = frameToSec(state, state.frame);
   if (tNow >= t0 && tNow <= t0 + (n - 1) * dt) {
@@ -504,7 +571,7 @@ function draw(ctx, state) {
   const s = state.renderScale || 1;
   const p = currentPunch(state);
   if (!p) return;
-  const onGt = state.frame === secToFrame(state, p.gt_sec);
+  const onGt = hasGt(p) && state.frame === secToFrame(state, p.gt_sec);
   const onPred = state.frame === secToFrame(state, p.pred_sec);
   if (onGt || onPred) {
     // frame-accurate border flash: green = labeled turnaround, orange = pred
@@ -522,13 +589,14 @@ function draw(ctx, state) {
   // HUD
   ctx.save();
   ctx.font = `${13 * s}px monospace`;
-  const cls = errClass(p.err_ms);
-  const txt = `${p.ptype} ${p.err_ms > 0 ? "+" : ""}${p.err_ms}ms  ` +
-              `GT f${secToFrame(state, p.gt_sec)} → pred f${secToFrame(state, p.pred_sec)}`;
+  const txt = hasGt(p)
+    ? `${p.ptype} ${p.err_ms > 0 ? "+" : ""}${p.err_ms}ms  ` +
+      `GT f${secToFrame(state, p.gt_sec)} → pred f${secToFrame(state, p.pred_sec)}`
+    : `${p.ptype} (${p.hand})  pred f${secToFrame(state, p.pred_sec)}  [no GT]`;
   const w = ctx.measureText(txt).width + 16 * s;
   ctx.fillStyle = "rgba(0,0,0,0.65)";
   ctx.fillRect(8 * s, 8 * s, w, 24 * s);
-  ctx.fillStyle = ERR_COLOR[cls];
+  ctx.fillStyle = hasGt(p) ? ERR_COLOR[errClass(p.err_ms)] : C.pred;
   ctx.fillText(txt, 16 * s, 25 * s);
   ctx.restore();
 }
