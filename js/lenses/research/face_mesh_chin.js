@@ -67,15 +67,14 @@ function startSec(state) {
 }
 
 function secToFrame(state, tSrc) {
-  // viewer convention (see impact_spotter.js): cache frame f sits on source
-  // frame start_frame + f, start_frame = floor(start_sec * fps).
+  // ROUND, not floor: the mesh was computed on (and the labelers' JPEGs were
+  // baked from) the source frame NEAREST tSrc, while the viewer's slot F
+  // displays source frame start_frame + F. Cache pts often sit a hair shy of
+  // the next frame boundary (frac(t*fps) ~ 0.99 on 36 of the 57 extracted
+  // rounds) — a floor mapping drew the mesh one frame ahead of the pixels on
+  // exactly those rounds.
   const fps = state.fps || 30;
-  return Math.floor(tSrc * fps + 1e-6) - Math.floor(startSec(state) * fps + 1e-6);
-}
-
-function frameToSec(state, f) {
-  const fps = state.fps || 30;
-  return (Math.floor(startSec(state) * fps) + f + 0.5) / fps;
+  return Math.round(tSrc * fps) - Math.floor(startSec(state) * fps + 1e-6);
 }
 
 function seekFrame(f) {
