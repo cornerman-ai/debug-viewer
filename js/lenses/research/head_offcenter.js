@@ -341,13 +341,10 @@ export const HeadOffCenterLensRule = {
   // Needs the full 33-joint cache — mouth/eye landmarks aren't in the COCO-17 remap.
   requires(slot) { return !!(slot && slot.blazepose); },
 
-  // Curated frontal videos only. This lens reads LATERAL (screen-x) head travel,
-  // which only means "off the center line" when the camera stands where the
-  // opponent does. The per-punch axiality gate below already drops side-on
-  // punches, but on footage shot from the side it drops nearly all of them —
-  // leaving an empty lens that looks broken rather than out of scope. Filtering
-  // the video list says so up front. See ../shared/frontal_set.js.
-  requiresVideo: isCuratedVideo,
+  // Every video. The per-punch axiality gate still drops side-on straights, so
+  // on side-shot footage expect few or no scored punches — that is the honest
+  // answer, not a bug. See HeadOffCenterFrontalRule below for the narrow mode.
+  curatedOnly: false,
 
   // Hide the base COCO-17 head joints (nose + eyes + ears) so the head shows ONLY
   // the two extreme landmarks this lens actually uses.
@@ -355,8 +352,22 @@ export const HeadOffCenterLensRule = {
 
   mount(_host, state) {
     host = _host;
+    // `this` is the rule object — the viewer always calls mount as a method, so
+    // the two registry entries below can share this one implementation.
+    const curated = !!this?.curatedOnly;
     host.innerHTML = `
       <h2>Head off the center line</h2>
+      <p class="hint" style="margin-bottom:6px">
+        <b>Videos:</b> ${curated
+          ? `the <b>curated frontal set</b> only — the clips where the camera stands
+             where the opponent would be, so lateral head travel means what it says.
+             Switch to <i>Head off center line (straights)</i> in the lens picker to
+             see every video.`
+          : `<b>all videos</b>. The axiality gate still drops side-on straights, so
+             side-shot footage may score few or no punches — that is the measurement
+             refusing to guess, not a fault. Switch to
+             <i>(straights, curated frontal)</i> to browse only the frontal set.`}
+      </p>
       <p class="hint">
         Per straight punch (jab/cross, head or body): how far the head moves off
         the body's center line, in torso heights. Head = midpoint of the left/right
@@ -446,6 +457,27 @@ export const HeadOffCenterLensRule = {
   },
 
   draw(ctx, state) { drawOverlay(ctx, state); },
+};
+
+// Same lens, video list narrowed to the curated frontal set (the 24 clips where
+// the camera stands where the opponent would be — ../shared/frontal_set.js).
+//
+// This is a SECOND REGISTRY ENTRY rather than a toggle inside the panel because
+// the panel does not mount until a round is loaded: a control in there could not
+// change which videos you are able to load in the first place. The lens picker
+// is usable before anything is loaded, so the mode belongs there.
+//
+// Why the mode is worth having: this lens reads LATERAL (screen-x) head travel,
+// which only means "off the center line" when the opponent axis is the camera
+// axis. The axiality gate already drops side-on straights punch-by-punch, but on
+// side-shot footage it drops nearly all of them, leaving a lens that looks
+// broken rather than out of scope. Narrowing the video list says so up front.
+export const HeadOffCenterFrontalRule = {
+  ...HeadOffCenterLensRule,
+  id: "head_offcenter_frontal",
+  label: "Head off center line (straights, curated frontal)",
+  requiresVideo: isCuratedVideo,
+  curatedOnly: true,
 };
 
 function renderLive(state) {

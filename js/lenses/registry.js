@@ -15,14 +15,16 @@ import { GuardDropRule } from "./rules/guard_drop.js";
 import { GuardHeightRule } from "./research/guard_height.js";
 import { ArmExtensionRule } from "./rules/arm_extension.js";
 import { HandReturnPathRule } from "./rules/hand_return_path.js";
-import { HeadOffCenterLensRule } from "./research/head_offcenter.js";
+import { HeadOffCenterLensRule, HeadOffCenterFrontalRule } from "./research/head_offcenter.js";
 import { HitHeightRule } from "./rules/hit_height.js";
 import { BladednessRule } from "./research/bladedness.js";
 import { BladednessFramesRule } from "./research/bladedness_frames.js";
 import { BladednessPairsRule } from "./research/bladedness_pairs.js";
 import { BladednessCoachRule } from "./research/bladedness_coach.js";
 import { BlazePoseInspectorRule } from "./inspect/blazepose_inspector.js";
+import { ChinHeightRule } from "./research/chin_height.js";
 import { ElbowTuckRule } from "./research/elbow_tuck.js";
+import { FaceMeshChinRule } from "./research/face_mesh_chin.js";
 import { StepPunchSyncRule } from "./rules/step_punch_sync.js";
 import { StepDetectorRule } from "./rules/step_detector.js";
 import { HipRotationReviewRule } from "./rules/hip_rotation_review.js";
@@ -52,11 +54,14 @@ export const RULES = [
   BladednessPairsRule,
   BladednessCoachRule,
   BlazePoseInspectorRule,
+  ChinHeightRule,
   ElbowTuckRule,
+  FaceMeshChinRule,
   GuardDropRule,
   GuardHeightRule,
   HandReturnPathRule,
   HeadOffCenterLensRule,
+  HeadOffCenterFrontalRule,
   HipRotationModelRule,
   HipRotationReviewRule,
   HitHeightRule,
