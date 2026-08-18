@@ -23,6 +23,8 @@
 // clocks, so an off-by-one shows up as a visible one-frame lag instead of
 // a silent mismatch.
 
+import { normStem } from "../shared/segment_set.js";
+
 const DATA_DIR = "./lens_data/face_mesh/";
 const SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbwM57VoFCXWIhw8jyechZQLtMzlmeT15bhIy0eozKpA0jHlmuZPSqVzyEcS5Vy0A5cS/exec";
@@ -101,12 +103,53 @@ function poke() {
 }
 
 // ---------------------------------------------------------------- data
+// Which stems have face-mesh data — index.json is written by
+// face_extract_v1.py next to the per-video JSONs. Fetched at module load
+// (registry.js imports every lens on page load) so the video dropdown
+// filters correctly on the first paint.
+let index = null;
+let indexError = null;
+(async () => {
+  try {
+    const res = await fetch(DATA_DIR + "index.json", { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    index = await res.json();
+  } catch (e) {
+    indexError = String(e);
+  }
+  // The video dropdown filters on requiresVideo(), which cannot answer
+  // until this lands — tell the viewer to re-filter now that it can.
+  window.dispatchEvent(new Event("lens-filter-changed"));
+})();
+
+// The index stem matching a video basename (re-encode tails and whitespace
+// normalized away, same rule as the curated segment sets), or null.
+function indexStemFor(base) {
+  if (!index || !base) return null;
+  const want = normStem(base);
+  for (const s of index.videos || []) {
+    if (normStem(s) === want) return s;
+  }
+  return null;
+}
+
+// Video-dropdown filter (segment_set semantics): pending ⇒ hide (the fetch
+// re-fires the filter once the data lands); failed ⇒ show everything,
+// because an unexplained empty dropdown is a dead end.
+function requiresVideo(base) {
+  if (indexError) return true;
+  if (!index) return false;
+  return indexStemFor(base) != null;
+}
+
 async function ensureFaceData(stem) {
   // The JSON is named by the LABEL stem; the loaded cache may carry an
   // _h264 suffix — try the exact basename first, then the stripped one.
   if (!stem || faceData[stem] || faceErrors[stem]) return;
   let lastErr = "not found";
-  for (const cand of [...new Set([stem, stripStem(stem)])]) {
+  const cands = [...new Set([stem, stripStem(stem), indexStemFor(stem)]
+    .filter(Boolean))];
+  for (const cand of cands) {
     try {
       const res = await fetch(DATA_DIR + encodeURIComponent(cand) + ".json",
                               { cache: "no-store" });
@@ -516,6 +559,8 @@ function draw(ctx, state) {
 export const FaceMeshChinRule = {
   id: "face_mesh_chin",
   label: "Face mesh (chin)",
+  // Only videos with extracted face-mesh data are selectable under this lens.
+  requiresVideo,
   mount,
   update,
   draw,
