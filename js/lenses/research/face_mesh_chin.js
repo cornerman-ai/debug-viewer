@@ -1,27 +1,30 @@
-// Face mesh (chin) — MediaPipe face mesh vs the v4 chin-point labelers.
+// Face mesh (chin) — the face pipeline vs the v4 chin-point labelers.
 //
-// BlazePose has no chin landmark. Step 1 of the chin-tuck rule is deciding
-// whether MediaPipe's face mesh can BE the chin oracle: this lens draws the
-// mesh jaw arc and two chin candidates on the footage, pulls the v4
-// chin-point labels LIVE from the labeler backend, and on labeled frames
-// shows each labeler's click plus its distance to the mesh chin.
+// BlazePose has no chin landmark; the adopted pipeline (SCRFD-10G
+// detection + 2d106 landmarks, see backend
+// ml/research/chin_tuck/FACE_PIPELINE.md) supplies one. This lens draws
+// that pipeline's output on every frame — box colored by the score
+// verdict, chin, nose, landmark cloud on labeled frames — pulls the v4
+// chin-point labels LIVE from the labeler backend, and shows each
+// labeler's click plus its distance to the pipeline's chin.
 //
-// Data: ./lens_data/face_mesh/<stem>.json, one per top-labeled video —
-//   cd ~/code/cornerman-backend && .venv-mediapipe/bin/python \
-//       ml/research/chin_tuck/face_extract_v1.py
-// Schema: { video, width, height, fps, engine, stride, chin_landmark,
-//   jaw_arc_indices, rounds: { <ri>: { fps, n_frames, start_sec, frames: [
-//     { f, t, found, chin:[x,y], low:[x,y], arc:[[x,y],...] } ] } } }
-// Coords are normalized 0-1; t is SOURCE-VIDEO seconds (the cache _pts
-// clock). Labels come from the chin-point Apps Script (statsChinPoint
-// roster -> listChinPoint per labeler) — the same endpoint the labeler
-// page saves to, so what you see here is always the live sheet.
+// Data, per video in ./lens_data/face_mesh/:
+//   <stem>.json          the benchmark-era face JSON. Its per-frame `t`
+//                        values are still THE clock carrier this lens maps
+//                        rows through (its mesh marks are no longer drawn).
+//   <stem>.cascade.json  the pipeline output. v3 = columnar per round
+//                        (score/box/chin/nose, null = no face) + labeled
+//                        frames with the full 106-point cloud; v2 files
+//                        (the mesh-tier era) still render, incl. their
+//                        jaw arcs.
+//   index.json           which stems exist — filters the video dropdown.
+// Coords normalized 0-1; t is SOURCE-VIDEO seconds (the cache _pts clock).
 //
-// Alignment is BY TIME: a label's (round, frame) is resolved to t through
-// the face JSON entry minted from the same cache grid, then to a viewer
-// frame via start_sec/fps — raw frame indices are never trusted across
-// clocks, so an off-by-one shows up as a visible one-frame lag instead of
-// a silent mismatch.
+// Alignment is BY TIME: a row's cache frame f is resolved to t through the
+// face JSON entry minted from the same cache grid, then to a viewer frame
+// via round(t*fps) - floor(start_sec*fps) — raw frame indices are never
+// trusted across clocks, so an off-by-one shows up as a visible one-frame
+// lag instead of a silent mismatch.
 
 import { normStem } from "../shared/segment_set.js";
 
@@ -31,12 +34,11 @@ const SCRIPT_URL =
 const EXCLUDE_LABELERS = new Set(["Test"]);   // verification rows, not a labeler
 
 const C = {
-  arc:      "#8ab4f8",   // blue — jaw arc from FACEMESH_FACE_OVAL
-  chin:     "#ffa657",   // orange — mesh chin tip (landmark 152)
-  low:      "#d3b136",   // yellow — lowest image-space jaw point
+  arc:      "#8ab4f8",   // blue — mesh-tier jaw arc (v2 sidecars only)
+  low:      "#d3b136",   // yellow — timeline lane color for found frames
   noface:   "#ff5d6c",   // red — no face detected
   ok:       "#7adf7a",   // green — SCRFD box above the include threshold
-  cascade:  "#ff5df1",   // magenta — gate-cascade landmarks (SCRFD → mesh|2d106)
+  cascade:  "#ff5df1",   // magenta — the pipeline's landmarks
   playhead: "#3ad9e0",
   text:     "#aaa",
 };
@@ -60,7 +62,6 @@ let cascadeByViewer = null; // Map(viewer frame -> cascade entry)
 let cascadeRuns = null;     // [{lo, hi, kind: mesh|l106|excluded|none}]
 let mapsKey = "";         // memo key for the per-round lookup maps
 let entryByViewer = null; // Map(viewer frame -> face frame entry)
-let noFaceRuns = null;    // [[viewerLo, viewerHi], ...] over stored frames
 let labelRows = null;     // scoped labels: [{labeler, ci, x, y, vis, rep, viewerF, approx}]
 
 // ---------------------------------------------------------------- helpers
@@ -270,25 +271,20 @@ function buildMaps(state) {
   entryByViewer = new Map();
   cascadeByViewer = new Map();
   cascadeRuns = [];
-  noFaceRuns = [];
   labelRows = [];
   if (activeRound) {
     const byF = new Map();
-    let run = null;
     for (const fr of activeRound.frames) {
       const vf = secToFrame(state, fr.t);
       entryByViewer.set(vf, fr);
       byF.set(fr.f, fr);
-      if (!fr.found) {
-        if (run && vf <= run[1] + 1) run[1] = vf;
-        else { run = [vf, vf]; noFaceRuns.push(run); }
-      }
     }
     if (activeCascade) {
       const thr = activeCascade.threshold || 0.6;
       const TIER = { m: "mesh", l: "l106", n: "none" };
-      // all-frames columns (v2 sidecars) — one entry per cache frame,
-      // viewer frame resolved through the face JSON's t for the same row
+      // all-frames columns — one entry per cache frame, viewer frame
+      // resolved through the face JSON's t for the same row. v3 sidecars
+      // have no tier column (one landmarker); v2 (mesh-tier era) do.
       const rc = activeCascade.rounds &&
                  activeCascade.rounds[String(state.cacheRound)];
       if (rc) {
@@ -297,11 +293,11 @@ function buildMaps(state) {
           if (!fe) continue;
           const score = rc.score[f];
           cascadeByViewer.set(secToFrame(state, fe.t), {
-            tier: TIER[rc.tier[f]] || "none",
+            tier: rc.tier ? TIER[rc.tier[f]] || "none" : undefined,
             score,
             included: score != null && score >= thr,
             box: rc.box[f], chin: rc.chin[f], nose: rc.nose[f],
-            arc: rc.arc[f],
+            arc: rc.arc ? rc.arc[f] : null,
           });
         }
       }
@@ -314,9 +310,10 @@ function buildMaps(state) {
           labeled: true,
         });
       }
-      // timeline runs: mesh / l106 (included), excluded, none
-      const kindOf = (e) => !e || e.tier === "none" ? "none"
-                          : !e.included ? "excluded" : e.tier;
+      // timeline runs: found (split mesh/l106 on v2 data), excluded, none
+      const kindOf = (e) => !e || e.score == null ? "none"
+                          : !e.included ? "excluded"
+                          : e.tier === "mesh" ? "mesh" : "l106";
       let cr = null;
       for (const vf of [...cascadeByViewer.keys()].sort((a, b) => a - b)) {
         const k = kindOf(cascadeByViewer.get(vf));
@@ -381,24 +378,25 @@ function buildSidebar() {
   } else if (!activeFace) {
     parts.push(`<div style="color:#888;font-size:12px">loading face-mesh data…</div>`);
   } else {
-    const rounds = Object.values(activeFace.rounds);
-    const n = rounds.reduce((a, r) => a + r.frames.length, 0);
-    const found = rounds.reduce(
-      (a, r) => a + r.frames.filter((f) => f.found).length, 0);
+    let cov = "";
+    if (activeCascade && activeCascade.rounds) {
+      let n = 0, found = 0;
+      for (const r of Object.values(activeCascade.rounds)) {
+        n += r.n;
+        for (const s of r.score) found += s != null;
+      }
+      cov = n ? ` · face on <b style="color:#ddd">${(100 * found / n).toFixed(1)}%</b>
+                 of ${n} frames` : "";
+    }
     parts.push(`<div style="font-size:12px;color:#888;margin-bottom:6px">
-      <code>${activeFace.video}</code> · ${activeFace.engine} ·
-      stride ${activeFace.stride} ·
-      face on <b style="color:#ddd">${n ? (100 * found / n).toFixed(1) : 0}%</b>
-      of ${n} frames</div>`);
+      <code>${activeFace.video}</code> ·
+      ${(activeCascade && activeCascade.engine) || "pipeline data loading…"}${cov}</div>`);
   }
   parts.push(`<div style="font-size:12px;margin-bottom:6px">
-    <span style="color:${C.arc}">— jaw arc</span> ·
-    <span style="color:${C.chin}">● chin 152</span> ·
-    <span style="color:${C.low}">◆ lowest jaw</span><br>
-    <span style="color:${C.cascade}">— cascade marks</span> ·
-    <span style="color:${C.ok}">▭ SCRFD ≥thr</span> ·
-    <span style="color:${C.noface}">▭ below thr</span>
-    <span style="color:#666">(labeled frames only)</span></div>`);
+    <span style="color:${C.cascade}">● chin · landmarks</span> ·
+    <span style="color:${C.ok}">▭ score ≥thr</span> ·
+    <span style="color:${C.noface}">▭ below thr</span> ·
+    <span style="color:#fff">● nose</span></div>`);
   if (labelsError) {
     parts.push(`<div style="color:${C.noface};font-size:12px">
       labels failed to load: ${labelsError}</div>`);
@@ -456,41 +454,29 @@ function renderCurrent(state) {
   const fr = entryByViewer.get(state.frame);
   const clicks = clicksAt(state.frame);
   const lines = [];
-  lines.push(fr
-    ? (fr.found
-        ? `face <b style="color:${C.arc}">✓</b> · t=${fr.t.toFixed(3)}s`
-        : `face <b style="color:${C.noface}">✗</b> · t=${fr.t.toFixed(3)}s`)
-    : `<span style="color:#666">frame not in face data (stride?)</span>`);
+  if (fr) lines.push(`<span style="color:#888">t=${fr.t.toFixed(3)}s</span>`);
   for (const r of clicks) {
-    const tag = `<span style="color:${labelerColor(r.labeler)}">✕ ${r.labeler}` +
-                `${r.rep ? " (rep)" : ""}${r.vis === "inferred" ? " ~" : ""}</span>`;
-    if (fr && fr.found) {
-      const d1 = dists(fr.chin, r), d2 = dists(fr.low, r);
-      lines.push(`${tag} → 152 <b style="color:${C.chin}">${d1.dn.toFixed(4)}</b> ` +
-        `(${d1.dpx.toFixed(0)}px) · low <b style="color:${C.low}">` +
-        `${d2.dn.toFixed(4)}</b> (${d2.dpx.toFixed(0)}px)`);
-    } else {
-      lines.push(`${tag} <span style="color:${C.noface}">— no mesh on this frame</span>`);
-    }
+    lines.push(`<span style="color:${labelerColor(r.labeler)}">✕ ${r.labeler}` +
+               `${r.rep ? " (rep)" : ""}${r.vis === "inferred" ? " ~" : ""}</span> labeled here`);
   }
   const ce = cascadeByViewer && cascadeByViewer.get(state.frame);
   if (ce) {
     const thr = (activeCascade && activeCascade.threshold) || 0.6;
     if (ce.box) {
-      lines.push(`cascade: SCRFD <b style="color:${ce.included ? C.ok : C.noface}">` +
+      lines.push(`SCRFD <b style="color:${ce.included ? C.ok : C.noface}">` +
         `${ce.score.toFixed(2)}</b> ${ce.included
-          ? `✓ ≥${thr}` : `✗ &lt;${thr} excluded`} · tier ` +
-        `${ce.tier === "mesh" ? "mesh" : "2d106"}`);
+          ? `✓ ≥${thr}` : `✗ &lt;${thr} excluded`}` +
+        (ce.tier ? ` · tier ${ce.tier === "mesh" ? "mesh" : "2d106"}` : ""));
       if (ce.chin) {
         for (const r of clicks) {
           const d = dists(ce.chin, r);
           lines.push(`<span style="color:${labelerColor(r.labeler)}">${r.labeler}</span>` +
-            ` → <span style="color:${C.cascade}">cascade chin</span> ` +
+            ` → <span style="color:${C.cascade}">chin</span> ` +
             `<b>${d.dn.toFixed(4)}</b> (${d.dpx.toFixed(0)}px)`);
         }
       }
     } else {
-      lines.push(`cascade: <span style="color:${C.noface}">SCRFD found no face</span>`);
+      lines.push(`<span style="color:${C.noface}">SCRFD found no face</span>`);
     }
   }
   el.innerHTML = lines.join("<br>");
@@ -509,7 +495,8 @@ function renderList(state) {
       `<span style="color:${labelerColor(r.labeler)}">${r.labeler}` +
       `${r.rep ? "·rep" : ""}</span>`).join(" ");
     const cur = vf === state.frame ? "background:#22303a;" : "";
-    const noface = rs[0].entry && !rs[0].entry.found
+    const ce = cascadeByViewer && cascadeByViewer.get(vf);
+    const noface = ce && ce.score == null
       ? ` <span style="color:${C.noface}">no face</span>` : "";
     const approx = rs[0].approx
       ? ` <span style="color:#d3b136" title="no t for this label — raw index">≈</span>` : "";
@@ -550,20 +537,9 @@ function drawTimeline(state) {
     ctx.font = `${11 * dpr}px monospace`;
     ctx.fillText("face mesh: no data for this round", 10 * dpr, 16 * dpr);
   } else {
-    // coverage strip — red where the original pipeline found no face
-    const y0 = H * 0.06, hh = H * 0.2;
-    ctx.fillStyle = "#243038";
-    ctx.fillRect(0, y0, W, hh);
-    ctx.fillStyle = "#5a2f35";
-    for (const [lo, hi] of noFaceRuns) {
-      ctx.fillRect(x(lo), y0, Math.max(1.5 * dpr, x(hi + 1) - x(lo)), hh);
-    }
-    ctx.fillStyle = C.text;
-    ctx.font = `${9 * dpr}px monospace`;
-    ctx.fillText("no-face", 4 * dpr, y0 - 1 * dpr);
-    // cascade lane — per-frame tier / verdict
+    // pipeline lane — per-frame verdict (mesh/l106 split only on v2 data)
     if (cascadeRuns && cascadeRuns.length) {
-      const y1 = H * 0.36, h1 = H * 0.2;
+      const y1 = H * 0.1, h1 = H * 0.3;
       const KIND = { mesh: C.arc, l106: C.low, excluded: "#ff9a3d",
                      none: "#5a2f35" };
       ctx.fillStyle = "#243038";
@@ -573,11 +549,12 @@ function drawTimeline(state) {
         ctx.fillRect(x(r.lo), y1, Math.max(1.5 * dpr, x(r.hi + 1) - x(r.lo)), h1);
       }
       ctx.fillStyle = C.text;
-      ctx.fillText("cascade", 4 * dpr, y1 - 1 * dpr);
+      ctx.font = `${9 * dpr}px monospace`;
+      ctx.fillText("face", 4 * dpr, y1 - 1 * dpr);
     }
     // labeled-frame ticks, one lane per labeler
     const roster = labels ? labels.roster : [];
-    const laneY = (i) => H * 0.66 + i * (H * 0.3 / Math.max(1, roster.length));
+    const laneY = (i) => H * 0.55 + i * (H * 0.4 / Math.max(1, roster.length));
     roster.forEach((nm, i) => {
       ctx.fillStyle = labelerColor(nm);
       ctx.font = `${9 * dpr}px monospace`;
@@ -615,52 +592,11 @@ function draw(ctx, state) {
   if (!activeRound) return;
   const s = state.renderScale || 1;
   const W = ctx.canvas.width, H = ctx.canvas.height;
-  const fr = entryByViewer.get(state.frame);
   const clicks = clicksAt(state.frame);
-  ctx.save();
-  if (fr && fr.found) {
-    // jaw arc polyline
-    ctx.strokeStyle = C.arc;
-    ctx.lineWidth = 2 * s;
-    ctx.beginPath();
-    fr.arc.forEach((q, i) => {
-      const px = q[0] * W, py = q[1] * H;
-      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-    });
-    ctx.stroke();
-    // lowest jaw point — yellow diamond
-    const lx = fr.low[0] * W, ly = fr.low[1] * H, r = 5 * s;
-    ctx.fillStyle = C.low;
-    ctx.beginPath();
-    ctx.moveTo(lx, ly - r); ctx.lineTo(lx + r, ly);
-    ctx.lineTo(lx, ly + r); ctx.lineTo(lx - r, ly);
-    ctx.closePath();
-    ctx.fill();
-    // chin 152 — orange dot + ring
-    const cx = fr.chin[0] * W, cy = fr.chin[1] * H;
-    ctx.fillStyle = C.chin;
-    ctx.beginPath(); ctx.arc(cx, cy, 3.5 * s, 0, 2 * Math.PI); ctx.fill();
-    ctx.strokeStyle = C.chin;
-    ctx.lineWidth = 1.5 * s;
-    ctx.beginPath(); ctx.arc(cx, cy, 7 * s, 0, 2 * Math.PI); ctx.stroke();
-    // labeler clicks + a thin tie-line from the mesh chin to each click
-    for (const rr of clicks) {
-      const px = rr.x * W, py = rr.y * H;
-      ctx.setLineDash([4 * s, 4 * s]);
-      ctx.strokeStyle = labelerColor(rr.labeler);
-      ctx.lineWidth = 1 * s;
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py); ctx.stroke();
-      ctx.setLineDash([]);
-      crossMark(ctx, px, py, 6 * s, labelerColor(rr.labeler), 2 * s);
-    }
-  } else {
-    for (const rr of clicks) {
-      crossMark(ctx, rr.x * W, rr.y * H, 6 * s, labelerColor(rr.labeler), 2 * s);
-    }
-  }
-  // gate-cascade overlay (sidecar): SCRFD box colored by the include
-  // verdict, magenta landmarks, white nose
   const ce = cascadeByViewer && cascadeByViewer.get(state.frame);
+  ctx.save();
+  // the pipeline: SCRFD box colored by the include verdict, magenta
+  // landmarks, white nose
   if (ce && ce.box) {
     ctx.strokeStyle = ce.included ? C.ok : C.noface;
     ctx.lineWidth = 2 * s;
@@ -702,38 +638,43 @@ function draw(ctx, state) {
       ctx.fill();
     }
   }
+  // labeler clicks, tied to the pipeline chin with a dashed line
+  for (const rr of clicks) {
+    const px = rr.x * W, py = rr.y * H;
+    if (ce && ce.chin) {
+      ctx.setLineDash([4 * s, 4 * s]);
+      ctx.strokeStyle = labelerColor(rr.labeler);
+      ctx.lineWidth = 1 * s;
+      ctx.beginPath();
+      ctx.moveTo(ce.chin[0] * W, ce.chin[1] * H);
+      ctx.lineTo(px, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    crossMark(ctx, px, py, 6 * s, labelerColor(rr.labeler), 2 * s);
+  }
   // HUD
   ctx.font = `${13 * s}px monospace`;
   const hud = [];
-  hud.push([fr ? (fr.found ? "face ✓" : "face ✗") : "face —",
-            fr && fr.found ? C.arc : C.noface]);
-  for (const rr of clicks) {
-    if (fr && fr.found) {
-      const d1 = dists(fr.chin, rr), d2 = dists(fr.low, rr);
-      hud.push([`${rr.labeler}${rr.rep ? "·rep" : ""}: 152 ${d1.dn.toFixed(4)} ` +
-                `(${d1.dpx.toFixed(0)}px) · low ${d2.dn.toFixed(4)} (${d2.dpx.toFixed(0)}px)`,
-                labelerColor(rr.labeler)]);
-    } else {
-      hud.push([`${rr.labeler}: labeled — no mesh here`, labelerColor(rr.labeler)]);
-    }
-  }
   if (ce) {
     const thr = (activeCascade && activeCascade.threshold) || 0.6;
     if (ce.box) {
       hud.push([`SCRFD ${ce.score.toFixed(2)} ` +
                 (ce.included ? `✓ ≥${thr}` : `✗ <${thr} excluded`) +
-                ` · tier ${ce.tier === "mesh" ? "mesh" : "2d106"}`,
+                (ce.tier ? ` · tier ${ce.tier === "mesh" ? "mesh" : "2d106"}` : ""),
                 ce.included ? C.ok : C.noface]);
       if (ce.chin) {
         for (const rr of clicks) {
           const d = dists(ce.chin, rr);
-          hud.push([`${rr.labeler} → cascade chin ${d.dn.toFixed(4)} ` +
-                    `(${d.dpx.toFixed(0)}px)`, C.cascade]);
+          hud.push([`${rr.labeler}${rr.rep ? "·rep" : ""} → chin ${d.dn.toFixed(4)} ` +
+                    `(${d.dpx.toFixed(0)}px)`, labelerColor(rr.labeler)]);
         }
       }
     } else {
       hud.push(["SCRFD: no detection", C.noface]);
     }
+  } else {
+    hud.push(["no pipeline data for this frame", "#888"]);
   }
   const wmax = Math.max(...hud.map(([t]) => ctx.measureText(t).width));
   ctx.fillStyle = "rgba(0,0,0,0.65)";
