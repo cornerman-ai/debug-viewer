@@ -359,6 +359,10 @@ function dists(pt, r) {
 function mount(hostEl, state) {
   host = hostEl;
   latestState = state;
+  // A transient fetch failure (server bounce, network blip) must not stick
+  // for the whole session — re-selecting the lens retries failed fetches.
+  faceErrors = {};
+  cascadeErrors = {};
   buildTimelineSlot();
   ensureLabels();
   matchRound(state);
