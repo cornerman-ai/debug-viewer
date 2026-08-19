@@ -35,6 +35,8 @@ const C = {
   chin:     "#ffa657",   // orange — mesh chin tip (landmark 152)
   low:      "#d3b136",   // yellow — lowest image-space jaw point
   noface:   "#ff5d6c",   // red — no face detected
+  ok:       "#7adf7a",   // green — SCRFD box above the include threshold
+  cascade:  "#ff5df1",   // magenta — gate-cascade landmarks (SCRFD → mesh|2d106)
   playhead: "#3ad9e0",
   text:     "#aaa",
 };
@@ -51,6 +53,10 @@ let labelsError = null;
 let activeStem = null;    // scoped stem (cacheBasename, _h264 stripped)
 let activeFace = null;    // faceData[activeStem]
 let activeRound = null;   // activeFace.rounds[cacheRound]
+let cascadeData = {};     // stem -> <stem>.cascade.json (gate-experiment sidecar)
+let cascadeErrors = {};   // stem -> error (absence is fine — overlay is optional)
+let activeCascade = null;
+let cascadeByViewer = null; // Map(viewer frame -> cascade entry)
 let mapsKey = "";         // memo key for the per-round lookup maps
 let entryByViewer = null; // Map(viewer frame -> face frame entry)
 let noFaceRuns = null;    // [[viewerLo, viewerHi], ...] over stored frames
@@ -164,14 +170,45 @@ async function ensureFaceData(stem) {
   poke();
 }
 
+async function ensureCascade(stem) {
+  // Gate-cascade sidecar (cascade_sidecar.py): SCRFD score + marks for the
+  // labeled frames. Optional — a missing file just means no overlay.
+  if (!stem || cascadeData[stem] || cascadeErrors[stem]) return;
+  let lastErr = "not found";
+  for (const cand of [...new Set([stem, stripStem(stem), indexStemFor(stem)]
+    .filter(Boolean))]) {
+    try {
+      const res = await fetch(DATA_DIR + encodeURIComponent(cand) + ".cascade.json",
+                              { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      cascadeData[stem] = await res.json();
+      poke();
+      return;
+    } catch (e) {
+      lastErr = String(e);
+    }
+  }
+  cascadeErrors[stem] = lastErr;
+  poke();
+}
+
 async function fetchLabels() {
+  // The Apps Script exec URL 404s in bursts — retry with backoff, same as
+  // the extractor's api() does.
   const get = async (params) => {
     const url = SCRIPT_URL + "?" + new URLSearchParams(params).toString();
-    const res = await fetch(url, { redirect: "follow" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const body = await res.json();
-    if (body.status !== "ok") throw new Error(body.message || "backend error");
-    return body;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await fetch(url, { redirect: "follow" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = await res.json();
+        if (body.status !== "ok") throw new Error(body.message || "backend error");
+        return body;
+      } catch (e) {
+        if (attempt >= 2) throw e;
+        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+      }
+    }
   };
   const roster = (await get({ action: "statsChinPoint" })).labelers
     .map((e) => e.labeler)
@@ -196,7 +233,10 @@ async function fetchLabels() {
 }
 
 function ensureLabels() {
-  if (labelsPromise) return;
+  // A failed fetch re-arms on the next mount, so re-selecting the lens
+  // retries after an endpoint outage.
+  if (labelsPromise && !labelsError) return;
+  labelsError = null;
   labelsPromise = fetchLabels()
     .then((out) => { labels = out; })
     .catch((e) => { labelsError = String(e); })
@@ -210,7 +250,9 @@ function matchRound(state) {
   activeRound = null;
   if (!activeStem) return;
   ensureFaceData(activeStem);
+  ensureCascade(activeStem);
   activeFace = faceData[activeStem] || null;
+  activeCascade = cascadeData[activeStem] || null;
   if (activeFace && state.cacheRound != null) {
     activeRound = activeFace.rounds[String(state.cacheRound)] || null;
   }
@@ -220,12 +262,20 @@ function matchRound(state) {
 // scoped labels resolved to viewer frames — all through t, memoized.
 function buildMaps(state) {
   const key = `${activeStem}|${state.cacheRound}|${startSec(state)}` +
-              `|${activeRound ? 1 : 0}|${labels ? labels.n : -1}`;
+              `|${activeRound ? 1 : 0}|${labels ? labels.n : -1}` +
+              `|${activeCascade ? 1 : 0}`;
   if (key === mapsKey) return;
   mapsKey = key;
   entryByViewer = new Map();
+  cascadeByViewer = new Map();
   noFaceRuns = [];
   labelRows = [];
+  if (activeCascade) {
+    for (const ce of activeCascade.frames || []) {
+      if (ce.round !== state.cacheRound) continue;
+      cascadeByViewer.set(secToFrame(state, ce.t), ce);
+    }
+  }
   if (activeRound) {
     const byF = new Map();
     let run = null;
@@ -304,7 +354,11 @@ function buildSidebar() {
   parts.push(`<div style="font-size:12px;margin-bottom:6px">
     <span style="color:${C.arc}">— jaw arc</span> ·
     <span style="color:${C.chin}">● chin 152</span> ·
-    <span style="color:${C.low}">◆ lowest jaw</span></div>`);
+    <span style="color:${C.low}">◆ lowest jaw</span><br>
+    <span style="color:${C.cascade}">— cascade marks</span> ·
+    <span style="color:${C.ok}">▭ SCRFD ≥thr</span> ·
+    <span style="color:${C.noface}">▭ below thr</span>
+    <span style="color:#666">(labeled frames only)</span></div>`);
   if (labelsError) {
     parts.push(`<div style="color:${C.noface};font-size:12px">
       labels failed to load: ${labelsError}</div>`);
@@ -377,6 +431,26 @@ function renderCurrent(state) {
         `${d2.dn.toFixed(4)}</b> (${d2.dpx.toFixed(0)}px)`);
     } else {
       lines.push(`${tag} <span style="color:${C.noface}">— no mesh on this frame</span>`);
+    }
+  }
+  const ce = cascadeByViewer && cascadeByViewer.get(state.frame);
+  if (ce) {
+    const thr = (activeCascade && activeCascade.threshold) || 0.6;
+    if (ce.box) {
+      lines.push(`cascade: SCRFD <b style="color:${ce.included ? C.ok : C.noface}">` +
+        `${ce.score.toFixed(2)}</b> ${ce.included
+          ? `✓ ≥${thr}` : `✗ &lt;${thr} excluded`} · tier ` +
+        `${ce.tier === "mesh" ? "mesh" : "2d106"}`);
+      if (ce.chin) {
+        for (const r of clicks) {
+          const d = dists(ce.chin, r);
+          lines.push(`<span style="color:${labelerColor(r.labeler)}">${r.labeler}</span>` +
+            ` → <span style="color:${C.cascade}">cascade chin</span> ` +
+            `<b>${d.dn.toFixed(4)}</b> (${d.dpx.toFixed(0)}px)`);
+        }
+      }
+    } else {
+      lines.push(`cascade: <span style="color:${C.noface}">SCRFD found no face</span>`);
     }
   }
   el.innerHTML = lines.join("<br>");
@@ -530,6 +604,50 @@ function draw(ctx, state) {
       crossMark(ctx, rr.x * W, rr.y * H, 6 * s, labelerColor(rr.labeler), 2 * s);
     }
   }
+  // gate-cascade overlay (sidecar): SCRFD box colored by the include
+  // verdict, magenta landmarks, white nose
+  const ce = cascadeByViewer && cascadeByViewer.get(state.frame);
+  if (ce && ce.box) {
+    ctx.strokeStyle = ce.included ? C.ok : C.noface;
+    ctx.lineWidth = 2 * s;
+    if (!ce.included) ctx.setLineDash([6 * s, 5 * s]);
+    ctx.strokeRect(ce.box[0] * W, ce.box[1] * H,
+                   (ce.box[2] - ce.box[0]) * W, (ce.box[3] - ce.box[1]) * H);
+    ctx.setLineDash([]);
+    if (ce.tier === "mesh" && ce.arc) {
+      ctx.strokeStyle = C.cascade;
+      ctx.lineWidth = 1.5 * s;
+      ctx.beginPath();
+      ce.arc.forEach((q, i) => {
+        i ? ctx.lineTo(q[0] * W, q[1] * H) : ctx.moveTo(q[0] * W, q[1] * H);
+      });
+      ctx.stroke();
+    } else if (ce.pts106) {
+      ctx.fillStyle = C.cascade;
+      for (const q of ce.pts106) {
+        ctx.beginPath();
+        ctx.arc(q[0] * W, q[1] * H, 1.6 * s, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+    if (ce.chin) {
+      ctx.strokeStyle = C.cascade;
+      ctx.lineWidth = 2 * s;
+      ctx.beginPath();
+      ctx.arc(ce.chin[0] * W, ce.chin[1] * H, 6 * s, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+    if (ce.nose) {
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.arc(ce.nose[0] * W, ce.nose[1] * H, 4 * s, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(ce.nose[0] * W, ce.nose[1] * H, 2.8 * s, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  }
   // HUD
   ctx.font = `${13 * s}px monospace`;
   const hud = [];
@@ -543,6 +661,24 @@ function draw(ctx, state) {
                 labelerColor(rr.labeler)]);
     } else {
       hud.push([`${rr.labeler}: labeled — no mesh here`, labelerColor(rr.labeler)]);
+    }
+  }
+  if (ce) {
+    const thr = (activeCascade && activeCascade.threshold) || 0.6;
+    if (ce.box) {
+      hud.push([`SCRFD ${ce.score.toFixed(2)} ` +
+                (ce.included ? `✓ ≥${thr}` : `✗ <${thr} excluded`) +
+                ` · tier ${ce.tier === "mesh" ? "mesh" : "2d106"}`,
+                ce.included ? C.ok : C.noface]);
+      if (ce.chin) {
+        for (const rr of clicks) {
+          const d = dists(ce.chin, rr);
+          hud.push([`${rr.labeler} → cascade chin ${d.dn.toFixed(4)} ` +
+                    `(${d.dpx.toFixed(0)}px)`, C.cascade]);
+        }
+      }
+    } else {
+      hud.push(["SCRFD: no detection", C.noface]);
     }
   }
   const wmax = Math.max(...hud.map(([t]) => ctx.measureText(t).width));
