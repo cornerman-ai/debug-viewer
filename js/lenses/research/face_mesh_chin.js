@@ -57,6 +57,7 @@ let cascadeData = {};     // stem -> <stem>.cascade.json (gate-experiment sideca
 let cascadeErrors = {};   // stem -> error (absence is fine — overlay is optional)
 let activeCascade = null;
 let cascadeByViewer = null; // Map(viewer frame -> cascade entry)
+let cascadeRuns = null;     // [{lo, hi, kind: mesh|l106|excluded|none}]
 let mapsKey = "";         // memo key for the per-round lookup maps
 let entryByViewer = null; // Map(viewer frame -> face frame entry)
 let noFaceRuns = null;    // [[viewerLo, viewerHi], ...] over stored frames
@@ -268,14 +269,9 @@ function buildMaps(state) {
   mapsKey = key;
   entryByViewer = new Map();
   cascadeByViewer = new Map();
+  cascadeRuns = [];
   noFaceRuns = [];
   labelRows = [];
-  if (activeCascade) {
-    for (const ce of activeCascade.frames || []) {
-      if (ce.round !== state.cacheRound) continue;
-      cascadeByViewer.set(secToFrame(state, ce.t), ce);
-    }
-  }
   if (activeRound) {
     const byF = new Map();
     let run = null;
@@ -286,6 +282,46 @@ function buildMaps(state) {
       if (!fr.found) {
         if (run && vf <= run[1] + 1) run[1] = vf;
         else { run = [vf, vf]; noFaceRuns.push(run); }
+      }
+    }
+    if (activeCascade) {
+      const thr = activeCascade.threshold || 0.6;
+      const TIER = { m: "mesh", l: "l106", n: "none" };
+      // all-frames columns (v2 sidecars) — one entry per cache frame,
+      // viewer frame resolved through the face JSON's t for the same row
+      const rc = activeCascade.rounds &&
+                 activeCascade.rounds[String(state.cacheRound)];
+      if (rc) {
+        for (let f = 0; f < rc.n; f++) {
+          const fe = byF.get(f);
+          if (!fe) continue;
+          const score = rc.score[f];
+          cascadeByViewer.set(secToFrame(state, fe.t), {
+            tier: TIER[rc.tier[f]] || "none",
+            score,
+            included: score != null && score >= thr,
+            box: rc.box[f], chin: rc.chin[f], nose: rc.nose[f],
+            arc: rc.arc[f],
+          });
+        }
+      }
+      // labeled frames keep their rich marks (pts106 etc.) on top
+      for (const ce of activeCascade.frames || []) {
+        if (ce.round !== state.cacheRound) continue;
+        cascadeByViewer.set(secToFrame(state, ce.t), {
+          ...ce,
+          included: ce.score != null && ce.score >= thr,
+          labeled: true,
+        });
+      }
+      // timeline runs: mesh / l106 (included), excluded, none
+      const kindOf = (e) => !e || e.tier === "none" ? "none"
+                          : !e.included ? "excluded" : e.tier;
+      let cr = null;
+      for (const vf of [...cascadeByViewer.keys()].sort((a, b) => a - b)) {
+        const k = kindOf(cascadeByViewer.get(vf));
+        if (cr && cr.kind === k && vf <= cr.hi + 1) cr.hi = vf;
+        else { cr = { lo: vf, hi: vf, kind: k }; cascadeRuns.push(cr); }
       }
     }
     const rows = (labels &&
@@ -510,8 +546,8 @@ function drawTimeline(state) {
     ctx.font = `${11 * dpr}px monospace`;
     ctx.fillText("face mesh: no data for this round", 10 * dpr, 16 * dpr);
   } else {
-    // coverage strip — red where no face was detected
-    const y0 = H * 0.12, hh = H * 0.3;
+    // coverage strip — red where the original pipeline found no face
+    const y0 = H * 0.06, hh = H * 0.2;
     ctx.fillStyle = "#243038";
     ctx.fillRect(0, y0, W, hh);
     ctx.fillStyle = "#5a2f35";
@@ -520,10 +556,24 @@ function drawTimeline(state) {
     }
     ctx.fillStyle = C.text;
     ctx.font = `${9 * dpr}px monospace`;
-    ctx.fillText("no-face", 4 * dpr, y0 - 2 * dpr);
+    ctx.fillText("no-face", 4 * dpr, y0 - 1 * dpr);
+    // cascade lane — per-frame tier / verdict
+    if (cascadeRuns && cascadeRuns.length) {
+      const y1 = H * 0.36, h1 = H * 0.2;
+      const KIND = { mesh: C.arc, l106: C.low, excluded: "#ff9a3d",
+                     none: "#5a2f35" };
+      ctx.fillStyle = "#243038";
+      ctx.fillRect(0, y1, W, h1);
+      for (const r of cascadeRuns) {
+        ctx.fillStyle = KIND[r.kind] || "#243038";
+        ctx.fillRect(x(r.lo), y1, Math.max(1.5 * dpr, x(r.hi + 1) - x(r.lo)), h1);
+      }
+      ctx.fillStyle = C.text;
+      ctx.fillText("cascade", 4 * dpr, y1 - 1 * dpr);
+    }
     // labeled-frame ticks, one lane per labeler
     const roster = labels ? labels.roster : [];
-    const laneY = (i) => H * 0.55 + i * (H * 0.4 / Math.max(1, roster.length));
+    const laneY = (i) => H * 0.66 + i * (H * 0.3 / Math.max(1, roster.length));
     roster.forEach((nm, i) => {
       ctx.fillStyle = labelerColor(nm);
       ctx.font = `${9 * dpr}px monospace`;
