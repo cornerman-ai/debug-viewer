@@ -1,27 +1,29 @@
-// Chin sources — the labelers' click vs the skeleton formula vs the face
-// pipeline, on the same frame.
+// Chin sources — the labelers' chin, the skeleton formula's chin, and the
+// face pipeline's chin, on the same frame.
 //
-// Three estimates of the same point exist, and the backend's
-// chin_height_compare.py says which is closer and by how much (face
-// pipeline ~2x, see ml/research/chin_tuck/FACE_PIPELINE.md). This lens is
-// the other half of that: it draws all three on the footage so you can see
-// WHY each one lands where it does.
+// Three estimates of one point, drawn as three marks and nothing else:
 //
-//   labelers   every click, one color per labeler, plus their median as a
-//              white ring — the ring is the ground truth the numbers use,
-//              and the spread between the crosses is the noise floor.
-//   formula    chin = nose + 2.25 * (mouth_mid - nose), drawn WITH its
-//              construction (nose -> mouth -> extrapolated chin), because
-//              its failure is directional: watch the ray swing off the jaw
-//              as the head turns.
-//   extractor  SCRFD-10G + 2d106, the lowest of the 106 landmarks. Solid
-//              when the SCRFD score clears the gate, dashed below it.
+//   ◯ white ring   the labelers' median click — ground truth
+//   ● magenta      chin = nose + 2.25 * (mouth_mid - nose), the skeleton
+//                  formula every chin_tuck sampler carries
+//   ● cyan         SCRFD-10G + 2d106, the lowest of the 106 landmarks;
+//                  dashed when the SCRFD score is below the gate, absent
+//                  when no face was found
+//
+// The backend's chin_height_compare.py says which is closer and by how much
+// (the face pipeline ~2x, see ml/research/chin_tuck/FACE_PIPELINE.md). This
+// is where that gets checked against the footage.
+//
+// A zoom inset carries the whole lens: boxers are usually far from the
+// camera, and at real scale the three marks land within a few pixels of each
+// other. It copies the video pixels around the chin BEFORE the marks go
+// down, magnifies them into the corner, and redraws the marks on top.
 //
 // Data: ./lens_data/chin_sources/<stem>.json + index.json, built by the
 // backend's chin_lens_data.py from a labels snapshot, the variant manifest
-// and the extractor sidecar. Only frames a human actually labeled have
-// data, so the lens is a frame-by-frame inspector, not a per-frame overlay:
-// the sidebar lists every labeled frame and the timeline lane marks them.
+// and the extractor sidecar. Only frames a human actually labeled have data,
+// so the lens is a frame-by-frame inspector, not a per-frame overlay: the
+// sidebar lists every labeled frame and the timeline lane marks them.
 //
 // Alignment is BY TIME, exactly as in face_mesh_chin: each entry's `t` is
 // SOURCE-VIDEO seconds off the cache _pts clock, mapped to a viewer frame
@@ -35,22 +37,13 @@ const C = {
   gt:      "#ffffff",   // the labelers' median — ground truth
   proxy:   "#ff5df1",   // magenta — the skeleton formula
   ext:     "#3ad9e0",   // cyan — the face pipeline
-  build:   "rgba(255,255,255,0.45)",
   gated:   "#ff9e64",   // extractor chin below the score gate
   mark:    "#d3b136",   // labeled-frame marks on the timeline
   playhead:"#3ad9e0",
   text:    "#aaa",
 };
-// Per-labeler click colors, assigned in index roster order.
-const LABELER_COLORS = ["#56d364", "#c792ea", "#f97583", "#79c0ff", "#ffab70"];
-
-const cfg = {
-  showClicks: true,
-  showProxy: true,
-  showExt: true,
-  showBuild: true,
-  snap: true,        // draw the nearest labeled frame within SNAP_FRAMES
-};
+// Labeled frames are sparse, so land on the nearest one rather than
+// showing nothing when the scrubber stops a frame short.
 const SNAP_FRAMES = 2;
 
 let host = null;
@@ -74,11 +67,6 @@ function secToFrame(state, tSrc) {
 }
 
 function fmt(v, d = 3) { return Number.isFinite(v) ? v.toFixed(d) : "—"; }
-
-function labelerColor(name) {
-  const i = index?.labelers ? index.labelers.indexOf(name) : -1;
-  return LABELER_COLORS[(i >= 0 ? i : 0) % LABELER_COLORS.length];
-}
 
 function seekFrame(f) {
   const slider = document.getElementById("scrubber");
@@ -211,7 +199,6 @@ function rebuildMaps(state) {
 function entryAt(f) {
   if (!byViewer) return null;
   if (byViewer.has(f)) return byViewer.get(f);
-  if (!cfg.snap) return null;
   for (let d = 1; d <= SNAP_FRAMES; d++) {
     if (byViewer.has(f - d)) return byViewer.get(f - d);
     if (byViewer.has(f + d)) return byViewer.get(f + d);
@@ -268,21 +255,14 @@ function buildSidebar() {
   host.innerHTML = `
     <h2>Chin sources</h2>
     <p class="hint">
-      <span style="color:${C.gt}">◯ labelers' median (GT)</span> ·
-      <span style="color:${C.proxy}">● formula</span> nose + ${activeData?.chin_coef ?? 2.25}·(mouth − nose) ·
-      <span style="color:${C.ext}">● extractor</span> SCRFD + 2d106.
+      Three chins on the frame:
+      <span style="color:${C.gt}">◯ the labelers' median</span>,
+      <span style="color:${C.proxy}">● the formula</span> (nose + ${activeData?.chin_coef ?? 2.25}·(mouth − nose)),
+      <span style="color:${C.ext}">● the extractor</span> (SCRFD + 2d106).
       Only labeled frames carry data — use the list below, or ◀ ▶.
     </p>
     ${indexError ? `<p class="hint" style="color:#ff5d6c">index.json failed: ${indexError}</p>` : ""}
     ${dataError[activeStem] ? `<p class="hint" style="color:#ff5d6c">no data for this video: ${dataError[activeStem]}</p>` : ""}
-
-    <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin:6px 0">
-      <label><input type="checkbox" id="cs-clicks" ${cfg.showClicks ? "checked" : ""}> clicks</label>
-      <label><input type="checkbox" id="cs-proxy" ${cfg.showProxy ? "checked" : ""}> formula</label>
-      <label><input type="checkbox" id="cs-ext" ${cfg.showExt ? "checked" : ""}> extractor</label>
-      <label><input type="checkbox" id="cs-build" ${cfg.showBuild ? "checked" : ""}> construction</label>
-      <label><input type="checkbox" id="cs-snap" ${cfg.snap ? "checked" : ""}> snap ±${SNAP_FRAMES}</label>
-    </div>
 
     <div style="display:flex;gap:6px;margin:6px 0">
       <button id="cs-prev" class="btn small">◀ prev labeled</button>
@@ -314,11 +294,6 @@ function buildSidebar() {
       labels ${activeData.labels_snapshot} · variant ${activeData.variant}</p>` : ""}
   `;
 
-  host.querySelector("#cs-clicks")?.addEventListener("change", e => { cfg.showClicks = e.target.checked; refresh(); });
-  host.querySelector("#cs-proxy")?.addEventListener("change", e => { cfg.showProxy = e.target.checked; refresh(); });
-  host.querySelector("#cs-ext")?.addEventListener("change", e => { cfg.showExt = e.target.checked; refresh(); });
-  host.querySelector("#cs-build")?.addEventListener("change", e => { cfg.showBuild = e.target.checked; refresh(); });
-  host.querySelector("#cs-snap")?.addEventListener("change", e => { cfg.snap = e.target.checked; refresh(); });
   host.querySelector("#cs-prev")?.addEventListener("click", () => step(-1));
   host.querySelector("#cs-next")?.addEventListener("click", () => step(+1));
   buildList();
@@ -428,52 +403,19 @@ function drawMarks(ctx, entry, P, s) {
       ctx.setLineDash([3 * s, 3 * s]); ctx.stroke(); ctx.setLineDash([]);
     } else {
       ctx.fillStyle = color; ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 1 * s; ctx.stroke();
     }
   };
-  const line = (a, b, color, width, dash) => {
-    ctx.strokeStyle = color; ctx.lineWidth = width * s;
-    ctx.setLineDash(dash || []);
-    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
-    ctx.setLineDash([]);
-  };
+
+  // Three chins, nothing else. The labelers' median is a ring rather than a
+  // dot so the two estimates stay readable when they land inside it — which
+  // on a good frame they do.
   const gt = P(entry.gt);
-
-  // The formula's construction: nose -> mouth -> extrapolated chin. Drawn
-  // first so the estimates sit on top of it.
-  if (cfg.showBuild && cfg.showProxy) {
-    const nose = P(entry.nose), mouth = P(entry.mouth), chin = P(entry.proxy);
-    line(nose, chin, C.build, 1.5, [5 * s, 4 * s]);
-    dot(nose[0], nose[1], 3, "#ffffff");
-    dot(mouth[0], mouth[1], 2.5, "#ffd95c");
-  }
-
-  // Error lines to ground truth — the thing being measured.
-  if (cfg.showProxy && entry.proxy) line(P(entry.proxy), gt, C.proxy, 1.5);
-  if (cfg.showExt && entry.ext) line(P(entry.ext), gt, C.ext, 1.5);
-
-  // Individual clicks, then their median: the spread between the crosses is
-  // the noise floor no estimator can beat.
-  if (cfg.showClicks) {
-    for (const [who, x, y, vis] of entry.clicks) {
-      const [cx, cy] = P([x, y]);
-      const r = 5 * s;
-      ctx.strokeStyle = labelerColor(who);
-      ctx.lineWidth = (vis === "visible" ? 2 : 1.2) * s;
-      ctx.setLineDash(vis === "visible" ? [] : [2 * s, 2 * s]);
-      ctx.beginPath();
-      ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
-      ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-  }
   ctx.strokeStyle = C.gt; ctx.lineWidth = 2.5 * s;
   ctx.beginPath(); ctx.arc(gt[0], gt[1], 7 * s, 0, Math.PI * 2); ctx.stroke();
 
-  if (cfg.showProxy && entry.proxy) {
-    const p = P(entry.proxy); dot(p[0], p[1], 5, C.proxy);
-  }
-  if (cfg.showExt && entry.ext) {
+  if (entry.proxy) { const p = P(entry.proxy); dot(p[0], p[1], 5, C.proxy); }
+  if (entry.ext) {
     const p = P(entry.ext);
     dot(p[0], p[1], 5, gatedOut(entry) ? C.gated : C.ext, gatedOut(entry));
   }
@@ -525,27 +467,33 @@ function draw(ctx, state) {
 
   drawMarks(ctx, entry, P, s);
 
-  // HUD
+  // A three-line key: which colour is which chin, and how far each estimate
+  // is from the ring. Everything else moved to the sidebar.
   const fsz = Math.round(13 * s), lineH = fsz + 4 * s;
   const lines = [
-    [`GT      ${entry.clicks.length} click(s), floor ${fmt(e.floor / e.ruler, 3)} sh`, C.gt],
-    [`formula ${fmt(e.proxy?.sh, 3)} sh  (dy ${fmt(e.proxy?.shy, 3)}  dx ${fmt(e.proxy?.shx, 3)})`, C.proxy],
-    [entry.ext
-      ? `extract ${fmt(e.ext?.sh, 3)} sh  (dy ${fmt(e.ext?.shy, 3)}  dx ${fmt(e.ext?.shx, 3)})`
-      : "extract no face", entry.ext ? (gatedOut(entry) ? C.gated : C.ext) : C.gated],
-    [`score   ${entry.score == null ? "—" : entry.score.toFixed(2)}${gatedOut(entry) ? "  BELOW GATE" : ""}`, C.text],
-    [`+dy = below the clicked chin`, C.text],
+    ["\u25cb labelers", C.gt, ""],
+    ["\u25cf formula", C.proxy, fmt(e.proxy?.sh, 3) + " sh"],
+    [entry.ext ? "\u25cf extractor" : "\u25cb extractor", entry.ext
+      ? (gatedOut(entry) ? C.gated : C.ext) : C.gated,
+      entry.ext ? fmt(e.ext?.sh, 3) + " sh" + (gatedOut(entry) ? " (gated)" : "")
+                : "no face"],
   ];
-  const padX = 10 * s, padY = 8 * s, boxW = 340 * s;
+  const padX = 10 * s, padY = 8 * s, boxW = 205 * s;
   const boxH = lines.length * lineH + padY * 2 - 4 * s;
   const bx = 10 * s, by = 10 * s;
   ctx.fillStyle = "rgba(0,0,0,0.62)";
   ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 6 * s); ctx.fill();
   ctx.font = `${fsz}px ui-monospace, monospace`;
   ctx.textBaseline = "top";
-  lines.forEach(([t, cc], i) => {
+  lines.forEach(([label, cc, value], i) => {
+    const y = by + padY + i * lineH;
     ctx.fillStyle = cc;
-    ctx.fillText(t, bx + padX, by + padY + i * lineH);
+    ctx.fillText(label, bx + padX, y);
+    if (value) {
+      ctx.textAlign = "right";
+      ctx.fillText(value, bx + boxW - padX, y);
+      ctx.textAlign = "left";
+    }
   });
   ctx.restore();
 }
