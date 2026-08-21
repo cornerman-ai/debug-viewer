@@ -395,15 +395,24 @@ function update(state) {
 // camera and the three estimates then land within a few pixels of each
 // other, which is exactly when you most need to see which is which.
 function drawMarks(ctx, entry, P, s) {
-  const dot = (x, y, r, color, dashed) => {
+  // Mark sizes are deliberately small. On a frame where both estimates are
+  // good they sit a couple of pixels apart, and a mark wide enough to be
+  // comfortable on its own swallows exactly the difference the lens exists
+  // to show. The zoom inset is what makes small marks readable.
+  const R = 2.6;                 // estimate dot radius
+  const RING = 4.6;              // the labelers' ring, big enough to contain
+                                 // both dots without touching them
+
+  const dot = (x, y, color, dashed) => {
     ctx.beginPath();
-    ctx.arc(x, y, r * s, 0, Math.PI * 2);
+    ctx.arc(x, y, R * s, 0, Math.PI * 2);
     if (dashed) {
-      ctx.strokeStyle = color; ctx.lineWidth = 2 * s;
-      ctx.setLineDash([3 * s, 3 * s]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = color; ctx.lineWidth = 1.3 * s;
+      ctx.setLineDash([2 * s, 2 * s]); ctx.stroke(); ctx.setLineDash([]);
     } else {
       ctx.fillStyle = color; ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 1 * s; ctx.stroke();
+      // a hairline of dark keeps the dot readable over pale skin or a glove
+      ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 0.7 * s; ctx.stroke();
     }
   };
 
@@ -411,13 +420,13 @@ function drawMarks(ctx, entry, P, s) {
   // dot so the two estimates stay readable when they land inside it — which
   // on a good frame they do.
   const gt = P(entry.gt);
-  ctx.strokeStyle = C.gt; ctx.lineWidth = 2.5 * s;
-  ctx.beginPath(); ctx.arc(gt[0], gt[1], 7 * s, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = C.gt; ctx.lineWidth = 1.4 * s;
+  ctx.beginPath(); ctx.arc(gt[0], gt[1], RING * s, 0, Math.PI * 2); ctx.stroke();
 
-  if (entry.proxy) { const p = P(entry.proxy); dot(p[0], p[1], 5, C.proxy); }
+  if (entry.proxy) { const p = P(entry.proxy); dot(p[0], p[1], C.proxy); }
   if (entry.ext) {
     const p = P(entry.ext);
-    dot(p[0], p[1], 5, gatedOut(entry) ? C.gated : C.ext, gatedOut(entry));
+    dot(p[0], p[1], gatedOut(entry) ? C.gated : C.ext, gatedOut(entry));
   }
 }
 
@@ -437,8 +446,20 @@ function draw(ctx, state) {
   const gtPx = P(entry.gt);
   const rulerPx = Math.hypot((entry.lsh[0] - entry.rsh[0]) * W,
                              (entry.lsh[1] - entry.rsh[1]) * H);
-  const src = Math.max(40, Math.min(W, H, rulerPx * 1.6));   // region to magnify
-  const box = Math.min(W, H) * 0.28;                          // inset size
+  // Region to magnify: about one shoulder-width around the chin — tight,
+  // because with marks this small the inset is where the difference is
+  // actually read, and a wider crop shows more boxer and less of the thing
+  // being judged. It widens when it has to: on a frame where an estimate
+  // flies off the jaw, a fixed crop would simply not contain that mark and
+  // the inset would imply the estimate was missing rather than wrong.
+  const reach = [entry.proxy, entry.ext].reduce((m, pt) => {
+    if (!pt) return m;
+    const q = P(pt);
+    return Math.max(m, Math.hypot(q[0] - gtPx[0], q[1] - gtPx[1]));
+  }, 0);
+  const want = Math.max(rulerPx * 1.1, reach * 2.6);
+  const src = Math.max(36, Math.min(W, H, want));
+  const box = Math.min(W, H) * 0.32;                          // inset size
   const zoom = box / src;
   const sx = Math.max(0, Math.min(W - src, gtPx[0] - src / 2));
   const sy = Math.max(0, Math.min(H - src, gtPx[1] - src / 2));
