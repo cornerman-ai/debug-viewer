@@ -167,9 +167,27 @@ function errorsOf(entry, W, H) {
   };
 }
 
+function scoreGate() { return activeData?.score_gate ?? 0.6; }
+
+// Which of the three chins to draw. Isolating one is how you answer "is the
+// extractor tracking the jaw, or is it just close to the formula?" — with
+// all three down you are reading a cluster, not a source. Persisted, because
+// the viewer re-mounts the lens on every video change and a comparison you
+// set up should survive moving to the next clip.
+const SHOW_KEY = "cornerman.chin_sources.show.v1";
+const show = { gt: true, proxy: true, ext: true };
+try {
+  Object.assign(show, JSON.parse(localStorage.getItem(SHOW_KEY) || "null") || {});
+} catch { /* private mode, or a value another build wrote */ }
+
+function setShow(k, v) {
+  show[k] = v;
+  try { localStorage.setItem(SHOW_KEY, JSON.stringify(show)); } catch { /* ditto */ }
+  refresh();
+}
+
 function gatedOut(entry) {
-  const gate = activeData?.score_gate ?? 0.6;
-  return entry?.ext != null && entry.score != null && entry.score < gate;
+  return entry?.ext != null && entry.score != null && entry.score < scoreGate();
 }
 
 // Which source is closer on this frame — the per-frame verdict the timeline
@@ -255,7 +273,7 @@ function buildSidebar() {
   const st = latestState;
   const has = !!activeData;
   const sum = has && byViewer ? summary(st) : null;
-  const gate = activeData?.score_gate ?? 0.6;
+  const gate = scoreGate();
 
   host.innerHTML = `
     <h2>Chin sources</h2>
@@ -263,9 +281,21 @@ function buildSidebar() {
       Three chins on the frame:
       <span style="color:${C.gt}">◯ the labelers' median</span>,
       <span style="color:${C.proxy}">● the formula</span> (nose + ${activeData?.chin_coef ?? 2.25}·(mouth − nose)),
-      <span style="color:${C.ext}">● the extractor</span> (SCRFD + 2d106).
+      <span style="color:${C.ext}">● the extractor</span> (SCRFD + 2d106),
+      <span style="color:${C.gated}">● orange</span> when its score is below
+      the ${gate} gate — drawn anyway, so you can see what is being excluded,
+      and counted nowhere.
       Only labeled frames carry data — use the list below, or ◀ ▶.
     </p>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin:6px 0" id="cs-show">
+      ${[["gt", "labelers", C.gt], ["proxy", "formula", C.proxy],
+         ["ext", "extractor", C.ext]].map(([k, label, col]) => `
+        <label class="small" style="display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" data-show="${k}" ${show[k] ? "checked" : ""}>
+          <span style="color:${col}">${label}</span>
+        </label>`).join("")}
+    </div>
     ${indexError ? `<p class="hint" style="color:#ff5d6c">index.json failed: ${indexError}</p>` : ""}
     ${dataError[activeStem] ? `<p class="hint" style="color:#ff5d6c">no data for this video: ${dataError[activeStem]}</p>` : ""}
 
@@ -301,6 +331,9 @@ function buildSidebar() {
 
   host.querySelector("#cs-prev")?.addEventListener("click", () => step(-1));
   host.querySelector("#cs-next")?.addEventListener("click", () => step(+1));
+  host.querySelectorAll("#cs-show input[data-show]").forEach(cb => {
+    cb.addEventListener("change", () => setShow(cb.dataset.show, cb.checked));
+  });
   buildList();
 }
 
@@ -360,6 +393,19 @@ function updateFrameBox(state) {
         <td style="text-align:right">${fmt(v.shx, 3)}</td>
         <td style="text-align:right" class="muted">${fmt(v.d, 1)}px</td></tr>` : `
     <tr><td style="color:${color}">${name}</td><td colspan="4" class="muted">—</td></tr>`;
+  // The SCRFD detection score, and what the gate does with it. This is the
+  // one number that decides whether the cyan chin counts at all, so it gets
+  // its own row saying the consequence — it used to sit mid-sentence in the
+  // grey meta line below, where it read as trivia.
+  const gate = scoreGate();
+  const gated = gatedOut(entry);
+  const [scoreText, verdict, scoreColor] =
+    entry.score == null
+      ? ["no face", `nothing detected — formula only`, C.gated]
+      : gated
+        ? [entry.score.toFixed(2), `below gate ${gate.toFixed(2)} — dropped, formula used`, C.gated]
+        : [entry.score.toFixed(2), `at or above gate ${gate.toFixed(2)} — chin used`, C.ext];
+
   box.innerHTML = `
     <table class="small" style="width:100%;border-collapse:collapse">
       <tr><th style="text-align:left">vs GT</th><th style="text-align:right">euclid</th>
@@ -368,11 +414,13 @@ function updateFrameBox(state) {
       ${row("formula", C.proxy, e.proxy)}
       ${row("extractor", C.ext, e.ext)}
     </table>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px">
+      <span class="small">face score</span>
+      <strong style="color:${scoreColor};font-size:1.15em">${scoreText}</strong>
+      <span class="muted small">${verdict}</span>
+    </div>
     <span class="muted">t ${entry.t}s · r${entry.round} f${entry.frame} ·
-      ${entry.clicks.length} click(s) · score
-      ${entry.score == null ? "no face" : entry.score.toFixed(2)}
-      ${gatedOut(entry) ? "(below gate)" : ""} ·
-      lead ${entry.lead || "?"}</span>`;
+      ${entry.clicks.length} click(s) · lead ${entry.lead || "?"}</span>`;
 }
 
 // ---------------------------------------------------------------- lifecycle
@@ -429,17 +477,17 @@ function drawMarks(ctx, entry, P, s, zoomed) {
     ctx.strokeStyle = color; ctx.lineWidth = w * s; ctx.stroke();
   };
 
-  const dot = (x, y, color, dashed) => {
+  // Below-gate chins used to be drawn as a dashed ring. At r=1.5 a dash
+  // pattern has nowhere to land — it rendered as a couple of stray pixels,
+  // so a chin the gate excluded looked like a chin that was never found.
+  // Colour survives at this size where dashing does not, so gated marks are
+  // solid in the gate colour: still plainly there, plainly not counted.
+  const dot = (x, y, color) => {
     ctx.beginPath();
     ctx.arc(x, y, R * s, 0, Math.PI * 2);
-    if (dashed) {
-      ctx.strokeStyle = color; ctx.lineWidth = 1.3 * s;
-      ctx.setLineDash([2 * s, 2 * s]); ctx.stroke(); ctx.setLineDash([]);
-    } else {
-      ctx.fillStyle = color; ctx.fill();
-      // a hairline of dark keeps the dot readable over pale skin or a glove
-      ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 0.5 * s; ctx.stroke();
-    }
+    ctx.fillStyle = color; ctx.fill();
+    // a hairline of dark keeps the dot readable over pale skin or a glove
+    ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 0.5 * s; ctx.stroke();
     tick(x, y, color, 1.1);
   };
 
@@ -447,6 +495,12 @@ function drawMarks(ctx, entry, P, s, zoomed) {
   // dot so the two estimates stay readable when they land inside it — which
   // on a good frame they do.
   const gt = P(entry.gt);
+  if (show.proxy && entry.proxy) { const p = P(entry.proxy); dot(p[0], p[1], C.proxy); }
+  if (show.ext && entry.ext) {
+    const p = P(entry.ext);
+    dot(p[0], p[1], gatedOut(entry) ? C.gated : C.ext);
+  }
+  if (!show.gt) return;
   ctx.beginPath(); ctx.arc(gt[0], gt[1], RING * s, 0, Math.PI * 2);
   // A white ring over a white shirt or a glove is invisible, which is where
   // chins tend to sit. The estimates carry a dark hairline for this; the
@@ -460,11 +514,6 @@ function drawMarks(ctx, entry, P, s, zoomed) {
   ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 0.8 * s; ctx.stroke();
   ctx.fillStyle = C.gt; ctx.fill();
 
-  if (entry.proxy) { const p = P(entry.proxy); dot(p[0], p[1], C.proxy); }
-  if (entry.ext) {
-    const p = P(entry.ext);
-    dot(p[0], p[1], gatedOut(entry) ? C.gated : C.ext, gatedOut(entry));
-  }
   // GT's ticks go on last so they cross whatever landed inside the ring.
   tick(gt[0], gt[1], C.gt, 1.4);
 }
@@ -513,7 +562,8 @@ function draw(ctx, state) {
   // being judged. It widens when it has to: on a frame where an estimate
   // flies off the jaw, a fixed crop would simply not contain that mark and
   // the inset would imply the estimate was missing rather than wrong.
-  const reach = [entry.proxy, entry.ext].reduce((m, pt) => {
+  const reach = [show.proxy ? entry.proxy : null,
+                 show.ext ? entry.ext : null].reduce((m, pt) => {
     if (!pt) return m;
     const q = P(pt);
     return Math.max(m, Math.hypot(q[0] - gtPx[0], q[1] - gtPx[1]));
@@ -563,13 +613,16 @@ function draw(ctx, state) {
   if (!chrome) { ctx.restore(); return; }
   const fsz = Math.round(13 * s), lineH = fsz + 4 * s;
   const lines = [
-    ["\u25cb labelers", C.gt, ""],
-    ["\u25cf formula", C.proxy, fmt(e.proxy?.sh, 3) + " sh"],
-    [entry.ext ? "\u25cf extractor" : "\u25cb extractor", entry.ext
+    show.gt ? ["\u25cb labelers", C.gt, ""] : null,
+    show.proxy ? ["\u25cf formula", C.proxy, fmt(e.proxy?.sh, 3) + " sh"] : null,
+    !show.ext ? null
+    : [entry.ext ? "\u25cf extractor" : "\u25cb extractor", entry.ext
       ? (gatedOut(entry) ? C.gated : C.ext) : C.gated,
-      entry.ext ? fmt(e.ext?.sh, 3) + " sh" + (gatedOut(entry) ? " (gated)" : "")
-                : "no face"],
-  ];
+      // No "(gated)" suffix: the row is already drawn in the gate colour, and
+      // the extra words ran into the right-aligned value column.
+      entry.ext ? fmt(e.ext?.sh, 3) + " sh" : "no face"],
+  ].filter(Boolean);
+  if (!lines.length) { ctx.restore(); return; }
   const padX = 10 * s, padY = 8 * s, boxW = 205 * s;
   const boxH = lines.length * lineH + padY * 2 - 4 * s;
   // Top-left of what is on screen, not of the frame — see the inset above.
