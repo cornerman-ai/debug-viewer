@@ -400,13 +400,16 @@ function update(state) {
 // camera and the three estimates then land within a few pixels of each
 // other, which is exactly when you most need to see which is which.
 function drawMarks(ctx, entry, P, s, zoomed) {
-  // Mark sizes are deliberately small. On a frame where both estimates are
-  // good they sit a couple of pixels apart, and a mark wide enough to be
-  // comfortable on its own swallows exactly the difference the lens exists
-  // to show. The zoom inset is what makes small marks readable.
-  const R = 2.6;                 // estimate dot radius
-  const RING = 4.6;              // the labelers' ring, big enough to contain
+  // Mark sizes are deliberately small, and were cut again after a read on
+  // real footage: on a frame where both estimates are good they sit a couple
+  // of pixels apart, and a mark wide enough to be comfortable on its own
+  // swallows exactly the difference the lens exists to show. Small enough to
+  // point at a pixel beats large enough to spot from across the room — the
+  // zoom inset and ctrl+scroll are what make them readable.
+  const R = 1.5;                 // estimate dot radius
+  const RING = 3.0;              // the labelers' ring, big enough to contain
                                  // both dots without touching them
+  const GTDOT = 0.7;             // the click itself, at the ring's centre
 
   // Zoomed in, a filled dot stops being enough: it holds its size on screen
   // while the footage under it grows, so it covers the very pixels you
@@ -416,13 +419,14 @@ function drawMarks(ctx, entry, P, s, zoomed) {
   // positions; two dots read as one blob.
   const tick = (x, y, color, w) => {
     if (!zoomed) return;
-    ctx.strokeStyle = color; ctx.lineWidth = w * s;
     ctx.beginPath();
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      ctx.moveTo(x + dx * 5.5 * s, y + dy * 5.5 * s);
-      ctx.lineTo(x + dx * 10.5 * s, y + dy * 10.5 * s);
+      ctx.moveTo(x + dx * 3.6 * s, y + dy * 3.6 * s);
+      ctx.lineTo(x + dx * 8.0 * s, y + dy * 8.0 * s);
     }
+    ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = (w + 1.0) * s;
     ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = w * s; ctx.stroke();
   };
 
   const dot = (x, y, color, dashed) => {
@@ -434,7 +438,7 @@ function drawMarks(ctx, entry, P, s, zoomed) {
     } else {
       ctx.fillStyle = color; ctx.fill();
       // a hairline of dark keeps the dot readable over pale skin or a glove
-      ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 0.7 * s; ctx.stroke();
+      ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 0.5 * s; ctx.stroke();
     }
     tick(x, y, color, 1.1);
   };
@@ -443,8 +447,18 @@ function drawMarks(ctx, entry, P, s, zoomed) {
   // dot so the two estimates stay readable when they land inside it — which
   // on a good frame they do.
   const gt = P(entry.gt);
-  ctx.strokeStyle = C.gt; ctx.lineWidth = 1.4 * s;
-  ctx.beginPath(); ctx.arc(gt[0], gt[1], RING * s, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(gt[0], gt[1], RING * s, 0, Math.PI * 2);
+  // A white ring over a white shirt or a glove is invisible, which is where
+  // chins tend to sit. The estimates carry a dark hairline for this; the
+  // ground truth needs one too, under the stroke rather than around it.
+  ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 2.0 * s; ctx.stroke();
+  ctx.strokeStyle = C.gt; ctx.lineWidth = 1.0 * s; ctx.stroke();
+  // The ring shows a neighbourhood; the click is its centre, which was empty
+  // — so "where exactly did the labelers click" was the one thing the lens
+  // did not draw. This dot is that point.
+  ctx.beginPath(); ctx.arc(gt[0], gt[1], GTDOT * s, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 0.8 * s; ctx.stroke();
+  ctx.fillStyle = C.gt; ctx.fill();
 
   if (entry.proxy) { const p = P(entry.proxy); dot(p[0], p[1], C.proxy); }
   if (entry.ext) {
