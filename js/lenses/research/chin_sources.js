@@ -14,10 +14,15 @@
 // (the face pipeline ~2x, see ml/research/chin_tuck/FACE_PIPELINE.md). This
 // is where that gets checked against the footage.
 //
-// A zoom inset carries the whole lens: boxers are usually far from the
-// camera, and at real scale the three marks land within a few pixels of each
-// other. It copies the video pixels around the chin BEFORE the marks go
-// down, magnifies them into the corner, and redraws the marks on top.
+// Two things make it readable when the boxer is far from the camera and the
+// three marks land within a few pixels of each other:
+//   - a zoom inset, which copies the video pixels around the chin BEFORE the
+//     marks go down, magnifies them into the corner, and redraws the marks
+//     on top;
+//   - ctrl+scroll zoom, which every mark here divides out (state.view.zoom),
+//     so marks stay a fixed size on screen and magnifying genuinely pulls
+//     them apart instead of inflating them together. HUD and inset ride the
+//     visible region so they stay on screen as you zoom and pan.
 //
 // Data: ./lens_data/chin_sources/<stem>.json + index.json, built by the
 // backend's chin_lens_data.py from a labels snapshot, the variant manifest
@@ -394,7 +399,7 @@ function update(state) {
 // the frame, once more inside the zoom inset. Boxers are often far from the
 // camera and the three estimates then land within a few pixels of each
 // other, which is exactly when you most need to see which is which.
-function drawMarks(ctx, entry, P, s) {
+function drawMarks(ctx, entry, P, s, zoomed) {
   // Mark sizes are deliberately small. On a frame where both estimates are
   // good they sit a couple of pixels apart, and a mark wide enough to be
   // comfortable on its own swallows exactly the difference the lens exists
@@ -402,6 +407,23 @@ function drawMarks(ctx, entry, P, s) {
   const R = 2.6;                 // estimate dot radius
   const RING = 4.6;              // the labelers' ring, big enough to contain
                                  // both dots without touching them
+
+  // Zoomed in, a filled dot stops being enough: it holds its size on screen
+  // while the footage under it grows, so it covers the very pixels you
+  // zoomed in to see, and its centre — the actual estimate — is a guess.
+  // Past ~1.5x each mark grows four ticks pointing at its own centre, clear
+  // of the mark itself. Two crosshairs a few pixels apart read as two
+  // positions; two dots read as one blob.
+  const tick = (x, y, color, w) => {
+    if (!zoomed) return;
+    ctx.strokeStyle = color; ctx.lineWidth = w * s;
+    ctx.beginPath();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      ctx.moveTo(x + dx * 5.5 * s, y + dy * 5.5 * s);
+      ctx.lineTo(x + dx * 10.5 * s, y + dy * 10.5 * s);
+    }
+    ctx.stroke();
+  };
 
   const dot = (x, y, color, dashed) => {
     ctx.beginPath();
@@ -414,6 +436,7 @@ function drawMarks(ctx, entry, P, s) {
       // a hairline of dark keeps the dot readable over pale skin or a glove
       ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 0.7 * s; ctx.stroke();
     }
+    tick(x, y, color, 1.1);
   };
 
   // Three chins, nothing else. The labelers' median is a ring rather than a
@@ -428,15 +451,39 @@ function drawMarks(ctx, entry, P, s) {
     const p = P(entry.ext);
     dot(p[0], p[1], gatedOut(entry) ? C.gated : C.ext, gatedOut(entry));
   }
+  // GT's ticks go on last so they cross whatever landed inside the ring.
+  tick(gt[0], gt[1], C.gt, 1.4);
 }
 
 function draw(ctx, state) {
   const entry = entryAt(state.frame);
   if (!entry) return;
-  const s = state.renderScale || 1;
   const W = ctx.canvas.width, H = ctx.canvas.height;
+  const view = state.view || { zoom: 1, x0: 0, y0: 0, x1: W, y1: H };
+  // Everything this lens draws is sized in `s`, which now DIVIDES OUT the
+  // ctrl+scroll zoom. The zoom is a CSS transform over the finished bitmap,
+  // so without this a mark grows with the magnification and two marks that
+  // overlap at 1x still overlap at 24x — the frames worth zooming into are
+  // exactly the ones zoom could not help with. Held constant on screen, the
+  // only thing zoom changes is the gap between the marks, which is the
+  // measurement.
+  //
+  // The 0.4 floor is on the SCALE, not a pixel size: below it a mark is a
+  // sub-pixel arc on the canvas and antialiasing thins it to a smudge. It
+  // starts binding around 6x on a typical 1080-in-410 stage, so past that
+  // marks do creep up on screen — but ~3x by full zoom against 24x more
+  // separation, which is the trade worth making. Past 2.5x the marks are the
+  // only thing `s` sizes, so nothing else inherits that creep.
+  const s = Math.max((state.renderScale || 1) / (view.zoom || 1), 0.4);
   const P = p => [p[0] * W, p[1] * H];
   const e = errorsOf(entry, ctxW(state), ctxH(state));
+  // Both overlays are canvas-drawn, so the zoom transform magnifies their
+  // rasterized pixels: past ~2.5x the key's text is a blur and the inset is
+  // a magnifier inside a magnifier, and between them they cover most of what
+  // you zoomed in to look at. The sidebar carries the same numbers as live
+  // DOM text, sharper than the key ever was. So once you are inspecting
+  // pixels, the marks get the frame to themselves.
+  const chrome = (view.zoom || 1) <= 2.5;
 
   ctx.save();
 
@@ -459,12 +506,19 @@ function draw(ctx, state) {
   }, 0);
   const want = Math.max(rulerPx * 1.1, reach * 2.6);
   const src = Math.max(36, Math.min(W, H, want));
-  const box = Math.min(W, H) * 0.32;                          // inset size
+  // Inset size follows the VISIBLE box, not the frame: zoomed in, most of
+  // the canvas is off screen, and a corner measured against the whole frame
+  // is a corner you cannot see.
+  const visW = Math.max(1, view.x1 - view.x0), visH = Math.max(1, view.y1 - view.y0);
+  const box = Math.min(visW, visH) * 0.32;                    // inset size
   const zoom = box / src;
   const sx = Math.max(0, Math.min(W - src, gtPx[0] - src / 2));
   const sy = Math.max(0, Math.min(H - src, gtPx[1] - src / 2));
-  const ix = W - box - 10 * s, iy = 10 * s;
-  if (Number.isFinite(sx) && Number.isFinite(sy) && box > 20) {
+  const ix = view.x1 - box - 10 * s, iy = view.y0 + 10 * s;
+  // `box` is canvas pixels, and at high zoom the visible slice is small, so a
+  // flat "box > 20" retired the inset exactly when it was still a comfortable
+  // 130 CSS px on screen. Compare in screen terms instead.
+  if (chrome && Number.isFinite(sx) && Number.isFinite(sy) && box > 24 * s) {
     ctx.drawImage(ctx.canvas, sx, sy, src, src, ix, iy, box, box);
     ctx.strokeStyle = "rgba(255,255,255,0.6)";
     ctx.lineWidth = 1.5 * s;
@@ -481,15 +535,18 @@ function draw(ctx, state) {
 
     ctx.save();
     ctx.beginPath(); ctx.rect(ix, iy, box, box); ctx.clip();
+    // The inset is its own magnifier, so it never gets the crosshairs — it
+    // would be showing them at two magnifications at once.
     drawMarks(ctx, entry, p => [ix + (p[0] * W - sx) * zoom,
-                                iy + (p[1] * H - sy) * zoom], s);
+                                iy + (p[1] * H - sy) * zoom], s, false);
     ctx.restore();
   }
 
-  drawMarks(ctx, entry, P, s);
+  drawMarks(ctx, entry, P, s, (view.zoom || 1) > 1.5);
 
   // A three-line key: which colour is which chin, and how far each estimate
   // is from the ring. Everything else moved to the sidebar.
+  if (!chrome) { ctx.restore(); return; }
   const fsz = Math.round(13 * s), lineH = fsz + 4 * s;
   const lines = [
     ["\u25cb labelers", C.gt, ""],
@@ -501,7 +558,8 @@ function draw(ctx, state) {
   ];
   const padX = 10 * s, padY = 8 * s, boxW = 205 * s;
   const boxH = lines.length * lineH + padY * 2 - 4 * s;
-  const bx = 10 * s, by = 10 * s;
+  // Top-left of what is on screen, not of the frame — see the inset above.
+  const bx = view.x0 + 10 * s, by = view.y0 + 10 * s;
   ctx.fillStyle = "rgba(0,0,0,0.62)";
   ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 6 * s); ctx.fill();
   ctx.font = `${fsz}px ui-monospace, monospace`;
