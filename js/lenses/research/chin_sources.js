@@ -3,8 +3,8 @@
 //
 // Three estimates of one point, drawn as three marks and nothing else:
 //
-//   ◯ white ring   the labelers' median click — ground truth
-//   ● magenta      chin = nose + 2.25 * (mouth_mid - nose), the skeleton
+//   ◯ red ring     the labelers' median click — ground truth
+//   ● purple       chin = nose + 2.25 * (mouth_mid - nose), the skeleton
 //                  formula every chin_tuck sampler carries
 //   ● cyan         SCRFD-10G + 2d106, the lowest of the 106 landmarks;
 //                  dashed when the SCRFD score is below the gate, absent
@@ -39,8 +39,14 @@
 const DATA_DIR = "./lens_data/chin_sources/";
 
 const C = {
-  gt:      "#ffffff",   // the labelers' median — ground truth
-  proxy:   "#ff5df1",   // magenta — the skeleton formula
+  // Red for ground truth: white lost itself against shirts and gloves, which
+  // is exactly where chins sit, and the dark halo that fixed that made it
+  // read grey at the current mark sizes. Red carries at r=1.5 on any
+  // background. That pushes the formula off magenta — red and magenta are
+  // two warm pinks once a mark is 3px across — so it moves to a clearly
+  // separate purple. Four hues, none adjacent: red / purple / cyan / orange.
+  gt:      "#ff2f45",   // red — the labelers' median, ground truth
+  proxy:   "#b45cff",   // purple — the skeleton formula
   ext:     "#3ad9e0",   // cyan — the face pipeline
   gated:   "#ff9e64",   // extractor chin below the score gate
   mark:    "#d3b136",   // labeled-frame marks on the timeline
@@ -502,11 +508,10 @@ function drawMarks(ctx, entry, P, s, zoomed) {
   }
   if (!show.gt) return;
   ctx.beginPath(); ctx.arc(gt[0], gt[1], RING * s, 0, Math.PI * 2);
-  // A white ring over a white shirt or a glove is invisible, which is where
-  // chins tend to sit. The estimates carry a dark hairline for this; the
-  // ground truth needs one too, under the stroke rather than around it.
-  ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 2.0 * s; ctx.stroke();
-  ctx.strokeStyle = C.gt; ctx.lineWidth = 1.0 * s; ctx.stroke();
+  // Still haloed, for dark footage — but thinner than it was. At 2.0 under a
+  // 1.0 stroke the dark outweighed the colour and the mark read grey.
+  ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 2.0 * s; ctx.stroke();
+  ctx.strokeStyle = C.gt; ctx.lineWidth = 1.3 * s; ctx.stroke();
   // The ring shows a neighbourhood; the click is its centre, which was empty
   // — so "where exactly did the labelers click" was the one thing the lens
   // did not draw. This dot is that point.
