@@ -1373,14 +1373,47 @@ window.addEventListener("resize", () => {
 // cursor; scrolling back out clamps to 1× and recentres. Double-click resets.
 const videoWrap = document.querySelector(".video-wrap");
 const zoom = { scale: 1, tx: 0, ty: 0 };
-const ZOOM_MAX = 8;
+// 8x sounds like a lot and isn't: the canvas carries the source video's own
+// resolution (often 1080 wide) inside a CSS box a quarter that size, so 8x
+// was only ~3x past native. Chin work compares marks a few source pixels
+// apart, which needs to go further.
+const ZOOM_MAX = 24;
 
+// The zoom, plus the part of the canvas still visible through the wrap, in
+// CANVAS pixels. A lens divides its drawing dimensions by `zoom` to hold a
+// constant size on screen, and anchors HUD or insets to [x0,y0]-[x1,y1] so
+// they don't drift off the edge when you zoom or pan. Lenses that ignore it
+// behave exactly as before.
+function viewTransform() {
+  const z = zoom.scale || 1;
+  const s = state.renderScale || 1;
+  const full = { zoom: z, x0: 0, y0: 0,
+                 x1: els.canvas.width, y1: els.canvas.height };
+  const rect = videoWrap?.getBoundingClientRect();
+  if (!rect || !rect.width || !rect.height) return full;
+  // transform-origin is 0 0, so a canvas CSS point c maps to wrap point
+  // t + c*z. Invert that over the wrap's own box, then CSS -> canvas px.
+  return {
+    zoom: z,
+    x0: Math.max(0, (-zoom.tx / z) * s),
+    y0: Math.max(0, (-zoom.ty / z) * s),
+    x1: Math.min(els.canvas.width, ((rect.width - zoom.tx) / z) * s),
+    y1: Math.min(els.canvas.height, ((rect.height - zoom.ty) / z) * s),
+  };
+}
+
+// Wheel events fire far faster than we need to repaint, so coalesce.
+let zoomRedraw = 0;
 function applyZoom() {
   const t = `translate(${zoom.tx}px, ${zoom.ty}px) scale(${zoom.scale})`;
   els.video.style.transform = t;
   els.canvas.style.transform = t;
   // Hint that the frame is draggable once it's zoomed in.
   if (videoWrap) videoWrap.style.cursor = zoom.scale > 1 ? "grab" : "";
+  // Zoom-aware lenses have to re-render to pick up the new scale.
+  if (!zoomRedraw) {
+    zoomRedraw = requestAnimationFrame(() => { zoomRedraw = 0; redraw(); });
+  }
 }
 
 // Keep the frame covering the wrap (no black gaps) after any tx/ty change.
@@ -2076,8 +2109,23 @@ function redraw() {
   // 2px-wide bones at 1080 internal → 0.3px on screen, i.e. invisible. Push
   // a render-scale into state so the active rule can multiply its drawing
   // dimensions accordingly. Default skeleton dims also get scaled below.
-  const cssW = els.canvas.getBoundingClientRect().width || els.canvas.width;
+  // offsetWidth, NOT getBoundingClientRect(): the latter reports the box
+  // AFTER the ctrl+scroll zoom transform, so renderScale silently shrank by
+  // the zoom factor on any redraw that happened while zoomed in — and stayed
+  // stale on the redraws that didn't. Marks then changed size depending on
+  // whether a frame had been repainted since you last scrolled. Layout width
+  // ignores transforms, so renderScale now means one thing at every zoom.
+  const cssW = els.canvas.offsetWidth
+    || els.canvas.getBoundingClientRect().width || els.canvas.width;
   state.renderScale = els.canvas.width / Math.max(1, cssW);
+
+  // The zoom is a CSS transform over the finished bitmap, so it magnifies
+  // whatever a lens drew: a 3px mark becomes a 24px blob at 8x, and zooming
+  // in on two marks that overlap never separates them. Publish the transform
+  // so a lens can divide its mark sizes by it — constant on screen, so the
+  // growing gap between marks is the only thing zoom changes — and keep its
+  // HUD inside the region still on screen.
+  state.view = viewTransform();
 
   // Let the active rule influence the base skeleton style, then draw it.
   // Apply renderScale to width-style fields so lines/dots stay legible at
