@@ -176,17 +176,22 @@ async function ensureLabels(variant) {
 
 // ---------------------------------------------------------------- lookups
 function rebuildMaps(st) {
-  const base = st.videoStem || st.stem || poseOf(st)?.stem || "";
-  const key = `${pick.variant}|${base}|${st.round ?? ""}|${startSec(st)}|${st.fps}`;
+  // `cacheBasename` is the viewer's name for the loaded round's video — the
+  // same field chin_sources reads, and the one requiresVideo() is handed.
+  // Anything else (there is no state.videoStem) leaves the stem empty and
+  // the lens silently finds no frames.
+  const base = st.cacheBasename || "";
+  const key = `${pick.variant}|${base}|${startSec(st)}|${st.fps}|${poseOf(st)?.n_frames}`;
   if (key === mapsKey) return;
   mapsKey = key;
   activeKey = `${pick.variant}|${base}`;
-  activeData = data[activeKey] || null;
+  activeData = data[activeKey] || data[`${pick.variant}|${stripStem(base)}`] || null;
   byViewer = new Map();
   if (!activeData) { ensureData(pick.variant, base); return; }
+  const n = poseOf(st)?.n_frames || 0;
   for (const e of activeData.frames || []) {
     const f = secToFrame(st, e.t);
-    if (f >= 0) byViewer.set(f, e);
+    if (f >= 0 && f < n) byViewer.set(f, e);
   }
 }
 function entryAt(f) {
