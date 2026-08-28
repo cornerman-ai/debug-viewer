@@ -108,16 +108,14 @@ function indexStemFor(base) {
   return null;
 }
 
-// A video with no labeled frames under the CURRENT variant still stays
-// selectable: the variant is a lens control, so hiding videos on it would
-// make switching variants silently change which videos exist.
+// Only videos this variant actually has labeled frames for. Switching the
+// variant therefore changes the video list, which is why the change handler
+// fires "lens-filter-changed" — the viewer re-populates its dropdowns on it.
+// An index that failed to load returns true rather than hiding every video:
+// a missing file should look like a broken lens, not an empty corpus.
 function requiresVideo(base) {
   if (indexError || !index) return true;
-  for (const v of Object.keys(VARIANTS)) {
-    const list = index.variants?.[v] || [];
-    if (list.includes(base) || list.includes(stripStem(base))) return true;
-  }
-  return false;
+  return indexStemFor(base) != null;
 }
 
 async function ensureData(variant, stem) {
@@ -246,7 +244,13 @@ function summary() {
 }
 
 // ---------------------------------------------------------------- sidebar
-function rebuild() { if (latestState) rebuildMaps(latestState); buildSidebar(); refresh(); }
+function rebuild() {
+  if (latestState) rebuildMaps(latestState);
+  buildSidebar();
+  seekFirstIfUnlanded();
+  if (latestState) updateNav(latestState);
+  refresh();
+}
 
 function buildSidebar() {
   if (!host) return;
@@ -311,6 +315,8 @@ function buildSidebar() {
     pick.variant = ev.target.value; save();
     mapsKey = ""; activeData = null;
     ensureLabels(pick.variant);
+    // the labeled-video set is per variant, so the dropdowns must re-filter
+    window.dispatchEvent(new Event("lens-filter-changed"));
     rebuild();
   };
   host.querySelector("#cs2-point").onchange = (ev) => { pick.point = ev.target.value; save(); rebuild(); };
@@ -322,12 +328,94 @@ function buildSidebar() {
   if (st) updateFrameBox(st);
 }
 
+// Labeled frames are the unit here, not seconds: this is a frame viewer
+// that happens to read its pixels from a video. step() moves to the next
+// LABELED frame, and stops at the ends rather than wrapping, so "next"
+// never silently returns you to the start of the round.
 function step(dir) {
   const fs = labeledFrames();
   if (!fs.length || !latestState) return;
   const cur = latestState.frame;
   const next = dir > 0 ? fs.find(f => f > cur) : [...fs].reverse().find(f => f < cur);
   if (next != null) seekFrame(next);
+}
+
+// Land on a labeled frame as soon as the data for a video arrives — opening
+// a video on frame 0, which is almost never labeled, would show an empty
+// lens and look broken.
+function seekFirstIfUnlanded() {
+  const fs = labeledFrames();
+  if (!fs.length || !latestState) return;
+  if (entryAt(latestState.frame)) return;      // already on one
+  seekFrame(fs[0]);
+}
+
+// The frame strip lives in #stage-extras, which the viewer clears on every
+// lens switch — so it is built fresh in mount() and never leaks.
+function mountStageNav() {
+  const slot = document.getElementById("stage-extras");
+  if (!slot) return;
+  slot.innerHTML = `
+    <div id="cs2-nav" style="display:flex;align-items:center;gap:10px;
+         padding:6px 2px;flex-wrap:wrap">
+      <button id="cs2-first" class="btn small">⏮</button>
+      <button id="cs2-back" class="btn small">◀ prev frame</button>
+      <button id="cs2-fwd" class="btn small">next frame ▶</button>
+      <span id="cs2-count" class="small muted"></span>
+      <span class="small muted" style="margin-left:auto">← → steps labeled frames</span>
+    </div>
+    <canvas id="cs2-strip" style="width:100%;height:16px;display:block"></canvas>`;
+  slot.querySelector("#cs2-first").onclick = () => {
+    const fs = labeledFrames(); if (fs.length) seekFrame(fs[0]);
+  };
+  slot.querySelector("#cs2-back").onclick = () => step(-1);
+  slot.querySelector("#cs2-fwd").onclick = () => step(1);
+  const strip = slot.querySelector("#cs2-strip");
+  strip.onclick = (ev) => {
+    const fs = labeledFrames();
+    if (!fs.length || !latestState) return;
+    const n = poseOf(latestState)?.n_frames || 1;
+    const r = strip.getBoundingClientRect();
+    const want = ((ev.clientX - r.left) / r.width) * n;
+    // snap to the nearest LABELED frame — clicking between two marks should
+    // land on one of them, not on an empty frame
+    seekFrame(fs.reduce((a, b) => (Math.abs(b - want) < Math.abs(a - want) ? b : a)));
+  };
+}
+
+function drawStrip(st) {
+  const cv = document.getElementById("cs2-strip");
+  if (!cv || !st) return;
+  const dpr = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect();
+  if (!r.width) return;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(16 * dpr);
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const n = poseOf(st)?.n_frames || 1;
+  const X = f => (f / n) * cv.width;
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = C.mark;
+  for (const f of labeledFrames()) ctx.fillRect(X(f) - dpr, 3 * dpr, 2 * dpr, 10 * dpr);
+  ctx.fillStyle = C.playhead;
+  ctx.fillRect(X(st.frame) - dpr, 0, 2 * dpr, cv.height);
+}
+
+// One listener for the lens's lifetime; it no-ops whenever the lens is not
+// the mounted one (its sidebar is gone), since there is no unmount hook to
+// detach it in.
+let keysBound = false;
+function bindKeys() {
+  if (keysBound) return;
+  keysBound = true;
+  document.addEventListener("keydown", (ev) => {
+    if (!document.getElementById("cs2-variant")) return;
+    const tag = (ev.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "select" || tag === "textarea") return;
+    if (ev.key === "ArrowLeft") { ev.preventDefault(); step(-1); }
+    if (ev.key === "ArrowRight") { ev.preventDefault(); step(1); }
+  });
 }
 
 function buildList() {
@@ -340,6 +428,19 @@ function buildList() {
     : `<p class="hint muted">none for this video under ${pick.variant}</p>`;
   box.querySelectorAll(".cs2-row").forEach(el =>
     el.onclick = () => seekFrame(+el.dataset.f));
+}
+
+function updateNav(st) {
+  const fs = labeledFrames();
+  const el = document.getElementById("cs2-count");
+  if (el) {
+    const i = fs.indexOf(st.frame);
+    const near = i >= 0 ? i : fs.findIndex(f => Math.abs(f - st.frame) <= SNAP_FRAMES);
+    el.textContent = fs.length
+      ? `${near >= 0 ? near + 1 : "–"} / ${fs.length} labeled frames`
+      : "no labeled frames for this video";
+  }
+  drawStrip(st);
 }
 
 function updateFrameBox(st) {
@@ -416,14 +517,27 @@ function mount(_host, state) {
   host = _host; latestState = state;
   ensureIndex();
   ensureLabels(pick.variant);
+  bindKeys();
+  mountStageNav();
   rebuildMaps(state);
   buildSidebar();
+  seekFirstIfUnlanded();
+  updateNav(state);
 }
 function update(state) {
   latestState = state;
   rebuildMaps(state);
   updateFrameBox(state);
+  updateNav(state);
 }
+
+// No skeleton. Every joint it would draw sits within a few pixels of the
+// marks this lens exists to separate — the shoulder bones run straight
+// through the shoulder marks — and the pose is not what is being judged
+// here. hideJoints also drops any edge touching a hidden joint, so this
+// leaves the frame clean.
+const ALL_JOINTS = new Set(Array.from({ length: 17 }, (_, i) => i));
+function skeletonStyle() { return { hideJoints: ALL_JOINTS, showImputed: false }; }
 
 export const ChinShoulderRule = {
   id: "chin_shoulder",
@@ -432,4 +546,5 @@ export const ChinShoulderRule = {
   mount,
   update,
   draw,
+  skeletonStyle,
 };
