@@ -6,11 +6,21 @@
 // only; this covers the rest, including the shoulder endpoint that the
 // depth rule actually reads.
 //
-//   ◯ red        the labelers' median click — ground truth, toggleable
-//   · faint red  each individual click, so their own spread is visible
-//   ● purple     chin = nose + 2.25*(mouth_mid - nose), the shipped proxy
-//   ● orange     chin = nose + 1.47*(...), the x-axis refit  [depth only]
+//   ◯ red        ONE mark per landmark: the median of the labelers' clicks
+//                for it (chin gets one, shoulder gets one). Median rather
+//                than mean because that is what the backend scores against
+//                in chin_depth_compare — with two clicks they are the same
+//                number anyway, and with three a stray one cannot drag it.
+//   · faint red  OFF by default: every individual click, when you want to
+//                see the humans' own spread rather than their consensus
+//   ● orange     chin = nose + 1.47*(mouth_mid - nose), the x-axis refit
+//                — the adopted skeleton fallback              [depth only]
 //   ● cyan       chin from the face pipeline (SCRFD + 2d106)
+//
+// The shipped 2.25 proxy is NOT drawn: it is a y-axis coefficient that the
+// refit and the face pipeline both beat, and it only crowded the marks it
+// was being compared against. It is still in the cached data, so putting
+// it back is one line in SRC.
 //   ● yellow     shoulder = the BlazePose lead-shoulder keypoint
 //   ● green      shoulder = keypoint + d*0.1006*torso            [depth only]
 //
@@ -45,12 +55,11 @@ const VARIANTS = {
 
 const C = {
   gt: "#ff2f45", gtFaint: "rgba(255,47,69,0.5)",
-  chin_proxy: "#b45cff", chin_proxy_x: "#ffb347", chin_face: "#3ad9e0",
+  chin_proxy_x: "#ffb347", chin_face: "#3ad9e0",
   sh_kp: "#ffd93d", sh_corr: "#7adf7a",
   mark: "#d3b136", playhead: "#3ad9e0",
 };
 const SRC = {
-  chin_proxy:   { label: "proxy 2.25",    kind: "chin", axis: null },
   chin_proxy_x: { label: "proxy 1.47",    kind: "chin", axis: "depth" },
   chin_face:    { label: "face pipeline", kind: "chin", axis: null },
   sh_kp:        { label: "keypoint",      kind: "sh",   axis: null },
@@ -489,24 +498,17 @@ function draw(ctx, state) {
   // instead of inflating them together (same reasoning as chin_sources)
   const s = Math.max((state.renderScale || 1) / (view.zoom || 1), 0.4);
   const P = p => [p[0] * W, p[1] * H];
-  const zoomed = (view.zoom || 1) > 1.5;
 
-  const tick = (x, y, color, w) => {
-    if (!zoomed) return;
-    ctx.beginPath();
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      ctx.moveTo(x + dx * 3.6 * s, y + dy * 3.6 * s);
-      ctx.lineTo(x + dx * 8.0 * s, y + dy * 8.0 * s);
-    }
-    ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = (w + 1) * s; ctx.stroke();
-    ctx.strokeStyle = color; ctx.lineWidth = w * s; ctx.stroke();
-  };
+  // One mark per thing, and nothing else. An earlier version grew a
+  // four-tick crosshair around every mark once zoomed, which pointed at
+  // each centre precisely but put five crosshairs on the frame as soon as
+  // both points were shown — the marks stopped being readable as marks.
+  // Colour carries identity; the GT ring carries "this is the human".
   const dot = (p, color, r) => {
     const [x, y] = P(p);
     ctx.beginPath(); ctx.arc(x, y, r * s, 0, Math.PI * 2);
     ctx.fillStyle = color; ctx.fill();
     ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.lineWidth = 0.5 * s; ctx.stroke();
-    tick(x, y, color, 1.1);
   };
 
   for (const k of sources()) { const p = e.model?.[k]; if (p) dot(p, C[k], 1.5); }
@@ -522,7 +524,6 @@ function draw(ctx, state) {
     ctx.strokeStyle = C.gt; ctx.lineWidth = 1.3 * s; ctx.stroke();
     ctx.beginPath(); ctx.arc(x, y, 0.7 * s, 0, Math.PI * 2);
     ctx.fillStyle = C.gt; ctx.fill();
-    tick(x, y, C.gt, 1.4);
   }
 }
 
