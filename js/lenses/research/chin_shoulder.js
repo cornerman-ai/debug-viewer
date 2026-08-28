@@ -95,7 +95,16 @@ function ensureIndex() {
     .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
     .then(j => { index = j; })
     .catch(e => { indexError = String(e); })
-    .finally(() => { mapsKey = ""; if (host) { rebuild(); } });
+    .finally(() => {
+      mapsKey = "";
+      // The video dropdown filters on requiresVideo(), which cannot answer
+      // until this lands — until then every video passes. Tell the viewer to
+      // re-filter now that it can, or the list stays as it was: everything.
+      // Fires whether or not the lens is mounted; the viewer only re-reads
+      // its dropdowns.
+      window.dispatchEvent(new Event("lens-filter-changed"));
+      if (host) rebuild();
+    });
   return indexPromise;
 }
 ensureIndex();
