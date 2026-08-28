@@ -24,6 +24,7 @@ import { BladednessCoachRule } from "./research/bladedness_coach.js";
 import { BlazePoseInspectorRule } from "./inspect/blazepose_inspector.js";
 import { ChinDepthRule } from "./research/chin_depth.js";
 import { ChinHeightRule } from "./research/chin_height.js";
+import { ChinShoulderRule } from "./research/chin_shoulder.js";
 import { ChinSourcesRule } from "./research/chin_sources.js";
 import { ElbowTuckRule } from "./research/elbow_tuck.js";
 import { FaceMeshChinRule } from "./research/face_mesh_chin.js";
@@ -58,6 +59,7 @@ export const RULES = [
   BlazePoseInspectorRule,
   ChinDepthRule,
   ChinHeightRule,
+  ChinShoulderRule,
   ChinSourcesRule,
   ElbowTuckRule,
   FaceMeshChinRule,
