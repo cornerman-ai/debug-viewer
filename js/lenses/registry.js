@@ -35,6 +35,7 @@ import { HipRotationModelRule } from "./models/hip_rotation.js";
 import { AngleChangeRule } from "./rules/pivot_rate.js";
 import { ShoulderGateRule } from "./research/shoulder_gate.js";
 import { SideSetRule } from "./research/side_set.js";
+import { SlipsRule } from "./research/slips.js";
 import { PunchClassifierRule } from "./models/punch_classifier.js";
 import { OnDeviceLensRule } from "./inspect/ondevice.js";
 import { PoseCoverageLensRule } from "./inspect/pose_coverage.js";
@@ -80,6 +81,7 @@ export const RULES = [
   ShoulderGateRule,
   SideSetRule,
   SkeletonCompareRule,
+  SlipsRule,
   StanceWidthLensRule,
   StanceDepthSideRule,
   StepPunchSyncRule,
