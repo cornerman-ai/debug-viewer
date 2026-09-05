@@ -26,3 +26,44 @@ export const getManifestError = set.getManifestError;
 export const matchEntry = set.matchEntry;
 export const isCuratedVideo = set.isCuratedVideo;
 export { normStem };
+
+// ── which ROUNDS of a curated video carry frontal footage ───────────────────
+//
+// A curated video can have eight rounds and one span, and which round a
+// time-only span falls in needs each round's `_pts.npy` clock — the backend
+// has those, the browser does not. `lens_data/frontal_rounds.json` is the
+// backend's answer, dumped by
+//   python -m ml.frontal_spans --rounds-json > \
+//     ~/code/cornerman-debug-viewer/lens_data/frontal_rounds.json
+// (regenerate with the manifest). Lenses whose scope is the span rather than
+// the video set `requires: isCuratedRound` next to `requiresVideo`; the viewer
+// hands `requires` `{ base, round }` alongside the slot.
+
+let roundsByStem = null;   // Map<normStem(stem), Set<round>>
+let roundsError = null;
+fetch("./lens_data/frontal_rounds.json", { cache: "no-store" })
+  .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+  .then(j => {
+    roundsByStem = new Map();
+    for (const [stem, rs] of Object.entries(j.rounds || {})) {
+      roundsByStem.set(normStem(stem), new Set(rs));
+    }
+  })
+  .catch(err => { roundsError = err.message || String(err); })
+  // The dropdowns filter on requires(), which cannot answer until this lands.
+  .finally(() => window.dispatchEvent(new Event("lens-filter-changed")));
+
+// Same engine test as the viewer's default `requires` — any 2D skeleton cache.
+const hasSkeleton = slot => !!(slot?.blazepose || slot?.yolo || slot?.vision
+  || slot?.vision_glove || slot?.rtmpose || slot?.movenet || slot?.yolo11);
+
+// Pending ⇒ hide (the fetch re-fires the filter). Failed, or a stem the dump
+// does not know ⇒ do not filter rounds rather than hide footage silently.
+export function isCuratedRound(slot, ctx) {
+  if (!hasSkeleton(slot)) return false;
+  if (roundsError) return true;
+  if (!roundsByStem) return false;
+  const rs = roundsByStem.get(normStem(ctx?.base || ""));
+  if (!rs) return true;
+  return ctx?.round == null || rs.has(ctx.round);
+}

@@ -16,8 +16,10 @@ Folders (the folder is the type — filenames carry no `_lens`/`_model` suffix):
                  glove_filter, skeleton_schemas, axiality_predictions;
                  segment_set = the curated-set machinery behind frontal_set
                  (camera as opponent) and side_set (camera side-on), including
-                 the source-second → cache-frame conversion); not lenses,
-                 never in the registry
+                 the source-second → cache-frame conversion; slip_labels = the
+                 Sheet's slip rows via the labeler web app + the frontal-set
+                 frames of the loaded round, shared by the two slips lenses);
+                 not lenses, never in the registry
 
 Data a lens fetches lives in `/lens_data/` (fetch paths resolve against the
 page, so moving modules never breaks them).
