@@ -425,12 +425,14 @@ function syncStagePickers() {
 // True if a round-slot satisfies the active lens's requirements.
 // Default predicate (when a rule doesn't declare `requires`): at least one
 // 2D engine present. This keeps every existing 2D rule working without a
-// per-rule code change.
-function slotMatchesActiveLens(slot) {
+// per-rule code change. A lens's `requires(slot, { base, round })` also gets
+// WHICH round of WHICH video it is judging, for lenses whose scope is a
+// curated span inside a video (slips: one frontal round out of eight).
+function slotMatchesActiveLens(slot, base, round) {
   const req = state.rule?.requires;
   if (!req) return !!(slot?.yolo || slot?.vision || slot?.vision_glove || slot?.rtmpose
                       || slot?.movenet || slot?.yolo11 || slot?.blazepose);
-  try { return !!req(slot); }
+  try { return !!req(slot, { base, round }); }
   catch { return false; }
 }
 
@@ -446,8 +448,8 @@ function videoMatchesActiveLens(base) {
     try { if (!requiresVideo(base)) return false; }
     catch { return false; }
   }
-  for (const slot of rounds.values()) {
-    if (slotMatchesActiveLens(slot)) return true;
+  for (const [round, slot] of rounds) {
+    if (slotMatchesActiveLens(slot, base, round)) return true;
   }
   return false;
 }
@@ -643,7 +645,7 @@ function onVideoPick() {
     populateRoundSelect(null);
     return;
   }
-  populateRoundSelect(rounds);
+  populateRoundSelect(rounds, base);
   // Always auto-load the first round. (The dropdown defaults to r0 so
   // clicking r0 doesn't fire `change`; the dropdown stays interactive so
   // you can still pick r1, r2, …)
@@ -1150,7 +1152,7 @@ function loadFromFiles(videoFile, poseFiles) {
     });
 }
 
-function populateRoundSelect(rounds) {
+function populateRoundSelect(rounds, base = null) {
   // start()→setRule() rebuilds this dropdown on every load, so the user's
   // pick has to survive the rebuild or it visually snaps back to r0.
   const prev = els.roundSel.value;
@@ -1170,9 +1172,9 @@ function populateRoundSelect(rounds) {
     const o = document.createElement("option");
     o.value = String(r);
     const slot = rounds.get(r);
-    const ok = slotMatchesActiveLens(slot);
+    const ok = slotMatchesActiveLens(slot, base, r);
     if (!ok) o.disabled = true;
-    o.textContent = ok ? `r${r}` : `r${r} (no cache for lens)`;
+    o.textContent = ok ? `r${r}` : `r${r} (outside this lens)`;
     els.roundSel.appendChild(o);
     if (ok) enabledCount++;
   }
@@ -1533,7 +1535,10 @@ function setRule(id) {
   // state if the loaded clip can't be rendered.
   populateDriveVideoSelect();
   const v = els.videoFile.files[0];
-  if (v) populateRoundSelect(cacheIndex?.get(videoBasename(v.name)));
+  if (v) {
+    const base = videoBasename(v.name);
+    populateRoundSelect(cacheIndex?.get(base), base);
+  }
   redraw();
 }
 

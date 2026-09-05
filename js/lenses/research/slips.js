@@ -1,35 +1,90 @@
-// Slips lens — the curated frontal footage, grouped, as the starting point for
-// the slip work (cornerman-backend/ml/research/defense).
+// Slips lens — the curated frontal footage, grouped, with the Sheet's slip
+// labels on the timeline: the starting point for the slip work
+// (cornerman-backend/ml/research/defense).
 //
 // A slip is a lateral head movement OFF the opponent axis, so it is only
 // measurable when that axis is the camera axis: the curated frontal set, where
 // the boxer works toward the camera and the camera stands where the opponent
 // would be. This lens groups exactly that footage — the video dropdown offers
-// only the curated videos — and answers one question about the round you have
-// loaded: "which frames of it count?" Everything outside a curated span is
-// greyed out and the video is framed in red, so you can scrub a whole round
-// and cannot quietly measure footage the set does not cover.
+// only the curated videos — and answers two questions about the round you have
+// loaded: "which frames of it count?" (curated spans green, everything else
+// grey with a red frame on the video) and "where did the labelers see slips?"
+// (the Sheet's lead_slip / rear_slip rows, two lanes under the span track).
+// A slip outside every curated span is drawn dimmed: it is a label on footage
+// the set does not vouch for.
 //
-// For now a BROWSING lens, not a metric lens: the slip signals and the Sheet
-// slip labels come next and build on top of this grouping. The roll/duck
-// workbench (./roll_duck.js) shows the label-scoring idiom to follow then.
+// LABEL SOURCE: the labeler's Apps Script web app, via
+// sheet-labels.js fetchCombinedRowsForStem — NOT the viewer's state.labels.
+// That plumbing reads the Sheet's public CSV export, dead since the labeling
+// tabs moved to a spreadsheet that needs a login (2026-08). The web app reads
+// Combined Data, which is rebuilt by hand from the per-labeler tabs, so
+// Refresh re-pulls but cannot see labels newer than the last rebuild. Rows
+// carry no labeler field: two labelers' slips on the same footage appear as
+// two overlapping spans.
 //
-// Data + the source-second → cache-frame conversion: ../shared/frontal_set.js
-// and ../shared/segment_set.js (which documents the time base). Refresh the
-// copy in lens_data with:
+// TIME BASE: Sheet times are source-video seconds; cache frame =
+// floor(t * fps) - floor(start_sec * fps), the viewer's own convention (see
+// ../shared/segment_set.js). No slip signals yet — those build on this.
+//
+// ROUNDS: a curated video can have eight rounds and one frontal span, so the
+// Round dropdown offers only the rounds that carry frontal footage. Which round
+// a time-only span falls in needs each round's `_pts.npy` clock, which the
+// backend has and the browser does not — lens_data/frontal_rounds.json is that
+// answer, dumped by
+//   python -m ml.frontal_spans --rounds-json > \
+//     ~/code/cornerman-debug-viewer/lens_data/frontal_rounds.json
+// (regenerate with the manifest). Frontal set data + the span conversion:
+// ../shared/frontal_set.js and ../shared/segment_set.js. Refresh the manifest
+// copy with:
 //   cp ~/code/cornerman-backend/ml/frontal_segments.json \
 //      ~/code/cornerman-debug-viewer/lens_data/frontal_segments.json
 
-import { resolveRanges } from "../shared/segment_set.js";
+import { normStem, resolveRanges } from "../shared/segment_set.js";
 import {
   frontalSetReady, getManifest, getManifestError, isCuratedVideo, matchEntry,
 } from "../shared/frontal_set.js";
+import { fetchCombinedRowsForStem } from "../../sheet-labels.js";
 
 const COLOR_IN     = "#7adf7a";  // green — inside a curated span
 const COLOR_OUT    = "#888";     // grey  — outside
 const COLOR_MISS   = "#ff5d6c";  // red   — this video isn't in the set at all
 const COLOR_FRAME  = "#3ad9e0";  // cyan  — current-frame marker
 const COLOR_ACCENT = "#b48cff";
+const COLOR_LEAD   = "#7ec8ff";  // light blue — lead_slip
+const COLOR_REAR   = "#ffd95c";  // yellow     — rear_slip
+
+const SLIP_KIND = { lead_slip: "lead", rear_slip: "rear" };
+const KIND_COLOR = { lead: COLOR_LEAD, rear: COLOR_REAR };
+
+// ── which rounds carry frontal footage ──────────────────────────────────────
+
+let roundsByStem = null;   // Map<normStem(stem), Set<round>>
+let roundsError = null;
+fetch("./lens_data/frontal_rounds.json", { cache: "no-store" })
+  .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+  .then(j => {
+    roundsByStem = new Map();
+    for (const [stem, rs] of Object.entries(j.rounds || {})) {
+      roundsByStem.set(normStem(stem), new Set(rs));
+    }
+  })
+  .catch(err => { roundsError = err.message || String(err); })
+  // The dropdowns filter on requires(), which cannot answer until this lands.
+  .finally(() => window.dispatchEvent(new Event("lens-filter-changed")));
+
+// Same engine test as the viewer's default `requires` — any 2D skeleton cache.
+const hasSkeleton = slot => !!(slot?.blazepose || slot?.yolo || slot?.vision
+  || slot?.vision_glove || slot?.rtmpose || slot?.movenet || slot?.yolo11);
+
+// Pending ⇒ hide (the fetch re-fires the filter). Failed, or a stem the dump
+// does not know ⇒ do not filter rounds rather than hide footage silently.
+function roundHasFrontal(base, round) {
+  if (roundsError) return true;
+  if (!roundsByStem) return false;
+  const rs = roundsByStem.get(normStem(base || ""));
+  if (!rs) return true;
+  return round == null || rs.has(round);
+}
 
 // ── span → cache-frame mapping ──────────────────────────────────────────────
 
@@ -57,6 +112,66 @@ function compute(state) {
             entry, inSpan, ranges, nIn };
   return cache;
 }
+
+// ── Sheet slip labels → cache frames ────────────────────────────────────────
+
+// One fetch per cache basename, keyed so a lens remount does not refetch.
+let labels = { key: null, status: "idle", rows: null, error: null, source: null };
+let labelToken = 0;
+let lastBasename = null;
+
+function ensureLabels(basename, { force = false } = {}) {
+  const key = basename || "";
+  if (!force && labels.key === key && labels.status !== "idle") return;
+  const token = ++labelToken;
+  labels = { key, status: "loading", rows: null, error: null, source: null };
+  if (!basename) {
+    labels = { key, status: "error", rows: null, error: "no cache basename to match", source: null };
+    return;
+  }
+  fetchCombinedRowsForStem(basename, { force }).then(res => {
+    if (token !== labelToken) return;   // a newer video was loaded meanwhile
+    labels = res.error
+      ? { key, status: "error", rows: null, error: res.error, source: null }
+      : { key, status: "ok", rows: res.rows, error: null,
+          source: res.source_video, confidence: res.match_confidence, nRows: res.n_rows };
+    slipCache = { pose: null, rows: null };
+    refresh();
+  });
+}
+
+let slipCache = { pose: null, rows: null };
+
+// Slip rows of the matched video → this round's frames. Null while labels are
+// not in. `curated` = the slip's midpoint lies inside a curated frontal span.
+function computeSlips(c) {
+  if (labels.status !== "ok") return null;
+  if (slipCache.pose === c.pose && slipCache.rows === labels.rows) return slipCache;
+  const startFrame = Math.floor(c.startSec * c.fps);
+  const slips = [];
+  let nVideo = 0;
+  for (const r of labels.rows) {
+    const kind = SLIP_KIND[r.label];
+    if (!kind) continue;
+    nVideo++;
+    const s = Math.floor(r.start_sec * c.fps) - startFrame;
+    const e = Math.floor(r.end_sec * c.fps) - startFrame;
+    if (e < 0 || s > c.n - 1) continue;          // belongs to another round
+    const cs = Math.max(0, Math.min(c.n - 1, s));
+    const ce = Math.max(0, Math.min(c.n - 1, e));
+    const mid = Math.floor((cs + ce) / 2);
+    slips.push({ kind, s: cs, e: ce, startSec: r.start_sec, endSec: r.end_sec,
+                 uuid: r.punch_uuid, stance: r.stance,
+                 curated: !!(c.entry && c.inSpan[mid]) });
+  }
+  slips.sort((a, b) => a.s - b.s);
+  const nLead = slips.filter(x => x.kind === "lead").length;
+  slipCache = { pose: c.pose, rows: labels.rows, slips, nLead, nRear: slips.length - nLead,
+                nOut: slips.filter(x => !x.curated).length, nVideo };
+  return slipCache;
+}
+
+const slipsAt = (slips, f) => slips.filter(x => x.s <= f && f <= x.e);
 
 function fmtTime(sec) {
   if (sec == null) return "—";
@@ -87,11 +202,16 @@ export const SlipsRule = {
   // that is not in the set.
   requiresVideo: isCuratedVideo,
 
-  mount(_host) {
+  // Per-round filter on top of that: only the rounds whose footage a frontal
+  // span touches. The viewer hands `{ base, round }` alongside the slot.
+  requires: (slot, ctx) => hasSkeleton(slot) && roundHasFrontal(ctx?.base, ctx?.round),
+
+  mount(_host, state) {
     host = _host;
     cache = { pose: null, basename: null };
     host.innerHTML = `<h2>Slips</h2><p class="hint">Loading manifest…</p>`;
     mountStageTimeline();
+    if (state?.cacheBasename) ensureLabels(state.cacheBasename);
 
     const token = ++mountToken;
     frontalSetReady.then(() => {
@@ -117,6 +237,8 @@ export const SlipsRule = {
       if (frameEl) frameEl.innerHTML = "";
       return;
     }
+    lastBasename = c.basename;
+    ensureLabels(c.basename);
 
     if (!c.entry) {
       statusEl.innerHTML =
@@ -155,17 +277,24 @@ export const SlipsRule = {
       }
     }
 
+    const sl = computeSlips(c);
+    renderSlipLabels(c, sl);
+
     const f = state.frame;
     const inNow = c.entry && c.inSpan[f];
     if (frameEl) {
+      const here = sl ? slipsAt(sl.slips, f) : [];
       frameEl.innerHTML =
         `<strong>frame ${f}</strong> ·
          <span style="color:${inNow ? COLOR_IN : COLOR_OUT}; font-weight:600">
            ${inNow ? "in span" : "outside"}</span>
-         <span class="muted small"> · src ${fmtTime(c.startSec + f / c.fps)}</span>`;
+         <span class="muted small"> · src ${fmtTime(c.startSec + f / c.fps)}</span>
+         ${here.map(x => `<br><span style="color:${KIND_COLOR[x.kind]}; font-weight:600">
+             ${x.kind} slip</span>
+             <span class="muted small">frames ${x.s}–${x.e}${x.curated ? "" : " · outside the curated spans"}</span>`).join("")}`;
     }
 
-    drawTimeline(document.getElementById("sl-timeline"), c, f);
+    drawTimeline(document.getElementById("sl-timeline"), c, sl, f);
   },
 
   draw(ctx, state) {
@@ -185,18 +314,28 @@ export const SlipsRule = {
       ctx.restore();
     }
 
-    const label = !c.entry ? "VIDEO NOT IN SET" : inNow ? "IN FRONTAL SPAN" : "OUTSIDE SPAN";
-    const color = inNow ? COLOR_IN : COLOR_MISS;
     const fsz = Math.round(14 * s);
-    ctx.save();
-    ctx.font = `600 ${fsz}px ui-monospace, monospace`;
-    ctx.textBaseline = "top";
-    const w = ctx.measureText(label).width + 20 * s;
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.beginPath(); ctx.roundRect(10 * s, 10 * s, w, fsz + 14 * s, 6 * s); ctx.fill();
-    ctx.fillStyle = color;
-    ctx.fillText(label, 20 * s, 17 * s);
-    ctx.restore();
+    const badge = (text, color, y) => {
+      ctx.save();
+      ctx.font = `600 ${fsz}px ui-monospace, monospace`;
+      ctx.textBaseline = "top";
+      const w = ctx.measureText(text).width + 20 * s;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.beginPath(); ctx.roundRect(10 * s, y, w, fsz + 14 * s, 6 * s); ctx.fill();
+      ctx.fillStyle = color;
+      ctx.fillText(text, 20 * s, y + 7 * s);
+      ctx.restore();
+    };
+    badge(!c.entry ? "VIDEO NOT IN SET" : inNow ? "IN FRONTAL SPAN" : "OUTSIDE SPAN",
+          inNow ? COLOR_IN : COLOR_MISS, 10 * s);
+
+    // A second badge while the frame sits inside a labeled slip.
+    const sl = computeSlips(c);
+    const here = sl ? slipsAt(sl.slips, state.frame) : [];
+    here.forEach((x, i) => {
+      badge(`${x.kind.toUpperCase()} SLIP${x.curated ? "" : " (outside span)"}`,
+            KIND_COLOR[x.kind], (10 + (i + 1) * (fsz / s + 20)) * s);
+    });
   },
 };
 
@@ -227,7 +366,10 @@ function renderShell() {
       which is why it can only be read here. Selected on gaze/punch direction,
       not shoulder squareness.
       <span style="color:${COLOR_IN}">green</span> = curated,
-      <span style="color:${COLOR_OUT}">grey</span> = outside.
+      <span style="color:${COLOR_OUT}">grey</span> = outside;
+      <span style="color:${COLOR_LEAD}">lead</span> /
+      <span style="color:${COLOR_REAR}">rear</span> = the Sheet's slip labels
+      (dimmed when outside every curated span).
     </p>
 
     <h3>This round</h3>
@@ -235,6 +377,11 @@ function renderShell() {
 
     <h3>Spans here <span class="muted small">(click to jump)</span></h3>
     <div id="sl-spans" style="font-size:12px"></div>
+
+    <h3>Slip labels <span class="muted small">(Sheet · click to jump)</span>
+      <button id="sl-refresh" type="button" style="font-size:11px; margin-left:6px">Refresh</button></h3>
+    <div id="sl-lab-status" style="font-size:13px; line-height:1.6"></div>
+    <div id="sl-slips" style="font-size:12px; max-height:260px; overflow:auto"></div>
 
     <h3>Current frame</h3>
     <div id="sl-frame" style="font-size:13px; line-height:1.6"></div>
@@ -247,6 +394,51 @@ function renderShell() {
           — ${shortStem(k)}
         </div>`).join("")}
     </div>`;
+
+  host.querySelector("#sl-refresh").addEventListener("click", () => {
+    if (lastBasename) ensureLabels(lastBasename, { force: true });
+    refresh();
+  });
+}
+
+function renderSlipLabels(c, sl) {
+  const statusEl = host.querySelector("#sl-lab-status");
+  const listEl = host.querySelector("#sl-slips");
+  if (!statusEl || !listEl) return;
+
+  if (labels.status === "loading") {
+    statusEl.innerHTML = `<span class="muted">Fetching Combined Data rows from the labeler web app…</span>`;
+    listEl.innerHTML = "";
+    return;
+  }
+  if (labels.status !== "ok") {
+    statusEl.innerHTML =
+      `<span style="color:${COLOR_MISS}">No Sheet labels — ${labels.error || "not loaded"}</span>`;
+    listEl.innerHTML = "";
+    return;
+  }
+
+  statusEl.innerHTML =
+    `<code>${labels.nRows}</code> rows for <code>${shortStem(labels.source, 48)}</code>
+     <span class="muted small">(${labels.confidence} match)</span><br>
+     <code>${sl.nVideo}</code> slips in the video ·
+     <span style="color:${COLOR_LEAD}">${sl.nLead} lead</span> +
+     <span style="color:${COLOR_REAR}">${sl.nRear} rear</span> in this round${
+       sl.nOut ? ` · <span class="muted">${sl.nOut} outside the curated spans</span>` : ""}`;
+
+  listEl.innerHTML = sl.slips.length
+    ? sl.slips.map((x, i) =>
+        `<div class="sl-slip" data-i="${i}" style="cursor:pointer; padding:2px 0;
+              border-bottom:1px solid var(--border); opacity:${x.curated ? 1 : 0.55}">
+           <code style="color:${KIND_COLOR[x.kind]}">${x.kind}</code>
+           <span class="muted small"> src ${fmtTime(x.startSec)} → ${fmtTime(x.endSec)}</span>
+           <span class="small"> · frames <code>${x.s}</code>–<code>${x.e}</code></span>
+           ${x.curated ? "" : `<span class="muted small"> · outside span</span>`}
+         </div>`).join("")
+    : `<p class="muted small">No slip labels fall inside this round.</p>`;
+  listEl.querySelectorAll(".sl-slip").forEach(el => {
+    el.addEventListener("click", () => seekTo(sl.slips[+el.dataset.i].s));
+  });
 }
 
 // ── below-video timeline ────────────────────────────────────────────────────
@@ -273,12 +465,12 @@ function mountStageTimeline() {
   const label = document.createElement("div");
   label.className = "muted small";
   label.style.cssText = "margin-bottom:6px";
-  label.textContent = "Curated frontal spans in this round (click to seek)";
+  label.textContent = "Curated frontal spans + Sheet slip labels in this round (click to seek)";
   wrap.appendChild(label);
   const canvas = document.createElement("canvas");
   canvas.id = "sl-timeline";
-  canvas.style.cssText = "display:block;width:100%;height:44px";
-  canvas.width = 800; canvas.height = 44;
+  canvas.style.cssText = "display:block;width:100%;height:84px";
+  canvas.width = 800; canvas.height = 84;
   wrap.appendChild(canvas);
   slot.appendChild(wrap);
 
@@ -291,7 +483,9 @@ function mountStageTimeline() {
   });
 }
 
-function drawTimeline(canvas, c, frame) {
+// Track 1: curated spans (green / grey). Track 2: slip labels, lead lane over
+// rear lane, dimmed outside the curated spans.
+function drawTimeline(canvas, c, sl, frame) {
   if (!canvas) return;
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   const cssW = Math.max(1, canvas.getBoundingClientRect().width);
@@ -307,12 +501,12 @@ function drawTimeline(canvas, c, frame) {
 
   const xOf = f => TL_LABEL_W + (f / Math.max(1, N - 1)) * (W - TL_LABEL_W - 4);
   const colW = Math.max(1, (W - TL_LABEL_W - 4) / Math.max(1, N - 1));
-
-  const top = 6, barH = H - 18;
   ctx.font = "10px ui-monospace, monospace";
+
+  // Track 1 — curated spans.
+  const top = 4, barH = 24;
   ctx.fillStyle = c.entry ? COLOR_IN : COLOR_MISS;
   ctx.fillText(c.entry ? "frontal" : "not in set", 6, top + barH / 2 + 3);
-
   for (let f = 0; f < N; f++) {
     const on = c.entry && c.inSpan[f];
     ctx.fillStyle = on ? COLOR_IN : COLOR_OUT;
@@ -320,11 +514,30 @@ function drawTimeline(canvas, c, frame) {
     ctx.fillRect(xOf(f), top, colW + 0.5, barH);
   }
   ctx.globalAlpha = 1;
-
-  // span labels along the bottom
   ctx.fillStyle = COLOR_ACCENT;
   for (const r of c.ranges) {
-    ctx.fillText(r.label, Math.min(W - 20, xOf(r.s) + 2), H - 2);
+    ctx.fillText(r.label, Math.min(W - 20, xOf(r.s) + 2), top + barH + 10);
+  }
+
+  // Track 2 — slip labels, two lanes.
+  const laneH = 16, y2 = top + barH + 14;
+  const lanes = { lead: y2, rear: y2 + laneH + 2 };
+  for (const [kind, y] of Object.entries(lanes)) {
+    ctx.fillStyle = KIND_COLOR[kind];
+    ctx.fillText(kind, 6, y + laneH / 2 + 3);
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.fillRect(TL_LABEL_W, y, W - TL_LABEL_W - 4, laneH);
+  }
+  if (sl) {
+    for (const x of sl.slips) {
+      ctx.fillStyle = KIND_COLOR[x.kind];
+      ctx.globalAlpha = x.curated ? 0.95 : 0.35;
+      ctx.fillRect(xOf(x.s), lanes[x.kind], Math.max(2, xOf(x.e) - xOf(x.s)), laneH);
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillStyle = "#888";
+    ctx.fillText(labels.status === "loading" ? "loading labels…" : "no labels", TL_LABEL_W + 4, y2 + laneH + 4);
   }
 
   ctx.strokeStyle = COLOR_FRAME;

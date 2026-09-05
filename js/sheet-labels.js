@@ -21,6 +21,15 @@
 // step+punch-sync lens; the in-session cache is bypassed and the live
 // rows are re-pulled.
 
+// 2026-09: the gviz CSV path above is DEAD. The labeling tabs moved to a new
+// spreadsheet (Combined Data now lives in 1HkKO…) and neither file is
+// link-viewable, so every gviz fetch redirects to a Google login and fails on
+// CORS — state.labels never arrives. The read path that still works from the
+// browser is the labeler's own Apps Script web app (the deployment
+// cornerman-labeler/shared/player.js posts labels to): it runs as the script
+// owner and needs no sharing. fetchCombinedRowsForStem() at the bottom reads
+// one video's Combined Data rows through it; fetchRows()/fetchLiveLabels()
+// have not been moved over yet.
 const PUBLIC_SHEET_ID = "1CewEaweCBw9F-qSvNapiQMNj4wnidHqLA-I19whrly0";
 const COMBINED_SHEET = "Combined Data";
 const FORM_LABELS_SHEET = "Combined Form Labels";
@@ -233,14 +242,6 @@ export function normalizeName(s) {
 // If multiple candidates tie, pick the one with the most label rows (i.e.
 // the most specific source video).
 export function findSourceByBasename(rows, cacheBasename) {
-  if (!cacheBasename) return null;
-  // Strip the cache-shape suffix `_<engine>_r<N>` so the basename we match
-  // against is just the source name, e.g.
-  //   `30 MIN SHADOWBOXING…_h264_vision_r0` → `30 MIN SHADOWBOXING…_h264`
-  const cb = cacheBasename.replace(/_(yolo|vision)_r\d+$/i, "");
-  const cbN = normalize(cb);
-  if (!cbN) return null;
-
   // Tally counts per video for picking among ties.
   const counts = new Map();
   for (const r of rows) {
@@ -248,6 +249,20 @@ export function findSourceByBasename(rows, cacheBasename) {
     if (!v) continue;
     counts.set(v, (counts.get(v) || 0) + 1);
   }
+  return pickSourceByCounts(counts, cacheBasename);
+}
+
+// The matcher proper, over a `video_name → row count` map — shared by the
+// CSV path above and the web-app path at the bottom (which is handed counts,
+// not rows).
+export function pickSourceByCounts(counts, cacheBasename) {
+  if (!cacheBasename) return null;
+  // Strip the cache-shape suffix `_<engine>_r<N>` so the basename we match
+  // against is just the source name, e.g.
+  //   `30 MIN SHADOWBOXING…_h264_vision_r0` → `30 MIN SHADOWBOXING…_h264`
+  const cb = cacheBasename.replace(/_(yolo|vision)_r\d+$/i, "");
+  const cbN = normalize(cb);
+  if (!cbN) return null;
   const names = [...counts.keys()];
 
   const cbTokens = new Set(cbN.split(" ").filter(Boolean));
@@ -457,4 +472,95 @@ export async function fetchLiveLabels({
     total_punches: detections.length,
     detections,
   };
+}
+
+// ── Labeler web app — the read path that still works ────────────────────────
+//
+// `listCombinedVideos` → every video_name in Combined Data with its row count;
+// `listPunchesForVideo&video=<name|stem>` → that video's rows (label, start /
+// end as "MM:SS.mmm" text, stance, punch_uuid). Despite the name it returns
+// EVERY label except the round/rest markers — defense rows included — and no
+// labeler column, so two labelers' rows on the same footage come back as two
+// rows. Combined Data is rebuilt from the per-labeler tabs by hand (the
+// sheet's MyCorner ▸ Rebuild menu), so "live" means "as of the last rebuild".
+// Cached per session; `force` re-pulls.
+
+const LABELER_WEBAPP_URL =
+  "https://script.google.com/macros/s/AKfycbwM57VoFCXWIhw8jyechZQLtMzlmeT15bhIy0eozKpA0jHlmuZPSqVzyEcS5Vy0A5cS/exec";
+
+let cachedVideoCounts = null;          // Map<video_name, n_labels>
+const cachedRowsByName = new Map();    // video_name → rows (seconds parsed)
+
+async function webAppGet(params) {
+  const url = new URL(LABELER_WEBAPP_URL);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(`HTTP ${r.status} from the labeler web app`);
+  const j = await r.json();
+  if (j.status !== "ok") throw new Error(j.message || "labeler web app error");
+  return j;
+}
+
+export async function fetchCombinedVideoCounts({ force = false } = {}) {
+  if (!force && cachedVideoCounts) return cachedVideoCounts;
+  const j = await webAppGet({ action: "listCombinedVideos" });
+  const m = new Map();
+  for (const v of j.videos || []) m.set(v.name, v.n_labels || 0);
+  cachedVideoCounts = m;
+  return m;
+}
+
+// One video's Combined Data rows for a cache basename, matched the way
+// fetchLiveLabels matches (pickSourceByCounts). Resolves to
+//   { source_video, match_confidence, n_rows,
+//     rows: [{ label, start_sec, end_sec, stance, punch_uuid, id }] }
+// with times in source-video SECONDS, or { error }.
+export async function fetchCombinedRowsForStem(cacheBasename, { force = false } = {}) {
+  if (!cacheBasename) return { error: "no cache basename to match" };
+  const stem = cacheBasename.replace(/_(yolo|vision)_r\d+$/i, "");
+
+  const pull = async name => {
+    const hit = force ? null : cachedRowsByName.get(name);
+    if (hit) return hit;
+    const j = await webAppGet({ action: "listPunchesForVideo", video: name });
+    const rows = (j.punches || []).map(p => ({
+      label: String(p.label || "").trim().toLowerCase(),
+      start_sec: parseTimestamp(p.start_sec),
+      end_sec: parseTimestamp(p.end_sec),
+      stance: String(p.stance || "").trim().toLowerCase() || null,
+      punch_uuid: p.punch_uuid || null,
+      id: p.id ?? null,
+      video_name: p.video_name || name,
+    })).filter(r => r.label && r.start_sec != null && r.end_sec != null);
+    cachedRowsByName.set(name, rows);
+    return rows;
+  };
+
+  try {
+    // The web app matches the stem itself (exact, extension-stripped,
+    // case-insensitive), so the common case is one round trip. Each Apps
+    // Script call is seconds, so the video list is only pulled when needed.
+    let rows = await pull(stem);
+    if (rows.length) {
+      return { source_video: rows[0].video_name, match_confidence: "exact",
+               n_rows: rows.length, rows };
+    }
+    // Nothing under that exact name (an `_h264` tail, a double space) —
+    // fuzzy-match against the video list the way fetchLiveLabels does.
+    const counts = await fetchCombinedVideoCounts({ force });
+    const match = pickSourceByCounts(counts, cacheBasename);
+    // A fuzzy hit on a short name is a guess, not a match: an on-device
+    // round is called `round_1`, and both of its tokens sit in "Do a full
+    // round practicing a combo. Today: 1 - 2 - 3 …" — 29 rows of someone
+    // else's labels. Fuzzy needs a name with something to go on.
+    const nTokens = normalize(stem).split(" ").filter(Boolean).length;
+    if (!match || (match.confidence !== "exact" && nTokens < 3)) {
+      return { error: "no source-video match in Combined Data for this cache", cacheBasename };
+    }
+    rows = await pull(match.name);
+    return { source_video: match.name, match_confidence: match.confidence,
+             n_rows: rows.length, rows };
+  } catch (err) {
+    return { error: err.message };
+  }
 }
