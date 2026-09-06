@@ -20,7 +20,10 @@
 // stage's own video + round mirrors, the side panel — and shows the current
 // clip on the footage with the skeleton overlay, the viewer's play / speed /
 // scrubber controls, and a bar with ◀ prev / next ▶ and the clip's facts. The
-// full clip list sits folded under the player for jumping around.
+// full clip list sits folded under the player for jumping around. The viewer's
+// own round-wide scrubber and frame label are hidden too: the strip under the
+// player is the timeline, and it spans the clip only — click or drag it to
+// seek, ⏮ ⏭ step frames, the speed control slows the loop.
 //
 // Data: lens_data/frontal_auto/index.json (the clip list) and, per clip,
 // clips/<id>.json — the clip's own COCO-17 skeleton (normalized x,y as uint16,
@@ -481,6 +484,18 @@ function renderInfo() {
   if (play) play.textContent = (mode === "video" ? !video()?.paused : playing) ? "⏸" : "▶";
   const loop = root.querySelector("#fa-loop");
   if (loop) loop.textContent = looping ? "⟳ looping" : "⟳ loop off";
+  const fr = root.querySelector("#fa-frame");
+  if (fr) {
+    const d = curData();
+    let k = null;
+    if (mode === "video") { const x = clipInLoaded(activeState, c); if (x) k = (activeState?.frame ?? 0) - x.s; }
+    else if (d) k = frame;
+    fr.innerHTML = d && k != null
+      ? `clip frame <code>${Math.max(0, Math.min(d.n - 1, k)) + 1}</code> / ${d.n}
+         · src <code>${fmtTime(c.start_sec + Math.max(0, Math.min(d.n - 1, k)) / d.fps)}</code>
+         ${k < 0 ? `<span style="color:${COLOR_MISS}">· before the clip</span>` : k > d.n - 1 ? `<span style="color:${COLOR_MISS}">· after the clip</span>` : ""}`
+      : "";
+  }
 }
 
 function renderList() {
@@ -582,7 +597,7 @@ export const FrontalAutoRule = {
       #picker-card > *:not(.lens-row):not(#drive-section) { display:none !important; }
       #picker-card.fa-drive-ok > #drive-section { display:none !important; }
       #picker-card { padding-bottom:6px !important; }
-      .stage-pick, #meta { display:none !important; }
+      .stage-pick, #meta, .controls, #frame-label { display:none !important; }
       #side { display:none !important; }
       .layout { display:block !important; }
       #stage { width:100% !important; max-width:none !important; padding:0 !important; background:none !important; }
@@ -604,19 +619,28 @@ export const FrontalAutoRule = {
         <div id="fa-stage" style="flex:1; min-width:320px">
           <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:6px">
             <button id="fa-prev" type="button" title="Previous clip (P)">◀ prev</button>
+            <button id="fa-fprev" type="button" title="Previous frame (←)">⏮</button>
             <button id="fa-play" type="button" title="Play / pause (Space)">⏸</button>
+            <button id="fa-fnext" type="button" title="Next frame (→)">⏭</button>
             <button id="fa-next" type="button" title="Next clip (N)">next ▶</button>
             <button id="fa-loop" type="button" title="Loop the clip / play through"></button>
+            <label class="small">speed
+              <select id="fa-speed">
+                <option value="0.25">0.25x</option><option value="0.5">0.5x</option>
+                <option value="1">1x</option><option value="2">2x</option>
+              </select></label>
             <span id="fa-info" style="font-size:13px; line-height:1.5"></span>
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
-          <canvas id="fa-strip" style="display:block; width:100%; height:14px; margin-top:6px; cursor:pointer"></canvas>
-          <div class="muted small" style="margin-top:4px">
+          <canvas id="fa-strip" style="display:block; width:100%; height:18px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
+          <div id="fa-frame" class="small" style="margin-top:3px; font-size:12px"></div>
+          <div class="muted small" style="margin-top:2px">
+            the strip is the clip's timeline — click or drag to seek ·
             <span style="color:${COLOR_IN}">green</span> = facing within the band ·
             <span style="color:${COLOR_OUT}">grey</span> = outside ·
             <span style="color:${COLOR_NOPOSE}">dark</span> = no pose ·
-            <kbd>N</kbd>/<kbd>P</kbd> next/prev · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames · click the strip to seek
+            <kbd>N</kbd>/<kbd>P</kbd> next/prev clip · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames
           </div>
         </div>
         <details style="width:100%; flex:none">
@@ -657,13 +681,33 @@ export const FrontalAutoRule = {
       else { playing = !playing; if (playing) clock = { t0: performance.now(), f0: frame }; renderSkeletonFrame(); }
       renderInfo();
     });
-    strip.addEventListener("click", e => {
+    // Frame steps: the viewer's frames in video mode, our clock's otherwise.
+    const stepFrame = dir => {
+      if (mode === "video") { if (activeState?.pose || activeState?.poseV6) seekTo((activeState.frame || 0) + dir); }
+      else seekFrame(frame + dir, { pause: true });
+    };
+    root.querySelector("#fa-fprev").addEventListener("click", () => stepFrame(-1));
+    root.querySelector("#fa-fnext").addEventListener("click", () => stepFrame(1));
+    root.querySelector("#fa-speed").value = String(ui.speed);
+    root.querySelector("#fa-speed").addEventListener("change", e => {
+      ui.speed = parseFloat(e.target.value) || 1; saveUi();
+      const vs = document.getElementById("speed");            // the viewer's own (hidden) speed control
+      if (vs) { vs.value = String(ui.speed); vs.dispatchEvent(new Event("change")); }
+      clock = { t0: performance.now(), f0: frame }; renderInfo(); if (mode === "skeleton") renderSkeletonFrame();
+    });
+    // The strip is the clip's timeline: click or drag anywhere on it to seek.
+    const seekAt = e => {
       const d = curData(); if (!d) return;
       const r = strip.getBoundingClientRect();
-      const f = Math.round((e.clientX - r.left) / Math.max(1, r.width) * (d.n - 1));
+      const f = Math.max(0, Math.min(d.n - 1, Math.round((e.clientX - r.left) / Math.max(1, r.width) * (d.n - 1))));
       if (mode === "video") { const x = clipInLoaded(activeState, curClip()); if (x) seekTo(x.s + f); }
       else seekFrame(f, { pause: true });
-    });
+    };
+    let dragging = false;
+    strip.addEventListener("pointerdown", e => { dragging = true; strip.setPointerCapture(e.pointerId); seekAt(e); });
+    strip.addEventListener("pointermove", e => { if (dragging) seekAt(e); });
+    strip.addEventListener("pointerup", () => { dragging = false; });
+    strip.addEventListener("pointercancel", () => { dragging = false; });
 
     rebuildVisible();
     setMode(mode);
