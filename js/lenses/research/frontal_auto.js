@@ -25,6 +25,16 @@
 // player is the timeline, and it spans the clip only — click or drag it to
 // seek, ⏮ ⏭ step frames, the speed control slows the loop.
 //
+// ON THE STRIP AND THE BODY (2026-09-06). The Sheet's labels for the clip —
+// via ../shared/slip_labels.js, the labeler web app — sit in a second lane of
+// the strip: lead / rear slips in their colours, straight punches coloured by
+// the head-off-center-line rule from ./head_offcenter.js (did the head come off
+// the line at the punch? green yes, red no — ../shared/center_line.js), other
+// punches grey. The rule's quantity is drawn on the body every frame: the hip
+// line, the head point and the offset between them, in torso heights, and a
+// badge names the slip or the punch the frame sits in with its verdict. No
+// axiality gate here: the whole set faces the camera by construction.
+//
 // Data: lens_data/frontal_auto/index.json (the clip list) and, per clip,
 // clips/<id>.json — the clip's own COCO-17 skeleton (normalized x,y as uint16,
 // visibility as uint8, base64), the video's width/height, and the per-frame
@@ -58,6 +68,8 @@
 
 import { drawSkeleton } from "../../skeleton.js";
 import { normStem } from "../shared/segment_set.js";
+import { COLOR as SLIP, SLIP_KIND, ensureSlipLabels, isPunchLabel, slipLabelState } from "../shared/slip_labels.js";
+import { computeCenterLine, isStraightType, straightVerdict } from "../shared/center_line.js";
 
 const DATA = "./lens_data/frontal_auto/";
 
@@ -147,6 +159,106 @@ function rebuildVisible() {
 
 const curClip = () => visible[cur] || null;
 const curData = () => { const r = curClip() && clipCache.get(curClip().id); return r?.status === "ok" ? r.data : null; };
+
+// ── the Sheet's labels + the center-line rule, for the current clip ─────────
+
+let labelMemo = { rows: null, clipId: null, fps: null, items: null };
+
+// The clip's slips and punches in CLIP frames: [{ kind: "slip", side, s, e } |
+// { kind: "punch", label, straight, s, e }]. Label times are source seconds,
+// the clip's frame 0 is at clip.start_sec (its round's pts clock).
+function clipLabels(c, d) {
+  if (!c || !d) return null;
+  ensureSlipLabels(c.stem);
+  const lab = slipLabelState();
+  if (lab.status !== "ok" || normStem(lab.key) !== normStem(c.stem)) return null;
+  if (labelMemo.rows === lab.rows && labelMemo.clipId === c.id && labelMemo.fps === d.fps) return labelMemo.items;
+  const items = [];
+  for (const r of lab.rows) {
+    const s = Math.round((r.start_sec - c.start_sec) * d.fps), e = Math.round((r.end_sec - c.start_sec) * d.fps);
+    if (e < 0 || s > d.n - 1) continue;
+    const cs = Math.max(0, s), ce = Math.min(d.n - 1, e);
+    if (SLIP_KIND[r.label]) items.push({ kind: "slip", side: SLIP_KIND[r.label], s: cs, e: ce, label: r.label });
+    else if (isPunchLabel(r.label)) items.push({ kind: "punch", label: r.label, straight: isStraightType(r.label), s: cs, e: ce });
+  }
+  items.sort((a, b) => a.s - b.s);
+  labelMemo = { rows: lab.rows, clipId: c.id, fps: d.fps, items };
+  return items;
+}
+
+// The center line for the clip: the viewer's pose in video mode (round frames,
+// `base` = the clip's first round frame), the clip's own skeleton in the
+// fallback (clip frames, base 0). Points come back in the pose's pixel space.
+function centerLineFor(d, state) {
+  if (mode === "video") {
+    const x = clipInLoaded(state, curClip());
+    const m = computeCenterLine(state?.poseV6 || state?.pose);
+    return m && !m.bad && x ? { m, base: x.s, w: state.pose?.width || null } : null;
+  }
+  if (!d) return null;
+  if (!d.posePx) {
+    const sk = new Float32Array(d.n * 17 * 2);
+    for (let i = 0; i < d.n * 17; i++) { sk[i * 2] = d.xy[i * 2] * d.width; sk[i * 2 + 1] = d.xy[i * 2 + 1] * d.height; }
+    d.posePx = { n_frames: d.n, skeleton: sk, conf: d.conf };
+  }
+  const m = computeCenterLine(d.posePx);
+  return m && !m.bad ? { m, base: 0 } : null;
+}
+
+// Verdict per straight punch of the clip, memoized on (labels, center line).
+let verdictMemo = { items: null, m: null, out: null };
+function straightVerdicts(items, cl) {
+  if (!items || !cl) return null;
+  if (verdictMemo.items === items && verdictMemo.m === cl.m) return verdictMemo.out;
+  const out = new Map();
+  for (const it of items) {
+    if (it.kind !== "punch" || !it.straight) continue;
+    const v = straightVerdict(cl.m, it.s + cl.base, it.e + cl.base);
+    if (v) out.set(it, v);
+  }
+  verdictMemo = { items, m: cl.m, out };
+  return out;
+}
+
+const itemsAt = (items, f) => (items || []).filter(it => it.s <= f && f <= it.e);
+
+// Draw the rule's quantity on the body: the hip line, the head point and the
+// offset between them. `toX/toY` map the pose's pixels to the target canvas.
+function drawCenterLine(ctx, cl, f, col, toX, toY, s = 1) {
+  const m = cl.m, fr = f + cl.base;
+  const hx = m.hipX[fr], hy = m.hipY[fr], hxHead = m.headX[fr], hyHead = m.headY[fr];
+  if (![hx, hy, hxHead, hyHead].every(Number.isFinite)) return;
+  const HX = toX(hx), HY = toY(hy), KX = toX(hxHead), KY = toY(hyHead);
+  ctx.save();
+  ctx.strokeStyle = COLOR_FRAME; ctx.lineWidth = 1.5 * s; ctx.setLineDash([6 * s, 6 * s]);
+  ctx.beginPath(); ctx.moveTo(HX, HY + 20 * s); ctx.lineTo(HX, KY - 60 * s); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = col; ctx.lineWidth = 4 * s;
+  ctx.beginPath(); ctx.moveTo(HX, KY); ctx.lineTo(KX, KY); ctx.stroke();
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(KX, KY, 5 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.font = `${Math.round(13 * s)}px ui-monospace, monospace`; ctx.textBaseline = "bottom"; ctx.textAlign = "left";
+  const v = m.off[fr];
+  ctx.fillText(`${v >= 0 ? "+" : ""}${Number.isFinite(v) ? v.toFixed(2) : "—"} torso`, Math.max(HX, KX) + 10 * s, KY - 4 * s);
+  ctx.restore();
+}
+
+// What the frame sits in, for the badge and the colour of the offset bar.
+function frameContext(items, verdicts, f) {
+  const here = itemsAt(items, f);
+  const slip = here.find(it => it.kind === "slip");
+  const punch = here.find(it => it.kind === "punch");
+  if (slip) return { text: `${slip.side.toUpperCase()} SLIP`, color: SLIP[slip.side] };
+  if (punch) {
+    const v = verdicts?.get(punch);
+    if (punch.straight && v) {
+      return { text: `${punch.label.toUpperCase()} · head ${v.ok ? "off the line" : "on the line"} ${Math.abs(v.peak).toFixed(2)}`,
+               color: v.ok ? COLOR_IN : COLOR_MISS };
+    }
+    return { text: punch.label.toUpperCase(), color: "#bbb" };
+  }
+  return null;
+}
 
 // ── the viewer's video: is the clip's round loaded, and where is the clip ───
 
@@ -372,22 +484,46 @@ function drawBadge(ctx, text, color, s = 1, y = 10) {
   ctx.restore();
 }
 
-// The strip under the player: every frame of the clip, in band / out / no
-// pose, with the playhead at clip frame `f`.
-function drawStrip(d, f) {
+// The strip under the player: the clip's frames. Top lane: facing in band /
+// out / no pose. Bottom lane: the Sheet's labels — slips in their colours,
+// straights by the center-line verdict, other punches grey. Playhead at clip
+// frame `f`.
+function drawStrip(d, f, items = null, verdicts = null) {
   if (!strip || !d) return;
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 14;
+  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 26;
   if (strip.width !== Math.round(cssW * dpr)) strip.width = Math.round(cssW * dpr);
   if (strip.height !== Math.round(cssH * dpr)) strip.height = Math.round(cssH * dpr);
   const ctx = strip.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cssW, cssH);
-  const colW = cssW / d.n;
+  const colW = cssW / d.n, laneH = 12, gap = 2;
   for (let i = 0; i < d.n; i++) {
     const v = d.deg[i];
     ctx.fillStyle = !Number.isFinite(v) ? COLOR_NOPOSE : inBand(v) ? COLOR_IN : COLOR_OUT;
-    ctx.fillRect(i * colW, 0, colW + 0.5, cssH);
+    ctx.fillRect(i * colW, 0, colW + 0.5, laneH);
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fillRect(0, laneH + gap, cssW, laneH);
+  if (items) {
+    for (const it of items) {
+      if (it.kind === "punch") {
+        const v = it.straight ? verdicts?.get(it) : null;
+        ctx.fillStyle = it.straight ? (v ? (v.ok ? COLOR_IN : COLOR_MISS) : "#bbb") : "#777";
+        ctx.globalAlpha = it.straight ? 0.9 : 0.45;
+        ctx.fillRect(it.s * colW, laneH + gap, Math.max(2, (it.e - it.s + 1) * colW), laneH);
+      }
+    }
+    for (const it of items) {
+      if (it.kind !== "slip") continue;
+      ctx.fillStyle = SLIP[it.side]; ctx.globalAlpha = 0.95;
+      ctx.fillRect(it.s * colW, laneH + gap, Math.max(2, (it.e - it.s + 1) * colW), laneH);
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillStyle = "#888"; ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "middle";
+    const lab = slipLabelState();
+    ctx.fillText(lab.status === "loading" ? "loading the Sheet's labels…" : lab.status === "error" ? `no labels — ${lab.error}` : "labels…", 4, laneH + gap + laneH / 2);
   }
   if (Number.isFinite(f)) { ctx.fillStyle = COLOR_FRAME; ctx.fillRect(Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH); }
 }
@@ -416,8 +552,12 @@ function renderSkeletonFrame() {
     boneColor: inBand(deg) ? "rgba(122,223,122,0.85)" : "rgba(255,255,255,0.7)",
     boneWidth: 3, jointRadius: 4, minConf: 0.3,
   });
-  drawCompass(ctx, deg, W);
   const c = curClip();
+  const items = clipLabels(c, d), cl = centerLineFor(d, activeState), verdicts = straightVerdicts(items, cl);
+  const fc = frameContext(items, verdicts, f);
+  if (cl) drawCenterLine(ctx, cl, f, fc?.color || "rgba(255,255,255,0.6)", x => x * W / d.width, y => y * H / d.height);
+  if (fc) drawBadge(ctx, fc.text, fc.color, 1, 10);
+  drawCompass(ctx, deg, W);
   ctx.save();
   ctx.font = "13px ui-monospace, monospace"; ctx.textBaseline = "bottom";
   const t = `skeleton only · frame ${f + 1}/${d.n} · src ${fmtTime(c.start_sec + f / d.fps)} · ${playing ? "▶" : "⏸"} ${ui.speed}x`;
@@ -426,7 +566,7 @@ function renderSkeletonFrame() {
   ctx.beginPath(); ctx.roundRect(8, H - 30, tw + 16, 24, 5); ctx.fill();
   ctx.fillStyle = "#ddd"; ctx.fillText(t, 16, H - 12);
   ctx.restore();
-  drawStrip(d, f);
+  drawStrip(d, f, items, verdicts);
 }
 
 // ── DOM ─────────────────────────────────────────────────────────────────────
@@ -473,12 +613,26 @@ function renderInfo() {
       : x ? `· <span style="color:${x.s <= f && f <= x.e ? COLOR_IN : COLOR_MISS}">${x.s <= f && f <= x.e ? "in the clip" : "outside the clip"}</span>
              <span class="muted">frames ${x.s}–${x.e}</span>` : "";
   }
+  const d0 = curData();
+  const items = clipLabels(c, d0);
+  let labelsTxt = "";
+  if (items) {
+    const nSlip = items.filter(i => i.kind === "slip").length;
+    const straights = items.filter(i => i.kind === "punch" && i.straight);
+    const cl = centerLineFor(d0, activeState), vs = straightVerdicts(items, cl);
+    const ok = straights.filter(i => vs?.get(i)?.ok).length, bad = straights.filter(i => vs?.get(i) && !vs.get(i).ok).length;
+    labelsTxt = ` · <span style="color:${SLIP.lead}">${nSlip} slip${nSlip === 1 ? "" : "s"}</span>
+      · ${straights.length} straight${straights.length === 1 ? "" : "s"}${vs ? ` (<span style="color:${COLOR_IN}">${ok} off the line</span> / <span style="color:${COLOR_MISS}">${bad} on it</span>)` : ""}`;
+  } else {
+    const lab = slipLabelState();
+    labelsTxt = lab.status === "loading" ? ` · <span class="muted">labels…</span>` : lab.status === "error" ? ` · <span class="muted">no Sheet labels</span>` : "";
+  }
   el.innerHTML =
     `<span style="font-size:15px; font-weight:600; color:${COLOR_CLIP}">clip ${cur + 1} / ${visible.length}</span>
      <span style="font-weight:600" title="${c.stem.replace(/"/g, "&quot;")}">${shortStem(c.stem, 52)}</span> <code>r${c.round}</code>
      <span class="muted"> · src ${fmtTime(c.start_sec)} → ${fmtTime(c.end_sec)} · ${c.duration_sec.toFixed(1)} s
      · ${Math.round(100 * c.frontal_frac)}% frontal · mean |${c.mean_abs_deg}°|
-     · ${c.in_hand_set ? `<span style="color:${COLOR_HAND}">hand-curated ${Math.round(100 * c.hand_frac)}%</span>` : "not in the hand set"}</span>
+     · ${c.in_hand_set ? `<span style="color:${COLOR_HAND}">hand-curated ${Math.round(100 * c.hand_frac)}%</span>` : "not in the hand set"}${labelsTxt}</span>
      ${where}`;
   const play = root.querySelector("#fa-play");
   if (play) play.textContent = (mode === "video" ? !video()?.paused : playing) ? "⏸" : "▶";
@@ -633,13 +787,17 @@ export const FrontalAutoRule = {
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
-          <canvas id="fa-strip" style="display:block; width:100%; height:18px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-strip" style="display:block; width:100%; height:26px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-frame" class="small" style="margin-top:3px; font-size:12px"></div>
           <div class="muted small" style="margin-top:2px">
-            the strip is the clip's timeline — click or drag to seek ·
-            <span style="color:${COLOR_IN}">green</span> = facing within the band ·
-            <span style="color:${COLOR_OUT}">grey</span> = outside ·
-            <span style="color:${COLOR_NOPOSE}">dark</span> = no pose ·
+            the strip is the clip's timeline — click or drag to seek · top lane:
+            <span style="color:${COLOR_IN}">facing within the band</span> /
+            <span style="color:${COLOR_OUT}">outside</span> /
+            <span style="color:${COLOR_NOPOSE}">no pose</span> · bottom lane, the Sheet's labels:
+            <span style="color:${SLIP.lead}">lead slip</span> ·
+            <span style="color:${SLIP.rear}">rear slip</span> ·
+            straights <span style="color:${COLOR_IN}">head off the line</span> /
+            <span style="color:${COLOR_MISS}">on the line</span> · other punches grey ·
             <kbd>N</kbd>/<kbd>P</kbd> next/prev clip · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames
           </div>
         </div>
@@ -752,7 +910,10 @@ export const FrontalAutoRule = {
     }
     renderInfo();
     const d = curData();
-    if (d && x) drawStrip(d, f - x.s);
+    if (d && x) {
+      const items = clipLabels(c, d), cl = centerLineFor(d, state);
+      drawStrip(d, f - x.s, items, straightVerdicts(items, cl));
+    }
   },
 
   // Video mode: red frame outside the clip, a badge, the compass.
@@ -775,6 +936,13 @@ export const FrontalAutoRule = {
     const d = curData();
     const deg = d && x && inNow ? d.deg[Math.min(d.n - 1, f - x.s)] : NaN;
     drawCompass(ctx, deg, ctx.canvas.width, s);
+    // The center line on the body, and what this frame sits in.
+    if (d && x) {
+      const items = clipLabels(c, d), cl = centerLineFor(d, state), verdicts = straightVerdicts(items, cl);
+      const fc = frameContext(items, verdicts, f - x.s);
+      if (cl) drawCenterLine(ctx, cl, f - x.s, fc?.color || "rgba(255,255,255,0.6)", v => v, v => v, s);
+      if (fc) drawBadge(ctx, fc.text, fc.color, s, 60);   // under the clip badge + progress bar
+    }
     if (x) {
       const fsz = Math.round(14 * s);
       const bx = 20 * s, by = 10 * s + fsz + 20 * s, bw = 220 * s, bh = 6 * s;

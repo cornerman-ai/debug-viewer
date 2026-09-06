@@ -17,12 +17,9 @@
 //
 // CENTER LINE VS SLIPS — the measurement (2026-09-06). Can the head-off-center-
 // line quantity, read at the right TIMES, find slips? The quantity is the one
-// the head-off-center-line lens (./head_offcenter.js) reads, on the COCO-17
-// remap: head x = midpoint of the visible head landmarks' horizontal extent
-// (nose, eyes, ears), reference = a vertical line through the hip center (the
-// hips stay planted in a slip; the spine tilts with it), unit = the round's
-// median torso height, smoothed over 5 frames like the defense research's
-// `lat`. The times are PUNCH-ANCHORED WINDOWS: the gaps between consecutive
+// the head-off-center-line lens (./head_offcenter.js) reads, computed in
+// ../shared/center_line.js (head extent midpoint vs the hip line, median-torso
+// units, 5-frame smoothing). The times are PUNCH-ANCHORED WINDOWS: the gaps between consecutive
 // punch labels, trimmed to `window` seconds from the nearest punch on each
 // side. Inside a punch the head is MEANT to leave the line (that is the
 // center-line rule), so punch frames are left out. A window is a slip window
@@ -49,6 +46,7 @@ import {
   COLOR, computePunches, computeSlips, curatedFrames, drawSlipTimeline, ensureSlipLabels,
   fmtTime, mountTimeline, refresh, seekTo, shortStem, slipLabelState, slipsAt,
 } from "../shared/slip_labels.js";
+import { computeCenterLine } from "../shared/center_line.js";
 
 const COLOR_TP   = "#7adf7a";   // slip window that fired
 const COLOR_FA   = "#ff5d6c";   // no-slip window that fired
@@ -67,67 +65,9 @@ const cl = { winS: 1.0, metric: "range", thr: 0.10, minConf: 0.3 };
 try { Object.assign(cl, JSON.parse(localStorage.getItem(CL_KEY) || "{}")); } catch {}
 function saveCl() { try { localStorage.setItem(CL_KEY, JSON.stringify(cl)); } catch {} }
 
-const HEAD_JOINTS = [J.NOSE, J.L_EYE, J.R_EYE, J.L_EAR, J.R_EAR];
-const SMOOTH_K = 5;
-
-function median(xs) {
-  const v = xs.filter(Number.isFinite).sort((a, b) => a - b);
-  if (!v.length) return NaN;
-  const m = Math.floor(v.length / 2);
-  return v.length % 2 ? v[m] : 0.5 * (v[m - 1] + v[m]);
-}
-
-function smooth(xs, k) {
-  const n = xs.length, half = Math.floor(k / 2), out = new Float64Array(n).fill(NaN);
-  for (let i = 0; i < n; i++) {
-    let s = 0, c = 0;
-    for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) {
-      if (Number.isFinite(xs[j])) { s += xs[j]; c++; }
-    }
-    if (c) out[i] = s / c;
-  }
-  return out;
-}
-
-let clCache = { pose: null };
-
-// { n, torso, off (torso units, smoothed), offMed, headX, headY, hipX, hipY }
-// or { bad } when the torso cannot be measured.
-function computeCenterLine(state) {
-  const pose = state.poseV6 || state.pose;
-  if (!pose) return null;
-  if (clCache.pose === pose && clCache.minConf === cl.minConf) return clCache;
-
-  const n = pose.n_frames, sk = pose.skeleton, cf = pose.conf;
-  const raw = new Float64Array(n).fill(NaN);
-  const headX = new Float64Array(n).fill(NaN), headY = new Float64Array(n).fill(NaN);
-  const hipX = new Float64Array(n).fill(NaN), hipY = new Float64Array(n).fill(NaN);
-  const torsos = [];
-  for (let f = 0; f < n; f++) {
-    const base = f * 17;
-    const jx = j => sk[(base + j) * 2], jy = j => sk[(base + j) * 2 + 1];
-    const ok = j => (!cf || cf[base + j] >= cl.minConf) && Number.isFinite(jx(j)) && Number.isFinite(jy(j));
-    if (!(ok(J.L_HIP) && ok(J.R_HIP) && ok(J.L_SHOULDER) && ok(J.R_SHOULDER))) continue;
-    const hx = 0.5 * (jx(J.L_HIP) + jx(J.R_HIP)), hy = 0.5 * (jy(J.L_HIP) + jy(J.R_HIP));
-    const sx = 0.5 * (jx(J.L_SHOULDER) + jx(J.R_SHOULDER)), sy = 0.5 * (jy(J.L_SHOULDER) + jy(J.R_SHOULDER));
-    const t = Math.hypot(sx - hx, sy - hy);
-    if (t > 1e-6) torsos.push(t);
-    let minX = Infinity, maxX = -Infinity, ys = 0, k = 0;
-    for (const j of HEAD_JOINTS) {
-      if (!ok(j)) continue;
-      minX = Math.min(minX, jx(j)); maxX = Math.max(maxX, jx(j)); ys += jy(j); k++;
-    }
-    if (!k) continue;
-    headX[f] = 0.5 * (minX + maxX); headY[f] = ys / k; hipX[f] = hx; hipY[f] = hy;
-    raw[f] = headX[f] - hx;
-  }
-  const torso = median(torsos);
-  if (!Number.isFinite(torso) || torso < 1e-6) { clCache = { pose, minConf: cl.minConf, bad: true }; return clCache; }
-  const off = smooth(Array.from(raw, v => v / torso), SMOOTH_K);
-  clCache = { pose, minConf: cl.minConf, n, torso, off, offMed: median(Array.from(off)),
-              headX, headY, hipX, hipY };
-  return clCache;
-}
+// The per-frame offset itself lives in ../shared/center_line.js (shared with
+// the Frontal (angle model) player); this lens adds the windows and the stats.
+const centerLine = state => computeCenterLine(state.poseV6 || state.pose, { minConf: cl.minConf });
 
 // ── punch-anchored windows ──────────────────────────────────────────────────
 
@@ -338,7 +278,7 @@ export const SlipsRule = {
     const sl = computeSlips(c);
     renderSlipLabels(sl);
 
-    const m = computeCenterLine(state);
+    const m = centerLine(state);
     const pun = computePunches(c);
     const win = (m && !m.bad && sl && pun) ? computeWindows(c, m, sl, pun) : null;
     const sc = win ? scoreWindows(win, sl) : null;
@@ -405,7 +345,7 @@ export const SlipsRule = {
 
     // The center line on the body: the hip line, the head point, and the
     // offset between them, colored by what this frame is.
-    const m = computeCenterLine(state);
+    const m = centerLine(state);
     if (!m || m.bad) return;
     const pun = computePunches(c);
     const win = (sl && pun) ? computeWindows(c, m, sl, pun) : null;
