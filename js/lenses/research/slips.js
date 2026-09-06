@@ -1,6 +1,6 @@
 // Slips lens — the curated frontal footage, grouped, with the Sheet's slip
-// labels on the timeline: the starting point for the slip work
-// (cornerman-backend/ml/research/defense).
+// labels on the timeline and the center-line-vs-slips measurement: the starting
+// point for the slip work (cornerman-backend/ml/research/defense).
 //
 // A slip is a lateral head movement OFF the opponent axis, so it is only
 // measurable when that axis is the camera axis: the curated frontal set, where
@@ -15,29 +15,243 @@
 // not vouch for. To step through the slips one at a time, looped, use the
 // Slips GT lens (./slips_gt.js).
 //
+// CENTER LINE VS SLIPS — the measurement (2026-09-06). Can the head-off-center-
+// line quantity, read at the right TIMES, find slips? The quantity is the one
+// the head-off-center-line lens (./head_offcenter.js) reads, on the COCO-17
+// remap: head x = midpoint of the visible head landmarks' horizontal extent
+// (nose, eyes, ears), reference = a vertical line through the hip center (the
+// hips stay planted in a slip; the spine tilts with it), unit = the round's
+// median torso height, smoothed over 5 frames like the defense research's
+// `lat`. The times are PUNCH-ANCHORED WINDOWS: the gaps between consecutive
+// punch labels, trimmed to `window` seconds from the nearest punch on each
+// side. Inside a punch the head is MEANT to leave the line (that is the
+// center-line rule), so punch frames are left out. A window is a slip window
+// when a labeled slip touches it. Per window one number — the offset's RANGE
+// inside the window (a move out and back), or its PEAK distance from the
+// round's median line — and the lens reports how well that number separates
+// slip windows from the rest (AUC) and what a threshold buys: slips caught,
+// false-alarm windows, precision, F1, with the best-F1 threshold named. The
+// defense research measured this signal round-wide three ways and it did not
+// find slips (S1: +0.007 recall for +349 FAs; `lat_stable`: worse); the timing
+// prior is the untested part, and only 48% of the frontal set's slips overlap
+// a punch label, 23% are more than 1 s from any punch (measured 2026-09-06,
+// 261 slips), so "reachable" is shown next to recall as its ceiling.
+//
 // Where the labels come from, the time base, and the shared drawing:
 // ../shared/slip_labels.js. Which videos and rounds count:
 // ../shared/frontal_set.js (refresh commands for both data files there).
-// No slip signals yet — those build on this.
 
+import { J } from "../../skeleton.js";
 import {
   frontalSetReady, getManifest, getManifestError, isCuratedRound, isCuratedVideo,
 } from "../shared/frontal_set.js";
 import {
-  COLOR, computeSlips, curatedFrames, drawSlipTimeline, ensureSlipLabels, fmtTime,
-  mountTimeline, refresh, seekTo, shortStem, slipLabelState, slipsAt,
+  COLOR, computePunches, computeSlips, curatedFrames, drawSlipTimeline, ensureSlipLabels,
+  fmtTime, mountTimeline, refresh, seekTo, shortStem, slipLabelState, slipsAt,
 } from "../shared/slip_labels.js";
+
+const COLOR_TP   = "#7adf7a";   // slip window that fired
+const COLOR_FA   = "#ff5d6c";   // no-slip window that fired
+const COLOR_MISS = "#ff9e64";   // slip window that stayed quiet
+const COLOR_NEG  = "#666";      // no-slip window, quiet
+const VERDICT_COLOR = { tp: COLOR_TP, fa: COLOR_FA, miss: COLOR_MISS, neg: COLOR_NEG };
 
 let host = null;
 let mountToken = 0;
 let lastBasename = null;
+
+// ── center line: per-frame head offset from the hip line ────────────────────
+
+const CL_KEY = "cornerman.slips.centerline.v1";
+const cl = { winS: 1.0, metric: "range", thr: 0.10, minConf: 0.3 };
+try { Object.assign(cl, JSON.parse(localStorage.getItem(CL_KEY) || "{}")); } catch {}
+function saveCl() { try { localStorage.setItem(CL_KEY, JSON.stringify(cl)); } catch {} }
+
+const HEAD_JOINTS = [J.NOSE, J.L_EYE, J.R_EYE, J.L_EAR, J.R_EAR];
+const SMOOTH_K = 5;
+
+function median(xs) {
+  const v = xs.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!v.length) return NaN;
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : 0.5 * (v[m - 1] + v[m]);
+}
+
+function smooth(xs, k) {
+  const n = xs.length, half = Math.floor(k / 2), out = new Float64Array(n).fill(NaN);
+  for (let i = 0; i < n; i++) {
+    let s = 0, c = 0;
+    for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) {
+      if (Number.isFinite(xs[j])) { s += xs[j]; c++; }
+    }
+    if (c) out[i] = s / c;
+  }
+  return out;
+}
+
+let clCache = { pose: null };
+
+// { n, torso, off (torso units, smoothed), offMed, headX, headY, hipX, hipY }
+// or { bad } when the torso cannot be measured.
+function computeCenterLine(state) {
+  const pose = state.poseV6 || state.pose;
+  if (!pose) return null;
+  if (clCache.pose === pose && clCache.minConf === cl.minConf) return clCache;
+
+  const n = pose.n_frames, sk = pose.skeleton, cf = pose.conf;
+  const raw = new Float64Array(n).fill(NaN);
+  const headX = new Float64Array(n).fill(NaN), headY = new Float64Array(n).fill(NaN);
+  const hipX = new Float64Array(n).fill(NaN), hipY = new Float64Array(n).fill(NaN);
+  const torsos = [];
+  for (let f = 0; f < n; f++) {
+    const base = f * 17;
+    const jx = j => sk[(base + j) * 2], jy = j => sk[(base + j) * 2 + 1];
+    const ok = j => (!cf || cf[base + j] >= cl.minConf) && Number.isFinite(jx(j)) && Number.isFinite(jy(j));
+    if (!(ok(J.L_HIP) && ok(J.R_HIP) && ok(J.L_SHOULDER) && ok(J.R_SHOULDER))) continue;
+    const hx = 0.5 * (jx(J.L_HIP) + jx(J.R_HIP)), hy = 0.5 * (jy(J.L_HIP) + jy(J.R_HIP));
+    const sx = 0.5 * (jx(J.L_SHOULDER) + jx(J.R_SHOULDER)), sy = 0.5 * (jy(J.L_SHOULDER) + jy(J.R_SHOULDER));
+    const t = Math.hypot(sx - hx, sy - hy);
+    if (t > 1e-6) torsos.push(t);
+    let minX = Infinity, maxX = -Infinity, ys = 0, k = 0;
+    for (const j of HEAD_JOINTS) {
+      if (!ok(j)) continue;
+      minX = Math.min(minX, jx(j)); maxX = Math.max(maxX, jx(j)); ys += jy(j); k++;
+    }
+    if (!k) continue;
+    headX[f] = 0.5 * (minX + maxX); headY[f] = ys / k; hipX[f] = hx; hipY[f] = hy;
+    raw[f] = headX[f] - hx;
+  }
+  const torso = median(torsos);
+  if (!Number.isFinite(torso) || torso < 1e-6) { clCache = { pose, minConf: cl.minConf, bad: true }; return clCache; }
+  const off = smooth(Array.from(raw, v => v / torso), SMOOTH_K);
+  clCache = { pose, minConf: cl.minConf, n, torso, off, offMed: median(Array.from(off)),
+              headX, headY, hipX, hipY };
+  return clCache;
+}
+
+// ── punch-anchored windows ──────────────────────────────────────────────────
+
+let winCache = { key: null };
+
+// Gaps between consecutive punch labels, trimmed to cl.winS seconds from the
+// nearest punch on each side (a gap under 2·winS is one window; the stretch
+// before the first punch / after the last gets one side). Each window carries
+// its metric value and the slips touching it.
+function computeWindows(c, m, sl, pun) {
+  const key = `${cl.winS}|${cl.metric}`;
+  if (winCache.pose === c.pose && winCache.sl === sl && winCache.pun === pun && winCache.key === key) return winCache;
+  const W = Math.max(1, Math.round(cl.winS * c.fps));
+  const gaps = [];
+  let prevEnd = -1;
+  for (const p of pun.punches) {
+    if (p.s > prevEnd + 1) gaps.push({ gs: prevEnd + 1, ge: p.s - 1, after: prevEnd >= 0, before: true });
+    prevEnd = Math.max(prevEnd, p.e);
+  }
+  if (prevEnd >= 0 && prevEnd < c.n - 1) gaps.push({ gs: prevEnd + 1, ge: c.n - 1, after: true, before: false });
+
+  const spans = [];
+  for (const g of gaps) {
+    if (g.after && g.before && g.ge - g.gs + 1 > 2 * W) {
+      spans.push({ s: g.gs, e: g.gs + W - 1, side: "after" });
+      spans.push({ s: g.ge - W + 1, e: g.ge, side: "before" });
+    } else if (g.after && g.before) {
+      spans.push({ s: g.gs, e: g.ge, side: "between" });
+    } else if (g.after) {
+      spans.push({ s: g.gs, e: Math.min(g.ge, g.gs + W - 1), side: "after" });
+    } else {
+      spans.push({ s: Math.max(g.gs, g.ge - W + 1), e: g.ge, side: "before" });
+    }
+  }
+
+  const windows = spans.map(w => {
+    let lo = Infinity, hi = -Infinity, peak = -Infinity, k = 0;
+    for (let f = w.s; f <= w.e; f++) {
+      const v = m.off[f];
+      if (!Number.isFinite(v)) continue;
+      k++; lo = Math.min(lo, v); hi = Math.max(hi, v);
+      peak = Math.max(peak, Math.abs(v - m.offMed));
+    }
+    const exc = k >= 3 ? (cl.metric === "range" ? hi - lo : peak) : NaN;
+    const slipIdx = [];
+    sl.slips.forEach((x, i) => { if (x.s <= w.e && x.e >= w.s) slipIdx.push(i); });
+    return { ...w, exc, slipIdx };
+  }).filter(w => Number.isFinite(w.exc));
+
+  winCache = { pose: c.pose, sl, pun, key, windows, W };
+  return winCache;
+}
+
+// Rank-based AUC of exc for slip windows vs the rest (ties share ranks).
+function auc(pos, neg) {
+  if (!pos.length || !neg.length) return NaN;
+  const all = [...pos.map(v => [v, 1]), ...neg.map(v => [v, 0])].sort((a, b) => a[0] - b[0]);
+  let i = 0, rankSumPos = 0;
+  while (i < all.length) {
+    let j = i;
+    while (j + 1 < all.length && all[j + 1][0] === all[i][0]) j++;
+    const r = (i + j) / 2 + 1;
+    for (let k = i; k <= j; k++) if (all[k][1]) rankSumPos += r;
+    i = j + 1;
+  }
+  return (rankSumPos - pos.length * (pos.length + 1) / 2) / (pos.length * neg.length);
+}
+
+// Verdict per window at cl.thr, slip-level recall, and the best-F1 threshold.
+function scoreWindows(win, sl) {
+  const windows = win.windows;
+  const reachable = new Set(), caught = new Set();
+  let tp = 0, fa = 0, miss = 0, neg = 0;
+  for (const w of windows) {
+    const pos = w.slipIdx.length > 0;
+    w.slipIdx.forEach(i => reachable.add(i));
+    const fired = w.exc >= cl.thr;
+    if (fired && pos)  { tp++;  w.verdict = "tp";  w.slipIdx.forEach(i => caught.add(i)); }
+    else if (fired)    { fa++;  w.verdict = "fa"; }
+    else if (pos)      { miss++; w.verdict = "miss"; }
+    else               { neg++; w.verdict = "neg"; }
+  }
+  const P = tp + fa ? tp / (tp + fa) : 0, R = tp + miss ? tp / (tp + miss) : 0;
+  const F1 = P + R ? 2 * P * R / (P + R) : 0;
+  const pos = windows.filter(w => w.slipIdx.length).map(w => w.exc);
+  const negs = windows.filter(w => !w.slipIdx.length).map(w => w.exc);
+
+  // Best F1 over the observed values, for the "what would a threshold buy" line.
+  let best = { thr: NaN, F1: 0, P: 0, R: 0 };
+  const cands = [...new Set(windows.map(w => +w.exc.toFixed(3)))].sort((a, b) => a - b);
+  for (const t of cands) {
+    let tpi = 0, fai = 0, mi = 0;
+    for (const w of windows) {
+      const f = w.exc >= t, p = w.slipIdx.length > 0;
+      if (f && p) tpi++; else if (f) fai++; else if (p) mi++;
+    }
+    const Pi = tpi + fai ? tpi / (tpi + fai) : 0, Ri = tpi + mi ? tpi / (tpi + mi) : 0;
+    const Fi = Pi + Ri ? 2 * Pi * Ri / (Pi + Ri) : 0;
+    if (Fi > best.F1) best = { thr: t, F1: Fi, P: Pi, R: Ri };
+  }
+
+  return {
+    windows, nPos: pos.length, nNeg: negs.length, tp, fa, miss, neg, P, R, F1,
+    auc: auc(pos, negs), reachable: reachable.size, caught: caught.size, nSlips: sl.slips.length,
+    best,
+    items: windows.map(w => ({ s: w.s, e: w.e, color: VERDICT_COLOR[w.verdict],
+                               alpha: w.verdict === "neg" ? 0.35 : 0.9 })),
+  };
+}
+
+const windowAt = (windows, f) => windows.find(w => w.s <= f && f <= w.e) || null;
+const fmt = (v, d = 2) => Number.isFinite(v) ? v.toFixed(d) : "—";
+
+// ── lens ────────────────────────────────────────────────────────────────────
 
 export const SlipsRule = {
   id: "slips",
   label: "Slips (curated frontal)",
 
   skeletonStyle() {
-    return { boneColor: "rgba(255,255,255,0.25)", boneWidth: 1.5, jointRadius: 3 };
+    return {
+      boneColor: "rgba(255,255,255,0.25)", boneWidth: 1.5, jointRadius: 3,
+      highlightJoints: new Set([J.NOSE, J.L_HIP, J.R_HIP]),
+    };
   },
 
   // Only the curated frontal videos in the video dropdown, and of those only
@@ -51,8 +265,8 @@ export const SlipsRule = {
     host = _host;
     host.innerHTML = `<h2>Slips</h2><p class="hint">Loading manifest…</p>`;
     mountTimeline({
-      id: "sl-timeline",
-      caption: "Curated frontal spans + Sheet slip labels in this round (click to seek)",
+      id: "sl-timeline", height: 106,
+      caption: "Curated frontal spans · Sheet slip labels · punch-anchored windows by verdict (click to seek)",
       onClick: seekTo,
     });
     if (state?.cacheBasename) ensureSlipLabels(state.cacheBasename);
@@ -124,7 +338,13 @@ export const SlipsRule = {
     const sl = computeSlips(c);
     renderSlipLabels(sl);
 
+    const m = computeCenterLine(state);
+    const pun = computePunches(c);
+    const win = (m && !m.bad && sl && pun) ? computeWindows(c, m, sl, pun) : null;
+    const sc = win ? scoreWindows(win, sl) : null;
     const f = state.frame;
+    renderCenterLine(c, m, sl, pun, win, sc, f);
+
     const inNow = c.entry && c.inSpan[f];
     if (frameEl) {
       const here = sl ? slipsAt(sl.slips, f) : [];
@@ -138,14 +358,16 @@ export const SlipsRule = {
              <span class="muted small">frames ${x.s}–${x.e}${x.curated ? "" : " · outside the curated spans"}</span>`).join("")}`;
     }
 
-    drawSlipTimeline(document.getElementById("sl-timeline"), c, sl, f);
+    drawSlipTimeline(document.getElementById("sl-timeline"), c, sl, f,
+      { extraLane: { label: "windows", items: sc ? sc.items : [] } });
   },
 
   draw(ctx, state) {
     const c = curatedFrames(state);
     if (!c) return;
     const s = state.renderScale || 1;
-    const inNow = c.entry && c.inSpan[state.frame];
+    const f = state.frame;
+    const inNow = c.entry && c.inSpan[f];
 
     // Frame the video in red whenever you're looking at footage that is NOT
     // part of the curated set — you cannot miss it while scrubbing.
@@ -175,11 +397,59 @@ export const SlipsRule = {
 
     // A second badge while the frame sits inside a labeled slip.
     const sl = computeSlips(c);
-    const here = sl ? slipsAt(sl.slips, state.frame) : [];
+    const here = sl ? slipsAt(sl.slips, f) : [];
     here.forEach((x, i) => {
       badge(`${x.kind.toUpperCase()} SLIP${x.curated ? "" : " (outside span)"}`,
             COLOR[x.kind], (10 + (i + 1) * (fsz / s + 20)) * s);
     });
+
+    // The center line on the body: the hip line, the head point, and the
+    // offset between them, colored by what this frame is.
+    const m = computeCenterLine(state);
+    if (!m || m.bad) return;
+    const pun = computePunches(c);
+    const win = (sl && pun) ? computeWindows(c, m, sl, pun) : null;
+    const w = win ? windowAt(win.windows, f) : null;
+    if (w && win) scoreWindows(win, sl);           // refresh verdicts at the current threshold
+    const hx = m.hipX[f], hy = m.hipY[f], hxHead = m.headX[f], hyHead = m.headY[f];
+    if (![hx, hy, hxHead, hyHead].every(Number.isFinite)) return;
+    const col = here.length ? COLOR[here[0].kind]
+      : w ? (w.verdict === "fa" ? COLOR_FA : w.verdict === "tp" ? COLOR_TP : "rgba(255,255,255,0.75)")
+      : "rgba(255,255,255,0.45)";
+    ctx.save();
+    ctx.strokeStyle = COLOR.frame;
+    ctx.lineWidth = 1.5 * s;
+    ctx.setLineDash([6 * s, 6 * s]);
+    ctx.beginPath(); ctx.moveTo(hx, hy + 20 * s); ctx.lineTo(hx, hyHead - 60 * s); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 4 * s;
+    ctx.beginPath(); ctx.moveTo(hx, hyHead); ctx.lineTo(hxHead, hyHead); ctx.stroke();
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(hxHead, hyHead, 5 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.font = `${Math.round(13 * s)}px ui-monospace, monospace`;
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`${m.off[f] >= 0 ? "+" : ""}${fmt(m.off[f])} torso`, Math.max(hx, hxHead) + 10 * s, hyHead - 4 * s);
+    ctx.restore();
+
+    // Corner HUD: the offset, and what window (if any) this frame sits in.
+    const lines = [
+      [`off ${m.off[f] >= 0 ? "+" : ""}${fmt(m.off[f])} · med ${fmt(m.offMed)}`, "#fff"],
+      w ? [`${w.side} window · ${cl.metric} ${fmt(w.exc)} ${w.exc >= cl.thr ? "≥" : "<"} ${cl.thr.toFixed(2)}`,
+           VERDICT_COLOR[w.verdict] || "#fff"]
+        : [pun ? "not in a punch window" : "no punch labels", "#888"],
+    ];
+    const hs = Math.round(13 * s), lineH = hs + 4 * s, padX = 10 * s, padY = 8 * s;
+    ctx.save();
+    ctx.font = `${hs}px ui-monospace, monospace`;
+    ctx.textBaseline = "top";
+    const boxW = Math.max(...lines.map(l => ctx.measureText(l[0]).width)) + padX * 2;
+    const boxH = lines.length * lineH + padY * 2 - 4 * s;
+    const bx = ctx.canvas.width - boxW - 10 * s, by = 10 * s;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 6 * s); ctx.fill();
+    lines.forEach(([t, colr], i) => { ctx.fillStyle = colr; ctx.fillText(t, bx + padX, by + padY + i * lineH); });
+    ctx.restore();
   },
 };
 
@@ -225,7 +495,34 @@ function renderShell() {
     <h3>Slip labels <span class="muted small">(Sheet · click to jump)</span>
       <button id="sl-refresh" type="button" style="font-size:11px; margin-left:6px">Refresh</button></h3>
     <div id="sl-lab-status" style="font-size:13px; line-height:1.6"></div>
-    <div id="sl-slips" style="font-size:12px; max-height:260px; overflow:auto"></div>
+    <div id="sl-slips" style="font-size:12px; max-height:200px; overflow:auto"></div>
+
+    <h3>Center line vs slips <span class="muted small">(punch-anchored windows)</span></h3>
+    <p class="hint">
+      Head offset from the vertical through the <span style="color:${COLOR.frame}">hip center</span>,
+      in torso heights — the head-off-center-line quantity. Windows are the
+      gaps between punch labels, trimmed to the seconds below on each side of a
+      punch; frames inside a punch are left out (there the head is meant to
+      move). A window is a slip window when a labeled slip touches it.
+      <span style="color:${COLOR_TP}">fired, slip</span> ·
+      <span style="color:${COLOR_FA}">fired, no slip</span> ·
+      <span style="color:${COLOR_MISS}">quiet, slip</span> ·
+      <span style="color:${COLOR_NEG}">quiet</span>.
+    </p>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12px">
+      <label>window <input id="sl-cl-win" type="number" min="0.2" max="3" step="0.1" value="${cl.winS}" style="width:58px"> s</label>
+      <label>metric
+        <select id="sl-cl-metric" style="font-size:12px">
+          <option value="range" ${cl.metric === "range" ? "selected" : ""}>range in window</option>
+          <option value="peak" ${cl.metric === "peak" ? "selected" : ""}>peak |offset − median|</option>
+        </select></label>
+    </div>
+    <label style="display:block; font-size:12px; margin-top:4px">
+      threshold = <output id="sl-cl-thr-out">${cl.thr.toFixed(2)}</output> torso
+      <input type="range" id="sl-cl-thr" min="0" max="0.8" step="0.01" value="${cl.thr}" style="width:100%"></label>
+    <div id="sl-cl-stats" style="font-size:13px; line-height:1.6; margin-top:4px"></div>
+    <canvas id="sl-cl-trace" width="320" height="130" style="display:block; margin-top:6px"></canvas>
+    <div class="muted small" id="sl-cl-legend">offset trace · slips shaded in their color · punches grey · window verdicts along the bottom</div>
 
     <h3>Current frame</h3>
     <div id="sl-frame" style="font-size:13px; line-height:1.6"></div>
@@ -242,6 +539,18 @@ function renderShell() {
   host.querySelector("#sl-refresh").addEventListener("click", () => {
     if (lastBasename) ensureSlipLabels(lastBasename, { force: true });
     refresh();
+  });
+  host.querySelector("#sl-cl-win").addEventListener("change", e => {
+    const v = parseFloat(e.target.value);
+    if (Number.isFinite(v) && v > 0) { cl.winS = v; saveCl(); refresh(); }
+  });
+  host.querySelector("#sl-cl-metric").addEventListener("change", e => {
+    cl.metric = e.target.value; saveCl(); refresh();
+  });
+  host.querySelector("#sl-cl-thr").addEventListener("input", e => {
+    cl.thr = parseFloat(e.target.value);
+    host.querySelector("#sl-cl-thr-out").textContent = cl.thr.toFixed(2);
+    saveCl(); refresh();
   });
 }
 
@@ -284,4 +593,112 @@ function renderSlipLabels(sl) {
   listEl.querySelectorAll(".sl-slip").forEach(el => {
     el.addEventListener("click", () => seekTo(sl.slips[+el.dataset.i].s));
   });
+}
+
+// ── center line section: stats + trace ──────────────────────────────────────
+
+function renderCenterLine(c, m, sl, pun, win, sc, f) {
+  const statsEl = host.querySelector("#sl-cl-stats");
+  const canvas = host.querySelector("#sl-cl-trace");
+  if (!statsEl) return;
+
+  if (!m || m.bad) {
+    statsEl.innerHTML = `<span class="muted">No usable torso in this cache — cannot measure the center line.</span>`;
+    drawTrace(canvas, c, m, sl, pun, null, f);
+    return;
+  }
+  if (!sl || !pun) {
+    statsEl.innerHTML = `<span class="muted">Waiting for the Sheet rows (slips + punches) to place the windows.</span>`;
+    drawTrace(canvas, c, m, null, null, null, f);
+    return;
+  }
+  if (!pun.punches.length) {
+    statsEl.innerHTML = `<span class="muted">No punch labels in this round — nothing to anchor windows to.</span>`;
+    drawTrace(canvas, c, m, sl, pun, null, f);
+    return;
+  }
+
+  statsEl.innerHTML =
+    `<code>${sc.windows.length}</code> windows ·
+     <span style="color:${COLOR_TP}">${sc.nPos} with a slip</span> /
+     <span style="color:${COLOR_NEG}">${sc.nNeg} without</span> ·
+     AUC <code>${fmt(sc.auc, 3)}</code><br>
+     at <code>${cl.thr.toFixed(2)}</code>: slips caught <code>${sc.caught}</code> / ${sc.nSlips}
+       <span class="muted small">(${sc.reachable} reachable by a window)</span> ·
+     <span style="color:${COLOR_FA}">FA ${sc.fa}</span> ·
+     <span style="color:${COLOR_MISS}">quiet slip windows ${sc.miss}</span><br>
+     P <code>${fmt(sc.P)}</code> · window R <code>${fmt(sc.R)}</code> · F1 <code>${fmt(sc.F1)}</code>
+     <span class="muted small">· best F1 <code>${fmt(sc.best.F1)}</code> at <code>${fmt(sc.best.thr)}</code>
+       (P ${fmt(sc.best.P)}, R ${fmt(sc.best.R)})</span>`;
+
+  drawTrace(canvas, c, m, sl, pun, sc, f);
+}
+
+// Sidebar trace: the offset over the round, slips and punches shaded, window
+// verdicts along the bottom, the median line, ±threshold for the peak metric.
+function drawTrace(canvas, c, m, sl, pun, sc, frame) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  if (!m || m.bad) return;
+  const N = m.n;
+  const xOf = f => (f / Math.max(1, N - 1)) * W;
+  const stripH = 6, plotH = H - stripH - 4;
+
+  let lo = Infinity, hi = -Infinity;
+  for (let f = 0; f < N; f++) { const v = m.off[f]; if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+  if (!Number.isFinite(lo)) return;
+  const pad = 0.1 * Math.max(0.2, hi - lo);
+  lo -= pad; hi += pad;
+  const yOf = v => plotH - 2 - ((v - lo) / (hi - lo)) * (plotH - 4);
+
+  if (pun) {
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    for (const p of pun.punches) ctx.fillRect(xOf(p.s), 0, Math.max(1, xOf(p.e) - xOf(p.s)), plotH);
+  }
+  if (sl) {
+    ctx.globalAlpha = 0.3;
+    for (const x of sl.slips) {
+      ctx.fillStyle = COLOR[x.kind];
+      ctx.fillRect(xOf(x.s), 0, Math.max(1.5, xOf(x.e) - xOf(x.s)), plotH);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(0, yOf(m.offMed)); ctx.lineTo(W, yOf(m.offMed)); ctx.stroke();
+  if (cl.metric === "peak") {
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    for (const sgn of [-1, 1]) {
+      const y = yOf(m.offMed + sgn * cl.thr);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+  }
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.85)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  let started = false;
+  for (let f = 0; f < N; f++) {
+    const v = m.off[f];
+    if (!Number.isFinite(v)) { started = false; continue; }
+    if (!started) { ctx.moveTo(xOf(f), yOf(v)); started = true; } else ctx.lineTo(xOf(f), yOf(v));
+  }
+  ctx.stroke();
+
+  if (sc) {
+    for (const w of sc.windows) {
+      ctx.fillStyle = VERDICT_COLOR[w.verdict];
+      ctx.globalAlpha = w.verdict === "neg" ? 0.4 : 0.95;
+      ctx.fillRect(xOf(w.s), H - stripH, Math.max(1.5, xOf(w.e) - xOf(w.s)), stripH);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.strokeStyle = COLOR.frame;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(xOf(frame), 0); ctx.lineTo(xOf(frame), H); ctx.stroke();
 }

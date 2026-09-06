@@ -29,6 +29,15 @@ export const COLOR = {
 };
 export const SLIP_KIND = { lead_slip: "lead", rear_slip: "rear" };
 
+// The Sheet's other rows: defensive moves and round/rest markers. A punch is
+// anything that is neither (jab_head, cross_head, lead_hook_head, …).
+export const DEFENSE_LABELS = new Set([
+  "lead_slip", "rear_slip", "lead_roll", "rear_roll", "pull_back", "duck", "step_back",
+]);
+const MARKER_LABELS = new Set(["round_start", "round_end", "rest_start", "rest_end"]);
+export const isPunchLabel = l =>
+  !!l && !MARKER_LABELS.has(l) && !DEFENSE_LABELS.has(l) && l !== "unsure";
+
 // ── curated frames of the loaded round ──────────────────────────────────────
 
 let cur = { pose: null, basename: null, entryStem: undefined };
@@ -124,6 +133,31 @@ export function computeSlips(c) {
 
 export const slipsAt = (slips, f) => slips.filter(x => x.s <= f && f <= x.e);
 
+let pc = { pose: null, rows: null };
+
+// The video's punch rows → this round's frames, time-ordered:
+// { punches: [{ s, e, label, startSec, endSec }], nVideo } — null while labels
+// are not in. Same frame convention as computeSlips.
+export function computePunches(c) {
+  if (!c || labels.status !== "ok") return null;
+  if (pc.pose === c.pose && pc.rows === labels.rows) return pc;
+  const startFrame = Math.floor(c.startSec * c.fps);
+  const punches = [];
+  let nVideo = 0;
+  for (const r of labels.rows) {
+    if (!isPunchLabel(r.label)) continue;
+    nVideo++;
+    const s = Math.floor(r.start_sec * c.fps) - startFrame;
+    const e = Math.floor(r.end_sec * c.fps) - startFrame;
+    if (e < 0 || s > c.n - 1) continue;
+    punches.push({ s: Math.max(0, s), e: Math.min(c.n - 1, e), label: r.label,
+                   startSec: r.start_sec, endSec: r.end_sec });
+  }
+  punches.sort((a, b) => a.s - b.s || a.e - b.e);
+  pc = { pose: c.pose, rows: labels.rows, punches, nVideo };
+  return pc;
+}
+
 // ── small shared bits ───────────────────────────────────────────────────────
 
 export function fmtTime(sec) {
@@ -185,7 +219,9 @@ export function mountTimeline({ id, caption, height = 84, onClick }) {
 // Track 1: curated spans (green / grey). Track 2: slip labels, lead lane over
 // rear lane, dimmed outside the curated spans. `highlight` (a slip from
 // computeSlips) is drawn bright with an outline and the rest recede.
-export function drawSlipTimeline(canvas, c, sl, frame, { highlight = null } = {}) {
+// `extraLane` = { label, items: [{ s, e, color, alpha }] } adds one more lane
+// under the slips (the canvas needs ~22px more height for it).
+export function drawSlipTimeline(canvas, c, sl, frame, { highlight = null, extraLane = null } = {}) {
   if (!canvas || !c) return;
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   const cssW = Math.max(1, canvas.getBoundingClientRect().width);
@@ -248,6 +284,20 @@ export function drawSlipTimeline(canvas, c, sl, frame, { highlight = null } = {}
     ctx.fillStyle = "#888";
     ctx.fillText(labels.status === "loading" ? "loading labels…" : "no labels",
                  TL_LABEL_W + 4, y2 + laneH + 4);
+  }
+
+  if (extraLane) {
+    const y3 = lanes.rear + laneH + 6;
+    ctx.fillStyle = "#aaa";
+    ctx.fillText(extraLane.label, 6, y3 + laneH / 2 + 3);
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.fillRect(TL_LABEL_W, y3, W - TL_LABEL_W - 4, laneH);
+    for (const it of extraLane.items || []) {
+      ctx.fillStyle = it.color;
+      ctx.globalAlpha = it.alpha ?? 0.9;
+      ctx.fillRect(xOf(it.s), y3, Math.max(2, xOf(it.e) - xOf(it.s)), laneH);
+    }
+    ctx.globalAlpha = 1;
   }
 
   ctx.strokeStyle = COLOR.frame;
