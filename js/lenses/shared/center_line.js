@@ -110,3 +110,56 @@ export function straightVerdict(m, s, e) {
   const sc = scoreOffCenter(peak);
   return { peak, peakF, quality: sc.quality, ok: sc.quality >= 50 };
 }
+
+// ── the three formulations of "slip" on that offset ─────────────────────────
+//
+// Which quantity says slip is the open question the Slip exploration lens puts
+// on screen: the head's POSITION relative to the hip line (`off`), its
+// DEVIATION from the boxer's own resting position (`dev` = off minus its
+// rolling 3-s median — a bladed stance sits off-center all round), or its
+// MOVEMENT (`travel` = the range of off inside a centered 0.5-s window, an
+// out-and-back; `vel` = |change over 0.1 s|). Measured on the hand-curated
+// frontal set against the Sheet's slips (ml/research/defense/slip_rule/):
+// position wins, movement alone is weak — see that script's docstring for the
+// numbers.
+
+export function rollingMedian(arr, win) {
+  const n = arr.length, half = Math.floor(win / 2), out = new Float64Array(n).fill(NaN);
+  for (let i = 0; i < n; i++) {
+    const w = [];
+    for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) if (Number.isFinite(arr[j])) w.push(arr[j]);
+    if (w.length >= Math.min(15, win)) { w.sort((a, b) => a - b); const m = w.length >> 1; out[i] = w.length % 2 ? w[m] : 0.5 * (w[m - 1] + w[m]); }
+  }
+  return out;
+}
+
+export function rollingRange(arr, win) {
+  const n = arr.length, half = Math.floor(win / 2), out = new Float64Array(n).fill(NaN);
+  for (let i = 0; i < n; i++) {
+    let lo = Infinity, hi = -Infinity, k = 0;
+    for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) {
+      const v = arr[j]; if (!Number.isFinite(v)) continue; k++; if (v < lo) lo = v; if (v > hi) hi = v;
+    }
+    if (k >= 5) out[i] = hi - lo;
+  }
+  return out;
+}
+
+const sigMemo = new WeakMap();   // center-line result → { fps, signals }
+
+// { dev, travel, vel } for a computeCenterLine() result, at `fps`. Memoized.
+export function centerLineSignals(m, fps = 30) {
+  if (!m || m.bad) return null;
+  const hit = sigMemo.get(m);
+  if (hit && hit.fps === fps) return hit.signals;
+  const off = m.off;
+  const dev = new Float64Array(off.length);
+  const base = rollingMedian(off, Math.round(3 * fps) | 1);
+  for (let i = 0; i < off.length; i++) dev[i] = off[i] - base[i];
+  const lag = Math.max(1, Math.round(0.1 * fps));
+  const vel = new Float64Array(off.length).fill(NaN);
+  for (let i = lag; i < off.length; i++) vel[i] = Math.abs(off[i] - off[i - lag]);
+  const signals = { dev, travel: rollingRange(off, Math.round(0.5 * fps) | 1), vel };
+  sigMemo.set(m, { fps, signals });
+  return signals;
+}

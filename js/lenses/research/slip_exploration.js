@@ -39,6 +39,15 @@
 // badge names the slip or the punch the frame sits in with its verdict. No
 // axiality gate here: the whole set faces the camera by construction.
 //
+// WHAT SAYS "SLIP"? Under the strip, four traces of the center-line quantity
+// over the clip, each with its own threshold: off (the head's distance from
+// the hip line), dev (its deviation from the boxer's own resting position),
+// travel (the range of off inside 0.5 s) and vel (its change over 0.1 s).
+// Labeled slips are shaded in the traces so you can see which formulation
+// lines up with what the labelers called a slip; frames past a threshold are
+// marked under each trace and the badge names the frame's live values. The
+// numbers behind the defaults: ml/research/defense/slip_rule/.
+//
 // Data: lens_data/frontal_auto/index.json (the clip list) and, per clip,
 // clips/<id>.json — the clip's own COCO-17 skeleton (normalized x,y as uint16,
 // visibility as uint8, base64), the video's width/height, and the per-frame
@@ -84,7 +93,7 @@
 import { drawSkeleton } from "../../skeleton.js";
 import { normStem } from "../shared/segment_set.js";
 import { COLOR as SLIP, SLIP_KIND, ensureSlipLabels, isPunchLabel, slipLabelState } from "../shared/slip_labels.js";
-import { computeCenterLine, isStraightType, straightVerdict } from "../shared/center_line.js";
+import { computeCenterLine, centerLineSignals, isStraightType, straightVerdict } from "../shared/center_line.js";
 import { fetchCombinedRowsForStem } from "../../sheet-labels.js";
 
 const DATA = "./lens_data/frontal_auto/";
@@ -149,7 +158,8 @@ function ensureClip(c) {
 // ── list order + current clip ───────────────────────────────────────────────
 
 const UI_KEY = "cornerman.slip_exploration.v1";
-const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null, muted: false };   // speed: the skeleton fallback's clock
+const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null, muted: false,
+             thr: { off: 0.22, dev: 0.24, travel: 0.50, vel: 0.12 } };   // speed: the skeleton fallback's clock
 try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || "{}")); } catch {}
 function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch {} }
 
@@ -630,6 +640,7 @@ function renderSkeletonFrame() {
   const fc = frameContext(items, verdicts, f);
   if (cl) drawCenterLine(ctx, cl, f, fc?.color || "rgba(255,255,255,0.6)", x => x * W / d.width, y => y * H / d.height);
   if (fc) drawBadge(ctx, fc.text, fc.color, 1, 10);
+  if (cl) drawBadge(ctx, liveValues(cl, f, d.fps), "#ddd", 1, fc ? 42 : 10);
   drawCompass(ctx, deg, W);
   ctx.save();
   ctx.font = "13px ui-monospace, monospace"; ctx.textBaseline = "bottom";
@@ -640,6 +651,105 @@ function renderSkeletonFrame() {
   ctx.fillStyle = "#ddd"; ctx.fillText(t, 16, H - 12);
   ctx.restore();
   drawStrip(d, f, items, verdicts);
+  drawTraces(d, f, items, cl);
+}
+
+// ── the four traces ─────────────────────────────────────────────────────────
+
+const TRACE_ROWS = [
+  { key: "off",    signed: true,  label: "off  · distance from the hip line" },
+  { key: "dev",    signed: true,  label: "dev  · deviation from the resting position (3 s median)" },
+  { key: "travel", signed: false, label: "travel · range of off inside 0.5 s" },
+  { key: "vel",    signed: false, label: "vel  · change of off over 0.1 s" },
+];
+
+function seriesFor(cl, fps) {
+  const sig = centerLineSignals(cl.m, fps);
+  return sig ? { off: cl.m.off, dev: sig.dev, travel: sig.travel, vel: sig.vel } : null;
+}
+
+let lastTrace = null;
+function redrawTraces() { if (lastTrace) drawTraces(...lastTrace); }
+
+// Rows of the clip's frames; labeled slips shaded, punches faint, the threshold
+// dashed (± for the signed rows), frames past it marked along the row's bottom.
+function drawTraces(d, f, items, cl) {
+  const canvas = root?.querySelector("#fa-traces");
+  if (!canvas || !d) return;
+  lastTrace = [d, f, items, cl];
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const cssW = Math.max(1, canvas.getBoundingClientRect().width), cssH = 176;
+  if (canvas.width !== Math.round(cssW * dpr)) canvas.width = Math.round(cssW * dpr);
+  if (canvas.height !== Math.round(cssH * dpr)) canvas.height = Math.round(cssH * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+  const rowH = cssH / TRACE_ROWS.length, colW = cssW / d.n;
+  const fps = mode === "video" ? (activeState?.pose?.fps || d.fps) : d.fps;
+  const series = cl ? seriesFor(cl, fps) : null;
+  ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "top";
+  TRACE_ROWS.forEach((row, ri) => {
+    const y0 = ri * rowH, thr = ui.thr[row.key];
+    const arr = series?.[row.key];
+    // scale: signed rows ±max(0.6, thr·1.2), unsigned 0..max(0.8, thr·1.5)
+    const lim = row.signed ? Math.max(0.6, thr * 1.2) : Math.max(0.8, thr * 1.5);
+    const yOf = v => row.signed ? y0 + rowH / 2 - (v / lim) * (rowH / 2 - 8) : y0 + rowH - 4 - (v / lim) * (rowH - 16);
+    ctx.fillStyle = "rgba(255,255,255,0.04)"; ctx.fillRect(0, y0, cssW, rowH - 1);
+    if (items) {
+      for (const it of items) {
+        if (it.kind === "punch") { ctx.fillStyle = "rgba(255,255,255,0.07)"; ctx.fillRect(it.s * colW, y0, Math.max(1, (it.e - it.s + 1) * colW), rowH - 1); }
+      }
+      for (const it of items) {
+        if (it.kind !== "slip") continue;
+        ctx.fillStyle = SLIP[it.side]; ctx.globalAlpha = 0.22;
+        ctx.fillRect(it.s * colW, y0, Math.max(1.5, (it.e - it.s + 1) * colW), rowH - 1);
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+    if (row.signed) {
+      ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(0, yOf(0)); ctx.lineTo(cssW, yOf(0)); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.setLineDash([4, 4]);
+      for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, yOf(sgn * thr)); ctx.lineTo(cssW, yOf(sgn * thr)); ctx.stroke(); }
+    } else {
+      ctx.beginPath(); ctx.moveTo(0, yOf(thr)); ctx.lineTo(cssW, yOf(thr)); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    if (arr) {
+      const base = cl.base;
+      ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.lineWidth = 1.2; ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < d.n; i++) {
+        const v = arr[i + base];
+        if (!Number.isFinite(v)) { started = false; continue; }
+        const vv = Math.max(-lim, Math.min(lim, v));
+        if (!started) { ctx.moveTo(i * colW, yOf(vv)); started = true; } else ctx.lineTo(i * colW, yOf(vv));
+      }
+      ctx.stroke();
+      ctx.fillStyle = "#ff9e64";                      // past the threshold
+      for (let i = 0; i < d.n; i++) {
+        const v = arr[i + base];
+        if (Number.isFinite(v) && Math.abs(v) >= thr) ctx.fillRect(i * colW, y0 + rowH - 4, colW + 0.5, 3);
+      }
+    }
+    ctx.fillStyle = "#aaa"; ctx.fillText(row.label, 6, y0 + 3);
+    const vNow = arr ? arr[f + cl.base] : NaN;
+    ctx.fillStyle = Number.isFinite(vNow) && Math.abs(vNow) >= thr ? "#ff9e64" : "#ddd"; ctx.textAlign = "right";
+    ctx.fillText(Number.isFinite(vNow) ? `${vNow >= 0 ? "+" : ""}${vNow.toFixed(2)}` : "—", cssW - 6, y0 + 3);
+    ctx.textAlign = "left";
+  });
+  ctx.fillStyle = COLOR_FRAME;
+  ctx.fillRect(Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH);
+}
+
+// "off +0.31 · dev +0.28 · travel 0.19 · vel 0.05" for the frame's badge.
+function liveValues(cl, f, fps) {
+  const series = seriesFor(cl, fps);
+  if (!series) return "";
+  const fr = f + cl.base;
+  const fmt = v => Number.isFinite(v) ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}` : "—";
+  return `off ${fmt(series.off[fr])} · dev ${fmt(series.dev[fr])} · travel ${fmt(series.travel[fr])} · vel ${fmt(series.vel[fr])}`;
 }
 
 // ── DOM ─────────────────────────────────────────────────────────────────────
@@ -870,6 +980,13 @@ export const SlipExplorationRule = {
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
           <canvas id="fa-strip" style="display:block; width:100%; height:26px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-frame" class="small" style="margin-top:3px; font-size:12px"></div>
+          <canvas id="fa-traces" style="display:block; width:100%; height:176px; margin-top:8px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
+          <div id="fa-thr" style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:4px">
+            ${["off", "dev", "travel", "vel"].map(k => `
+              <label>${k} ≥ <output id="fa-thr-${k}-out">${ui.thr[k].toFixed(2)}</output>
+                <input type="range" id="fa-thr-${k}" min="0" max="1" step="0.01" value="${ui.thr[k]}" style="width:110px; vertical-align:middle"></label>`).join("")}
+            <span class="muted small">torso units · position (off, dev) vs movement (travel, vel); frames past a threshold are marked under each trace</span>
+          </div>
           <div class="muted small" style="margin-top:2px">
             the strip is the clip's timeline — click or drag to seek · top lane:
             <span style="color:${COLOR_IN}">facing within the band</span> /
@@ -940,19 +1057,28 @@ export const SlipExplorationRule = {
       if (vs) { vs.value = String(ui.speed); vs.dispatchEvent(new Event("change")); }
       clock = { t0: performance.now(), f0: frame }; renderInfo(); if (mode === "skeleton") renderSkeletonFrame();
     });
+    for (const k of ["off", "dev", "travel", "vel"]) {
+      root.querySelector(`#fa-thr-${k}`).addEventListener("input", e => {
+        ui.thr[k] = parseFloat(e.target.value); saveUi();
+        root.querySelector(`#fa-thr-${k}-out`).textContent = ui.thr[k].toFixed(2);
+        redrawTraces();
+      });
+    }
     // The strip is the clip's timeline: click or drag anywhere on it to seek.
     const seekAt = e => {
       const d = curData(); if (!d) return;
-      const r = strip.getBoundingClientRect();
+      const r = (e.currentTarget || strip).getBoundingClientRect();
       const f = Math.max(0, Math.min(d.n - 1, Math.round((e.clientX - r.left) / Math.max(1, r.width) * (d.n - 1))));
       if (mode === "video") { const x = clipInLoaded(activeState, curClip()); if (x) seekTo(x.s + f); }
       else seekFrame(f, { pause: true });
     };
     let dragging = false;
-    strip.addEventListener("pointerdown", e => { dragging = true; strip.setPointerCapture(e.pointerId); seekAt(e); });
-    strip.addEventListener("pointermove", e => { if (dragging) seekAt(e); });
-    strip.addEventListener("pointerup", () => { dragging = false; });
-    strip.addEventListener("pointercancel", () => { dragging = false; });
+    for (const el of [strip, root.querySelector("#fa-traces")]) {
+      el.addEventListener("pointerdown", e => { dragging = true; el.setPointerCapture(e.pointerId); seekAt(e); });
+      el.addEventListener("pointermove", e => { if (dragging) seekAt(e); });
+      el.addEventListener("pointerup", () => { dragging = false; });
+      el.addEventListener("pointercancel", () => { dragging = false; });
+    }
 
     rebuildVisible();
     setMode(mode);
@@ -1000,6 +1126,7 @@ export const SlipExplorationRule = {
     if (d && x) {
       const items = clipLabels(c, d), cl = centerLineFor(d, state);
       drawStrip(d, f - x.s, items, straightVerdicts(items, cl));
+      drawTraces(d, f - x.s, items, cl);
     }
   },
 
@@ -1029,6 +1156,7 @@ export const SlipExplorationRule = {
       const fc = frameContext(items, verdicts, f - x.s);
       if (cl) drawCenterLine(ctx, cl, f - x.s, fc?.color || "rgba(255,255,255,0.6)", v => v, v => v, s);
       if (fc) drawBadge(ctx, fc.text, fc.color, s, 60);   // under the clip badge + progress bar
+      if (cl) drawBadge(ctx, liveValues(cl, f - x.s, state.pose?.fps || d.fps), "#ddd", s, fc ? 92 : 60);
     }
     if (x) {
       const fsz = Math.round(14 * s);
