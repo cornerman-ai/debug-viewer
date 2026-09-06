@@ -23,7 +23,8 @@
 // stage's own video + round mirrors, the side panel — and shows the current
 // clip on the footage with the skeleton overlay, the viewer's play / speed /
 // scrubber controls, and a bar with ◀ prev / next ▶ and the clip's facts. The
-// full clip list sits folded under the player for jumping around. The viewer's
+// full clip list sits folded under the player for jumping around; ◀◀ / ▶▶ video
+// (Shift+P / Shift+N) jump to the first span of the previous / next video. The viewer's
 // own round-wide scrubber and frame label are hidden too: the strip under the
 // player is the timeline, and it spans the clip only — click or drag it to
 // seek, ⏮ ⏭ step frames, the speed control slows the loop.
@@ -46,14 +47,16 @@
 // (15-20 min for the model pass; `--from-angles` re-segments and re-writes the
 // clip files in seconds).
 //
-// THE NEXT CLIP IS WARMED WHILE YOU WATCH THIS ONE. Switching videos was slow
-// because a Drive for Desktop file in streaming mode is a placeholder until it
-// is read, and the first read downloads all of it. So when a clip starts, the
-// lens asks the viewer to drain the NEXT clip's video and cache files
+// THE NEXT TEN CLIPS ARE WARMED WHILE YOU WATCH THIS ONE. Switching videos was
+// slow because a Drive for Desktop file in streaming mode is a placeholder
+// until it is read, and the first read downloads all of it. So when a clip
+// starts, the lens walks the next PREFETCH_AHEAD clips in list order and, one
+// video at a time (nearest first, no bandwidth fight with the current clip),
+// asks the viewer to drain each new video's file and cache files
 // (window.cornermanPrefetchVideo — bytes read and discarded, so Drive fetches
-// them now), pulls the next video's Sheet rows into sheet-labels.js's cache,
-// and fetches the next clip's skeleton file. Pressing next then mostly finds
-// everything local.
+// them now), pulls its Sheet rows into sheet-labels.js's cache, and fetches
+// every clip's skeleton file. Jumping elsewhere re-plans from there. The bar
+// shows how far the warming got.
 //
 // WHEN THE DRIVE LIST IS READ. The viewer mounts a lens BEFORE it repopulates
 // the video dropdown for it, so at mount time the dropdown still holds the
@@ -370,8 +373,7 @@ function showClip(i) {
   ui.lastId = c.id; saveUi();
   listKey = null;
   ensureClip(c);                                        // strip + compass (+ the fallback's skeleton)
-  const nxt = visible[(cur + 1) % visible.length];
-  if (nxt && nxt !== c) prefetchClip(nxt, c);
+  prefetchAhead(cur);
 
   // Real footage when the clip's round is already loaded (by hand, or by us)
   // or its video is in the Drive index; the exported skeleton otherwise.
@@ -394,22 +396,61 @@ function showClip(i) {
   }
 }
 
-// Warm what the next clip will need: its skeleton file, its video's Sheet rows
+// Warm what the next PREFETCH_AHEAD clips will need: every clip's skeleton
+// file (small, all at once), and for each NEW video among them, in list order
+// and one at a time, its file + cache files on the Drive and its Sheet rows
 // (into sheet-labels.js's per-video cache, not the shared single-slot state
-// the current clip is using), and — when it is in another video — that
-// video's file + cache files on the Drive.
-const prefetchedStems = new Set();
-function prefetchClip(nxt, current) {
-  ensureClip(nxt);
-  if (normStem(nxt.stem) === normStem(current.stem)) return;
-  if (!prefetchedStems.has(nxt.stem)) {
-    prefetchedStems.add(nxt.stem);
-    fetchCombinedRowsForStem(nxt.stem).catch(() => {});
+// the current clip is using). A newer call supersedes an older walk.
+const PREFETCH_AHEAD = 10;
+const videoWarmed = new Set(), rowsWarmed = new Set();   // per stem, separately
+let warmGen = 0;
+async function prefetchAhead(from) {
+  const gen = ++warmGen;
+  const cur0 = visible[from];
+  if (!cur0 || visible.length < 2) return;
+  const ahead = [];
+  for (let k = 1; k <= Math.min(PREFETCH_AHEAD, visible.length - 1); k++) ahead.push(visible[(from + k) % visible.length]);
+  ahead.forEach(ensureClip);
+  const stems = [];
+  for (const c of ahead) {
+    if (normStem(c.stem) === normStem(cur0.stem) || stems.includes(c.stem)) continue;
+    stems.push(c.stem);
   }
-  const opt = driveOption(nxt);
-  if (opt && typeof window.cornermanPrefetchVideo === "function") {
-    window.cornermanPrefetchVideo(opt.value).catch(() => {});
+  let done = 0;
+  const show = () => { const el = root?.querySelector("#fa-warm"); if (el) el.textContent = stems.length ? `· warming next videos ${done}/${stems.length}` : ""; };
+  show();
+  for (const stem of stems) {
+    if (gen !== warmGen) return;                          // the user moved on; a newer walk runs
+    if (!videoWarmed.has(stem)) {
+      const opt = driveOption({ stem });                  // only when the Drive lists it
+      if (opt && typeof window.cornermanPrefetchVideo === "function") {
+        let ok = false;
+        try { ok = await window.cornermanPrefetchVideo(opt.value); } catch { /* noted by the viewer */ }
+        if (ok) videoWarmed.add(stem);
+      }
+    }
+    if (!rowsWarmed.has(stem)) {
+      try { await fetchCombinedRowsForStem(stem); rowsWarmed.add(stem); } catch { /* the lane says so when it matters */ }
+    }
+    if (gen !== warmGen) return;
+    done++; show();
   }
+}
+
+// The first clip (in list order) of the previous / next video relative to the
+// current clip's video. In "by video" order that is the neighbouring block;
+// in the other orders it is the next clip along whose video differs, taken at
+// that video's first appearance in the list.
+function neighbourVideoIndex(dir) {
+  if (!visible.length || cur < 0) return -1;
+  const here = normStem(visible[cur].stem);
+  for (let k = 1; k < visible.length; k++) {
+    const j = ((cur + dir * k) % visible.length + visible.length) % visible.length;
+    const st = normStem(visible[j].stem);
+    if (st === here) continue;
+    return visible.findIndex(c => normStem(c.stem) === st);
+  }
+  return -1;
 }
 
 const driveConnected = () => {
@@ -742,6 +783,8 @@ window.addEventListener("resize", () => {
 document.addEventListener("keydown", e => {
   if (!root || !document.contains(root) || activeState?.rule !== SlipExplorationRule) return;
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "N" && e.shiftKey) { const j = neighbourVideoIndex(1); if (j >= 0) showClip(j); e.preventDefault(); e.stopImmediatePropagation(); return; }
+  if (e.key === "P" && e.shiftKey) { const j = neighbourVideoIndex(-1); if (j >= 0) showClip(j); e.preventDefault(); e.stopImmediatePropagation(); return; }
   if (e.key === "n" || e.key === "N") { showClip(cur + 1); e.preventDefault(); e.stopImmediatePropagation(); return; }
   if (e.key === "p" || e.key === "P") { showClip(cur - 1); e.preventDefault(); e.stopImmediatePropagation(); return; }
   if (mode !== "skeleton") return;
@@ -806,11 +849,13 @@ export const SlipExplorationRule = {
       <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap">
         <div id="fa-stage" style="flex:1; min-width:320px">
           <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:6px">
+            <button id="fa-vprev" type="button" title="First span of the previous video (Shift+P)">◀◀ video</button>
             <button id="fa-prev" type="button" title="Previous clip (P)">◀ prev</button>
             <button id="fa-fprev" type="button" title="Previous frame (←)">⏮</button>
             <button id="fa-play" type="button" title="Play / pause (Space)">⏸</button>
             <button id="fa-fnext" type="button" title="Next frame (→)">⏭</button>
             <button id="fa-next" type="button" title="Next clip (N)">next ▶</button>
+            <button id="fa-vnext" type="button" title="First span of the next video (Shift+N)">video ▶▶</button>
             <button id="fa-loop" type="button" title="Loop the clip / play through"></button>
             <label class="small">speed
               <select id="fa-speed">
@@ -819,6 +864,7 @@ export const SlipExplorationRule = {
               </select></label>
             <button id="fa-mute" type="button" title="Mute / unmute (M)">🔊</button>
             <span id="fa-info" style="font-size:13px; line-height:1.5"></span>
+            <span id="fa-warm" class="muted small"></span>
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
@@ -833,7 +879,7 @@ export const SlipExplorationRule = {
             <span style="color:${SLIP.rear}">rear slip</span> ·
             straights <span style="color:${COLOR_IN}">head off the line</span> /
             <span style="color:${COLOR_MISS}">on the line</span> · other punches grey ·
-            <kbd>N</kbd>/<kbd>P</kbd> next/prev clip · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames
+            <kbd>N</kbd>/<kbd>P</kbd> next/prev clip · <kbd>Shift+N</kbd>/<kbd>Shift+P</kbd> next/prev video · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames
           </div>
         </div>
         <details style="width:100%; flex:none">
@@ -865,6 +911,8 @@ export const SlipExplorationRule = {
     });
     root.querySelector("#fa-prev").addEventListener("click", () => showClip(cur - 1));
     root.querySelector("#fa-next").addEventListener("click", () => showClip(cur + 1));
+    root.querySelector("#fa-vprev").addEventListener("click", () => { const j = neighbourVideoIndex(-1); if (j >= 0) showClip(j); });
+    root.querySelector("#fa-vnext").addEventListener("click", () => { const j = neighbourVideoIndex(1); if (j >= 0) showClip(j); });
     root.querySelector("#fa-loop").addEventListener("click", () => {
       looping = !looping;
       if (looping && curClip() && mode === "video") startVideoLoop(curClip()); else renderInfo();
