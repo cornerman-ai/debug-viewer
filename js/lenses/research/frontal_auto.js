@@ -30,6 +30,15 @@
 // (15-20 min for the model pass; `--from-angles` re-segments and re-writes the
 // clip files in seconds).
 //
+// WHEN THE DRIVE LIST IS READ. The viewer mounts a lens BEFORE it repopulates
+// the video dropdown for it, so at mount time the dropdown still holds the
+// previous lens's filtered list (the Slips lens leaves 24 videos in it). The
+// "is this clip's video on the Drive?" decision therefore runs a tick after
+// mount, and a MutationObserver on the dropdown re-runs it whenever the list
+// changes — the Drive index also arrives asynchronously after a page load —
+// so a clip that started as skeleton-only switches to its footage the moment
+// the video shows up.
+//
 // TWO WAYS TO SHOW A CLIP. With the Drive folder connected the lens loads the
 // clip's video + round by driving the viewer's own video and round selects
 // (the same two selects bladedness's gotoRound drives), then loops the clip on
@@ -175,29 +184,44 @@ function seekTo(f) {
   slider.value = f;
   slider.dispatchEvent(new Event("input"));
 }
-const wait = ms => new Promise(r => setTimeout(r, ms));
-async function waitFor(cond, ms) {
-  const t0 = performance.now();
-  while (performance.now() - t0 < ms) { if (cond()) return true; await wait(100); }
-  return cond();
-}
-
 // Load the clip's video + round through the viewer's selects. Resolves true
-// once that round is the loaded one.
+// once that round is the loaded one. Event-driven, not polled: the viewer
+// remounts this lens on every round load and calls update() on every redraw,
+// and both poke `pendingCheck`; a MutationObserver watches the round dropdown
+// for the clip's round to appear. (Polling with chained timers stalls in a
+// background tab, where Chrome throttles them to once a minute.)
 let pending = null;
-async function loadClipRound(c) {
+let pendingCheck = null;
+function loadClipRound(c) {
   const opt = driveOption(c);
-  if (!opt) return false;
+  if (!opt) return Promise.resolve(false);
   note(`Loading ${shortStem(c.stem)} r${c.round}…`);
   const vsel = document.getElementById("video-pick");
   if (vsel.value !== opt.value) { vsel.value = opt.value; vsel.dispatchEvent(new Event("change")); }
   const rsel = document.getElementById("round-select");
-  const roundReady = () => rsel && [...rsel.options].some(o => o.value === String(c.round) && !o.disabled);
-  if (!await waitFor(roundReady, 20000)) { note(`r${c.round} of ${shortStem(c.stem)} is not in the Drive index.`); return false; }
-  if (rsel.value !== String(c.round)) { rsel.value = String(c.round); rsel.dispatchEvent(new Event("change")); }
-  if (!await waitFor(() => !!clipInLoaded(activeState, c), 20000)) { note("The round did not finish loading."); return false; }
-  note("");
-  return true;
+  return new Promise(resolve => {
+    let done = false, roundPicked = false;
+    const finish = ok => { if (done) return; done = true; mo?.disconnect(); clearTimeout(timer); pendingCheck = null; resolve(ok); };
+    const check = () => {
+      if (done) return;
+      if (clipInLoaded(activeState, c)) { note(""); return finish(true); }
+      // The video's first round loads on its own; if it is not the clip's,
+      // pick the clip's round once the dropdown offers it.
+      if (!roundPicked && rsel && [...rsel.options].some(o => o.value === String(c.round) && !o.disabled)
+          && rsel.value !== String(c.round)) {
+        roundPicked = true;
+        rsel.value = String(c.round); rsel.dispatchEvent(new Event("change"));
+      }
+    };
+    pendingCheck = check;
+    const mo = rsel ? new MutationObserver(check) : null;
+    mo?.observe(rsel, { childList: true, attributes: true, subtree: true });
+    const timer = setTimeout(() => {
+      note(clipInLoaded(activeState, c) ? "" : `${shortStem(c.stem)} r${c.round} did not load from the Drive folder.`);
+      finish(!!clipInLoaded(activeState, c));
+    }, 25000);
+    check();
+  });
 }
 
 // ── the player ──────────────────────────────────────────────────────────────
@@ -417,6 +441,8 @@ function renderAll() { renderParams(); renderInfo(); renderList(); if (mode === 
 function renderParams() {
   const el = root?.querySelector("#fa-params");
   if (!el) return;
+  // The Drive connect section stays visible until the folder is connected.
+  document.getElementById("picker-card")?.classList.toggle("fa-drive-ok", driveConnected());
   if (indexError) {
     el.innerHTML = `<span style="color:${COLOR_MISS}">frontal_auto/index.json failed to load — ${indexError}.</span>
       Generate it with <code>python -m ml.frontal_auto</code> in cornerman-backend.`;
@@ -485,6 +511,22 @@ function renderList() {
   listEl.querySelector(".fa-clip[style*='rgba(255,255,255,0.08)']")?.scrollIntoView({ block: "nearest" });
 }
 
+// The Drive list changed (repopulated for this lens, or the index arrived):
+// a clip playing as skeleton-only because its video "was not there" gets
+// another look.
+let listObserver = null;
+function watchDriveList() {
+  const vsel = document.getElementById("video-pick");
+  if (!vsel || listObserver) return;
+  listObserver = new MutationObserver(() => {
+    if (!root || !document.contains(root) || activeState?.rule !== FrontalAutoRule) return;
+    const c = curClip();
+    if (c && mode === "skeleton" && !pending && driveOption(c)) queueMicrotask(() => showClip(cur));
+    else if (mode === "skeleton") renderParams();
+  });
+  listObserver.observe(vsel, { childList: true });
+}
+
 window.addEventListener("resize", () => {
   if (!root || !document.contains(root) || mode !== "skeleton") return;
   const d = curData();
@@ -537,7 +579,8 @@ export const FrontalAutoRule = {
          row (and the Drive connect section while the folder is not connected),
          the stage loses its video / round mirrors and the meta line, the side
          panel goes. */
-      #picker-card > *:not(.lens-row)${driveConnected() ? "" : ":not(#drive-section)"} { display:none !important; }
+      #picker-card > *:not(.lens-row):not(#drive-section) { display:none !important; }
+      #picker-card.fa-drive-ok > #drive-section { display:none !important; }
       #picker-card { padding-bottom:6px !important; }
       .stage-pick, #meta { display:none !important; }
       #side { display:none !important; }
@@ -625,28 +668,36 @@ export const FrontalAutoRule = {
     rebuildVisible();
     setMode(mode);
     renderAll();
-    // Resume where we were. A remount happens on every round load (the viewer
-    // rebuilds the panel), so do not restart a load that is in flight; a round
-    // the user loaded by hand jumps to its first clip, and a hand-loaded round
-    // with no clip is left alone rather than swapped for another video.
-    const c = curClip();
-    if (c) {
-      const loaded = !!(state?.poseV6 || state?.pose);
-      const here = loaded ? visible.findIndex(k => clipInLoaded(state, k)) : -1;
-      if (pending) { setMode("video"); renderAll(); }
-      else if (here >= 0 && !clipInLoaded(state, c)) showClip(here);
+    watchDriveList();
+    // Resume where we were — a tick later, once the viewer has repopulated the
+    // video dropdown for this lens (it mounts first, repopulates second). A
+    // remount happens on every round load (the viewer rebuilds the panel), so
+    // do not restart a load that is in flight; a round the user loaded by hand
+    // jumps to its first clip, and a hand-loaded round with no clip is left
+    // alone rather than swapped for another video.
+    const mountedRoot = root;
+    setTimeout(() => {
+      if (root !== mountedRoot || !document.contains(root)) return;
+      const c = curClip();
+      if (!c) return;
+      const st = activeState;
+      const loaded = !!(st?.poseV6 || st?.pose);
+      const here = loaded ? visible.findIndex(k => clipInLoaded(st, k)) : -1;
+      if (pending) { setMode("video"); renderAll(); pendingCheck?.(); }
+      else if (here >= 0 && !clipInLoaded(st, c)) showClip(here);
       else if (here >= 0 && mode === "video") renderAll();
       else if (loaded && here < 0) {
         setMode("video"); renderAll();
         note(`The loaded round has no auto clip — press next for clip ${cur + 1} (${shortStem(c.stem, 30)} r${c.round}).`);
       }
       else showClip(cur);
-    }
+    }, 0);
   },
 
   // Video mode: the loop, the strip and the info follow the viewer's frames.
   update(state) {
     activeState = state;
+    if (pending) pendingCheck?.();
     if (mode !== "video" || !root) return;
     const c = curClip();
     const x = clipInLoaded(state, c);
