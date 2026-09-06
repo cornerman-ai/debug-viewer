@@ -76,8 +76,17 @@ let labels = null, labelsFor = null, labelsPromise = null;
 
 const SHOW_KEY = "cornerman.chin_shoulder.v1";
 const pick = { variant: "depth_guard", point: "both", gt: true, all: false };
-try { Object.assign(pick, JSON.parse(localStorage.getItem(SHOW_KEY) || "{}")); } catch {}
-function save() { try { localStorage.setItem(SHOW_KEY, JSON.stringify(pick)); } catch {} }
+// `all` (every individual click) is deliberately NOT restored: it is a peek
+// at the labelers' spread, not a way to read a frame, and it multiplies the
+// marks by the number of labelers. It starts off on every load and stays
+// wherever you put it for the session.
+try {
+  const { all, ...saved } = JSON.parse(localStorage.getItem(SHOW_KEY) || "{}");
+  Object.assign(pick, saved);
+} catch {}
+function save() {
+  try { localStorage.setItem(SHOW_KEY, JSON.stringify({ ...pick, all: false })); } catch {}
+}
 
 // ---------------------------------------------------------------- helpers
 const stripStem = (s) => String(s || "").replace(/_h264$/, "");
