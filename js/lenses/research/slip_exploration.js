@@ -146,7 +146,7 @@ function ensureClip(c) {
 // ── list order + current clip ───────────────────────────────────────────────
 
 const UI_KEY = "cornerman.slip_exploration.v1";
-const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null };   // speed: the skeleton fallback's clock
+const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null, muted: false };   // speed: the skeleton fallback's clock
 try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || "{}")); } catch {}
 function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch {} }
 
@@ -432,6 +432,7 @@ function startVideoLoop(c) {
   if (!x) return;
   seekTo(x.s);
   const v = video();
+  if (v) v.muted = !!ui.muted;                       // the mute choice survives clips and reloads
   if (looping && v?.paused) v.play().catch(() => { /* autoplay policy — Space starts it */ });
   renderAll();
 }
@@ -880,7 +881,7 @@ export const SlipExplorationRule = {
     };
     root.querySelector("#fa-mute").addEventListener("click", () => {
       const v = video(); if (!v) return;
-      v.muted = !v.muted; renderInfo();
+      v.muted = !v.muted; ui.muted = v.muted; saveUi(); renderInfo();
     });
     root.querySelector("#fa-fprev").addEventListener("click", () => stepFrame(-1));
     root.querySelector("#fa-fnext").addEventListener("click", () => stepFrame(1));
