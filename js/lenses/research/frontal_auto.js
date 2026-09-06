@@ -1,6 +1,6 @@
 // Frontal (angle model) lens — the MODEL-curated frontal set as a player: one
-// clip at a time, its skeleton looping, a next button. No video, no Drive
-// folder, nothing to pick.
+// clip at a time on the real footage, its skeleton overlaid, looping, a next
+// button. Nothing to pick: the lens loads each clip's video and round itself.
 //
 // The hand-curated frontal set (../shared/frontal_set.js) is 24 videos picked
 // by eye. This lens steps through what the boxer_facing_angle model finds when
@@ -13,32 +13,46 @@
 // docstring measures this against the window-union and gap-bridging
 // alternatives.
 //
+// THE SCREEN IS THE SPAN. While this lens is active the page hides everything
+// that is about choosing footage — the picker card's Drive / cache / video /
+// round / Firebase / on-device sections (the lens dropdown stays, and the
+// Drive connect section comes back when the folder is not connected), the
+// stage's own video + round mirrors, the side panel — and shows the current
+// clip on the footage with the skeleton overlay, the viewer's play / speed /
+// scrubber controls, and a bar with ◀ prev / next ▶ and the clip's facts. The
+// full clip list sits folded under the player for jumping around.
+//
 // Data: lens_data/frontal_auto/index.json (the clip list) and, per clip,
 // clips/<id>.json — the clip's own COCO-17 skeleton (normalized x,y as uint16,
-// visibility as uint8, base64), the video's width/height for the aspect, and
-// the per-frame facing angle. Written by cornerman-backend ml/frontal_auto.py:
+// visibility as uint8, base64), the video's width/height, and the per-frame
+// facing angle. Written by cornerman-backend ml/frontal_auto.py:
 //   cd ~/code/cornerman-backend && python -m ml.frontal_auto
 // (15-20 min for the model pass; `--from-angles` re-segments and re-writes the
 // clip files in seconds).
 //
-// THE PLAYER. This lens IS the view: it takes over the stage (the same hiding
-// CSS as bladedness_frames, living inside #stage-extras so a lens switch
-// undoes it) and animates the current clip's skeleton on its own canvas with
-// its own clock — the viewer's <video> machinery is not involved. ◀ ▶ (keys
-// P / N) step to the previous / next clip in the list's current order (sort +
-// filter); Space pauses, ← → then step frames; the speed control slows the
-// loop. Bones turn green while the frame is inside the ±22.5° band, a compass
-// shows the model's angle, and a strip under the canvas shows which frames of
-// the clip are in the band. The list on the right selects any clip directly.
+// TWO WAYS TO SHOW A CLIP. With the Drive folder connected the lens loads the
+// clip's video + round by driving the viewer's own video and round selects
+// (the same two selects bladedness's gotoRound drives), then loops the clip on
+// the real footage with the viewer's skeleton overlay: update() runs on every
+// displayed frame and seeks back to the clip start once the frame passes its
+// end. Without the Drive folder (the hosted site, a machine without the
+// grant), or for a clip whose video is not in the index, it falls back to
+// playing the clip's own exported skeleton on a canvas of its own, with its
+// own clock. Either way ◀ ▶ (keys P / N) step through the list in its current
+// order (sort + filter), Space pauses, ← → step frames, and the list on the
+// right selects any clip directly. The side panel is hidden while this lens
+// is active (the bladedness_frames takeover, undone by the lens switch); in
+// the skeleton fallback the video player is hidden too.
 
 import { drawSkeleton } from "../../skeleton.js";
+import { normStem } from "../shared/segment_set.js";
 
 const DATA = "./lens_data/frontal_auto/";
 
-const COLOR_IN     = "#7adf7a";   // green  — facing within the band
+const COLOR_IN     = "#7adf7a";   // green  — facing within the band / inside the clip
 const COLOR_OUT    = "#888";      // grey   — pose, but outside the band
 const COLOR_NOPOSE = "#3a3a3a";   // dark   — no pose
-const COLOR_MISS   = "#ff5d6c";
+const COLOR_MISS   = "#ff5d6c";   // red    — outside the clip
 const COLOR_FRAME  = "#3ad9e0";   // cyan   — playhead
 const COLOR_CLIP   = "#b48cff";   // purple — the clip / current row
 const COLOR_HAND   = "#ffd24a";   // yellow — hand-curated
@@ -66,7 +80,7 @@ function b64(s) {
   return out;
 }
 
-// { n, fps, width, height, xy: Float32Array(n*17*2) normalized, conf: Float32Array(n*17), deg: Float32Array(n) }
+// { n, fps, width, height, xy (normalized), conf, deg }
 function decodeClip(j) {
   const raw = b64(j.xy_b64);
   const u16 = new Uint16Array(raw.buffer, raw.byteOffset, raw.byteLength / 2);
@@ -77,7 +91,7 @@ function decodeClip(j) {
   for (let i = 0; i < c8.length; i++) conf[i] = c8[i] / 255;
   const deg = new Float32Array(j.n).fill(NaN);
   (j.deg || []).forEach((v, i) => { if (v != null) deg[i] = v; });
-  return { n: j.n, fps: j.fps || 30, width: j.width || 1080, height: j.height || 1920, xy, conf, deg, meta: j };
+  return { n: j.n, fps: j.fps || 30, width: j.width || 1080, height: j.height || 1920, xy, conf, deg };
 }
 
 function ensureClip(c) {
@@ -87,15 +101,15 @@ function ensureClip(c) {
   clipCache.set(c.id, rec);
   fetch(DATA + "clips/" + encodeURIComponent(c.id) + ".json", { cache: "no-store" })
     .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-    .then(j => { rec.status = "ok"; rec.data = decodeClip(j); if (visible[cur] === c) startClip(); })
-    .catch(err => { rec.status = "error"; rec.error = err.message || String(err); renderInfo(); });
+    .then(j => { rec.status = "ok"; rec.data = decodeClip(j); if (curClip() === c && mode === "skeleton") startSkeleton(); else renderAll(); })
+    .catch(err => { rec.status = "error"; rec.error = err.message || String(err); renderAll(); });
   return rec;
 }
 
 // ── list order + current clip ───────────────────────────────────────────────
 
 const UI_KEY = "cornerman.frontal_auto.v2";
-const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null };
+const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null };   // speed: the skeleton fallback's clock
 try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || "{}")); } catch {}
 function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch {} }
 
@@ -119,37 +133,142 @@ function rebuildVisible() {
   if (cur < 0 && visible.length) cur = 0;
 }
 
-// ── the player ──────────────────────────────────────────────────────────────
-
-let root = null;         // our DOM inside #stage-extras (null when not mounted)
-let canvas = null, strip = null;
-let activeState = null;
-let playing = true;
-let frame = 0;
-let clock = { t0: 0, f0: 0 };      // wall time of frame f0, for the running clock
-let rafHandle = 0;
-let listKey = null;
-
 const curClip = () => visible[cur] || null;
 const curData = () => { const r = curClip() && clipCache.get(curClip().id); return r?.status === "ok" ? r.data : null; };
 
-function showClip(i, { keepPlaying = true } = {}) {
-  if (!visible.length) return;
-  cur = ((i % visible.length) + visible.length) % visible.length;
-  ui.lastId = visible[cur].id; saveUi();
-  frame = 0;
-  listKey = null;
-  if (keepPlaying) playing = true;
-  const rec = ensureClip(visible[cur]);
-  if (rec?.status === "ok") startClip();
-  else renderAll();
-  const nxt = visible[(cur + 1) % visible.length];   // prefetch the next one
-  if (nxt) ensureClip(nxt);
+// ── the viewer's video: is the clip's round loaded, and where is the clip ───
+
+let activeState = null;
+const video = () => document.getElementById("video");
+
+// The Drive option for this clip's video, if the folder is connected and the
+// video is in it. The select lists every video with a cache for this lens.
+function driveOption(c) {
+  const vsel = document.getElementById("video-pick");
+  if (!vsel || !c) return null;
+  const want = normStem(c.stem);
+  return [...vsel.options].find(o => o.value && normStem(o.value.replace(/\.[^.]+$/, "")) === want) || null;
 }
 
-function startClip() {
+// { s, e, n } — the clip in the loaded round's frames, or null when that round
+// is not the loaded one. Same frame count as the export ⇒ frames directly,
+// otherwise the seconds via the viewer's convention.
+function clipInLoaded(state, c) {
+  const pose = state && (state.poseV6 || state.pose);
+  if (!pose || !c || !state.cacheBasename) return null;
+  if (normStem(state.cacheBasename) !== normStem(c.stem) || state.cacheRound !== c.round) return null;
+  const n = pose.n_frames, fps = pose.fps || state.fps || 30;
+  const rinfo = index?.rounds?.[`${c.stem}|r${c.round}`];
+  let s, e;
+  if (rinfo && rinfo.n_frames === n) { s = c.start_frame; e = c.end_frame; }
+  else {
+    const startFrame = Math.floor(Number(pose.start_sec || 0) * fps);
+    s = Math.floor(c.start_sec * fps) - startFrame; e = Math.floor(c.end_sec * fps) - startFrame;
+  }
+  if (e < 0 || s > n - 1) return null;
+  return { s: Math.max(0, s), e: Math.min(n - 1, e), n };
+}
+
+function seekTo(f) {
+  const slider = document.getElementById("scrubber");
+  if (!slider) return;
+  slider.value = f;
+  slider.dispatchEvent(new Event("input"));
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function waitFor(cond, ms) {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) { if (cond()) return true; await wait(100); }
+  return cond();
+}
+
+// Load the clip's video + round through the viewer's selects. Resolves true
+// once that round is the loaded one.
+let pending = null;
+async function loadClipRound(c) {
+  const opt = driveOption(c);
+  if (!opt) return false;
+  note(`Loading ${shortStem(c.stem)} r${c.round}…`);
+  const vsel = document.getElementById("video-pick");
+  if (vsel.value !== opt.value) { vsel.value = opt.value; vsel.dispatchEvent(new Event("change")); }
+  const rsel = document.getElementById("round-select");
+  const roundReady = () => rsel && [...rsel.options].some(o => o.value === String(c.round) && !o.disabled);
+  if (!await waitFor(roundReady, 20000)) { note(`r${c.round} of ${shortStem(c.stem)} is not in the Drive index.`); return false; }
+  if (rsel.value !== String(c.round)) { rsel.value = String(c.round); rsel.dispatchEvent(new Event("change")); }
+  if (!await waitFor(() => !!clipInLoaded(activeState, c), 20000)) { note("The round did not finish loading."); return false; }
+  note("");
+  return true;
+}
+
+// ── the player ──────────────────────────────────────────────────────────────
+
+let root = null, takeoverStage = null, canvas = null, strip = null;
+let mode = "video";                 // "video" (real footage + overlay) | "skeleton" (own canvas)
+let looping = true;
+let playing = true;                 // skeleton mode's own play state
+let frame = 0;                      // skeleton mode's frame
+let clock = { t0: 0, f0: 0 };
+let rafHandle = 0;
+let listKey = null;
+
+function showClip(i) {
+  if (!visible.length) return;
+  cur = ((i % visible.length) + visible.length) % visible.length;
+  const c = visible[cur];
+  ui.lastId = c.id; saveUi();
+  listKey = null;
+  ensureClip(c);                                        // strip + compass (+ the fallback's skeleton)
+  const nxt = visible[(cur + 1) % visible.length];
+  if (nxt) ensureClip(nxt);
+
+  // Real footage when the clip's round is already loaded (by hand, or by us)
+  // or its video is in the Drive index; the exported skeleton otherwise.
+  if (clipInLoaded(activeState, c) || driveOption(c)) {
+    setMode("video");
+    if (clipInLoaded(activeState, c)) { startVideoLoop(c); return; }
+    pending = c;
+    renderAll();
+    loadClipRound(c).then(ok => {
+      if (pending !== c) return;                        // moved on meanwhile
+      pending = null;
+      if (ok) startVideoLoop(c);
+      else { setMode("skeleton"); startSkeleton(); }
+    });
+  } else {
+    setMode("skeleton");
+    if (!driveConnected()) note("Drive folder not connected — playing the clip's exported skeleton instead of the footage.");
+    else note(`${shortStem(c.stem)} is not in the Drive index — playing its exported skeleton.`);
+    startSkeleton();
+  }
+}
+
+const driveConnected = () => {
+  const vsel = document.getElementById("video-pick");
+  return !!vsel && [...vsel.options].some(o => o.value);
+};
+
+function setMode(m) {
+  mode = m;
+  if (!root) return;
+  // Skeleton mode hides the viewer's player and shows our canvas; video mode
+  // the other way round.
+  takeoverStage.disabled = m !== "skeleton";
+  canvas.parentElement.style.display = m === "skeleton" ? "" : "none";
+  if (m === "video" && rafHandle) { cancelAnimationFrame(rafHandle); rafHandle = 0; }
+}
+
+function startVideoLoop(c) {
+  const x = clipInLoaded(activeState, c);
+  if (!x) return;
+  seekTo(x.s);
+  const v = video();
+  if (looping && v?.paused) v.play().catch(() => { /* autoplay policy — Space starts it */ });
+  renderAll();
+}
+
+function startSkeleton() {
   const d = curData();
-  if (!d || !canvas) return;
+  if (!d || !canvas) { renderAll(); return; }
   frame = 0;
   clock = { t0: performance.now(), f0: 0 };
   sizeCanvas(d);
@@ -174,26 +293,80 @@ function seekFrame(f, { pause = false } = {}) {
   frame = ((f % d.n) + d.n) % d.n;
   clock = { t0: performance.now(), f0: frame };
   if (pause) playing = false;
-  renderFrame();
+  renderSkeletonFrame();
   renderInfo();
 }
 
 function tick(now) {
   rafHandle = 0;
-  if (!root || !document.contains(root)) return;        // lens switched: stop
+  if (!root || !document.contains(root) || mode !== "skeleton") return;
   const d = curData();
   if (d && playing) {
     const f = Math.floor(clock.f0 + (now - clock.t0) / 1000 * d.fps * ui.speed);
     const nf = ((f % d.n) + d.n) % d.n;
-    if (nf !== frame) { frame = nf; renderFrame(); renderInfo(); }
+    if (nf !== frame) { frame = nf; renderSkeletonFrame(); renderInfo(); }
   }
   rafHandle = requestAnimationFrame(tick);
 }
 
-// ── drawing ─────────────────────────────────────────────────────────────────
+// ── drawing: compass, strip, skeleton canvas ────────────────────────────────
 
-function renderFrame() {
-  if (!canvas) return;
+function drawCompass(ctx, deg, W, s = 1) {
+  const R = 26 * s, cx = W - R - 14 * s, cy = R + 14 * s;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.beginPath(); ctx.roundRect(cx - R - 8 * s, cy - R - 8 * s, 2 * R + 16 * s, 2 * R + 16 * s + 20 * s, 6 * s); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1.5 * s;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  const b = band() * Math.PI / 180;
+  ctx.fillStyle = "rgba(122,223,122,0.25)";
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, -Math.PI / 2 - b, -Math.PI / 2 + b); ctx.closePath(); ctx.fill();
+  if (Number.isFinite(deg)) {
+    const a = deg * Math.PI / 180;
+    ctx.strokeStyle = inBand(deg) ? COLOR_IN : "#fff"; ctx.lineWidth = 3 * s;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.sin(a) * R * 0.9, cy - Math.cos(a) * R * 0.9); ctx.stroke();
+  }
+  ctx.font = `600 ${Math.round(13 * s)}px ui-monospace, monospace`; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillStyle = Number.isFinite(deg) ? (inBand(deg) ? COLOR_IN : "#fff") : "#888";
+  ctx.fillText(Number.isFinite(deg) ? `${deg >= 0 ? "+" : ""}${deg.toFixed(0)}°` : "no pose", cx, cy + R + 4 * s);
+  ctx.restore();
+}
+
+function drawBadge(ctx, text, color, s = 1, y = 10) {
+  const fsz = Math.round(14 * s);
+  ctx.save();
+  ctx.font = `600 ${fsz}px ui-monospace, monospace`;
+  ctx.textBaseline = "top";
+  const w = ctx.measureText(text).width + 20 * s;
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.beginPath(); ctx.roundRect(10 * s, y * s, w, fsz + 14 * s, 6 * s); ctx.fill();
+  ctx.fillStyle = color;
+  ctx.fillText(text, 20 * s, (y + 7) * s);
+  ctx.restore();
+}
+
+// The strip under the player: every frame of the clip, in band / out / no
+// pose, with the playhead at clip frame `f`.
+function drawStrip(d, f) {
+  if (!strip || !d) return;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 14;
+  if (strip.width !== Math.round(cssW * dpr)) strip.width = Math.round(cssW * dpr);
+  if (strip.height !== Math.round(cssH * dpr)) strip.height = Math.round(cssH * dpr);
+  const ctx = strip.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+  const colW = cssW / d.n;
+  for (let i = 0; i < d.n; i++) {
+    const v = d.deg[i];
+    ctx.fillStyle = !Number.isFinite(v) ? COLOR_NOPOSE : inBand(v) ? COLOR_IN : COLOR_OUT;
+    ctx.fillRect(i * colW, 0, colW + 0.5, cssH);
+  }
+  if (Number.isFinite(f)) { ctx.fillStyle = COLOR_FRAME; ctx.fillRect(Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH); }
+}
+
+function renderSkeletonFrame() {
+  if (!canvas || mode !== "skeleton") return;
   const d = curData();
   const ctx = canvas.getContext("2d");
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -210,69 +383,23 @@ function renderFrame() {
   }
   const f = Math.min(frame, d.n - 1);
   const deg = d.deg[f];
-
-  // The skeleton, in canvas pixels. Bones green inside the band.
   const sk = new Float32Array(17 * 2), cf = d.conf.subarray(f * 17, f * 17 + 17);
   for (let j = 0; j < 17; j++) { sk[j * 2] = d.xy[(f * 17 + j) * 2] * W; sk[j * 2 + 1] = d.xy[(f * 17 + j) * 2 + 1] * H; }
-  const pose = { skeleton: sk, conf: cf, n_frames: 1 };
-  drawSkeleton(ctx, pose, 0, {
+  drawSkeleton(ctx, { skeleton: sk, conf: cf, n_frames: 1 }, 0, {
     boneColor: inBand(deg) ? "rgba(122,223,122,0.85)" : "rgba(255,255,255,0.7)",
     boneWidth: 3, jointRadius: 4, minConf: 0.3,
   });
-
-  // Compass, top-right: up = chest to camera, right = facing image-right.
-  const R = 26, cx = W - R - 14, cy = R + 14;
-  ctx.save();
-  ctx.fillStyle = "rgba(0,0,0,0.55)";
-  ctx.beginPath(); ctx.roundRect(cx - R - 8, cy - R - 8, 2 * R + 16, 2 * R + 16 + 20, 6); ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-  const b = band() * Math.PI / 180;
-  ctx.fillStyle = "rgba(122,223,122,0.25)";
-  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, -Math.PI / 2 - b, -Math.PI / 2 + b); ctx.closePath(); ctx.fill();
-  if (Number.isFinite(deg)) {
-    const a = deg * Math.PI / 180;
-    ctx.strokeStyle = inBand(deg) ? COLOR_IN : "#fff"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.sin(a) * R * 0.9, cy - Math.cos(a) * R * 0.9); ctx.stroke();
-  }
-  ctx.font = "600 13px ui-monospace, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "top";
-  ctx.fillStyle = Number.isFinite(deg) ? (inBand(deg) ? COLOR_IN : "#fff") : "#888";
-  ctx.fillText(Number.isFinite(deg) ? `${deg >= 0 ? "+" : ""}${deg.toFixed(0)}°` : "no pose", cx, cy + R + 4);
-  ctx.restore();
-
-  // Frame / time, bottom-left.
+  drawCompass(ctx, deg, W);
   const c = curClip();
   ctx.save();
   ctx.font = "13px ui-monospace, monospace"; ctx.textBaseline = "bottom";
-  const t = `frame ${f + 1}/${d.n} · src ${fmtTime(c.start_sec + f / d.fps)} · ${playing ? "▶" : "⏸"} ${ui.speed}x`;
+  const t = `skeleton only · frame ${f + 1}/${d.n} · src ${fmtTime(c.start_sec + f / d.fps)} · ${playing ? "▶" : "⏸"} ${ui.speed}x`;
   const tw = ctx.measureText(t).width;
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   ctx.beginPath(); ctx.roundRect(8, H - 30, tw + 16, 24, 5); ctx.fill();
-  ctx.fillStyle = "#ddd";
-  ctx.fillText(t, 16, H - 12);
+  ctx.fillStyle = "#ddd"; ctx.fillText(t, 16, H - 12);
   ctx.restore();
-
   drawStrip(d, f);
-}
-
-// The strip under the canvas: every frame of the clip, in band / out / no pose.
-function drawStrip(d, f) {
-  if (!strip) return;
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 14;
-  if (strip.width !== Math.round(cssW * dpr)) strip.width = Math.round(cssW * dpr);
-  if (strip.height !== Math.round(cssH * dpr)) strip.height = Math.round(cssH * dpr);
-  const ctx = strip.getContext("2d");
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, cssW, cssH);
-  const colW = cssW / d.n;
-  for (let i = 0; i < d.n; i++) {
-    const v = d.deg[i];
-    ctx.fillStyle = !Number.isFinite(v) ? COLOR_NOPOSE : inBand(v) ? COLOR_IN : COLOR_OUT;
-    ctx.fillRect(i * colW, 0, colW + 0.5, cssH);
-  }
-  ctx.fillStyle = COLOR_FRAME;
-  ctx.fillRect(f * colW - 1, 0, 2, cssH);
 }
 
 // ── DOM ─────────────────────────────────────────────────────────────────────
@@ -283,8 +410,9 @@ function fmtTime(sec) {
   return `${m}:${s.toFixed(1).padStart(4, "0")}`;
 }
 function shortStem(s, max = 44) { return s.length <= max ? s : s.slice(0, max - 1) + "…"; }
+function note(msg) { const el = root?.querySelector("#fa-note"); if (el) el.textContent = msg; }
 
-function renderAll() { renderParams(); renderInfo(); renderList(); renderFrame(); }
+function renderAll() { renderParams(); renderInfo(); renderList(); if (mode === "skeleton") renderSkeletonFrame(); }
 
 function renderParams() {
   const el = root?.querySelector("#fa-params");
@@ -300,7 +428,7 @@ function renderParams() {
     `<code>${index.n_clips}</code> clips in <code>${index.n_videos_with_clips}</code> of ${index.n_videos} videos
      (${index.n_rounds} rounds scanned) · <code>${(index.clip_seconds / 60).toFixed(1)}</code> min
      · ≥${p.min_sec} s · ≥${Math.round(p.min_frac * 100)}% within ±${p.band_deg}° · spans by <code>${p.method || "window"}</code>
-     · ${index._generated}`;
+     · ${index._generated}${driveConnected() ? "" : ` · <span style="color:${COLOR_HAND}">Drive folder not connected: skeleton only</span>`}`;
 }
 
 function renderInfo() {
@@ -308,16 +436,25 @@ function renderInfo() {
   if (!el) return;
   const c = curClip();
   if (!c) { el.innerHTML = `<span class="muted">${index ? "No clips match the current filter." : ""}</span>`; return; }
-  const d = curData();
+  let where = "";
+  if (mode === "video") {
+    const x = clipInLoaded(activeState, c);
+    const f = activeState?.frame ?? 0;
+    where = pending === c ? `<span class="muted">· loading its video…</span>`
+      : x ? `· <span style="color:${x.s <= f && f <= x.e ? COLOR_IN : COLOR_MISS}">${x.s <= f && f <= x.e ? "in the clip" : "outside the clip"}</span>
+             <span class="muted">frames ${x.s}–${x.e}</span>` : "";
+  }
   el.innerHTML =
     `<span style="font-size:15px; font-weight:600; color:${COLOR_CLIP}">clip ${cur + 1} / ${visible.length}</span>
-     <span style="font-weight:600" title="${c.stem.replace(/"/g, "&quot;")}">${shortStem(c.stem, 56)}</span> <code>r${c.round}</code>
+     <span style="font-weight:600" title="${c.stem.replace(/"/g, "&quot;")}">${shortStem(c.stem, 52)}</span> <code>r${c.round}</code>
      <span class="muted"> · src ${fmtTime(c.start_sec)} → ${fmtTime(c.end_sec)} · ${c.duration_sec.toFixed(1)} s
      · ${Math.round(100 * c.frontal_frac)}% frontal · mean |${c.mean_abs_deg}°|
-     · ${c.in_hand_set ? `<span style="color:${COLOR_HAND}">hand-curated ${Math.round(100 * c.hand_frac)}%</span>` : "not in the hand set"}
-     ${d ? ` · ${d.width}×${d.height}` : ""}</span>`;
+     · ${c.in_hand_set ? `<span style="color:${COLOR_HAND}">hand-curated ${Math.round(100 * c.hand_frac)}%</span>` : "not in the hand set"}</span>
+     ${where}`;
   const play = root.querySelector("#fa-play");
-  if (play) play.textContent = playing ? "⏸" : "▶";
+  if (play) play.textContent = (mode === "video" ? !video()?.paused : playing) ? "⏸" : "▶";
+  const loop = root.querySelector("#fa-loop");
+  if (loop) loop.textContent = looping ? "⟳ looping" : "⟳ loop off";
 }
 
 function renderList() {
@@ -348,25 +485,24 @@ function renderList() {
   listEl.querySelector(".fa-clip[style*='rgba(255,255,255,0.08)']")?.scrollIntoView({ block: "nearest" });
 }
 
-// The canvas is sized to the stage when a clip starts; follow the window too.
 window.addEventListener("resize", () => {
-  if (!root || !document.contains(root)) return;
+  if (!root || !document.contains(root) || mode !== "skeleton") return;
   const d = curData();
-  if (d) { sizeCanvas(d); renderFrame(); }
+  if (d) { sizeCanvas(d); renderSkeletonFrame(); }
 });
 
-// Keys: ours while the lens is mounted, and kept from the viewer's own handler
-// (which would act on the empty <video>). Lens modules evaluate before
-// viewer.js, so this listener runs first.
+// Keys. N / P always; Space and the arrows only in skeleton mode (in video
+// mode the viewer's own handler drives its player). Lens modules evaluate
+// before viewer.js, so this listener runs first and can stop the viewer's.
 document.addEventListener("keydown", e => {
-  if (!root || !document.contains(root)) return;
-  if (activeState?.rule !== FrontalAutoRule) return;
+  if (!root || !document.contains(root) || activeState?.rule !== FrontalAutoRule) return;
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "n" || e.key === "N") { showClip(cur + 1); e.preventDefault(); e.stopImmediatePropagation(); return; }
+  if (e.key === "p" || e.key === "P") { showClip(cur - 1); e.preventDefault(); e.stopImmediatePropagation(); return; }
+  if (mode !== "skeleton") return;
   const d = curData();
   switch (e.key) {
-    case "n": case "N": showClip(cur + 1); break;
-    case "p": case "P": showClip(cur - 1); break;
-    case " ": playing = !playing; if (playing) clock = { t0: performance.now(), f0: frame }; renderInfo(); renderFrame(); break;
+    case " ": playing = !playing; if (playing) clock = { t0: performance.now(), f0: frame }; renderInfo(); renderSkeletonFrame(); break;
     case "ArrowRight": if (d) seekFrame(frame + 1, { pause: true }); break;
     case "ArrowLeft":  if (d) seekFrame(frame - 1, { pause: true }); break;
     case "]": if (d) seekFrame(frame + 10, { pause: true }); break;
@@ -382,6 +518,10 @@ export const FrontalAutoRule = {
   label: "Frontal (angle model, auto-curated)",
   standalone: true,
 
+  skeletonStyle() {
+    return { boneColor: "rgba(255,255,255,0.3)", boneWidth: 2, jointRadius: 3 };
+  },
+
   mount(host, state) {
     activeState = state;
     host.innerHTML = `<h2>Frontal (angle model)</h2><p class="hint">This lens lives on the stage.</p>`;
@@ -389,11 +529,17 @@ export const FrontalAutoRule = {
     if (!slot) return;
     slot.innerHTML = "";
 
-    // This lens IS the view — the same takeover as bladedness_frames, living
-    // inside #stage-extras so the viewer's lens switch undoes it.
-    const takeover = document.createElement("style");
-    takeover.textContent = `
-      #stage > *:not(#stage-extras) { display:none !important; }
+    // Takeover, living inside #stage-extras so the viewer's lens switch undoes
+    // it: the side panel always; the video player only in skeleton mode.
+    const base = document.createElement("style");
+    base.textContent = `
+      /* Nothing about choosing footage: the picker card keeps only the lens
+         row (and the Drive connect section while the folder is not connected),
+         the stage loses its video / round mirrors and the meta line, the side
+         panel goes. */
+      #picker-card > *:not(.lens-row)${driveConnected() ? "" : ":not(#drive-section)"} { display:none !important; }
+      #picker-card { padding-bottom:6px !important; }
+      .stage-pick, #meta { display:none !important; }
       #side { display:none !important; }
       .layout { display:block !important; }
       #stage { width:100% !important; max-width:none !important; padding:0 !important; background:none !important; }
@@ -401,27 +547,27 @@ export const FrontalAutoRule = {
       #fa-root button { font-size:13px; padding:4px 10px; }
       #fa-root select { font-size:12px; }
     `;
-    slot.appendChild(takeover);
+    slot.appendChild(base);
+    takeoverStage = document.createElement("style");
+    takeoverStage.textContent = `#stage > *:not(#stage-extras) { display:none !important; }`;
+    slot.appendChild(takeoverStage);
 
     root = document.createElement("div");
     root.id = "fa-root";
     root.style.cssText = "margin-top:12px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px";
     root.innerHTML = `
       <div id="fa-params" class="muted small" style="margin-bottom:6px"></div>
-      <div style="display:flex; gap:14px; align-items:flex-start">
-        <div id="fa-stage" style="flex:1; min-width:0">
+      <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap">
+        <div id="fa-stage" style="flex:1; min-width:320px">
           <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:6px">
             <button id="fa-prev" type="button" title="Previous clip (P)">◀ prev</button>
             <button id="fa-play" type="button" title="Play / pause (Space)">⏸</button>
             <button id="fa-next" type="button" title="Next clip (N)">next ▶</button>
-            <label class="small">speed
-              <select id="fa-speed">
-                <option value="0.25">0.25x</option><option value="0.5">0.5x</option>
-                <option value="1">1x</option><option value="2">2x</option>
-              </select></label>
+            <button id="fa-loop" type="button" title="Loop the clip / play through"></button>
             <span id="fa-info" style="font-size:13px; line-height:1.5"></span>
           </div>
-          <canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas>
+          <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
+          <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
           <canvas id="fa-strip" style="display:block; width:100%; height:14px; margin-top:6px; cursor:pointer"></canvas>
           <div class="muted small" style="margin-top:4px">
             <span style="color:${COLOR_IN}">green</span> = facing within the band ·
@@ -430,8 +576,9 @@ export const FrontalAutoRule = {
             <kbd>N</kbd>/<kbd>P</kbd> next/prev · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames · click the strip to seek
           </div>
         </div>
-        <div style="width:340px; flex:none">
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:12px; margin-bottom:4px">
+        <details style="width:100%; flex:none">
+          <summary class="muted small" style="cursor:pointer">all clips <span id="fa-count"></span> — click one to jump to it</summary>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:12px; margin:6px 0 4px">
             <label>order
               <select id="fa-sort">
                 <option value="video">by video</option>
@@ -442,9 +589,8 @@ export const FrontalAutoRule = {
               </select></label>
             <label><input type="checkbox" id="fa-outside"> outside the hand set only</label>
           </div>
-          <div id="fa-count" class="muted small" style="margin-bottom:4px"></div>
-          <div id="fa-list" style="font-size:12px; max-height:70vh; overflow:auto"></div>
-        </div>
+          <div id="fa-list" style="font-size:12px; max-height:50vh; overflow:auto"></div>
+        </details>
       </div>`;
     slot.appendChild(root);
     canvas = root.querySelector("#fa-canvas");
@@ -452,33 +598,99 @@ export const FrontalAutoRule = {
 
     root.querySelector("#fa-sort").value = ui.sort;
     root.querySelector("#fa-outside").checked = ui.outsideOnly;
-    root.querySelector("#fa-speed").value = String(ui.speed);
     root.querySelector("#fa-sort").addEventListener("change", e => { ui.sort = e.target.value; saveUi(); rebuildVisible(); listKey = null; renderAll(); });
     root.querySelector("#fa-outside").addEventListener("change", e => {
       ui.outsideOnly = e.target.checked; saveUi(); const before = curClip(); rebuildVisible(); listKey = null;
       if (curClip() !== before) showClip(cur); else renderAll();
     });
-    root.querySelector("#fa-speed").addEventListener("change", e => {
-      ui.speed = parseFloat(e.target.value) || 1; saveUi(); clock = { t0: performance.now(), f0: frame }; renderInfo(); renderFrame();
-    });
     root.querySelector("#fa-prev").addEventListener("click", () => showClip(cur - 1));
     root.querySelector("#fa-next").addEventListener("click", () => showClip(cur + 1));
+    root.querySelector("#fa-loop").addEventListener("click", () => {
+      looping = !looping;
+      if (looping && curClip() && mode === "video") startVideoLoop(curClip()); else renderInfo();
+    });
     root.querySelector("#fa-play").addEventListener("click", () => {
-      playing = !playing; if (playing) clock = { t0: performance.now(), f0: frame }; renderInfo(); renderFrame();
+      if (mode === "video") { const v = video(); if (!v) return; if (v.paused) v.play().catch(() => {}); else v.pause(); }
+      else { playing = !playing; if (playing) clock = { t0: performance.now(), f0: frame }; renderSkeletonFrame(); }
+      renderInfo();
     });
     strip.addEventListener("click", e => {
       const d = curData(); if (!d) return;
       const r = strip.getBoundingClientRect();
-      seekFrame(Math.round((e.clientX - r.left) / Math.max(1, r.width) * (d.n - 1)), { pause: true });
+      const f = Math.round((e.clientX - r.left) / Math.max(1, r.width) * (d.n - 1));
+      if (mode === "video") { const x = clipInLoaded(activeState, curClip()); if (x) seekTo(x.s + f); }
+      else seekFrame(f, { pause: true });
     });
 
-    playing = true;
     rebuildVisible();
+    setMode(mode);
     renderAll();
-    if (cur >= 0) showClip(cur);
-    if (!rafHandle) rafHandle = requestAnimationFrame(tick);
+    // Resume where we were. A remount happens on every round load (the viewer
+    // rebuilds the panel), so do not restart a load that is in flight; a round
+    // the user loaded by hand jumps to its first clip, and a hand-loaded round
+    // with no clip is left alone rather than swapped for another video.
+    const c = curClip();
+    if (c) {
+      const loaded = !!(state?.poseV6 || state?.pose);
+      const here = loaded ? visible.findIndex(k => clipInLoaded(state, k)) : -1;
+      if (pending) { setMode("video"); renderAll(); }
+      else if (here >= 0 && !clipInLoaded(state, c)) showClip(here);
+      else if (here >= 0 && mode === "video") renderAll();
+      else if (loaded && here < 0) {
+        setMode("video"); renderAll();
+        note(`The loaded round has no auto clip — press next for clip ${cur + 1} (${shortStem(c.stem, 30)} r${c.round}).`);
+      }
+      else showClip(cur);
+    }
   },
 
-  update(state) { activeState = state; },
-  draw() {},
+  // Video mode: the loop, the strip and the info follow the viewer's frames.
+  update(state) {
+    activeState = state;
+    if (mode !== "video" || !root) return;
+    const c = curClip();
+    const x = clipInLoaded(state, c);
+    const f = state.frame;
+    if (x && looping) {
+      const v = video();
+      if (v && !v.paused && (f >= x.e || f < x.s - 1)) seekTo(x.s);
+    }
+    renderInfo();
+    const d = curData();
+    if (d && x) drawStrip(d, f - x.s);
+  },
+
+  // Video mode: red frame outside the clip, a badge, the compass.
+  draw(ctx, state) {
+    if (mode !== "video") return;
+    const c = curClip();
+    const x = clipInLoaded(state, c);
+    const s = state.renderScale || 1;
+    const f = state.frame;
+    const inNow = !!(x && x.s <= f && f <= x.e);
+    if (!inNow) {
+      ctx.save();
+      ctx.strokeStyle = COLOR_MISS; ctx.lineWidth = 4 * s; ctx.globalAlpha = 0.85;
+      ctx.strokeRect(2 * s, 2 * s, ctx.canvas.width - 4 * s, ctx.canvas.height - 4 * s);
+      ctx.restore();
+    }
+    const label = !c ? "NO CLIP" : !x ? (pending ? "LOADING THE CLIP'S VIDEO…" : "CURRENT CLIP IS IN ANOTHER ROUND")
+      : inNow ? `CLIP ${cur + 1}/${visible.length}` : `OUTSIDE CLIP ${cur + 1}/${visible.length}`;
+    drawBadge(ctx, label, inNow ? COLOR_IN : COLOR_MISS, s);
+    const d = curData();
+    const deg = d && x && inNow ? d.deg[Math.min(d.n - 1, f - x.s)] : NaN;
+    drawCompass(ctx, deg, ctx.canvas.width, s);
+    if (x) {
+      const fsz = Math.round(14 * s);
+      const bx = 20 * s, by = 10 * s + fsz + 20 * s, bw = 220 * s, bh = 6 * s;
+      const px = fr => bx + ((fr - x.s) / Math.max(1, x.e - x.s)) * bw;
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.beginPath(); ctx.roundRect(bx - 10 * s, by - 6 * s, bw + 20 * s, bh + 12 * s, 6 * s); ctx.fill();
+      ctx.fillStyle = COLOR_CLIP; ctx.globalAlpha = 0.9; ctx.fillRect(bx, by, bw, bh);
+      ctx.globalAlpha = 1; ctx.fillStyle = COLOR_FRAME;
+      ctx.fillRect(px(Math.max(x.s, Math.min(x.e, f))) - 1 * s, by - 2 * s, 2 * s, bh + 4 * s);
+      ctx.restore();
+    }
+  },
 };
