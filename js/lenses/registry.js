@@ -28,6 +28,7 @@ import { ChinShoulderRule } from "./research/chin_shoulder.js";
 import { ChinSourcesRule } from "./research/chin_sources.js";
 import { ElbowTuckRule } from "./research/elbow_tuck.js";
 import { FaceMeshChinRule } from "./research/face_mesh_chin.js";
+import { FrontalAutoRule } from "./research/frontal_auto.js";
 import { StepPunchSyncRule } from "./rules/step_punch_sync.js";
 import { StepDetectorRule } from "./rules/step_detector.js";
 import { HipRotationReviewRule } from "./rules/hip_rotation_review.js";
@@ -65,6 +66,7 @@ export const RULES = [
   ChinSourcesRule,
   ElbowTuckRule,
   FaceMeshChinRule,
+  FrontalAutoRule,
   GuardDropRule,
   GuardHeightRule,
   HandReturnPathRule,

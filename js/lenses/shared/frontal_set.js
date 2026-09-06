@@ -54,7 +54,8 @@ fetch("./lens_data/frontal_rounds.json", { cache: "no-store" })
   .finally(() => window.dispatchEvent(new Event("lens-filter-changed")));
 
 // Same engine test as the viewer's default `requires` — any 2D skeleton cache.
-const hasSkeleton = slot => !!(slot?.blazepose || slot?.yolo || slot?.vision
+// Exported for lenses that build their own round filter on top of it.
+export const hasSkeleton = slot => !!(slot?.blazepose || slot?.yolo || slot?.vision
   || slot?.vision_glove || slot?.rtmpose || slot?.movenet || slot?.yolo11);
 
 // Pending ⇒ hide (the fetch re-fires the filter). Failed, or a stem the dump
