@@ -1,5 +1,5 @@
 // The head-off-center-line quantity, shared by the lenses that read it on the
-// frontal set (research/slips.js, research/frontal_auto.js). Not a lens.
+// frontal set (research/slip_exploration.js). Not a lens.
 //
 // Per frame: the head's horizontal offset from a vertical line through the hip
 // center, in torso heights — what research/head_offcenter.js reads on the full

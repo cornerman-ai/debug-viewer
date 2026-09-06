@@ -1,6 +1,9 @@
-// Frontal (angle model) lens — the MODEL-curated frontal set as a player: one
-// clip at a time on the real footage, its skeleton overlaid, looping, a next
-// button. Nothing to pick: the lens loads each clip's video and round itself.
+// Slip exploration lens — the MODEL-curated frontal set as a player: one clip
+// at a time on the real footage, its skeleton overlaid, looping, a next button.
+// Nothing to pick: the lens loads each clip's video and round itself. Built to
+// eyeball slips on frontal footage (the Sheet's slip labels and the center-line
+// rule ride on the strip and the body — below); it replaced the per-round
+// "Slips (curated frontal)" lens on 2026-09-06.
 //
 // The hand-curated frontal set (../shared/frontal_set.js) is 24 videos picked
 // by eye. This lens steps through what the boxer_facing_angle model finds when
@@ -43,6 +46,15 @@
 // (15-20 min for the model pass; `--from-angles` re-segments and re-writes the
 // clip files in seconds).
 //
+// THE NEXT CLIP IS WARMED WHILE YOU WATCH THIS ONE. Switching videos was slow
+// because a Drive for Desktop file in streaming mode is a placeholder until it
+// is read, and the first read downloads all of it. So when a clip starts, the
+// lens asks the viewer to drain the NEXT clip's video and cache files
+// (window.cornermanPrefetchVideo — bytes read and discarded, so Drive fetches
+// them now), pulls the next video's Sheet rows into sheet-labels.js's cache,
+// and fetches the next clip's skeleton file. Pressing next then mostly finds
+// everything local.
+//
 // WHEN THE DRIVE LIST IS READ. The viewer mounts a lens BEFORE it repopulates
 // the video dropdown for it, so at mount time the dropdown still holds the
 // previous lens's filtered list (the Slips lens leaves 24 videos in it). The
@@ -70,6 +82,7 @@ import { drawSkeleton } from "../../skeleton.js";
 import { normStem } from "../shared/segment_set.js";
 import { COLOR as SLIP, SLIP_KIND, ensureSlipLabels, isPunchLabel, slipLabelState } from "../shared/slip_labels.js";
 import { computeCenterLine, isStraightType, straightVerdict } from "../shared/center_line.js";
+import { fetchCombinedRowsForStem } from "../../sheet-labels.js";
 
 const DATA = "./lens_data/frontal_auto/";
 
@@ -132,7 +145,7 @@ function ensureClip(c) {
 
 // ── list order + current clip ───────────────────────────────────────────────
 
-const UI_KEY = "cornerman.frontal_auto.v2";
+const UI_KEY = "cornerman.slip_exploration.v1";
 const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null };   // speed: the skeleton fallback's clock
 try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || "{}")); } catch {}
 function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch {} }
@@ -358,7 +371,7 @@ function showClip(i) {
   listKey = null;
   ensureClip(c);                                        // strip + compass (+ the fallback's skeleton)
   const nxt = visible[(cur + 1) % visible.length];
-  if (nxt) ensureClip(nxt);
+  if (nxt && nxt !== c) prefetchClip(nxt, c);
 
   // Real footage when the clip's round is already loaded (by hand, or by us)
   // or its video is in the Drive index; the exported skeleton otherwise.
@@ -378,6 +391,24 @@ function showClip(i) {
     if (!driveConnected()) note("Drive folder not connected — playing the clip's exported skeleton instead of the footage.");
     else note(`${shortStem(c.stem)} is not in the Drive index — playing its exported skeleton.`);
     startSkeleton();
+  }
+}
+
+// Warm what the next clip will need: its skeleton file, its video's Sheet rows
+// (into sheet-labels.js's per-video cache, not the shared single-slot state
+// the current clip is using), and — when it is in another video — that
+// video's file + cache files on the Drive.
+const prefetchedStems = new Set();
+function prefetchClip(nxt, current) {
+  ensureClip(nxt);
+  if (normStem(nxt.stem) === normStem(current.stem)) return;
+  if (!prefetchedStems.has(nxt.stem)) {
+    prefetchedStems.add(nxt.stem);
+    fetchCombinedRowsForStem(nxt.stem).catch(() => {});
+  }
+  const opt = driveOption(nxt);
+  if (opt && typeof window.cornermanPrefetchVideo === "function") {
+    window.cornermanPrefetchVideo(opt.value).catch(() => {});
   }
 }
 
@@ -638,6 +669,8 @@ function renderInfo() {
   if (play) play.textContent = (mode === "video" ? !video()?.paused : playing) ? "⏸" : "▶";
   const loop = root.querySelector("#fa-loop");
   if (loop) loop.textContent = looping ? "⟳ looping" : "⟳ loop off";
+  const mute = root.querySelector("#fa-mute");
+  if (mute) { mute.textContent = video()?.muted ? "🔇" : "🔊"; mute.style.display = mode === "video" ? "" : "none"; }
   const fr = root.querySelector("#fa-frame");
   if (fr) {
     const d = curData();
@@ -688,7 +721,7 @@ function watchDriveList() {
   const vsel = document.getElementById("video-pick");
   if (!vsel || listObserver) return;
   listObserver = new MutationObserver(() => {
-    if (!root || !document.contains(root) || activeState?.rule !== FrontalAutoRule) return;
+    if (!root || !document.contains(root) || activeState?.rule !== SlipExplorationRule) return;
     const c = curClip();
     if (c && mode === "skeleton" && !pending && driveOption(c)) queueMicrotask(() => showClip(cur));
     else if (mode === "skeleton") renderParams();
@@ -706,7 +739,7 @@ window.addEventListener("resize", () => {
 // mode the viewer's own handler drives its player). Lens modules evaluate
 // before viewer.js, so this listener runs first and can stop the viewer's.
 document.addEventListener("keydown", e => {
-  if (!root || !document.contains(root) || activeState?.rule !== FrontalAutoRule) return;
+  if (!root || !document.contains(root) || activeState?.rule !== SlipExplorationRule) return;
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
   if (e.key === "n" || e.key === "N") { showClip(cur + 1); e.preventDefault(); e.stopImmediatePropagation(); return; }
   if (e.key === "p" || e.key === "P") { showClip(cur - 1); e.preventDefault(); e.stopImmediatePropagation(); return; }
@@ -724,9 +757,9 @@ document.addEventListener("keydown", e => {
   e.stopImmediatePropagation();
 });
 
-export const FrontalAutoRule = {
-  id: "frontal_auto",
-  label: "Frontal (angle model, auto-curated)",
+export const SlipExplorationRule = {
+  id: "slip_exploration",
+  label: "Slip exploration",
   standalone: true,
 
   skeletonStyle() {
@@ -735,7 +768,7 @@ export const FrontalAutoRule = {
 
   mount(host, state) {
     activeState = state;
-    host.innerHTML = `<h2>Frontal (angle model)</h2><p class="hint">This lens lives on the stage.</p>`;
+    host.innerHTML = `<h2>Slip exploration</h2><p class="hint">This lens lives on the stage.</p>`;
     const slot = document.getElementById("stage-extras");
     if (!slot) return;
     slot.innerHTML = "";
@@ -783,6 +816,7 @@ export const FrontalAutoRule = {
                 <option value="0.25">0.25x</option><option value="0.5">0.5x</option>
                 <option value="1">1x</option><option value="2">2x</option>
               </select></label>
+            <button id="fa-mute" type="button" title="Mute / unmute (M)">🔊</button>
             <span id="fa-info" style="font-size:13px; line-height:1.5"></span>
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
@@ -844,6 +878,10 @@ export const FrontalAutoRule = {
       if (mode === "video") { if (activeState?.pose || activeState?.poseV6) seekTo((activeState.frame || 0) + dir); }
       else seekFrame(frame + dir, { pause: true });
     };
+    root.querySelector("#fa-mute").addEventListener("click", () => {
+      const v = video(); if (!v) return;
+      v.muted = !v.muted; renderInfo();
+    });
     root.querySelector("#fa-fprev").addEventListener("click", () => stepFrame(-1));
     root.querySelector("#fa-fnext").addEventListener("click", () => stepFrame(1));
     root.querySelector("#fa-speed").value = String(ui.speed);

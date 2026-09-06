@@ -18,7 +18,9 @@ Folders (the folder is the type — filenames carry no `_lens`/`_model` suffix):
                  (camera as opponent) and side_set (camera side-on), including
                  the source-second → cache-frame conversion; slip_labels = the
                  Sheet's slip rows via the labeler web app + the frontal-set
-                 frames of the loaded round, shared by the two slips lenses);
+                 frames of the loaded round, shared by slips_gt and
+                 slip_exploration; center_line = the head-off-center-line
+                 quantity + head_offcenter's scoring, read by slip_exploration);
                  not lenses, never in the registry
 
 Data a lens fetches lives in `/lens_data/` (fetch paths resolve against the

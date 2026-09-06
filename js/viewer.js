@@ -461,6 +461,45 @@ window.addEventListener("lens-filter-changed", () => {
   populateDriveVideoSelect();
 });
 
+// Warm a Drive video and its cache files so a later load is quick. With Drive
+// for Desktop in streaming mode a file is a placeholder until something reads
+// it, and the first read downloads the whole thing — for a 20-minute video
+// that is the wait a lens sees when it switches videos. Draining the bytes here
+// (read and discard, nothing kept) makes Drive fetch them NOW, while the user
+// is still on the current clip. Lenses that step through footage across videos
+// (slip_exploration) call this for the next clip's video; harmless when the files
+// are already local. One in-flight prefetch per name; a finished one is
+// remembered for the session.
+const prefetched = new Map();   // name → Promise<boolean>
+window.cornermanPrefetchVideo = function prefetchDriveVideo(name) {
+  if (!name || !driveVideos?.has(name)) return Promise.resolve(false);
+  if (prefetched.has(name)) return prefetched.get(name);
+  const drain = async fileOrHandle => {
+    const file = fileOrHandle?.getFile ? await fileOrHandle.getFile() : fileOrHandle;
+    if (!file?.stream) return;
+    const reader = file.stream().getReader();
+    while (!(await reader.read()).done) { /* discard */ }
+  };
+  const p = (async () => {
+    try {
+      await drain(driveVideos.get(name));
+      const rounds = cacheIndex?.get(videoBasename(name));
+      for (const slot of rounds?.values() || []) {
+        for (const eng of Object.values(slot)) {
+          for (const k of ["npy", "meta", "pts"]) if (eng?.[k]) await drain(eng[k]);
+        }
+      }
+      return true;
+    } catch (err) {
+      console.warn("prefetch failed:", name, err);
+      prefetched.delete(name);
+      return false;
+    }
+  })();
+  prefetched.set(name, p);
+  return p;
+};
+
 async function onDriveVideoPick() {
   const name = els.videoPick.value;
   if (!name) return;

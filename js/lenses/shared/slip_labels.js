@@ -1,6 +1,7 @@
 // Slip labels + the curated frontal frames of the loaded round — shared by the
-// two slips lenses: research/slips.js (the frontal set, labels on the timeline)
-// and research/slips_gt.js (one labeled slip at a time, looped). Not a lens.
+// slips lenses: research/slip_exploration.js (the model-curated frontal clips
+// with the labels on the strip) and research/slips_gt.js (one labeled slip at
+// a time, looped). Not a lens.
 //
 // LABEL SOURCE: the labeler's Apps Script web app, via sheet-labels.js
 // fetchCombinedRowsForStem — NOT the viewer's state.labels. That plumbing reads

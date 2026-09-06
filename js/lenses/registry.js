@@ -28,7 +28,6 @@ import { ChinShoulderRule } from "./research/chin_shoulder.js";
 import { ChinSourcesRule } from "./research/chin_sources.js";
 import { ElbowTuckRule } from "./research/elbow_tuck.js";
 import { FaceMeshChinRule } from "./research/face_mesh_chin.js";
-import { FrontalAutoRule } from "./research/frontal_auto.js";
 import { StepPunchSyncRule } from "./rules/step_punch_sync.js";
 import { StepDetectorRule } from "./rules/step_detector.js";
 import { HipRotationReviewRule } from "./rules/hip_rotation_review.js";
@@ -36,7 +35,7 @@ import { HipRotationModelRule } from "./models/hip_rotation.js";
 import { AngleChangeRule } from "./rules/pivot_rate.js";
 import { ShoulderGateRule } from "./research/shoulder_gate.js";
 import { SideSetRule } from "./research/side_set.js";
-import { SlipsRule } from "./research/slips.js";
+import { SlipExplorationRule } from "./research/slip_exploration.js";
 import { SlipsGtRule } from "./research/slips_gt.js";
 import { PunchClassifierRule } from "./models/punch_classifier.js";
 import { OnDeviceLensRule } from "./inspect/ondevice.js";
@@ -66,7 +65,6 @@ export const RULES = [
   ChinSourcesRule,
   ElbowTuckRule,
   FaceMeshChinRule,
-  FrontalAutoRule,
   GuardDropRule,
   GuardHeightRule,
   HandReturnPathRule,
@@ -84,7 +82,7 @@ export const RULES = [
   ShoulderGateRule,
   SideSetRule,
   SkeletonCompareRule,
-  SlipsRule,
+  SlipExplorationRule,
   SlipsGtRule,
   StanceWidthLensRule,
   StanceDepthSideRule,
