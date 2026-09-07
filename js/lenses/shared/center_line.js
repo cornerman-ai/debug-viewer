@@ -118,7 +118,10 @@ export function straightVerdict(m, s, e) {
 // DEVIATION from the boxer's own resting position (`dev` = off minus its
 // rolling 3-s median — a bladed stance sits off-center all round), or its
 // MOVEMENT (`travel` = the range of off inside a centered 0.5-s window, an
-// out-and-back; `vel` = |change over 0.1 s|). Measured on the hand-curated
+// out-and-back; `vel` = |change over 0.1 s`), or its distance from the boxer's
+// MOST COMMON position (`rest` = off minus the mode of off over the footage —
+// some boxers carry the head a little to one side all round, and a slip is a
+// move away from THAT, not from the geometric hip line). Measured on the hand-curated
 // frontal set against the Sheet's slips (ml/research/defense/slip_rule/):
 // position wins, movement alone is weak — see that script's docstring for the
 // numbers.
@@ -145,9 +148,26 @@ export function rollingRange(arr, win) {
   return out;
 }
 
+// The most common value of `off`: the peak of a 0.02-torso histogram, smoothed
+// over 3 bins. NaN when fewer than 30 finite frames.
+export function modeOf(arr, bin = 0.02, lo = -1.5, hi = 1.5) {
+  const nb = Math.round((hi - lo) / bin), counts = new Float64Array(nb);
+  let k = 0;
+  for (const v of arr) { if (!Number.isFinite(v)) continue; const i = Math.floor((v - lo) / bin); if (i >= 0 && i < nb) { counts[i]++; k++; } }
+  if (k < 30) return NaN;
+  let best = -1, bestV = -1;
+  for (let i = 0; i < nb; i++) {
+    const c = counts[i] + (counts[i - 1] || 0) + (counts[i + 1] || 0);
+    if (c > bestV) { bestV = c; best = i; }
+  }
+  return lo + (best + 0.5) * bin;
+}
+
 const sigMemo = new WeakMap();   // center-line result → { fps, signals }
 
-// { dev, travel, vel } for a computeCenterLine() result, at `fps`. Memoized.
+// { dev, travel, vel, rest, restMode } for a computeCenterLine() result, at
+// `fps`. Memoized. `rest` is measured from the mode over the whole array the
+// result was computed on — the round in the viewer, the clip in the fallback.
 export function centerLineSignals(m, fps = 30) {
   if (!m || m.bad) return null;
   const hit = sigMemo.get(m);
@@ -159,7 +179,10 @@ export function centerLineSignals(m, fps = 30) {
   const lag = Math.max(1, Math.round(0.1 * fps));
   const vel = new Float64Array(off.length).fill(NaN);
   for (let i = lag; i < off.length; i++) vel[i] = Math.abs(off[i] - off[i - lag]);
-  const signals = { dev, travel: rollingRange(off, Math.round(0.5 * fps) | 1), vel };
+  const restMode = modeOf(off);
+  const rest = new Float64Array(off.length);
+  for (let i = 0; i < off.length; i++) rest[i] = off[i] - restMode;
+  const signals = { dev, travel: rollingRange(off, Math.round(0.5 * fps) | 1), vel, rest, restMode };
   sigMemo.set(m, { fps, signals });
   return signals;
 }

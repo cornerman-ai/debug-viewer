@@ -50,9 +50,10 @@
 //
 // THE TWO RULES, FIRING ONLY WHEN NO PUNCH IS THROWN. Under the labels the
 // strip carries two more lanes, one per position method: the off rule and the
-// dev rule. Each fires on a run of ≥ 3 frames past its threshold (gaps ≤ 2
-// frames bridged) OUTSIDE the punch gate — the Sheet's punch labels widened by
-// 0.25 s on each side, for now: the measured skeleton cue (2D arm extension)
+// dev rule, and the rest rule (distance from the boxer's most common head
+// position over the round, the mode of the offset). Each fires on a run of ≥ 3 frames past its threshold (gaps ≤ 2
+// frames bridged) OUTSIDE the punch gate — the Sheet's punch labels, exactly
+// their span (slips come right after punches), for now: the measured skeleton cue (2D arm extension)
 // does not see punches thrown at the camera, and a depth-aware one is not
 // built yet. An event touching a labeled slip is green, one touching none is
 // red, grey while the labels are still loading; the gated stretches are
@@ -171,9 +172,14 @@ function ensureClip(c) {
 // ── list order + current clip ───────────────────────────────────────────────
 
 const UI_KEY = "cornerman.slip_exploration.v1";
+const UI_DEFAULT_THR = { off: 0.22, dev: 0.24, rest: 0.24, travel: 0.50, vel: 0.12 };
 const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null, muted: false,
-             thr: { off: 0.22, dev: 0.24, travel: 0.50, vel: 0.12 }, gate: true };   // speed: the skeleton fallback's clock
-try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || "{}")); } catch {}
+             thr: { ...UI_DEFAULT_THR }, gate: true };   // speed: the skeleton fallback's clock
+try {
+  const saved = JSON.parse(localStorage.getItem(UI_KEY) || "{}");
+  Object.assign(ui, saved);
+  ui.thr = { ...UI_DEFAULT_THR, ...(saved.thr || {}) };   // a saved set predating a new row keeps the new default
+} catch {}
 function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch {} }
 
 let visible = [];
@@ -587,7 +593,7 @@ function drawBadge(ctx, text, color, s = 1, y = 10) {
 function drawStrip(d, f, items = null, verdicts = null, rules = null) {
   if (!strip || !d) return;
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 54;
+  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 68;
   if (strip.width !== Math.round(cssW * dpr)) strip.width = Math.round(cssW * dpr);
   if (strip.height !== Math.round(cssH * dpr)) strip.height = Math.round(cssH * dpr);
   const ctx = strip.getContext("2d");
@@ -701,14 +707,15 @@ function renderSkeletonFrame() {
 // is the arrow in the readout (→ head to image right, ← to image left).
 const TRACE_ROWS = [
   { key: "off",    label: "|off| · distance from the hip line" },
-  { key: "dev",    label: "|dev| · deviation from the resting position (3 s median)" },
+  { key: "dev",    label: "|dev| · deviation from the rolling 3 s median" },
+  { key: "rest",   label: "|rest| · distance from the most common position" },
   { key: "travel", label: "travel · range of off inside 0.5 s" },
   { key: "vel",    label: "vel  · change of off over 0.1 s" },
 ];
 
 function seriesFor(cl, fps) {
   const sig = centerLineSignals(cl.m, fps);
-  return sig ? { off: cl.m.off, dev: sig.dev, travel: sig.travel, vel: sig.vel } : null;
+  return sig ? { off: cl.m.off, dev: sig.dev, rest: sig.rest, travel: sig.travel, vel: sig.vel, restMode: sig.restMode } : null;
 }
 
 let lastTrace = null;
@@ -727,7 +734,7 @@ function drawTraces(d, f, items, cl) {
   if (!canvas || !d) return;
   lastTrace = [d, f, items, cl];
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, canvas.getBoundingClientRect().width), cssH = 176;
+  const cssW = Math.max(1, canvas.getBoundingClientRect().width), cssH = 220;
   if (canvas.width !== Math.round(cssW * dpr)) canvas.width = Math.round(cssW * dpr);
   if (canvas.height !== Math.round(cssH * dpr)) canvas.height = Math.round(cssH * dpr);
   const ctx = canvas.getContext("2d");
@@ -775,7 +782,7 @@ function drawTraces(d, f, items, cl) {
         if (Number.isFinite(v) && Math.abs(v) >= thr) ctx.fillRect(i * colW, y0 + rowH - 4, colW + 0.5, 3);
       }
     }
-    if (ui.gate && (row.key === "off" || row.key === "dev")) {           // the gate, dimmed
+    if (ui.gate && RULES.includes(row.key)) {                            // the gate, dimmed
       ctx.fillStyle = "rgba(0,0,0,0.45)";
       let a = -1;
       for (let i = 0; i <= d.n; i++) {
@@ -784,10 +791,13 @@ function drawTraces(d, f, items, cl) {
         if (!g && a >= 0) { ctx.fillRect(a * colW, y0, (i - a) * colW, rowH - 1); a = -1; }
       }
     }
-    ctx.fillStyle = "#aaa"; ctx.fillText(row.label, 6, y0 + 3);
+    ctx.fillStyle = "#aaa";
+    const modeTxt = row.key === "rest" && series && Number.isFinite(series.restMode)
+      ? ` (mode ${Math.abs(series.restMode).toFixed(2)}${series.restMode > 0 ? " →" : series.restMode < 0 ? " ←" : ""})` : "";
+    ctx.fillText(row.label + modeTxt, 6, y0 + 3);
     const vNow = arr ? arr[f + cl.base] : NaN;
     ctx.fillStyle = Number.isFinite(vNow) && Math.abs(vNow) >= thr ? "#ff9e64" : "#ddd"; ctx.textAlign = "right";
-    const arrow = (row.key === "off" || row.key === "dev") && Number.isFinite(vNow) ? (vNow > 0 ? " →" : vNow < 0 ? " ←" : "") : "";
+    const arrow = ["off", "dev", "rest"].includes(row.key) && Number.isFinite(vNow) ? (vNow > 0 ? " →" : vNow < 0 ? " ←" : "") : "";
     ctx.fillText(Number.isFinite(vNow) ? `${Math.abs(vNow).toFixed(2)}${arrow}` : "—", cssW - 6, y0 + 3);
     ctx.textAlign = "left";
   });
@@ -797,8 +807,8 @@ function drawTraces(d, f, items, cl) {
 
 // ── the two rules ───────────────────────────────────────────────────────────
 
-const RULES = ["off", "dev"];
-const GATE_PAD_S = 0.25;
+const RULES = ["off", "dev", "rest"];
+const GATE_PAD_S = 0;          // the label span exactly: slips come right after punches
 
 // Clip frames inside a punch label, widened by GATE_PAD_S each side.
 function punchGate(items, n, fps) {
@@ -856,7 +866,7 @@ function liveValues(cl, f, fps) {
   const fr = f + cl.base;
   const mag = v => Number.isFinite(v) ? `${Math.abs(v).toFixed(2)}${v > 0 ? "→" : v < 0 ? "←" : ""}` : "—";
   const fmt = v => Number.isFinite(v) ? v.toFixed(2) : "—";
-  return `|off| ${mag(series.off[fr])} · |dev| ${mag(series.dev[fr])} · travel ${fmt(series.travel[fr])} · vel ${fmt(series.vel[fr])}`;
+  return `|off| ${mag(series.off[fr])} · |dev| ${mag(series.dev[fr])} · |rest| ${mag(series.rest[fr])} · travel ${fmt(series.travel[fr])} · vel ${fmt(series.vel[fr])}`;
 }
 
 // ── DOM ─────────────────────────────────────────────────────────────────────
@@ -1096,14 +1106,14 @@ export const SlipExplorationRule = {
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
-          <canvas id="fa-strip" style="display:block; width:100%; height:54px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-strip" style="display:block; width:100%; height:68px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-frame" class="small" style="margin-top:3px; font-size:12px"></div>
-          <canvas id="fa-traces" style="display:block; width:100%; height:176px; margin-top:8px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-traces" style="display:block; width:100%; height:220px; margin-top:8px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-thr" style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:4px">
-            ${["off", "dev", "travel", "vel"].map(k => `
+            ${["off", "dev", "rest", "travel", "vel"].map(k => `
               <label>${k} ≥ <output id="fa-thr-${k}-out">${ui.thr[k].toFixed(2)}</output>
                 <input type="range" id="fa-thr-${k}" min="0" max="1" step="0.01" value="${ui.thr[k]}" style="width:110px; vertical-align:middle"></label>`).join("")}
-            <label><input type="checkbox" id="fa-gate" ${ui.gate ? "checked" : ""}> fire only when no punch is thrown (Sheet punch labels ±${GATE_PAD_S} s)</label>
+            <label><input type="checkbox" id="fa-gate" ${ui.gate ? "checked" : ""}> fire only when no punch is thrown (the Sheet's punch spans)</label>
             <span class="muted small">torso units, all magnitudes (a slip to either side goes up; → / ← in the readout is the side) · position (off, dev) vs movement (travel, vel); frames past a threshold are marked under each trace; the off and dev rules fire on runs ≥ 3 frames outside the gate</span>
           </div>
           <div class="muted small" style="margin-top:2px">
@@ -1176,7 +1186,7 @@ export const SlipExplorationRule = {
       if (vs) { vs.value = String(ui.speed); vs.dispatchEvent(new Event("change")); }
       clock = { t0: performance.now(), f0: frame }; renderInfo(); if (mode === "skeleton") renderSkeletonFrame();
     });
-    for (const k of ["off", "dev", "travel", "vel"]) {
+    for (const k of ["off", "dev", "rest", "travel", "vel"]) {
       root.querySelector(`#fa-thr-${k}`).addEventListener("input", e => {
         ui.thr[k] = parseFloat(e.target.value); saveUi();
         root.querySelector(`#fa-thr-${k}-out`).textContent = ui.thr[k].toFixed(2);
