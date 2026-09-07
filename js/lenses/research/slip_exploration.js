@@ -39,27 +39,35 @@
 // badge names the slip or the punch the frame sits in with its verdict. No
 // axiality gate here: the whole set faces the camera by construction.
 //
-// WHAT SAYS "SLIP"? Under the strip, four traces of the center-line quantity
+// WHAT SAYS "SLIP"? Under the strip, two traces of the center-line quantity
 // over the clip, each with its own threshold: off (the head's distance from
-// the hip line), dev (its deviation from the boxer's own resting position),
-// travel (the range of off inside 0.5 s) and vel (its change over 0.1 s).
-// Labeled slips are shaded in the traces so you can see which formulation
-// lines up with what the labelers called a slip; frames past a threshold are
-// marked under each trace and the badge names the frame's live values. The
-// numbers behind the defaults: ml/research/defense/slip_rule/.
+// the hip line) and dev (its deviation from the boxer's own resting position,
+// the rolling 3-s median). Five formulations were measured and shown here on
+// 2026-09-06/07 — these two plus rest (distance from the round's most common
+// position), travel (range inside 0.5 s) and vel (change over 0.1 s) — and
+// narrowed to off + dev: position beats movement, rest trails dev. The
+// numbers: ml/research/defense/slip_rule/README.md. Labeled slips are shaded
+// in the traces, frames past a threshold marked under each, the badge names
+// the frame's live values.
 //
-// THE TWO RULES, FIRING ONLY WHEN NO PUNCH IS THROWN. Under the labels the
-// strip carries two more lanes, one per position method: the off rule and the
-// dev rule, and the rest rule (distance from the boxer's most common head
-// position over the round, the mode of the offset). Each fires on a run of ≥ 3 frames past its threshold (gaps ≤ 2
-// frames bridged) OUTSIDE the punch gate — the Sheet's punch labels, exactly
-// their span (slips come right after punches), for now: the measured skeleton cue (2D arm extension)
-// does not see punches thrown at the camera, and a depth-aware one is not
-// built yet. An event touching a labeled slip is green, one touching none is
-// red, grey while the labels are still loading; the gated stretches are
-// dimmed in the traces. The gate can be switched off to see what the raw
-// rule would do. Measured cost of the gate on the hand-curated set: recall of
-// the labeled slips 0.80 → 0.21, because 76 % of them ride on a punch label —
+// THE TWO RULES, FIRING ONLY WHEN NO PUNCH IS BEING THROWN. Under the labels
+// the strip carries two more lanes, one per position method: the off rule and
+// the dev rule. Each fires on a run of ≥ 3 frames past its threshold (gaps ≤ 2
+// frames bridged) OUTSIDE the punch gate. The gate closes the FIRST HALF of
+// each of the Sheet's punch labels — start to midpoint, the midpoint standing
+// in for the impact (2026-09-07): a slip that closes a combo is thrown while
+// the last punch retracts, so the retraction half stays open — but only to
+// movement AWAY from the line: a head that came off the line with the jab and
+// returns with the arm is not slipping, so in the retraction a frame counts
+// only while the quantity is still growing (0.1-s look-back). A select under
+// the traces closes the whole label instead, for comparison (±0.25 s widening
+// swallowed most of the labeled slips and is gone). The Sheet's
+// labels are the gate for now because the measured skeleton cue (2D arm
+// extension) does not see punches thrown at the camera, and a depth-aware one
+// is not built yet. An event touching a labeled slip is green, one touching
+// none is red, grey while the labels are still loading; the gated stretches
+// are dimmed in the traces. The gate can be switched off to see what the raw
+// rule would do. Its measured cost and the alternatives:
 // ml/research/defense/slip_rule/README.md.
 //
 // Data: lens_data/frontal_auto/index.json (the clip list) and, per clip,
@@ -172,9 +180,9 @@ function ensureClip(c) {
 // ── list order + current clip ───────────────────────────────────────────────
 
 const UI_KEY = "cornerman.slip_exploration.v1";
-const UI_DEFAULT_THR = { off: 0.22, dev: 0.24, rest: 0.24, travel: 0.50, vel: 0.12 };
+const UI_DEFAULT_THR = { off: 0.22, dev: 0.24 };
 const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null, muted: false,
-             thr: { ...UI_DEFAULT_THR }, gate: true };   // speed: the skeleton fallback's clock
+             thr: { ...UI_DEFAULT_THR }, gate: true, gateExt: "half" };   // speed: the skeleton fallback's clock
 try {
   const saved = JSON.parse(localStorage.getItem(UI_KEY) || "{}");
   Object.assign(ui, saved);
@@ -593,7 +601,7 @@ function drawBadge(ctx, text, color, s = 1, y = 10) {
 function drawStrip(d, f, items = null, verdicts = null, rules = null) {
   if (!strip || !d) return;
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 68;
+  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 54;
   if (strip.width !== Math.round(cssW * dpr)) strip.width = Math.round(cssW * dpr);
   if (strip.height !== Math.round(cssH * dpr)) strip.height = Math.round(cssH * dpr);
   const ctx = strip.getContext("2d");
@@ -632,12 +640,12 @@ function drawStrip(d, f, items = null, verdicts = null, rules = null) {
     const y = (laneH + gap) * (2 + ri);
     ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(0, y, cssW, laneH);
     if (rules) {
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      let a = -1;
+      let a = -1, cur = GATE_OPEN;                     // closed dark, away-only lighter
       for (let i = 0; i <= d.n; i++) {
-        const g = i < d.n && rules.gate[i];
-        if (g && a < 0) a = i;
-        if (!g && a >= 0) { ctx.fillRect(a * colW, y, (i - a) * colW, laneH); a = -1; }
+        const g = i < d.n ? rules.gate[i] : GATE_OPEN;
+        if (g === cur) continue;
+        if (cur !== GATE_OPEN) { ctx.fillStyle = cur === GATE_CLOSED ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.28)"; ctx.fillRect(a * colW, y, (i - a) * colW, laneH); }
+        a = i; cur = g;
       }
       for (const ev of rules.events[k]) {
         ctx.fillStyle = RULE_COLOR[ev.hit]; ctx.globalAlpha = 0.95;
@@ -646,7 +654,7 @@ function drawStrip(d, f, items = null, verdicts = null, rules = null) {
       ctx.globalAlpha = 1;
     }
     ctx.fillStyle = "#bbb"; ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "middle";
-    ctx.fillText(`${k} rule ≥ ${ui.thr[k].toFixed(2)}${ui.gate ? " · no-punch" : ""}`, 4, y + laneH / 2);
+    ctx.fillText(`${k} rule ≥ ${ui.thr[k].toFixed(2)}${ui.gate ? (ui.gateExt === "full" ? " · no-punch" : " · not mid-punch · retraction: away only") : ""}`, 4, y + laneH / 2);
   });
   if (Number.isFinite(f)) { ctx.fillStyle = COLOR_FRAME; ctx.fillRect(Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH); }
 }
@@ -706,16 +714,13 @@ function renderSkeletonFrame() {
 // All four rows are magnitudes: a slip to either side goes UP. The side itself
 // is the arrow in the readout (→ head to image right, ← to image left).
 const TRACE_ROWS = [
-  { key: "off",    label: "|off| · distance from the hip line" },
-  { key: "dev",    label: "|dev| · deviation from the rolling 3 s median" },
-  { key: "rest",   label: "|rest| · distance from the most common position" },
-  { key: "travel", label: "travel · range of off inside 0.5 s" },
-  { key: "vel",    label: "vel  · change of off over 0.1 s" },
+  { key: "off", label: "|off| · distance from the hip line" },
+  { key: "dev", label: "|dev| · deviation from the rolling 3 s median" },
 ];
 
 function seriesFor(cl, fps) {
   const sig = centerLineSignals(cl.m, fps);
-  return sig ? { off: cl.m.off, dev: sig.dev, rest: sig.rest, travel: sig.travel, vel: sig.vel, restMode: sig.restMode } : null;
+  return sig ? { off: cl.m.off, dev: sig.dev } : null;
 }
 
 let lastTrace = null;
@@ -734,7 +739,7 @@ function drawTraces(d, f, items, cl) {
   if (!canvas || !d) return;
   lastTrace = [d, f, items, cl];
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, canvas.getBoundingClientRect().width), cssH = 220;
+  const cssW = Math.max(1, canvas.getBoundingClientRect().width), cssH = 120;
   if (canvas.width !== Math.round(cssW * dpr)) canvas.width = Math.round(cssW * dpr);
   if (canvas.height !== Math.round(cssH * dpr)) canvas.height = Math.round(cssH * dpr);
   const ctx = canvas.getContext("2d");
@@ -743,7 +748,7 @@ function drawTraces(d, f, items, cl) {
   const rowH = cssH / TRACE_ROWS.length, colW = cssW / d.n;
   const fps = mode === "video" ? (activeState?.pose?.fps || d.fps) : d.fps;
   const series = cl ? seriesFor(cl, fps) : null;
-  const gate = punchGate(items, d.n, fps);
+  const gate = punchGate(items, d.n);
   ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "top";
   TRACE_ROWS.forEach((row, ri) => {
     const y0 = ri * rowH, thr = ui.thr[row.key];
@@ -782,22 +787,19 @@ function drawTraces(d, f, items, cl) {
         if (Number.isFinite(v) && Math.abs(v) >= thr) ctx.fillRect(i * colW, y0 + rowH - 4, colW + 0.5, 3);
       }
     }
-    if (ui.gate && RULES.includes(row.key)) {                            // the gate, dimmed
-      ctx.fillStyle = "rgba(0,0,0,0.45)";
-      let a = -1;
+    if (ui.gate && RULES.includes(row.key)) {                            // the gate, dimmed: closed dark, away-only lighter
+      let a = -1, cur = GATE_OPEN;
       for (let i = 0; i <= d.n; i++) {
-        const g = i < d.n && gate[i];
-        if (g && a < 0) a = i;
-        if (!g && a >= 0) { ctx.fillRect(a * colW, y0, (i - a) * colW, rowH - 1); a = -1; }
+        const g = i < d.n ? gate[i] : GATE_OPEN;
+        if (g === cur) continue;
+        if (cur !== GATE_OPEN) { ctx.fillStyle = cur === GATE_CLOSED ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.22)"; ctx.fillRect(a * colW, y0, (i - a) * colW, rowH - 1); }
+        a = i; cur = g;
       }
     }
-    ctx.fillStyle = "#aaa";
-    const modeTxt = row.key === "rest" && series && Number.isFinite(series.restMode)
-      ? ` (mode ${Math.abs(series.restMode).toFixed(2)}${series.restMode > 0 ? " →" : series.restMode < 0 ? " ←" : ""})` : "";
-    ctx.fillText(row.label + modeTxt, 6, y0 + 3);
+    ctx.fillStyle = "#aaa"; ctx.fillText(row.label, 6, y0 + 3);
     const vNow = arr ? arr[f + cl.base] : NaN;
     ctx.fillStyle = Number.isFinite(vNow) && Math.abs(vNow) >= thr ? "#ff9e64" : "#ddd"; ctx.textAlign = "right";
-    const arrow = ["off", "dev", "rest"].includes(row.key) && Number.isFinite(vNow) ? (vNow > 0 ? " →" : vNow < 0 ? " ←" : "") : "";
+    const arrow = Number.isFinite(vNow) ? (vNow > 0 ? " →" : vNow < 0 ? " ←" : "") : "";
     ctx.fillText(Number.isFinite(vNow) ? `${Math.abs(vNow).toFixed(2)}${arrow}` : "—", cssW - 6, y0 + 3);
     ctx.textAlign = "left";
   });
@@ -807,17 +809,24 @@ function drawTraces(d, f, items, cl) {
 
 // ── the two rules ───────────────────────────────────────────────────────────
 
-const RULES = ["off", "dev", "rest"];
-const GATE_PAD_S = 0;          // the label span exactly: slips come right after punches
-
-// Clip frames inside a punch label, widened by GATE_PAD_S each side.
-function punchGate(items, n, fps) {
+const RULES = ["off", "dev"];
+// Clip frames inside a punch label, per frame: GATE_CLOSED for the label's
+// FIRST HALF — start up to midpoint, the midpoint standing in for the impact
+// (the whole label when the extent select says so) — and GATE_AWAY for the
+// retraction half, which is open only to movement AWAY from the reference:
+// the slip that closes a combo is thrown while the last punch retracts
+// (1-2-slip), but a head that came off the line with the jab and returns with
+// the arm is not slipping — so in that half a frame counts only while the
+// rule's quantity is still growing (ruleEvents). In a combo the next punch's
+// own first half closes the gate again (closed wins over away).
+const GATE_OPEN = 0, GATE_AWAY = 1, GATE_CLOSED = 2;
+function punchGate(items, n) {
   const g = new Uint8Array(n);
   if (!ui.gate || !items) return g;
-  const pad = Math.round(GATE_PAD_S * fps);
   for (const it of items) {
     if (it.kind !== "punch") continue;
-    for (let f = Math.max(0, it.s - pad); f <= Math.min(n - 1, it.e + pad); f++) g[f] = 1;
+    const mid = ui.gateExt === "full" ? it.e : Math.floor((it.s + it.e) / 2);
+    for (let f = Math.max(0, it.s); f <= Math.min(n - 1, it.e); f++) g[f] = Math.max(g[f], f <= mid ? GATE_CLOSED : GATE_AWAY);
   }
   return g;
 }
@@ -828,7 +837,15 @@ function ruleEvents(series, key, thr, gate, items, base, n) {
   const arr = series?.[key];
   if (!arr) return [];
   const on = new Uint8Array(n);
-  for (let i = 0; i < n; i++) { const v = arr[i + base]; if (Number.isFinite(v) && Math.abs(v) >= thr && !gate[i]) on[i] = 1; }
+  for (let i = 0; i < n; i++) {
+    const v = arr[i + base];
+    if (!Number.isFinite(v) || Math.abs(v) < thr || gate[i] === GATE_CLOSED) continue;
+    if (gate[i] === GATE_AWAY) {                       // retraction: only while still moving away
+      const p = arr[i + base - AWAY_LOOKBACK];
+      if (!Number.isFinite(p) || Math.abs(v) - Math.abs(p) <= AWAY_MIN) continue;
+    }
+    on[i] = 1;
+  }
   const runs = [];
   let s = -1, prev = -10;
   for (let i = 0; i < n; i++) {
@@ -845,13 +862,15 @@ function ruleEvents(series, key, thr, gate, items, base, n) {
 }
 
 const RULE_COLOR = { true: COLOR_IN, false: COLOR_MISS, null: COLOR_CLIP };
+const AWAY_LOOKBACK = 3;       // frames (0.1 s at 30 fps) over which "moving away" is judged
+const AWAY_MIN = 0.01;         // torso: the quantity must have grown by more than this
 
 // Everything the lanes, traces and badge need for the current clip.
 function ruleState(d, items, cl, fps) {
   if (!d || !cl) return null;
   const series = seriesFor(cl, fps);
   if (!series) return null;
-  const gate = punchGate(items, d.n, fps);
+  const gate = punchGate(items, d.n);
   const events = {};
   for (const k of RULES) events[k] = ruleEvents(series, k, ui.thr[k], gate, items, cl.base, d.n);
   return { gate, events };
@@ -859,14 +878,13 @@ function ruleState(d, items, cl, fps) {
 
 const eventAt = (evs, f) => (evs || []).find(e => e.s <= f && f <= e.e) || null;
 
-// "off +0.31 · dev +0.28 · travel 0.19 · vel 0.05" for the frame's badge.
+// "|off| 0.31→ · |dev| 0.28→" for the frame's badge.
 function liveValues(cl, f, fps) {
   const series = seriesFor(cl, fps);
   if (!series) return "";
   const fr = f + cl.base;
   const mag = v => Number.isFinite(v) ? `${Math.abs(v).toFixed(2)}${v > 0 ? "→" : v < 0 ? "←" : ""}` : "—";
-  const fmt = v => Number.isFinite(v) ? v.toFixed(2) : "—";
-  return `|off| ${mag(series.off[fr])} · |dev| ${mag(series.dev[fr])} · |rest| ${mag(series.rest[fr])} · travel ${fmt(series.travel[fr])} · vel ${fmt(series.vel[fr])}`;
+  return `|off| ${mag(series.off[fr])} · |dev| ${mag(series.dev[fr])}`;
 }
 
 // ── DOM ─────────────────────────────────────────────────────────────────────
@@ -1106,15 +1124,19 @@ export const SlipExplorationRule = {
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
-          <canvas id="fa-strip" style="display:block; width:100%; height:68px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-strip" style="display:block; width:100%; height:54px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-frame" class="small" style="margin-top:3px; font-size:12px"></div>
-          <canvas id="fa-traces" style="display:block; width:100%; height:220px; margin-top:8px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-traces" style="display:block; width:100%; height:120px; margin-top:8px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-thr" style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:4px">
-            ${["off", "dev", "rest", "travel", "vel"].map(k => `
+            ${["off", "dev"].map(k => `
               <label>${k} ≥ <output id="fa-thr-${k}-out">${ui.thr[k].toFixed(2)}</output>
                 <input type="range" id="fa-thr-${k}" min="0" max="1" step="0.01" value="${ui.thr[k]}" style="width:110px; vertical-align:middle"></label>`).join("")}
-            <label><input type="checkbox" id="fa-gate" ${ui.gate ? "checked" : ""}> fire only when no punch is thrown (the Sheet's punch spans)</label>
-            <span class="muted small">torso units, all magnitudes (a slip to either side goes up; → / ← in the readout is the side) · position (off, dev) vs movement (travel, vel); frames past a threshold are marked under each trace; the off and dev rules fire on runs ≥ 3 frames outside the gate</span>
+            <label><input type="checkbox" id="fa-gate" ${ui.gate ? "checked" : ""}> fire only when no punch is being thrown, gate =</label>
+            <select id="fa-gate-ext">
+              <option value="half" ${ui.gateExt !== "full" ? "selected" : ""}>first half of each punch label closed (start → midpoint ≈ impact); in the retraction only movement away from the line counts</option>
+              <option value="full" ${ui.gateExt === "full" ? "selected" : ""}>the whole punch label closed</option>
+            </select>
+            <span class="muted small">torso units, magnitudes (a slip to either side goes up; → / ← in the readout is the side); frames past a threshold are marked under each trace; the rules fire on runs ≥ 3 frames outside the gate</span>
           </div>
           <div class="muted small" style="margin-top:2px">
             the strip is the clip's timeline — click or drag to seek · top lane:
@@ -1186,7 +1208,7 @@ export const SlipExplorationRule = {
       if (vs) { vs.value = String(ui.speed); vs.dispatchEvent(new Event("change")); }
       clock = { t0: performance.now(), f0: frame }; renderInfo(); if (mode === "skeleton") renderSkeletonFrame();
     });
-    for (const k of ["off", "dev", "rest", "travel", "vel"]) {
+    for (const k of ["off", "dev"]) {
       root.querySelector(`#fa-thr-${k}`).addEventListener("input", e => {
         ui.thr[k] = parseFloat(e.target.value); saveUi();
         root.querySelector(`#fa-thr-${k}-out`).textContent = ui.thr[k].toFixed(2);
@@ -1194,6 +1216,7 @@ export const SlipExplorationRule = {
       });
     }
     root.querySelector("#fa-gate").addEventListener("change", e => { ui.gate = e.target.checked; saveUi(); redrawTraces(); renderInfo(); });
+    root.querySelector("#fa-gate-ext").addEventListener("change", e => { ui.gateExt = e.target.value; saveUi(); redrawTraces(); renderInfo(); });
     // The strip is the clip's timeline: click or drag anywhere on it to seek.
     const seekAt = e => {
       const d = curData(); if (!d) return;
