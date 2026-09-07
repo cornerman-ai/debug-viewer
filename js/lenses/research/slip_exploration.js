@@ -56,7 +56,12 @@
 // under it, the badge names the frame's live values (off and dev both).
 //
 // THE RULE, FIRING ONLY WHEN NO PUNCH IS BEING THROWN. The trace row carries
-// its SLIP blocks along its bottom. The rule fires on a run of ≥ 3 frames past
+// its SLIP blocks along its bottom, each named LEAD or REAR by the side the
+// head moved toward (the sign of dev at the peak through the video's stance;
+// the labels agree on 19 of 24 events touching a labeled slip, 2026-09-08),
+// and each needing the head at least 0.05 torso off the hip line at some
+// point — a head coming back to the line has not slipped (same day; on this
+// footage that removes 1 event in 102). The rule fires on a run of ≥ 3 frames past
 // the threshold (gaps ≤ 2
 // frames bridged) that BEGINS as a movement away from the line while no punch
 // is being thrown. The gate closes the FIRST HALF of each of the Sheet's punch
@@ -245,6 +250,10 @@ function clipLabels(c, d) {
     else if (isPunchLabel(r.label)) items.push({ kind: "punch", label: r.label, straight: isStraightType(r.label), s: cs, e: ce });
   }
   items.sort((a, b) => a.s - b.s);
+  // The boxer's stance, from the rows (per video): it decides which image side is the lead side.
+  const counts = {};
+  for (const r of lab.rows) if (r.stance) counts[r.stance] = (counts[r.stance] || 0) + 1;
+  items.stance = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || null;
   labelMemo = { rows: lab.rows, clipId: c.id, fps: d.fps, items };
   return items;
 }
@@ -657,7 +666,8 @@ function legendHtml() {
     row(ln("rgba(255,255,255,0.85)"), "the quantity's magnitude frame by frame, in torso heights: 0 at the row's bottom, up is away from the reference — a slip to either side goes UP (which side is the arrow in the readout). The row tops out at max(0.8, 1.5 × threshold)"),
     row(ln("rgba(255,255,255,0.5)", true), "the threshold"),
     row(sw("#ff9e64", "height:3px"), "orange ticks along the row's bottom: frames past the threshold — BEFORE the gate and the ≥ 3-frame rule, so not every tick becomes a SLIP block"),
-    row(sw(COLOR_IN), "a block in the band under the ticks = that row's rule says SLIP here: a run of ≥ 3 frames past its threshold, gaps ≤ 2 frames bridged, outside the gate; the word SLIP is written in when it fits. Green: the block touches a labeled slip (±3 frames)"),
+    row(sw(COLOR_IN), "a block in the band under the ticks = the rule says SLIP here: a run of ≥ 3 frames past its threshold, gaps ≤ 2 frames bridged, outside the gate, with the head at least 0.05 torso off the hip line at some point (a head coming back to the line has not slipped). Green: the block touches a labeled slip (±3 frames)"),
+    row(`<span style="font:bold 9px ui-sans-serif,system-ui,sans-serif;color:#ddd">LEAD</span>`, "the word in a block is the side: LEAD or REAR, the side of the body the head moved toward — the sign of dev at its peak, mapped through the boxer's stance from the Sheet's rows (orthodox: lead is the image's right; southpaw the left). LEAD? / REAR? = the video has no stance and orthodox was assumed. On this footage the side matches the label on 19 of 24 events that touch a labeled slip"),
     row(sw(COLOR_MISS), "a red SLIP block: it touches no slip label — a false alarm, or a slip the labelers missed"),
     row(sw(COLOR_CLIP), "a purple SLIP block: the labels are still loading — not judged yet"),
     row(sw(SLIP.lead, "opacity:.35"), "a wash over the whole row: a labeled slip from the Sheet — blue lead, yellow rear"),
@@ -685,11 +695,11 @@ const GUTTER = 62;             // left gutter of the traces: the rule's name and
 
 
 // A rule's SLIP block: the verdict colour, and the word when there is room.
-function slipBlock(ctx, x, y, w, h, color) {
+function slipBlock(ctx, x, y, w, h, color, text = "SLIP") {
   ctx.fillStyle = color; ctx.globalAlpha = 0.95; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1;
-  if (w < 26) return;
+  if (w < 30) return;
   ctx.fillStyle = "#111"; ctx.font = "bold 9px ui-sans-serif, system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText("SLIP", x + w / 2, y + h / 2 + 0.5);
+  ctx.fillText(text, x + w / 2, y + h / 2 + 0.5);
   ctx.textAlign = "left";
 }
 
@@ -738,7 +748,7 @@ function renderSkeletonFrame() {
   const fired = rs ? RULES.filter(k => eventAt(rs.events[k], f)) : [];
   if (fired.length) {
     const hit = fired.some(k => eventAt(rs.events[k], f).hit);
-    drawBadge(ctx, `SLIP? ${fired.map(k => k + " rule").join(" + ")}${hit ? " · on a labeled slip" : items ? " · no label here" : ""}`,
+    drawBadge(ctx, `${fired.map(k => `${sideText(eventAt(rs.events[k], f))} SLIP? ${k} rule`).join(" + ")}${hit ? " · on a labeled slip" : items ? " · no label here" : ""}`,
               hit ? COLOR_IN : items ? COLOR_MISS : COLOR_CLIP, 1, fc ? 74 : 42);
   }
   drawCompass(ctx, deg, W);
@@ -833,7 +843,7 @@ function drawTraces(d, f, items, cl) {
       }
     }
     drawGate(ctx, gate, d.n, x0, colW, y0, rowH - BAND - 1, 0.45, 0.22);
-    if (rs) for (const ev of rs.events[row.key]) slipBlock(ctx, x0 + ev.s * colW, y0 + rowH - BAND + 4, Math.max(2, (ev.e - ev.s + 1) * colW), BAND - 5, RULE_COLOR[ev.hit]);
+    if (rs) for (const ev of rs.events[row.key]) slipBlock(ctx, x0 + ev.s * colW, y0 + rowH - BAND + 4, Math.max(2, (ev.e - ev.s + 1) * colW), BAND - 5, RULE_COLOR[ev.hit], sideText(ev));
     // The gutter names the rule and its threshold; the long label sits over the plot.
     ctx.font = "bold 11px ui-monospace, monospace"; ctx.textBaseline = "top"; ctx.textAlign = "left";
     ctx.fillStyle = "#ddd"; ctx.fillText(row.key, 4, y0 + 4);
@@ -914,14 +924,34 @@ function ruleEvents(series, key, thr, gate, items, base, n) {
     }
     if (ev >= 0) events.push([ev, b]);
   }
+  // Each event: at least 3 frames; the head at least MIN_OFF from the hip
+  // line at some point; named LEAD or REAR by the side the head moved toward
+  // (the sign of the quantity at its peak: + = the image's right, which is
+  // the lead side for an orthodox boxer and the rear side for a southpaw).
   const slips = items ? items.filter(it => it.kind === "slip") : null;
-  return events.filter(([a, b]) => b - a + 1 >= 3).map(([a, b]) => ({
-    s: a, e: b, hit: slips ? slips.some(sl => sl.s <= b + 3 && sl.e >= a - 3) : null,
-  }));
+  const stance = items?.stance || null;
+  const out = [];
+  for (const [a, b] of events) {
+    if (b - a + 1 < 3) continue;
+    let peak = a, pk = -1, offMax = 0;
+    for (let i = a; i <= b; i++) {
+      const v = Math.abs(arr[i + base]); if (v > pk) { pk = v; peak = i; }
+      const o = Math.abs(series.off[i + base]); if (o > offMax) offMax = o;
+    }
+    if (!(offMax >= MIN_OFF)) continue;
+    const side = (arr[peak + base] > 0) !== (stance === "southpaw") ? "lead" : "rear";
+    const touched = slips ? slips.filter(sl => sl.s <= b + 3 && sl.e >= a - 3) : null;
+    out.push({ s: a, e: b, side, stanceKnown: !!stance, peak, offMax,
+               hit: touched ? touched.length > 0 : null,
+               sideOk: touched && touched.length ? touched.some(sl => sl.side === side) : null });
+  }
+  return out;
 }
 
 const RULE_COLOR = { true: COLOR_IN, false: COLOR_MISS, null: COLOR_CLIP };
 const REARM = 0.08;            // torso: a head already off the line when the gate releases must move this much further away to count
+const MIN_OFF = 0.05;          // torso: the head must get at least this far from the hip line during the event — a head coming back to the line has not slipped
+const sideText = ev => ev.side.toUpperCase() + (ev.stanceKnown ? "" : "?");
 
 // Everything the lanes, traces and badge need for the current clip.
 function ruleState(d, items, cl, fps) {
@@ -1006,9 +1036,12 @@ function renderInfo() {
         const evs = rs.events[k];
         const caught = slips.filter(sl => evs.some(ev => ev.s <= sl.e + 3 && ev.e >= sl.s - 3)).length;
         const fa = evs.filter(ev => ev.hit === false).length;
+        const nLead = evs.filter(ev => ev.side === "lead").length;
+        const judged = evs.filter(ev => ev.sideOk != null), sideOk = judged.filter(ev => ev.sideOk).length;
         return ` · <span style="color:${COLOR_CLIP}">${k} rule</span> ${evs.length} event${evs.length === 1 ? "" : "s"}
-          (<span style="color:${COLOR_IN}">${caught}/${slips.length} slips</span>, <span style="color:${COLOR_MISS}">${fa} FA</span>)`;
-      }).join("");
+          (<span style="color:${SLIP.lead}">${nLead} lead</span> / <span style="color:${SLIP.rear}">${evs.length - nLead} rear</span>;
+          <span style="color:${COLOR_IN}">${caught}/${slips.length} slips</span>, <span style="color:${COLOR_MISS}">${fa} FA</span>${judged.length ? `, side as labeled ${sideOk}/${judged.length}` : ""})`;
+      }).join("") + (items.stance ? "" : ` · <span class="muted">no stance in the rows → orthodox assumed for lead / rear</span>`);
     }
   } else {
     const lab = slipLabelState();
@@ -1041,7 +1074,7 @@ function renderInfo() {
       const rs = cl ? ruleState(d, its, cl, mode === "video" ? (activeState?.pose?.fps || d.fps) : d.fps) : null;
       if (rs) says = RULES.map(k2 => {
         const ev = rs.events[k2].find(ev => ev.s <= kk && kk <= ev.e);
-        return ev ? `<b style="color:${RULE_COLOR[ev.hit]}">${k2} rule: SLIP</b>` : `<span class="muted">${k2} rule: —</span>`;
+        return ev ? `<b style="color:${RULE_COLOR[ev.hit]}">${k2} rule: ${sideText(ev)} SLIP</b>` : `<span class="muted">${k2} rule: —</span>`;
       }).join(" · ");
     }
     fr.innerHTML = d && k != null
@@ -1397,7 +1430,7 @@ export const SlipExplorationRule = {
       const fired = rs ? RULES.filter(k => eventAt(rs.events[k], f - x.s)) : [];
       if (fired.length) {
         const hit = fired.some(k => eventAt(rs.events[k], f - x.s).hit);
-        drawBadge(ctx, `SLIP? ${fired.map(k => k + " rule").join(" + ")}${hit ? " · on a labeled slip" : items ? " · no label here" : ""}`,
+        drawBadge(ctx, `${fired.map(k => `${sideText(eventAt(rs.events[k], f - x.s))} SLIP? ${k} rule`).join(" + ")}${hit ? " · on a labeled slip" : items ? " · no label here" : ""}`,
                   hit ? COLOR_IN : items ? COLOR_MISS : COLOR_CLIP, s, fc ? 124 : 92);
       }
     }
