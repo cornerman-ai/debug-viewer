@@ -182,7 +182,7 @@ function ensureClip(c) {
 const UI_KEY = "cornerman.slip_exploration.v1";
 const UI_DEFAULT_THR = { off: 0.22, dev: 0.24 };
 const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null, muted: false,
-             thr: { ...UI_DEFAULT_THR }, gate: true, gateExt: "half" };   // speed: the skeleton fallback's clock
+             thr: { ...UI_DEFAULT_THR }, gate: true, gateExt: "half", legendOpen: true };   // speed: the skeleton fallback's clock
 try {
   const saved = JSON.parse(localStorage.getItem(UI_KEY) || "{}");
   Object.assign(ui, saved);
@@ -503,6 +503,7 @@ function setMode(m) {
   takeoverStage.disabled = m !== "skeleton";
   canvas.parentElement.style.display = m === "skeleton" ? "" : "none";
   if (m === "video" && rafHandle) { cancelAnimationFrame(rafHandle); rafHandle = 0; }
+  fittedH = 0; fitVideo();
 }
 
 function startVideoLoop(c) {
@@ -525,9 +526,30 @@ function startSkeleton() {
   if (!rafHandle) rafHandle = requestAnimationFrame(tick);
 }
 
+// Footage and timelines on one screen: the height the viewport leaves for the
+// footage under the lens's own rows — bar, strip, traces, sliders, legend.
+function availHeight() {
+  const stage = document.getElementById("stage");
+  if (!root || !stage) return 480;
+  const top = stage.getBoundingClientRect().top + window.scrollY;
+  const own = canvas?.parentElement?.offsetHeight || 0;       // the skeleton canvas, when shown
+  const thr = root.querySelector("#fa-thr");                  // down to the sliders; the legend and the clip list may sit below the fold
+  const need = (thr || root).getBoundingClientRect().bottom - root.getBoundingClientRect().top + 12;
+  return Math.max(240, window.innerHeight - top - (need - own) - 24);
+}
+let fittedH = 0;
+function fitVideo() {
+  const wrap = document.querySelector(".video-wrap");
+  if (!wrap || mode !== "video") return;
+  const h = Math.round(availHeight());
+  if (h === fittedH) return;
+  fittedH = h;
+  wrap.style.setProperty("--fa-video-h", `${h}px`);
+}
+
 function sizeCanvas(d) {
   const maxW = Math.max(320, (root?.querySelector("#fa-stage")?.clientWidth || 800) - 4);
-  const maxH = Math.min(680, Math.max(360, window.innerHeight - 260));
+  const maxH = Math.min(680, availHeight());
   const scale = Math.min(maxW / d.width, maxH / d.height);
   const cw = Math.round(d.width * scale), ch = Math.round(d.height * scale);
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -594,69 +616,142 @@ function drawBadge(ctx, text, color, s = 1, y = 10) {
   ctx.restore();
 }
 
+// The legend: every colour, shade and line the lens draws, from the same
+// constants the drawing code uses, so it cannot drift from the picture.
+const LANE_BG = "#20242b";                                   // roughly the lanes' ground under the shades
+const sw = (bg, extra = "") => `<span class="fa-sw" style="background:${bg};${extra}"></span>`;
+const ln = (color, dashed = false) => `<span class="fa-ln" style="border-top:2px ${dashed ? "dashed" : "solid"} ${color}"></span>`;
+const shade = a => sw(LANE_BG, `box-shadow:inset 0 0 0 20px rgba(0,0,0,${a})`);
+function legendHtml() {
+  const row = (swatch, text) => `<div>${swatch}</div><div>${text}</div>`;
+  const head = t => `<div class="fa-lg-h">${t}</div>`;
+  return [
+    head("The strip — the clip's timeline, one column per frame. The left gutter names the lanes."),
+    row(ln(COLOR_FRAME), "the frame you are looking at — the same cyan line runs through the traces, and it is the marker on the purple progress bar"),
+    row(sw(COLOR_IN), "<b>facing</b> lane: the facing-angle model puts the boxer within ±22.5° of chest-to-camera on this frame"),
+    row(sw(COLOR_OUT), "facing: a pose, but outside the band"),
+    row(sw(COLOR_NOPOSE), "facing: no pose detected"),
+    row(sw(SLIP.lead), "<b>labels</b> lane — the Sheet's labels for this clip: a lead-slip label"),
+    row(sw(SLIP.rear), "labels: a rear-slip label"),
+    row(sw("#8a8a8a", "opacity:.6"), "labels: a punch label, any type"),
+    row(sw("#8a8a8a", `opacity:.75;border-top:3px solid ${COLOR_IN}`), "labels: a straight (jab / cross) capped green — the head came off the hip line during that punch (the head-off-center-line rule's verdict)"),
+    row(sw("#8a8a8a", `opacity:.75;border-top:3px solid ${COLOR_MISS}`), "labels: a straight capped red — the head stayed on the line"),
+    row(sw("#8a8a8a", "opacity:.75;border-top:3px solid #ddd"), "labels: a straight capped light grey — no verdict, no pose to measure"),
+    row(sw(COLOR_IN), "<b>off rule</b> / <b>dev rule</b> lanes: a block = that rule says SLIP here — a run of ≥ 3 frames past its threshold, gaps ≤ 2 frames bridged, outside the gate; the word SLIP is written in when it fits. Green: the block touches a labeled slip (±3 frames)"),
+    row(sw(COLOR_MISS), "rule lanes: a SLIP block touching no slip label — a false alarm, or a slip the labelers missed"),
+    row(sw(COLOR_CLIP), "rule lanes: a SLIP block while the labels are still loading — not judged yet"),
+    row(shade(0.55), "rule lanes, dark shade: the punch gate is closed — the first half of a punch label (start → midpoint ≈ impact), or the whole label when the select says so. No rule can fire here"),
+    row(shade(0.28), "rule lanes, lighter shade: the retraction half of a punch label — a rule fires here only while the head is still moving AWAY from its reference (the quantity grew over the last 3 frames); a head returning with the arm does not count"),
+    head("The traces — one row per rule, the same frames as the strip. Gutter: the rule's name and its threshold (the slider below)."),
+    row(ln("rgba(255,255,255,0.85)"), "the quantity's magnitude frame by frame, in torso heights: 0 at the row's bottom, up is away from the reference — a slip to either side goes UP (which side is the arrow in the readout). The row tops out at max(0.8, 1.5 × threshold)"),
+    row(ln("rgba(255,255,255,0.5)", true), "the threshold"),
+    row(sw("#ff9e64", "height:3px"), "orange ticks along the row's bottom: frames past the threshold — BEFORE the gate and the ≥ 3-frame rule, so not every tick becomes a SLIP block"),
+    row(sw(COLOR_IN), "the band under the ticks: the rule's SLIP blocks, exactly as on the strip (green / red / purple)"),
+    row(sw(SLIP.lead, "opacity:.35"), "a wash over the whole row: a labeled slip — blue lead, yellow rear"),
+    row(sw("rgba(255,255,255,0.14)"), "a faint wash: a punch label"),
+    row(shade(0.45), "dark / lighter shade: the gate, as on the strip"),
+    row(`<span style="color:#ff9e64;font-weight:600;font-size:11px">0.31→</span>`, "the readout at the right: this frame's value; → the head sits to the image's right of its reference, ← to the left; orange when past the threshold"),
+    head("On the body"),
+    row(ln(COLOR_FRAME, true), "the hip line: the vertical through the hip midpoint — the boxer's own center line, the reference for <b>off</b>"),
+    row(`<span class="fa-sw" style="background:${SLIP.lead};border-radius:50%;width:10px;margin-left:3px"></span>`, "the head point (midpoint of the visible head landmarks) with the bar from the hip line to it: the offset, in torso heights, written beside it. Its colour is what the frame sits in — blue / yellow a slip label, green a straight with the head off the line, red one with the head on it, grey another punch, white when nothing is labeled here"),
+    row(ln("rgba(122,223,122,0.85)"), "the skeleton, skeleton-only mode: green bones while the facing is within the band, white outside; on the footage the bones are faint white"),
+    row(sw("transparent", `border:2px solid ${COLOR_MISS};height:8px`), "a red frame around the picture: the video is outside the clip (video mode)"),
+    row(`<span style="color:${COLOR_IN};font-weight:600;font-size:10px">CLIP</span>`, `the badges top-left: the clip counter — green inside the clip, red outside; the label this frame sits in, in that label's colour; the live |off| · |dev| values; and <span style="color:${COLOR_IN}">SLIP? off rule</span> when a rule fires — green on a labeled slip, red with no label there, purple while the labels load`),
+    row(sw(COLOR_CLIP, "height:4px"), "the purple bar under the badges: the clip's extent, the cyan marker your position in it (video mode)"),
+    row(`<span style="color:${COLOR_IN};font-weight:600;font-size:11px">−3°</span>`, "the dial top-right: this frame's facing angle from the model. The green wedge is the ±22.5° band; needle and number are green inside it, white outside, “no pose” when there is none"),
+    head("Text"),
+    row(`<span style="color:${COLOR_IN};font-weight:600;font-size:10px">SLIP</span>`, "the frame line under the strip: what each rule says on this frame, in its block's colour; — when that rule is quiet"),
+    row(`<span style="color:${COLOR_MISS};font-weight:600;font-size:10px">FA</span>`, `the info line: <span style="color:${SLIP.lead}">slips</span> = the clip's slip labels; straights <span style="color:${COLOR_IN}">off the line</span> / <span style="color:${COLOR_MISS}">on it</span>; per <span style="color:${COLOR_CLIP}">rule</span>: its events on this clip, how many of the labeled slips they touch, and FA = events touching no slip label`),
+  ].join("");
+}
+
 // The strip under the player: the clip's frames. Top lane: facing in band /
 // out / no pose. Bottom lane: the Sheet's labels — slips in their colours,
 // straights by the center-line verdict, other punches grey. Playhead at clip
 // frame `f`.
+const GUTTER = 62;             // left gutter of the strip and the traces: the lane names
+
 function drawStrip(d, f, items = null, verdicts = null, rules = null) {
   if (!strip || !d) return;
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 54;
+  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 58;
   if (strip.width !== Math.round(cssW * dpr)) strip.width = Math.round(cssW * dpr);
   if (strip.height !== Math.round(cssH * dpr)) strip.height = Math.round(cssH * dpr);
   const ctx = strip.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cssW, cssH);
-  const colW = cssW / d.n, laneH = 12, gap = 2;
+  const x0 = GUTTER, colW = (cssW - GUTTER) / d.n, laneH = 13, gap = 2;
+  const laneY = i => (laneH + gap) * i;
+  const name = (i, txt) => {
+    ctx.fillStyle = "#bbb"; ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+    ctx.fillText(txt, 4, laneY(i) + laneH / 2);
+  };
+  // Lane 1: facing.
   for (let i = 0; i < d.n; i++) {
     const v = d.deg[i];
     ctx.fillStyle = !Number.isFinite(v) ? COLOR_NOPOSE : inBand(v) ? COLOR_IN : COLOR_OUT;
-    ctx.fillRect(i * colW, 0, colW + 0.5, laneH);
+    ctx.fillRect(x0 + i * colW, laneY(0), colW + 0.5, laneH);
   }
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
-  ctx.fillRect(0, laneH + gap, cssW, laneH);
+  name(0, "facing");
+  // Lane 2: the Sheet's labels — punches grey (a straight capped by the
+  // head-off-center-line verdict), slips in their colours on top.
+  ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(x0, laneY(1), cssW - x0, laneH);
   if (items) {
     for (const it of items) {
-      if (it.kind === "punch") {
-        const v = it.straight ? verdicts?.get(it) : null;
-        ctx.fillStyle = it.straight ? (v ? (v.ok ? COLOR_IN : COLOR_MISS) : "#bbb") : "#777";
-        ctx.globalAlpha = it.straight ? 0.9 : 0.45;
-        ctx.fillRect(it.s * colW, laneH + gap, Math.max(2, (it.e - it.s + 1) * colW), laneH);
+      if (it.kind !== "punch") continue;
+      const px = x0 + it.s * colW, pw = Math.max(2, (it.e - it.s + 1) * colW);
+      ctx.fillStyle = "#8a8a8a"; ctx.globalAlpha = 0.6; ctx.fillRect(px, laneY(1), pw, laneH);
+      if (it.straight) {
+        const v = verdicts?.get(it);
+        ctx.fillStyle = v ? (v.ok ? COLOR_IN : COLOR_MISS) : "#ddd"; ctx.globalAlpha = 1; ctx.fillRect(px, laneY(1), pw, 3);
       }
     }
     for (const it of items) {
       if (it.kind !== "slip") continue;
       ctx.fillStyle = SLIP[it.side]; ctx.globalAlpha = 0.95;
-      ctx.fillRect(it.s * colW, laneH + gap, Math.max(2, (it.e - it.s + 1) * colW), laneH);
+      ctx.fillRect(x0 + it.s * colW, laneY(1), Math.max(2, (it.e - it.s + 1) * colW), laneH);
     }
     ctx.globalAlpha = 1;
   } else {
-    ctx.fillStyle = "#888"; ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#888"; ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
     const lab = slipLabelState();
-    ctx.fillText(lab.status === "loading" ? "loading the Sheet's labels…" : lab.status === "error" ? `no labels — ${lab.error}` : "labels…", 4, laneH + gap + laneH / 2);
+    ctx.fillText(lab.status === "loading" ? "loading the Sheet's labels…" : lab.status === "error" ? `no labels — ${lab.error}` : "labels…", x0 + 4, laneY(1) + laneH / 2);
   }
-  // Lanes 3–4: the two rules, gated. Gated stretches dark, events by verdict.
+  name(1, "labels");
+  // Lanes 3–4: what each rule says. A block = that rule says SLIP, coloured
+  // by whether a labeled slip is there (green), not (red) or the labels are
+  // still loading (purple); the punch gate's closed stretches dark, its
+  // away-only retraction stretches lighter.
   RULES.forEach((k, ri) => {
-    const y = (laneH + gap) * (2 + ri);
-    ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(0, y, cssW, laneH);
+    const y = laneY(2 + ri);
+    ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(x0, y, cssW - x0, laneH);
     if (rules) {
-      let a = -1, cur = GATE_OPEN;                     // closed dark, away-only lighter
-      for (let i = 0; i <= d.n; i++) {
-        const g = i < d.n ? rules.gate[i] : GATE_OPEN;
-        if (g === cur) continue;
-        if (cur !== GATE_OPEN) { ctx.fillStyle = cur === GATE_CLOSED ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.28)"; ctx.fillRect(a * colW, y, (i - a) * colW, laneH); }
-        a = i; cur = g;
-      }
-      for (const ev of rules.events[k]) {
-        ctx.fillStyle = RULE_COLOR[ev.hit]; ctx.globalAlpha = 0.95;
-        ctx.fillRect(ev.s * colW, y, Math.max(2, (ev.e - ev.s + 1) * colW), laneH);
-      }
-      ctx.globalAlpha = 1;
+      drawGate(ctx, rules.gate, d.n, x0, colW, y, laneH, 0.55, 0.28);
+      for (const ev of rules.events[k]) slipBlock(ctx, x0 + ev.s * colW, y, Math.max(2, (ev.e - ev.s + 1) * colW), laneH, RULE_COLOR[ev.hit]);
     }
-    ctx.fillStyle = "#bbb"; ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "middle";
-    ctx.fillText(`${k} rule ≥ ${ui.thr[k].toFixed(2)}${ui.gate ? (ui.gateExt === "full" ? " · no-punch" : " · not mid-punch · retraction: away only") : ""}`, 4, y + laneH / 2);
+    name(2 + ri, `${k} rule`);
   });
-  if (Number.isFinite(f)) { ctx.fillStyle = COLOR_FRAME; ctx.fillRect(Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH); }
+  if (Number.isFinite(f)) { ctx.fillStyle = COLOR_FRAME; ctx.fillRect(x0 + Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH); }
+}
+
+// A rule's SLIP block: the verdict colour, and the word when there is room.
+function slipBlock(ctx, x, y, w, h, color) {
+  ctx.fillStyle = color; ctx.globalAlpha = 0.95; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1;
+  if (w < 26) return;
+  ctx.fillStyle = "#111"; ctx.font = "bold 9px ui-sans-serif, system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("SLIP", x + w / 2, y + h / 2 + 0.5);
+  ctx.textAlign = "left";
+}
+
+// The punch gate over a lane: closed stretches dark, away-only lighter.
+function drawGate(ctx, gate, n, x0, colW, y, h, aClosed, aAway) {
+  let a = -1, cur = GATE_OPEN;
+  for (let i = 0; i <= n; i++) {
+    const g = i < n ? gate[i] : GATE_OPEN;
+    if (g === cur) continue;
+    if (cur !== GATE_OPEN) { ctx.fillStyle = `rgba(0,0,0,${cur === GATE_CLOSED ? aClosed : aAway})`; ctx.fillRect(x0 + a * colW, y, (i - a) * colW, h); }
+    a = i; cur = g;
+  }
 }
 
 function renderSkeletonFrame() {
@@ -714,8 +809,8 @@ function renderSkeletonFrame() {
 // All four rows are magnitudes: a slip to either side goes UP. The side itself
 // is the arrow in the readout (→ head to image right, ← to image left).
 const TRACE_ROWS = [
-  { key: "off", label: "|off| · distance from the hip line" },
-  { key: "dev", label: "|dev| · deviation from the rolling 3 s median" },
+  { key: "off", label: "the head's distance from the hip line" },
+  { key: "dev", label: "its deviation from the rolling 3 s median (the boxer's own resting position)" },
 ];
 
 function seriesFor(cl, fps) {
@@ -730,45 +825,49 @@ function redrawTraces() {
   drawTraces(d, f, items, cl);
   const fps = mode === "video" ? (activeState?.pose?.fps || d.fps) : d.fps;
   drawStrip(d, f, items, straightVerdicts(items, cl), ruleState(d, items, cl, fps));
+  fitVideo();
 }
 
-// Rows of the clip's frames; labeled slips shaded, punches faint, the threshold
-// dashed (± for the signed rows), frames past it marked along the row's bottom.
+// Rows of the clip's frames, one per rule quantity: its magnitude over the
+// clip, the threshold dashed, labeled slips shaded, punches faint, the gate
+// dimmed, and along the row's bottom the frames past the threshold (orange
+// ticks) over the rule's own SLIP blocks — the same events as on the strip.
 function drawTraces(d, f, items, cl) {
   const canvas = root?.querySelector("#fa-traces");
   if (!canvas || !d) return;
   lastTrace = [d, f, items, cl];
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, canvas.getBoundingClientRect().width), cssH = 120;
+  const cssW = Math.max(1, canvas.getBoundingClientRect().width), cssH = 140;
   if (canvas.width !== Math.round(cssW * dpr)) canvas.width = Math.round(cssW * dpr);
   if (canvas.height !== Math.round(cssH * dpr)) canvas.height = Math.round(cssH * dpr);
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cssW, cssH);
-  const rowH = cssH / TRACE_ROWS.length, colW = cssW / d.n;
+  const x0 = GUTTER, rowH = cssH / TRACE_ROWS.length, colW = (cssW - x0) / d.n;
   const fps = mode === "video" ? (activeState?.pose?.fps || d.fps) : d.fps;
   const series = cl ? seriesFor(cl, fps) : null;
-  const gate = punchGate(items, d.n);
-  ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "top";
+  const rs = cl ? ruleState(d, items, cl, fps) : null;
+  const gate = rs?.gate || punchGate(items, d.n);
+  const BAND = 13;                                          // the row's bottom band: ticks over SLIP blocks
   TRACE_ROWS.forEach((row, ri) => {
     const y0 = ri * rowH, thr = ui.thr[row.key];
     const arr = series?.[row.key];
     const lim = Math.max(0.8, thr * 1.5);                   // 0 at the bottom, magnitudes up
-    const yOf = v => y0 + rowH - 4 - (v / lim) * (rowH - 16);
-    ctx.fillStyle = "rgba(255,255,255,0.04)"; ctx.fillRect(0, y0, cssW, rowH - 1);
+    const yOf = v => y0 + rowH - BAND - 2 - (v / lim) * (rowH - BAND - 16);
+    ctx.fillStyle = "rgba(255,255,255,0.04)"; ctx.fillRect(x0, y0, cssW - x0, rowH - 1);
     if (items) {
       for (const it of items) {
-        if (it.kind === "punch") { ctx.fillStyle = "rgba(255,255,255,0.07)"; ctx.fillRect(it.s * colW, y0, Math.max(1, (it.e - it.s + 1) * colW), rowH - 1); }
+        if (it.kind === "punch") { ctx.fillStyle = "rgba(255,255,255,0.07)"; ctx.fillRect(x0 + it.s * colW, y0, Math.max(1, (it.e - it.s + 1) * colW), rowH - 1); }
       }
       for (const it of items) {
         if (it.kind !== "slip") continue;
         ctx.fillStyle = SLIP[it.side]; ctx.globalAlpha = 0.22;
-        ctx.fillRect(it.s * colW, y0, Math.max(1.5, (it.e - it.s + 1) * colW), rowH - 1);
+        ctx.fillRect(x0 + it.s * colW, y0, Math.max(1.5, (it.e - it.s + 1) * colW), rowH - 1);
         ctx.globalAlpha = 1;
       }
     }
     ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, yOf(thr)); ctx.lineTo(cssW, yOf(thr)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0, yOf(thr)); ctx.lineTo(cssW, yOf(thr)); ctx.stroke();
     ctx.setLineDash([]);
     if (arr) {
       const base = cl.base;
@@ -778,25 +877,22 @@ function drawTraces(d, f, items, cl) {
         const v = arr[i + base];
         if (!Number.isFinite(v)) { started = false; continue; }
         const vv = Math.min(lim, Math.abs(v));
-        if (!started) { ctx.moveTo(i * colW, yOf(vv)); started = true; } else ctx.lineTo(i * colW, yOf(vv));
+        if (!started) { ctx.moveTo(x0 + i * colW, yOf(vv)); started = true; } else ctx.lineTo(x0 + i * colW, yOf(vv));
       }
       ctx.stroke();
       ctx.fillStyle = "#ff9e64";                      // past the threshold
       for (let i = 0; i < d.n; i++) {
         const v = arr[i + base];
-        if (Number.isFinite(v) && Math.abs(v) >= thr) ctx.fillRect(i * colW, y0 + rowH - 4, colW + 0.5, 3);
+        if (Number.isFinite(v) && Math.abs(v) >= thr) ctx.fillRect(x0 + i * colW, y0 + rowH - BAND, colW + 0.5, 3);
       }
     }
-    if (ui.gate && RULES.includes(row.key)) {                            // the gate, dimmed: closed dark, away-only lighter
-      let a = -1, cur = GATE_OPEN;
-      for (let i = 0; i <= d.n; i++) {
-        const g = i < d.n ? gate[i] : GATE_OPEN;
-        if (g === cur) continue;
-        if (cur !== GATE_OPEN) { ctx.fillStyle = cur === GATE_CLOSED ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.22)"; ctx.fillRect(a * colW, y0, (i - a) * colW, rowH - 1); }
-        a = i; cur = g;
-      }
-    }
-    ctx.fillStyle = "#aaa"; ctx.fillText(row.label, 6, y0 + 3);
+    drawGate(ctx, gate, d.n, x0, colW, y0, rowH - BAND - 1, 0.45, 0.22);
+    if (rs) for (const ev of rs.events[row.key]) slipBlock(ctx, x0 + ev.s * colW, y0 + rowH - BAND + 4, Math.max(2, (ev.e - ev.s + 1) * colW), BAND - 5, RULE_COLOR[ev.hit]);
+    // The gutter names the rule and its threshold; the long label sits over the plot.
+    ctx.font = "bold 11px ui-monospace, monospace"; ctx.textBaseline = "top"; ctx.textAlign = "left";
+    ctx.fillStyle = "#ddd"; ctx.fillText(row.key, 4, y0 + 4);
+    ctx.font = "10px ui-monospace, monospace"; ctx.fillStyle = "#aaa"; ctx.fillText(`≥ ${thr.toFixed(2)}`, 4, y0 + 18);
+    ctx.fillText(row.label, x0 + 6, y0 + 3);
     const vNow = arr ? arr[f + cl.base] : NaN;
     ctx.fillStyle = Number.isFinite(vNow) && Math.abs(vNow) >= thr ? "#ff9e64" : "#ddd"; ctx.textAlign = "right";
     const arrow = Number.isFinite(vNow) ? (vNow > 0 ? " →" : vNow < 0 ? " ←" : "") : "";
@@ -804,7 +900,7 @@ function drawTraces(d, f, items, cl) {
     ctx.textAlign = "left";
   });
   ctx.fillStyle = COLOR_FRAME;
-  ctx.fillRect(Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH);
+  ctx.fillRect(x0 + Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH);
 }
 
 // ── the two rules ───────────────────────────────────────────────────────────
@@ -897,7 +993,7 @@ function fmtTime(sec) {
 function shortStem(s, max = 44) { return s.length <= max ? s : s.slice(0, max - 1) + "…"; }
 function note(msg) { const el = root?.querySelector("#fa-note"); if (el) el.textContent = msg; }
 
-function renderAll() { renderParams(); renderInfo(); renderList(); if (mode === "skeleton") renderSkeletonFrame(); }
+function renderAll() { renderParams(); renderInfo(); renderList(); if (mode === "skeleton") renderSkeletonFrame(); fitVideo(); }
 
 function renderParams() {
   const el = root?.querySelector("#fa-params");
@@ -975,10 +1071,22 @@ function renderInfo() {
     let k = null;
     if (mode === "video") { const x = clipInLoaded(activeState, c); if (x) k = (activeState?.frame ?? 0) - x.s; }
     else if (d) k = frame;
+    // What each rule says at this frame — the same events the strip and traces draw.
+    let says = "";
+    if (d && k != null) {
+      const kk = Math.max(0, Math.min(d.n - 1, k));
+      const its = clipLabels(c, d), cl = centerLineFor(d, activeState);
+      const rs = cl ? ruleState(d, its, cl, mode === "video" ? (activeState?.pose?.fps || d.fps) : d.fps) : null;
+      if (rs) says = RULES.map(k2 => {
+        const ev = rs.events[k2].find(ev => ev.s <= kk && kk <= ev.e);
+        return ev ? `<b style="color:${RULE_COLOR[ev.hit]}">${k2} rule: SLIP</b>` : `<span class="muted">${k2} rule: —</span>`;
+      }).join(" · ");
+    }
     fr.innerHTML = d && k != null
       ? `clip frame <code>${Math.max(0, Math.min(d.n - 1, k)) + 1}</code> / ${d.n}
          · src <code>${fmtTime(c.start_sec + Math.max(0, Math.min(d.n - 1, k)) / d.fps)}</code>
-         ${k < 0 ? `<span style="color:${COLOR_MISS}">· before the clip</span>` : k > d.n - 1 ? `<span style="color:${COLOR_MISS}">· after the clip</span>` : ""}`
+         ${k < 0 ? `<span style="color:${COLOR_MISS}">· before the clip</span>` : k > d.n - 1 ? `<span style="color:${COLOR_MISS}">· after the clip</span>` : ""}
+         ${says ? ` · ${says}` : ""}`
       : "";
   }
 }
@@ -1028,7 +1136,9 @@ function watchDriveList() {
 }
 
 window.addEventListener("resize", () => {
-  if (!root || !document.contains(root) || mode !== "skeleton") return;
+  if (!root || !document.contains(root)) return;
+  fittedH = 0; fitVideo();
+  if (mode !== "skeleton") return;
   const d = curData();
   if (d) { sizeCanvas(d); renderSkeletonFrame(); }
 });
@@ -1088,9 +1198,17 @@ export const SlipExplorationRule = {
       #side { display:none !important; }
       .layout { display:block !important; }
       #stage { width:100% !important; max-width:none !important; padding:0 !important; background:none !important; }
+      /* Footage and timelines on one screen: the video box takes what the
+         viewport leaves under the lens's rows (fitVideo sets --fa-video-h),
+         not the viewer's 75vh. Gone with this style on the lens switch. */
+      .video-wrap { max-height: var(--fa-video-h, 75vh) !important; max-width: calc(var(--fa-video-h, 75vh) * var(--video-ratio, 16 / 9)) !important; }
       #stage-extras { margin-top:0 !important; }
       #fa-root button { font-size:13px; padding:4px 10px; }
       #fa-root select { font-size:12px; }
+      #fa-legend .fa-lg { display:grid; grid-template-columns:22px 1fr; gap:3px 8px; font-size:12px; line-height:1.35; margin-top:6px; align-items:start; }
+      #fa-legend .fa-lg-h { grid-column:1 / -1; font-weight:600; margin-top:8px; color:#ddd; }
+      #fa-legend .fa-sw { display:inline-block; width:16px; height:10px; border-radius:2px; vertical-align:middle; margin-top:3px; }
+      #fa-legend .fa-ln { display:inline-block; width:16px; height:0; vertical-align:middle; margin-top:3px; }
     `;
     slot.appendChild(base);
     takeoverStage = document.createElement("style");
@@ -1124,9 +1242,9 @@ export const SlipExplorationRule = {
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
-          <canvas id="fa-strip" style="display:block; width:100%; height:54px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-strip" style="display:block; width:100%; height:58px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-frame" class="small" style="margin-top:3px; font-size:12px"></div>
-          <canvas id="fa-traces" style="display:block; width:100%; height:120px; margin-top:8px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-traces" style="display:block; width:100%; height:140px; margin-top:8px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-thr" style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:4px">
             ${["off", "dev"].map(k => `
               <label>${k} ≥ <output id="fa-thr-${k}-out">${ui.thr[k].toFixed(2)}</output>
@@ -1138,16 +1256,12 @@ export const SlipExplorationRule = {
             </select>
             <span class="muted small">torso units, magnitudes (a slip to either side goes up; → / ← in the readout is the side); frames past a threshold are marked under each trace; the rules fire on runs ≥ 3 frames outside the gate</span>
           </div>
-          <div class="muted small" style="margin-top:2px">
-            the strip is the clip's timeline — click or drag to seek · top lane:
-            <span style="color:${COLOR_IN}">facing within the band</span> /
-            <span style="color:${COLOR_OUT}">outside</span> /
-            <span style="color:${COLOR_NOPOSE}">no pose</span> · bottom lane, the Sheet's labels:
-            <span style="color:${SLIP.lead}">lead slip</span> ·
-            <span style="color:${SLIP.rear}">rear slip</span> ·
-            straights <span style="color:${COLOR_IN}">head off the line</span> /
-            <span style="color:${COLOR_MISS}">on the line</span> · other punches grey ·
-            <kbd>N</kbd>/<kbd>P</kbd> next/prev clip · <kbd>Shift+N</kbd>/<kbd>Shift+P</kbd> next/prev video · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames
+          <details id="fa-legend" ${ui.legendOpen === false ? "" : "open"} style="margin-top:6px">
+            <summary class="small" style="cursor:pointer; color:#ddd">Legend — every colour, shade and line, what it means</summary>
+            <div class="fa-lg">${legendHtml()}</div>
+          </details>
+          <div class="muted small" style="margin-top:4px">
+            <kbd>N</kbd>/<kbd>P</kbd> next/prev clip · <kbd>Shift+N</kbd>/<kbd>Shift+P</kbd> next/prev video · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames · click or drag the strip or the traces to seek
           </div>
         </div>
         <details style="width:100%; flex:none">
@@ -1221,7 +1335,7 @@ export const SlipExplorationRule = {
     const seekAt = e => {
       const d = curData(); if (!d) return;
       const r = (e.currentTarget || strip).getBoundingClientRect();
-      const f = Math.max(0, Math.min(d.n - 1, Math.round((e.clientX - r.left) / Math.max(1, r.width) * (d.n - 1))));
+      const f = Math.max(0, Math.min(d.n - 1, Math.round((e.clientX - r.left - GUTTER) / Math.max(1, r.width - GUTTER) * (d.n - 1))));
       if (mode === "video") { const x = clipInLoaded(activeState, curClip()); if (x) seekTo(x.s + f); }
       else seekFrame(f, { pause: true });
     };
@@ -1231,6 +1345,17 @@ export const SlipExplorationRule = {
       el.addEventListener("pointermove", e => { if (dragging) seekAt(e); });
       el.addEventListener("pointerup", () => { dragging = false; });
       el.addEventListener("pointercancel", () => { dragging = false; });
+    }
+
+    // The legend or the clip list unfolding changes what the footage may take;
+    // the legend remembers whether it is open.
+    for (const det of root.querySelectorAll("details")) {
+      det.addEventListener("toggle", () => {
+        if (det.id === "fa-legend") { ui.legendOpen = det.open; saveUi(); }
+        fittedH = 0; fitVideo();
+        const d = curData();
+        if (d && mode === "skeleton") { sizeCanvas(d); renderSkeletonFrame(); }
+      });
     }
 
     rebuildVisible();
