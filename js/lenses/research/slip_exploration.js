@@ -25,19 +25,22 @@
 // scrubber controls, and a bar with ◀ prev / next ▶ and the clip's facts. The
 // full clip list sits folded under the player for jumping around; ◀◀ / ▶▶ video
 // (Shift+P / Shift+N) jump to the first span of the previous / next video. The viewer's
-// own round-wide scrubber and frame label are hidden too: the strip under the
-// player is the timeline, and it spans the clip only — click or drag it to
-// seek, ⏮ ⏭ step frames, the speed control slows the loop.
+// own round-wide scrubber and frame label are hidden too: the traces under
+// the player are the timeline, and they span the clip only — click or drag
+// them to seek, ⏮ ⏭ step frames, the speed control slows the loop.
 //
-// ON THE STRIP AND THE BODY (2026-09-06). The Sheet's labels for the clip —
-// via ../shared/slip_labels.js, the labeler web app — sit in a second lane of
-// the strip: lead / rear slips in their colours, straight punches coloured by
+// ON THE TRACES AND THE BODY (2026-09-06). The Sheet's labels for the clip —
+// via ../shared/slip_labels.js, the labeler web app — wash over the traces:
+// lead / rear slips in their colours, punches faint. Straight punches carry
 // the head-off-center-line rule from ./head_offcenter.js (did the head come off
-// the line at the punch? green yes, red no — ../shared/center_line.js), other
-// punches grey. The rule's quantity is drawn on the body every frame: the hip
-// line, the head point and the offset between them, in torso heights, and a
-// badge names the slip or the punch the frame sits in with its verdict. No
-// axiality gate here: the whole set faces the camera by construction.
+// the line at the punch? green yes, red no — ../shared/center_line.js) in the
+// body badge and the info line. The rule's quantity is drawn on the body every
+// frame: the hip line, the head point and the offset between them, in torso
+// heights, and a badge names the slip or the punch the frame sits in with its
+// verdict. No axiality gate here: the whole set faces the camera by
+// construction. (Until 2026-09-07 evening a strip above the traces carried
+// facing, labels and rule lanes; Mathe had it removed — the traces already
+// show all of it, and the footage gets the height.)
 //
 // WHAT SAYS "SLIP"? Under the strip, two traces of the center-line quantity
 // over the clip, each with its own threshold: off (the head's distance from
@@ -50,17 +53,19 @@
 // in the traces, frames past a threshold marked under each, the badge names
 // the frame's live values.
 //
-// THE TWO RULES, FIRING ONLY WHEN NO PUNCH IS BEING THROWN. Under the labels
-// the strip carries two more lanes, one per position method: the off rule and
-// the dev rule. Each fires on a run of ≥ 3 frames past its threshold (gaps ≤ 2
-// frames bridged) OUTSIDE the punch gate. The gate closes the FIRST HALF of
-// each of the Sheet's punch labels — start to midpoint, the midpoint standing
-// in for the impact (2026-09-07): a slip that closes a combo is thrown while
-// the last punch retracts, so the retraction half stays open — but only to
-// movement AWAY from the line: a head that came off the line with the jab and
-// returns with the arm is not slipping, so in the retraction a frame counts
-// only while the quantity is still growing (0.1-s look-back). A select under
-// the traces closes the whole label instead, for comparison (±0.25 s widening
+// THE TWO RULES, FIRING ONLY WHEN NO PUNCH IS BEING THROWN. Each trace row
+// carries its rule's SLIP blocks along its bottom: the off rule and the dev
+// rule. Each fires on a run of ≥ 3 frames past its threshold (gaps ≤ 2
+// frames bridged) that BEGINS as a movement away from the line while no punch
+// is being thrown. The gate closes the FIRST HALF of each of the Sheet's punch
+// labels — start to midpoint, the midpoint standing in for the impact
+// (2026-09-07): a slip that closes a combo is thrown while the last punch
+// retracts, so the retraction half stays open. A head that went off the line
+// inside the closed half is the punch's: it does not count while it stays
+// there, while it returns with the arm, or after the label ends — only a
+// further movement away (REARM, 0.08 torso) starts a slip (the onset rule in
+// ruleEvents; Mathe's three cases of the same evening). A select under the
+// traces closes the whole label instead, for comparison (±0.25 s widening
 // swallowed most of the labeled slips and is gone). The Sheet's
 // labels are the gate for now because the measured skeleton cue (2D arm
 // extension) does not see punches thrown at the camera, and a depth-aware one
@@ -394,7 +399,7 @@ function loadClipRound(c) {
 
 // ── the player ──────────────────────────────────────────────────────────────
 
-let root = null, takeoverStage = null, canvas = null, strip = null;
+let root = null, takeoverStage = null, canvas = null;
 let mode = "video";                 // "video" (real footage + overlay) | "skeleton" (own canvas)
 let looping = true;
 let playing = true;                 // skeleton mode's own play state
@@ -409,7 +414,7 @@ function showClip(i) {
   const c = visible[cur];
   ui.lastId = c.id; saveUi();
   listKey = null;
-  ensureClip(c);                                        // strip + compass (+ the fallback's skeleton)
+  ensureClip(c);                                        // traces + compass (+ the fallback's skeleton)
   prefetchAhead(cur);
 
   // Real footage when the clip's round is already loaded (by hand, or by us)
@@ -535,7 +540,7 @@ function availHeight() {
   const own = canvas?.parentElement?.offsetHeight || 0;       // the skeleton canvas, when shown
   const thr = root.querySelector("#fa-thr");                  // down to the sliders; the legend and the clip list may sit below the fold
   const need = (thr || root).getBoundingClientRect().bottom - root.getBoundingClientRect().top + 12;
-  return Math.max(240, window.innerHeight - top - (need - own) - 24);
+  return Math.max(240, window.innerHeight - top - (need - own) - 16);
 }
 let fittedH = 0;
 function fitVideo() {
@@ -626,113 +631,36 @@ function legendHtml() {
   const row = (swatch, text) => `<div>${swatch}</div><div>${text}</div>`;
   const head = t => `<div class="fa-lg-h">${t}</div>`;
   return [
-    head("The strip — the clip's timeline, one column per frame. The left gutter names the lanes."),
-    row(ln(COLOR_FRAME), "the frame you are looking at — the same cyan line runs through the traces, and it is the marker on the purple progress bar"),
-    row(sw(COLOR_IN), "<b>facing</b> lane: the facing-angle model puts the boxer within ±22.5° of chest-to-camera on this frame"),
-    row(sw(COLOR_OUT), "facing: a pose, but outside the band"),
-    row(sw(COLOR_NOPOSE), "facing: no pose detected"),
-    row(sw(SLIP.lead), "<b>labels</b> lane — the Sheet's labels for this clip: a lead-slip label"),
-    row(sw(SLIP.rear), "labels: a rear-slip label"),
-    row(sw("#8a8a8a", "opacity:.6"), "labels: a punch label, any type"),
-    row(sw("#8a8a8a", `opacity:.75;border-top:3px solid ${COLOR_IN}`), "labels: a straight (jab / cross) capped green — the head came off the hip line during that punch (the head-off-center-line rule's verdict)"),
-    row(sw("#8a8a8a", `opacity:.75;border-top:3px solid ${COLOR_MISS}`), "labels: a straight capped red — the head stayed on the line"),
-    row(sw("#8a8a8a", "opacity:.75;border-top:3px solid #ddd"), "labels: a straight capped light grey — no verdict, no pose to measure"),
-    row(sw(COLOR_IN), "<b>off rule</b> / <b>dev rule</b> lanes: a block = that rule says SLIP here — a run of ≥ 3 frames past its threshold, gaps ≤ 2 frames bridged, outside the gate; the word SLIP is written in when it fits. Green: the block touches a labeled slip (±3 frames)"),
-    row(sw(COLOR_MISS), "rule lanes: a SLIP block touching no slip label — a false alarm, or a slip the labelers missed"),
-    row(sw(COLOR_CLIP), "rule lanes: a SLIP block while the labels are still loading — not judged yet"),
-    row(shade(0.55), "rule lanes, dark shade: the punch gate is closed — the first half of a punch label (start → midpoint ≈ impact), or the whole label when the select says so. No rule can fire here"),
-    row(shade(0.28), "rule lanes, lighter shade: the retraction half of a punch label — a rule fires here only while the head is still moving AWAY from its reference (the quantity grew over the last 3 frames); a head returning with the arm does not count"),
-    head("The traces — one row per rule, the same frames as the strip. Gutter: the rule's name and its threshold (the slider below)."),
+    head("The traces — the clip's timeline, one column per frame, one row per rule. The left gutter names the rule and its threshold (the slider below). Click or drag anywhere to seek."),
+    row(ln(COLOR_FRAME), "the frame you are looking at — the same cyan marker sits on the purple progress bar over the footage"),
     row(ln("rgba(255,255,255,0.85)"), "the quantity's magnitude frame by frame, in torso heights: 0 at the row's bottom, up is away from the reference — a slip to either side goes UP (which side is the arrow in the readout). The row tops out at max(0.8, 1.5 × threshold)"),
     row(ln("rgba(255,255,255,0.5)", true), "the threshold"),
     row(sw("#ff9e64", "height:3px"), "orange ticks along the row's bottom: frames past the threshold — BEFORE the gate and the ≥ 3-frame rule, so not every tick becomes a SLIP block"),
-    row(sw(COLOR_IN), "the band under the ticks: the rule's SLIP blocks, exactly as on the strip (green / red / purple)"),
-    row(sw(SLIP.lead, "opacity:.35"), "a wash over the whole row: a labeled slip — blue lead, yellow rear"),
-    row(sw("rgba(255,255,255,0.14)"), "a faint wash: a punch label"),
-    row(shade(0.45), "dark / lighter shade: the gate, as on the strip"),
+    row(sw(COLOR_IN), "a block in the band under the ticks = that row's rule says SLIP here: a run of ≥ 3 frames past its threshold, gaps ≤ 2 frames bridged, outside the gate; the word SLIP is written in when it fits. Green: the block touches a labeled slip (±3 frames)"),
+    row(sw(COLOR_MISS), "a red SLIP block: it touches no slip label — a false alarm, or a slip the labelers missed"),
+    row(sw(COLOR_CLIP), "a purple SLIP block: the labels are still loading — not judged yet"),
+    row(sw(SLIP.lead, "opacity:.35"), "a wash over the whole row: a labeled slip from the Sheet — blue lead, yellow rear"),
+    row(sw("rgba(255,255,255,0.14)"), "a faint wash: a punch label from the Sheet (any type)"),
+    row(shade(0.45), "dark shade: the punch gate is closed — the first half of a punch label (start → midpoint ≈ impact), or the whole label when the select says so. No slip can begin here, and a head that went off the line in here belongs to the punch: it does not count while it stays off, while it returns with the arm, or after the label ends — only a further movement away (≥ 0.08 torso from where it settled) starts a slip"),
+    row(shade(0.22), "lighter shade: the retraction half of a punch label — open: a slip may begin here (the 1-2-slip)"),
+    row(sw(COLOR_IN), "so a SLIP block always starts where the head began moving away from its reference with no punch being thrown: either the threshold crossing itself, or the renewed movement after a punch"),
     row(`<span style="color:#ff9e64;font-weight:600;font-size:11px">0.31→</span>`, "the readout at the right: this frame's value; → the head sits to the image's right of its reference, ← to the left; orange when past the threshold"),
     head("On the body"),
     row(ln(COLOR_FRAME, true), "the hip line: the vertical through the hip midpoint — the boxer's own center line, the reference for <b>off</b>"),
     row(`<span class="fa-sw" style="background:${SLIP.lead};border-radius:50%;width:10px;margin-left:3px"></span>`, "the head point (midpoint of the visible head landmarks) with the bar from the hip line to it: the offset, in torso heights, written beside it. Its colour is what the frame sits in — blue / yellow a slip label, green a straight with the head off the line, red one with the head on it, grey another punch, white when nothing is labeled here"),
-    row(ln("rgba(122,223,122,0.85)"), "the skeleton, skeleton-only mode: green bones while the facing is within the band, white outside; on the footage the bones are faint white"),
+    row(ln("rgba(122,223,122,0.85)"), "the skeleton, skeleton-only mode: green bones while the facing-angle model has the boxer within ±22.5° of chest-to-camera, white outside; on the footage the bones are faint white"),
     row(sw("transparent", `border:2px solid ${COLOR_MISS};height:8px`), "a red frame around the picture: the video is outside the clip (video mode)"),
-    row(`<span style="color:${COLOR_IN};font-weight:600;font-size:10px">CLIP</span>`, `the badges top-left: the clip counter — green inside the clip, red outside; the label this frame sits in, in that label's colour; the live |off| · |dev| values; and <span style="color:${COLOR_IN}">SLIP? off rule</span> when a rule fires — green on a labeled slip, red with no label there, purple while the labels load`),
+    row(`<span style="color:${COLOR_IN};font-weight:600;font-size:10px">CLIP</span>`, `the badges top-left: the clip counter — green inside the clip, red outside; the label this frame sits in, in that label's colour (a straight also says whether the head came off the line); the live |off| · |dev| values; and <span style="color:${COLOR_IN}">SLIP? off rule</span> when a rule fires — green on a labeled slip, red with no label there, purple while the labels load`),
     row(sw(COLOR_CLIP, "height:4px"), "the purple bar under the badges: the clip's extent, the cyan marker your position in it (video mode)"),
     row(`<span style="color:${COLOR_IN};font-weight:600;font-size:11px">−3°</span>`, "the dial top-right: this frame's facing angle from the model. The green wedge is the ±22.5° band; needle and number are green inside it, white outside, “no pose” when there is none"),
     head("Text"),
-    row(`<span style="color:${COLOR_IN};font-weight:600;font-size:10px">SLIP</span>`, "the frame line under the strip: what each rule says on this frame, in its block's colour; — when that rule is quiet"),
+    row(`<span style="color:${COLOR_IN};font-weight:600;font-size:10px">SLIP</span>`, "the frame line under the traces: what each rule says on this frame, in its block's colour; — when that rule is quiet"),
     row(`<span style="color:${COLOR_MISS};font-weight:600;font-size:10px">FA</span>`, `the info line: <span style="color:${SLIP.lead}">slips</span> = the clip's slip labels; straights <span style="color:${COLOR_IN}">off the line</span> / <span style="color:${COLOR_MISS}">on it</span>; per <span style="color:${COLOR_CLIP}">rule</span>: its events on this clip, how many of the labeled slips they touch, and FA = events touching no slip label`),
   ].join("");
 }
 
-// The strip under the player: the clip's frames. Top lane: facing in band /
-// out / no pose. Bottom lane: the Sheet's labels — slips in their colours,
-// straights by the center-line verdict, other punches grey. Playhead at clip
-// frame `f`.
-const GUTTER = 62;             // left gutter of the strip and the traces: the lane names
+const GUTTER = 62;             // left gutter of the traces: the rule's name and threshold
 
-function drawStrip(d, f, items = null, verdicts = null, rules = null) {
-  if (!strip || !d) return;
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 58;
-  if (strip.width !== Math.round(cssW * dpr)) strip.width = Math.round(cssW * dpr);
-  if (strip.height !== Math.round(cssH * dpr)) strip.height = Math.round(cssH * dpr);
-  const ctx = strip.getContext("2d");
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, cssW, cssH);
-  const x0 = GUTTER, colW = (cssW - GUTTER) / d.n, laneH = 13, gap = 2;
-  const laneY = i => (laneH + gap) * i;
-  const name = (i, txt) => {
-    ctx.fillStyle = "#bbb"; ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
-    ctx.fillText(txt, 4, laneY(i) + laneH / 2);
-  };
-  // Lane 1: facing.
-  for (let i = 0; i < d.n; i++) {
-    const v = d.deg[i];
-    ctx.fillStyle = !Number.isFinite(v) ? COLOR_NOPOSE : inBand(v) ? COLOR_IN : COLOR_OUT;
-    ctx.fillRect(x0 + i * colW, laneY(0), colW + 0.5, laneH);
-  }
-  name(0, "facing");
-  // Lane 2: the Sheet's labels — punches grey (a straight capped by the
-  // head-off-center-line verdict), slips in their colours on top.
-  ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(x0, laneY(1), cssW - x0, laneH);
-  if (items) {
-    for (const it of items) {
-      if (it.kind !== "punch") continue;
-      const px = x0 + it.s * colW, pw = Math.max(2, (it.e - it.s + 1) * colW);
-      ctx.fillStyle = "#8a8a8a"; ctx.globalAlpha = 0.6; ctx.fillRect(px, laneY(1), pw, laneH);
-      if (it.straight) {
-        const v = verdicts?.get(it);
-        ctx.fillStyle = v ? (v.ok ? COLOR_IN : COLOR_MISS) : "#ddd"; ctx.globalAlpha = 1; ctx.fillRect(px, laneY(1), pw, 3);
-      }
-    }
-    for (const it of items) {
-      if (it.kind !== "slip") continue;
-      ctx.fillStyle = SLIP[it.side]; ctx.globalAlpha = 0.95;
-      ctx.fillRect(x0 + it.s * colW, laneY(1), Math.max(2, (it.e - it.s + 1) * colW), laneH);
-    }
-    ctx.globalAlpha = 1;
-  } else {
-    ctx.fillStyle = "#888"; ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
-    const lab = slipLabelState();
-    ctx.fillText(lab.status === "loading" ? "loading the Sheet's labels…" : lab.status === "error" ? `no labels — ${lab.error}` : "labels…", x0 + 4, laneY(1) + laneH / 2);
-  }
-  name(1, "labels");
-  // Lanes 3–4: what each rule says. A block = that rule says SLIP, coloured
-  // by whether a labeled slip is there (green), not (red) or the labels are
-  // still loading (purple); the punch gate's closed stretches dark, its
-  // away-only retraction stretches lighter.
-  RULES.forEach((k, ri) => {
-    const y = laneY(2 + ri);
-    ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(x0, y, cssW - x0, laneH);
-    if (rules) {
-      drawGate(ctx, rules.gate, d.n, x0, colW, y, laneH, 0.55, 0.28);
-      for (const ev of rules.events[k]) slipBlock(ctx, x0 + ev.s * colW, y, Math.max(2, (ev.e - ev.s + 1) * colW), laneH, RULE_COLOR[ev.hit]);
-    }
-    name(2 + ri, `${k} rule`);
-  });
-  if (Number.isFinite(f)) { ctx.fillStyle = COLOR_FRAME; ctx.fillRect(x0 + Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH); }
-}
 
 // A rule's SLIP block: the verdict colour, and the word when there is room.
 function slipBlock(ctx, x, y, w, h, color) {
@@ -800,7 +728,6 @@ function renderSkeletonFrame() {
   ctx.beginPath(); ctx.roundRect(8, H - 30, tw + 16, 24, 5); ctx.fill();
   ctx.fillStyle = "#ddd"; ctx.fillText(t, 16, H - 12);
   ctx.restore();
-  drawStrip(d, f, items, verdicts, ruleState(d, items, cl, d.fps));
   drawTraces(d, f, items, cl);
 }
 
@@ -823,15 +750,13 @@ function redrawTraces() {
   if (!lastTrace) return;
   const [d, f, items, cl] = lastTrace;
   drawTraces(d, f, items, cl);
-  const fps = mode === "video" ? (activeState?.pose?.fps || d.fps) : d.fps;
-  drawStrip(d, f, items, straightVerdicts(items, cl), ruleState(d, items, cl, fps));
   fitVideo();
 }
 
-// Rows of the clip's frames, one per rule quantity: its magnitude over the
-// clip, the threshold dashed, labeled slips shaded, punches faint, the gate
-// dimmed, and along the row's bottom the frames past the threshold (orange
-// ticks) over the rule's own SLIP blocks — the same events as on the strip.
+// The timeline: rows of the clip's frames, one per rule quantity — its
+// magnitude over the clip, the threshold dashed, labeled slips washed in,
+// punches faint, the gate dimmed, and along the row's bottom the frames past
+// the threshold (orange ticks) over the rule's own SLIP blocks.
 function drawTraces(d, f, items, cl) {
   const canvas = root?.querySelector("#fa-traces");
   if (!canvas || !d) return;
@@ -909,12 +834,10 @@ const RULES = ["off", "dev"];
 // Clip frames inside a punch label, per frame: GATE_CLOSED for the label's
 // FIRST HALF — start up to midpoint, the midpoint standing in for the impact
 // (the whole label when the extent select says so) — and GATE_AWAY for the
-// retraction half, which is open only to movement AWAY from the reference:
-// the slip that closes a combo is thrown while the last punch retracts
-// (1-2-slip), but a head that came off the line with the jab and returns with
-// the arm is not slipping — so in that half a frame counts only while the
-// rule's quantity is still growing (ruleEvents). In a combo the next punch's
-// own first half closes the gate again (closed wins over away).
+// retraction half, which is open: the slip that closes a combo is thrown while
+// the last punch retracts (1-2-slip). What the closed half does to a head
+// that went off the line in it is ruleEvents' onset rule. In a combo the next
+// punch's own first half closes the gate again (closed wins over away).
 const GATE_OPEN = 0, GATE_AWAY = 1, GATE_CLOSED = 2;
 function punchGate(items, n) {
   const g = new Uint8Array(n);
@@ -929,37 +852,55 @@ function punchGate(items, n) {
 
 // Runs of |series[key]| >= thr on ungated clip frames, gaps <= 2 bridged, >= 3
 // frames kept: [{ s, e, hit }] with hit = touches a labeled slip (null = no labels).
+// The rule's events on the clip. An event is a stretch past the threshold that
+// BEGAN as a movement away from the reference while no punch was being thrown:
+// a run that crosses the threshold outside the closed gate starts an event at
+// the crossing. A run that was already past the threshold inside the closed
+// gate — the head went off the line with the punch — does not: not while the
+// head stays there, not while it returns with the arm, and not after the label
+// ends (Mathe, 2026-09-07) — unless the head then moves a further REARM torso
+// away from where it settled, which is a new movement and starts an event
+// there. The closed gate cuts a running event; the retraction half is open.
+// Runs are bridged over gaps ≤ 2 frames; events shorter than 3 frames drop.
 function ruleEvents(series, key, thr, gate, items, base, n) {
   const arr = series?.[key];
   if (!arr) return [];
-  const on = new Uint8Array(n);
-  for (let i = 0; i < n; i++) {
-    const v = arr[i + base];
-    if (!Number.isFinite(v) || Math.abs(v) < thr || gate[i] === GATE_CLOSED) continue;
-    if (gate[i] === GATE_AWAY) {                       // retraction: only while still moving away
-      const p = arr[i + base - AWAY_LOOKBACK];
-      if (!Number.isFinite(p) || Math.abs(v) - Math.abs(p) <= AWAY_MIN) continue;
-    }
-    on[i] = 1;
-  }
+  const q = i => { const v = arr[i + base]; return Number.isFinite(v) ? Math.abs(v) : NaN; };
   const runs = [];
   let s = -1, prev = -10;
   for (let i = 0; i < n; i++) {
-    if (!on[i]) continue;
+    if (!(q(i) >= thr)) continue;
     if (s < 0) { s = i; prev = i; continue; }
     if (i - prev > 3) { runs.push([s, prev]); s = i; }
     prev = i;
   }
   if (s >= 0) runs.push([s, prev]);
+  const events = [];
+  for (const [a, b] of runs) {
+    let ev = -1, parked = gate[a] === GATE_CLOSED, qmin = NaN;
+    for (let i = a; i <= b; i++) {
+      if (gate[i] === GATE_CLOSED) {                       // a punch: cut, and whatever is off the line now belongs to it
+        if (ev >= 0) { events.push([ev, i - 1]); ev = -1; }
+        parked = true; qmin = NaN;
+        continue;
+      }
+      if (ev >= 0) continue;
+      if (!parked) { ev = i; continue; }                   // crossed the threshold in the open: the crossing is the movement
+      const v = q(i);
+      if (!Number.isFinite(v)) continue;
+      qmin = Number.isFinite(qmin) ? Math.min(qmin, v) : v;
+      if (v - qmin >= REARM) { ev = i; parked = false; }  // a further movement away: a new slip
+    }
+    if (ev >= 0) events.push([ev, b]);
+  }
   const slips = items ? items.filter(it => it.kind === "slip") : null;
-  return runs.filter(([a, b]) => b - a + 1 >= 3).map(([a, b]) => ({
+  return events.filter(([a, b]) => b - a + 1 >= 3).map(([a, b]) => ({
     s: a, e: b, hit: slips ? slips.some(sl => sl.s <= b + 3 && sl.e >= a - 3) : null,
   }));
 }
 
 const RULE_COLOR = { true: COLOR_IN, false: COLOR_MISS, null: COLOR_CLIP };
-const AWAY_LOOKBACK = 3;       // frames (0.1 s at 30 fps) over which "moving away" is judged
-const AWAY_MIN = 0.01;         // torso: the quantity must have grown by more than this
+const REARM = 0.08;            // torso: a head already off the line when the gate releases must move this much further away to count
 
 // Everything the lanes, traces and badge need for the current clip.
 function ruleState(d, items, cl, fps) {
@@ -1242,16 +1183,15 @@ export const SlipExplorationRule = {
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
-          <canvas id="fa-strip" style="display:block; width:100%; height:58px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-traces" style="display:block; width:100%; height:140px; margin-top:6px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-frame" class="small" style="margin-top:3px; font-size:12px"></div>
-          <canvas id="fa-traces" style="display:block; width:100%; height:140px; margin-top:8px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-thr" style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:4px">
             ${["off", "dev"].map(k => `
               <label>${k} ≥ <output id="fa-thr-${k}-out">${ui.thr[k].toFixed(2)}</output>
                 <input type="range" id="fa-thr-${k}" min="0" max="1" step="0.01" value="${ui.thr[k]}" style="width:110px; vertical-align:middle"></label>`).join("")}
             <label><input type="checkbox" id="fa-gate" ${ui.gate ? "checked" : ""}> fire only when no punch is being thrown, gate =</label>
             <select id="fa-gate-ext">
-              <option value="half" ${ui.gateExt !== "full" ? "selected" : ""}>first half of each punch label closed (start → midpoint ≈ impact); in the retraction only movement away from the line counts</option>
+              <option value="half" ${ui.gateExt !== "full" ? "selected" : ""}>first half of each punch label closed (start → midpoint ≈ impact); a slip may begin in the retraction, but a head that went off the line with the punch counts only once it moves further away</option>
               <option value="full" ${ui.gateExt === "full" ? "selected" : ""}>the whole punch label closed</option>
             </select>
             <span class="muted small">torso units, magnitudes (a slip to either side goes up; → / ← in the readout is the side); frames past a threshold are marked under each trace; the rules fire on runs ≥ 3 frames outside the gate</span>
@@ -1261,7 +1201,7 @@ export const SlipExplorationRule = {
             <div class="fa-lg">${legendHtml()}</div>
           </details>
           <div class="muted small" style="margin-top:4px">
-            <kbd>N</kbd>/<kbd>P</kbd> next/prev clip · <kbd>Shift+N</kbd>/<kbd>Shift+P</kbd> next/prev video · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames · click or drag the strip or the traces to seek
+            <kbd>N</kbd>/<kbd>P</kbd> next/prev clip · <kbd>Shift+N</kbd>/<kbd>Shift+P</kbd> next/prev video · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> frames · click or drag the traces to seek
           </div>
         </div>
         <details style="width:100%; flex:none">
@@ -1282,7 +1222,6 @@ export const SlipExplorationRule = {
       </div>`;
     slot.appendChild(root);
     canvas = root.querySelector("#fa-canvas");
-    strip = root.querySelector("#fa-strip");
 
     root.querySelector("#fa-sort").value = ui.sort;
     root.querySelector("#fa-outside").checked = ui.outsideOnly;
@@ -1331,21 +1270,20 @@ export const SlipExplorationRule = {
     }
     root.querySelector("#fa-gate").addEventListener("change", e => { ui.gate = e.target.checked; saveUi(); redrawTraces(); renderInfo(); });
     root.querySelector("#fa-gate-ext").addEventListener("change", e => { ui.gateExt = e.target.value; saveUi(); redrawTraces(); renderInfo(); });
-    // The strip is the clip's timeline: click or drag anywhere on it to seek.
+    // The traces are the clip's timeline: click or drag anywhere on them to seek.
     const seekAt = e => {
       const d = curData(); if (!d) return;
-      const r = (e.currentTarget || strip).getBoundingClientRect();
+      const r = e.currentTarget.getBoundingClientRect();
       const f = Math.max(0, Math.min(d.n - 1, Math.round((e.clientX - r.left - GUTTER) / Math.max(1, r.width - GUTTER) * (d.n - 1))));
       if (mode === "video") { const x = clipInLoaded(activeState, curClip()); if (x) seekTo(x.s + f); }
       else seekFrame(f, { pause: true });
     };
     let dragging = false;
-    for (const el of [strip, root.querySelector("#fa-traces")]) {
-      el.addEventListener("pointerdown", e => { dragging = true; el.setPointerCapture(e.pointerId); seekAt(e); });
-      el.addEventListener("pointermove", e => { if (dragging) seekAt(e); });
-      el.addEventListener("pointerup", () => { dragging = false; });
-      el.addEventListener("pointercancel", () => { dragging = false; });
-    }
+    const tl = root.querySelector("#fa-traces");
+    tl.addEventListener("pointerdown", e => { dragging = true; tl.setPointerCapture(e.pointerId); seekAt(e); });
+    tl.addEventListener("pointermove", e => { if (dragging) seekAt(e); });
+    tl.addEventListener("pointerup", () => { dragging = false; });
+    tl.addEventListener("pointercancel", () => { dragging = false; });
 
     // The legend or the clip list unfolding changes what the footage may take;
     // the legend remembers whether it is open.
@@ -1403,8 +1341,6 @@ export const SlipExplorationRule = {
     const d = curData();
     if (d && x) {
       const items = clipLabels(c, d), cl = centerLineFor(d, state);
-      const fps = state.pose?.fps || d.fps;
-      drawStrip(d, f - x.s, items, straightVerdicts(items, cl), ruleState(d, items, cl, fps));
       drawTraces(d, f - x.s, items, cl);
     }
   },
