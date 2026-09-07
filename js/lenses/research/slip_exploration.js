@@ -697,11 +697,13 @@ function renderSkeletonFrame() {
 
 // ── the four traces ─────────────────────────────────────────────────────────
 
+// All four rows are magnitudes: a slip to either side goes UP. The side itself
+// is the arrow in the readout (→ head to image right, ← to image left).
 const TRACE_ROWS = [
-  { key: "off",    signed: true,  label: "off  · distance from the hip line" },
-  { key: "dev",    signed: true,  label: "dev  · deviation from the resting position (3 s median)" },
-  { key: "travel", signed: false, label: "travel · range of off inside 0.5 s" },
-  { key: "vel",    signed: false, label: "vel  · change of off over 0.1 s" },
+  { key: "off",    label: "|off| · distance from the hip line" },
+  { key: "dev",    label: "|dev| · deviation from the resting position (3 s median)" },
+  { key: "travel", label: "travel · range of off inside 0.5 s" },
+  { key: "vel",    label: "vel  · change of off over 0.1 s" },
 ];
 
 function seriesFor(cl, fps) {
@@ -739,9 +741,8 @@ function drawTraces(d, f, items, cl) {
   TRACE_ROWS.forEach((row, ri) => {
     const y0 = ri * rowH, thr = ui.thr[row.key];
     const arr = series?.[row.key];
-    // scale: signed rows ±max(0.6, thr·1.2), unsigned 0..max(0.8, thr·1.5)
-    const lim = row.signed ? Math.max(0.6, thr * 1.2) : Math.max(0.8, thr * 1.5);
-    const yOf = v => row.signed ? y0 + rowH / 2 - (v / lim) * (rowH / 2 - 8) : y0 + rowH - 4 - (v / lim) * (rowH - 16);
+    const lim = Math.max(0.8, thr * 1.5);                   // 0 at the bottom, magnitudes up
+    const yOf = v => y0 + rowH - 4 - (v / lim) * (rowH - 16);
     ctx.fillStyle = "rgba(255,255,255,0.04)"; ctx.fillRect(0, y0, cssW, rowH - 1);
     if (items) {
       for (const it of items) {
@@ -755,14 +756,7 @@ function drawTraces(d, f, items, cl) {
       }
     }
     ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
-    if (row.signed) {
-      ctx.strokeStyle = "rgba(255,255,255,0.2)"; ctx.setLineDash([]);
-      ctx.beginPath(); ctx.moveTo(0, yOf(0)); ctx.lineTo(cssW, yOf(0)); ctx.stroke();
-      ctx.strokeStyle = "rgba(255,255,255,0.5)"; ctx.setLineDash([4, 4]);
-      for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, yOf(sgn * thr)); ctx.lineTo(cssW, yOf(sgn * thr)); ctx.stroke(); }
-    } else {
-      ctx.beginPath(); ctx.moveTo(0, yOf(thr)); ctx.lineTo(cssW, yOf(thr)); ctx.stroke();
-    }
+    ctx.beginPath(); ctx.moveTo(0, yOf(thr)); ctx.lineTo(cssW, yOf(thr)); ctx.stroke();
     ctx.setLineDash([]);
     if (arr) {
       const base = cl.base;
@@ -771,7 +765,7 @@ function drawTraces(d, f, items, cl) {
       for (let i = 0; i < d.n; i++) {
         const v = arr[i + base];
         if (!Number.isFinite(v)) { started = false; continue; }
-        const vv = Math.max(-lim, Math.min(lim, v));
+        const vv = Math.min(lim, Math.abs(v));
         if (!started) { ctx.moveTo(i * colW, yOf(vv)); started = true; } else ctx.lineTo(i * colW, yOf(vv));
       }
       ctx.stroke();
@@ -793,7 +787,8 @@ function drawTraces(d, f, items, cl) {
     ctx.fillStyle = "#aaa"; ctx.fillText(row.label, 6, y0 + 3);
     const vNow = arr ? arr[f + cl.base] : NaN;
     ctx.fillStyle = Number.isFinite(vNow) && Math.abs(vNow) >= thr ? "#ff9e64" : "#ddd"; ctx.textAlign = "right";
-    ctx.fillText(Number.isFinite(vNow) ? `${vNow >= 0 ? "+" : ""}${vNow.toFixed(2)}` : "—", cssW - 6, y0 + 3);
+    const arrow = (row.key === "off" || row.key === "dev") && Number.isFinite(vNow) ? (vNow > 0 ? " →" : vNow < 0 ? " ←" : "") : "";
+    ctx.fillText(Number.isFinite(vNow) ? `${Math.abs(vNow).toFixed(2)}${arrow}` : "—", cssW - 6, y0 + 3);
     ctx.textAlign = "left";
   });
   ctx.fillStyle = COLOR_FRAME;
@@ -859,8 +854,9 @@ function liveValues(cl, f, fps) {
   const series = seriesFor(cl, fps);
   if (!series) return "";
   const fr = f + cl.base;
-  const fmt = v => Number.isFinite(v) ? `${v >= 0 ? "+" : ""}${v.toFixed(2)}` : "—";
-  return `off ${fmt(series.off[fr])} · dev ${fmt(series.dev[fr])} · travel ${fmt(series.travel[fr])} · vel ${fmt(series.vel[fr])}`;
+  const mag = v => Number.isFinite(v) ? `${Math.abs(v).toFixed(2)}${v > 0 ? "→" : v < 0 ? "←" : ""}` : "—";
+  const fmt = v => Number.isFinite(v) ? v.toFixed(2) : "—";
+  return `|off| ${mag(series.off[fr])} · |dev| ${mag(series.dev[fr])} · travel ${fmt(series.travel[fr])} · vel ${fmt(series.vel[fr])}`;
 }
 
 // ── DOM ─────────────────────────────────────────────────────────────────────
@@ -1108,7 +1104,7 @@ export const SlipExplorationRule = {
               <label>${k} ≥ <output id="fa-thr-${k}-out">${ui.thr[k].toFixed(2)}</output>
                 <input type="range" id="fa-thr-${k}" min="0" max="1" step="0.01" value="${ui.thr[k]}" style="width:110px; vertical-align:middle"></label>`).join("")}
             <label><input type="checkbox" id="fa-gate" ${ui.gate ? "checked" : ""}> fire only when no punch is thrown (Sheet punch labels ±${GATE_PAD_S} s)</label>
-            <span class="muted small">torso units · position (off, dev) vs movement (travel, vel); frames past a threshold are marked under each trace; the off and dev rules fire on runs ≥ 3 frames outside the gate</span>
+            <span class="muted small">torso units, all magnitudes (a slip to either side goes up; → / ← in the readout is the side) · position (off, dev) vs movement (travel, vel); frames past a threshold are marked under each trace; the off and dev rules fire on runs ≥ 3 frames outside the gate</span>
           </div>
           <div class="muted small" style="margin-top:2px">
             the strip is the clip's timeline — click or drag to seek · top lane:
