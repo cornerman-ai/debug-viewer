@@ -48,6 +48,19 @@
 // marked under each trace and the badge names the frame's live values. The
 // numbers behind the defaults: ml/research/defense/slip_rule/.
 //
+// THE TWO RULES, FIRING ONLY WHEN NO PUNCH IS THROWN. Under the labels the
+// strip carries two more lanes, one per position method: the off rule and the
+// dev rule. Each fires on a run of ≥ 3 frames past its threshold (gaps ≤ 2
+// frames bridged) OUTSIDE the punch gate — the Sheet's punch labels widened by
+// 0.25 s on each side, for now: the measured skeleton cue (2D arm extension)
+// does not see punches thrown at the camera, and a depth-aware one is not
+// built yet. An event touching a labeled slip is green, one touching none is
+// red, grey while the labels are still loading; the gated stretches are
+// dimmed in the traces. The gate can be switched off to see what the raw
+// rule would do. Measured cost of the gate on the hand-curated set: recall of
+// the labeled slips 0.80 → 0.21, because 76 % of them ride on a punch label —
+// ml/research/defense/slip_rule/README.md.
+//
 // Data: lens_data/frontal_auto/index.json (the clip list) and, per clip,
 // clips/<id>.json — the clip's own COCO-17 skeleton (normalized x,y as uint16,
 // visibility as uint8, base64), the video's width/height, and the per-frame
@@ -159,7 +172,7 @@ function ensureClip(c) {
 
 const UI_KEY = "cornerman.slip_exploration.v1";
 const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null, muted: false,
-             thr: { off: 0.22, dev: 0.24, travel: 0.50, vel: 0.12 } };   // speed: the skeleton fallback's clock
+             thr: { off: 0.22, dev: 0.24, travel: 0.50, vel: 0.12 }, gate: true };   // speed: the skeleton fallback's clock
 try { Object.assign(ui, JSON.parse(localStorage.getItem(UI_KEY) || "{}")); } catch {}
 function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch {} }
 
@@ -571,10 +584,10 @@ function drawBadge(ctx, text, color, s = 1, y = 10) {
 // out / no pose. Bottom lane: the Sheet's labels — slips in their colours,
 // straights by the center-line verdict, other punches grey. Playhead at clip
 // frame `f`.
-function drawStrip(d, f, items = null, verdicts = null) {
+function drawStrip(d, f, items = null, verdicts = null, rules = null) {
   if (!strip || !d) return;
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 26;
+  const cssW = Math.max(1, strip.getBoundingClientRect().width), cssH = 54;
   if (strip.width !== Math.round(cssW * dpr)) strip.width = Math.round(cssW * dpr);
   if (strip.height !== Math.round(cssH * dpr)) strip.height = Math.round(cssH * dpr);
   const ctx = strip.getContext("2d");
@@ -608,6 +621,27 @@ function drawStrip(d, f, items = null, verdicts = null) {
     const lab = slipLabelState();
     ctx.fillText(lab.status === "loading" ? "loading the Sheet's labels…" : lab.status === "error" ? `no labels — ${lab.error}` : "labels…", 4, laneH + gap + laneH / 2);
   }
+  // Lanes 3–4: the two rules, gated. Gated stretches dark, events by verdict.
+  RULES.forEach((k, ri) => {
+    const y = (laneH + gap) * (2 + ri);
+    ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(0, y, cssW, laneH);
+    if (rules) {
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      let a = -1;
+      for (let i = 0; i <= d.n; i++) {
+        const g = i < d.n && rules.gate[i];
+        if (g && a < 0) a = i;
+        if (!g && a >= 0) { ctx.fillRect(a * colW, y, (i - a) * colW, laneH); a = -1; }
+      }
+      for (const ev of rules.events[k]) {
+        ctx.fillStyle = RULE_COLOR[ev.hit]; ctx.globalAlpha = 0.95;
+        ctx.fillRect(ev.s * colW, y, Math.max(2, (ev.e - ev.s + 1) * colW), laneH);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = "#bbb"; ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "middle";
+    ctx.fillText(`${k} rule ≥ ${ui.thr[k].toFixed(2)}${ui.gate ? " · no-punch" : ""}`, 4, y + laneH / 2);
+  });
   if (Number.isFinite(f)) { ctx.fillStyle = COLOR_FRAME; ctx.fillRect(Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH); }
 }
 
@@ -641,6 +675,13 @@ function renderSkeletonFrame() {
   if (cl) drawCenterLine(ctx, cl, f, fc?.color || "rgba(255,255,255,0.6)", x => x * W / d.width, y => y * H / d.height);
   if (fc) drawBadge(ctx, fc.text, fc.color, 1, 10);
   if (cl) drawBadge(ctx, liveValues(cl, f, d.fps), "#ddd", 1, fc ? 42 : 10);
+  const rs = ruleState(d, items, cl, d.fps);
+  const fired = rs ? RULES.filter(k => eventAt(rs.events[k], f)) : [];
+  if (fired.length) {
+    const hit = fired.some(k => eventAt(rs.events[k], f).hit);
+    drawBadge(ctx, `SLIP? ${fired.map(k => k + " rule").join(" + ")}${hit ? " · on a labeled slip" : items ? " · no label here" : ""}`,
+              hit ? COLOR_IN : items ? COLOR_MISS : COLOR_CLIP, 1, fc ? 74 : 42);
+  }
   drawCompass(ctx, deg, W);
   ctx.save();
   ctx.font = "13px ui-monospace, monospace"; ctx.textBaseline = "bottom";
@@ -650,7 +691,7 @@ function renderSkeletonFrame() {
   ctx.beginPath(); ctx.roundRect(8, H - 30, tw + 16, 24, 5); ctx.fill();
   ctx.fillStyle = "#ddd"; ctx.fillText(t, 16, H - 12);
   ctx.restore();
-  drawStrip(d, f, items, verdicts);
+  drawStrip(d, f, items, verdicts, ruleState(d, items, cl, d.fps));
   drawTraces(d, f, items, cl);
 }
 
@@ -669,7 +710,13 @@ function seriesFor(cl, fps) {
 }
 
 let lastTrace = null;
-function redrawTraces() { if (lastTrace) drawTraces(...lastTrace); }
+function redrawTraces() {
+  if (!lastTrace) return;
+  const [d, f, items, cl] = lastTrace;
+  drawTraces(d, f, items, cl);
+  const fps = mode === "video" ? (activeState?.pose?.fps || d.fps) : d.fps;
+  drawStrip(d, f, items, straightVerdicts(items, cl), ruleState(d, items, cl, fps));
+}
 
 // Rows of the clip's frames; labeled slips shaded, punches faint, the threshold
 // dashed (± for the signed rows), frames past it marked along the row's bottom.
@@ -687,6 +734,7 @@ function drawTraces(d, f, items, cl) {
   const rowH = cssH / TRACE_ROWS.length, colW = cssW / d.n;
   const fps = mode === "video" ? (activeState?.pose?.fps || d.fps) : d.fps;
   const series = cl ? seriesFor(cl, fps) : null;
+  const gate = punchGate(items, d.n, fps);
   ctx.font = "10px ui-monospace, monospace"; ctx.textBaseline = "top";
   TRACE_ROWS.forEach((row, ri) => {
     const y0 = ri * rowH, thr = ui.thr[row.key];
@@ -733,6 +781,15 @@ function drawTraces(d, f, items, cl) {
         if (Number.isFinite(v) && Math.abs(v) >= thr) ctx.fillRect(i * colW, y0 + rowH - 4, colW + 0.5, 3);
       }
     }
+    if (ui.gate && (row.key === "off" || row.key === "dev")) {           // the gate, dimmed
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      let a = -1;
+      for (let i = 0; i <= d.n; i++) {
+        const g = i < d.n && gate[i];
+        if (g && a < 0) a = i;
+        if (!g && a >= 0) { ctx.fillRect(a * colW, y0, (i - a) * colW, rowH - 1); a = -1; }
+      }
+    }
     ctx.fillStyle = "#aaa"; ctx.fillText(row.label, 6, y0 + 3);
     const vNow = arr ? arr[f + cl.base] : NaN;
     ctx.fillStyle = Number.isFinite(vNow) && Math.abs(vNow) >= thr ? "#ff9e64" : "#ddd"; ctx.textAlign = "right";
@@ -742,6 +799,60 @@ function drawTraces(d, f, items, cl) {
   ctx.fillStyle = COLOR_FRAME;
   ctx.fillRect(Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH);
 }
+
+// ── the two rules ───────────────────────────────────────────────────────────
+
+const RULES = ["off", "dev"];
+const GATE_PAD_S = 0.25;
+
+// Clip frames inside a punch label, widened by GATE_PAD_S each side.
+function punchGate(items, n, fps) {
+  const g = new Uint8Array(n);
+  if (!ui.gate || !items) return g;
+  const pad = Math.round(GATE_PAD_S * fps);
+  for (const it of items) {
+    if (it.kind !== "punch") continue;
+    for (let f = Math.max(0, it.s - pad); f <= Math.min(n - 1, it.e + pad); f++) g[f] = 1;
+  }
+  return g;
+}
+
+// Runs of |series[key]| >= thr on ungated clip frames, gaps <= 2 bridged, >= 3
+// frames kept: [{ s, e, hit }] with hit = touches a labeled slip (null = no labels).
+function ruleEvents(series, key, thr, gate, items, base, n) {
+  const arr = series?.[key];
+  if (!arr) return [];
+  const on = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { const v = arr[i + base]; if (Number.isFinite(v) && Math.abs(v) >= thr && !gate[i]) on[i] = 1; }
+  const runs = [];
+  let s = -1, prev = -10;
+  for (let i = 0; i < n; i++) {
+    if (!on[i]) continue;
+    if (s < 0) { s = i; prev = i; continue; }
+    if (i - prev > 3) { runs.push([s, prev]); s = i; }
+    prev = i;
+  }
+  if (s >= 0) runs.push([s, prev]);
+  const slips = items ? items.filter(it => it.kind === "slip") : null;
+  return runs.filter(([a, b]) => b - a + 1 >= 3).map(([a, b]) => ({
+    s: a, e: b, hit: slips ? slips.some(sl => sl.s <= b + 3 && sl.e >= a - 3) : null,
+  }));
+}
+
+const RULE_COLOR = { true: COLOR_IN, false: COLOR_MISS, null: COLOR_CLIP };
+
+// Everything the lanes, traces and badge need for the current clip.
+function ruleState(d, items, cl, fps) {
+  if (!d || !cl) return null;
+  const series = seriesFor(cl, fps);
+  if (!series) return null;
+  const gate = punchGate(items, d.n, fps);
+  const events = {};
+  for (const k of RULES) events[k] = ruleEvents(series, k, ui.thr[k], gate, items, cl.base, d.n);
+  return { gate, events };
+}
+
+const eventAt = (evs, f) => (evs || []).find(e => e.s <= f && f <= e.e) || null;
 
 // "off +0.31 · dev +0.28 · travel 0.19 · vel 0.05" for the frame's badge.
 function liveValues(cl, f, fps) {
@@ -806,6 +917,17 @@ function renderInfo() {
     const ok = straights.filter(i => vs?.get(i)?.ok).length, bad = straights.filter(i => vs?.get(i) && !vs.get(i).ok).length;
     labelsTxt = ` · <span style="color:${SLIP.lead}">${nSlip} slip${nSlip === 1 ? "" : "s"}</span>
       · ${straights.length} straight${straights.length === 1 ? "" : "s"}${vs ? ` (<span style="color:${COLOR_IN}">${ok} off the line</span> / <span style="color:${COLOR_MISS}">${bad} on it</span>)` : ""}`;
+    const rs = ruleState(d0, items, cl, mode === "video" ? (activeState?.pose?.fps || d0.fps) : d0.fps);
+    if (rs) {
+      const slips = items.filter(i => i.kind === "slip");
+      labelsTxt += RULES.map(k => {
+        const evs = rs.events[k];
+        const caught = slips.filter(sl => evs.some(ev => ev.s <= sl.e + 3 && ev.e >= sl.s - 3)).length;
+        const fa = evs.filter(ev => ev.hit === false).length;
+        return ` · <span style="color:${COLOR_CLIP}">${k} rule</span> ${evs.length} event${evs.length === 1 ? "" : "s"}
+          (<span style="color:${COLOR_IN}">${caught}/${slips.length} slips</span>, <span style="color:${COLOR_MISS}">${fa} FA</span>)`;
+      }).join("");
+    }
   } else {
     const lab = slipLabelState();
     labelsTxt = lab.status === "loading" ? ` · <span class="muted">labels…</span>` : lab.status === "error" ? ` · <span class="muted">no Sheet labels</span>` : "";
@@ -978,14 +1100,15 @@ export const SlipExplorationRule = {
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
-          <canvas id="fa-strip" style="display:block; width:100%; height:26px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-strip" style="display:block; width:100%; height:54px; margin-top:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-frame" class="small" style="margin-top:3px; font-size:12px"></div>
           <canvas id="fa-traces" style="display:block; width:100%; height:176px; margin-top:8px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-thr" style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:4px">
             ${["off", "dev", "travel", "vel"].map(k => `
               <label>${k} ≥ <output id="fa-thr-${k}-out">${ui.thr[k].toFixed(2)}</output>
                 <input type="range" id="fa-thr-${k}" min="0" max="1" step="0.01" value="${ui.thr[k]}" style="width:110px; vertical-align:middle"></label>`).join("")}
-            <span class="muted small">torso units · position (off, dev) vs movement (travel, vel); frames past a threshold are marked under each trace</span>
+            <label><input type="checkbox" id="fa-gate" ${ui.gate ? "checked" : ""}> fire only when no punch is thrown (Sheet punch labels ±${GATE_PAD_S} s)</label>
+            <span class="muted small">torso units · position (off, dev) vs movement (travel, vel); frames past a threshold are marked under each trace; the off and dev rules fire on runs ≥ 3 frames outside the gate</span>
           </div>
           <div class="muted small" style="margin-top:2px">
             the strip is the clip's timeline — click or drag to seek · top lane:
@@ -1061,9 +1184,10 @@ export const SlipExplorationRule = {
       root.querySelector(`#fa-thr-${k}`).addEventListener("input", e => {
         ui.thr[k] = parseFloat(e.target.value); saveUi();
         root.querySelector(`#fa-thr-${k}-out`).textContent = ui.thr[k].toFixed(2);
-        redrawTraces();
+        redrawTraces(); renderInfo();
       });
     }
+    root.querySelector("#fa-gate").addEventListener("change", e => { ui.gate = e.target.checked; saveUi(); redrawTraces(); renderInfo(); });
     // The strip is the clip's timeline: click or drag anywhere on it to seek.
     const seekAt = e => {
       const d = curData(); if (!d) return;
@@ -1125,7 +1249,8 @@ export const SlipExplorationRule = {
     const d = curData();
     if (d && x) {
       const items = clipLabels(c, d), cl = centerLineFor(d, state);
-      drawStrip(d, f - x.s, items, straightVerdicts(items, cl));
+      const fps = state.pose?.fps || d.fps;
+      drawStrip(d, f - x.s, items, straightVerdicts(items, cl), ruleState(d, items, cl, fps));
       drawTraces(d, f - x.s, items, cl);
     }
   },
@@ -1157,6 +1282,13 @@ export const SlipExplorationRule = {
       if (cl) drawCenterLine(ctx, cl, f - x.s, fc?.color || "rgba(255,255,255,0.6)", v => v, v => v, s);
       if (fc) drawBadge(ctx, fc.text, fc.color, s, 60);   // under the clip badge + progress bar
       if (cl) drawBadge(ctx, liveValues(cl, f - x.s, state.pose?.fps || d.fps), "#ddd", s, fc ? 92 : 60);
+      const rs = ruleState(d, items, cl, state.pose?.fps || d.fps);
+      const fired = rs ? RULES.filter(k => eventAt(rs.events[k], f - x.s)) : [];
+      if (fired.length) {
+        const hit = fired.some(k => eventAt(rs.events[k], f - x.s).hit);
+        drawBadge(ctx, `SLIP? ${fired.map(k => k + " rule").join(" + ")}${hit ? " · on a labeled slip" : items ? " · no label here" : ""}`,
+                  hit ? COLOR_IN : items ? COLOR_MISS : COLOR_CLIP, s, fc ? 124 : 92);
+      }
     }
     if (x) {
       const fsz = Math.round(14 * s);
