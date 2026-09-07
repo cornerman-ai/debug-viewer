@@ -132,6 +132,7 @@ const COLOR_MISS   = "#ff5d6c";   // red    — outside the clip
 const COLOR_FRAME  = "#3ad9e0";   // cyan   — playhead
 const COLOR_CLIP   = "#b48cff";   // purple — the clip / current row
 const COLOR_HAND   = "#ffd24a";   // yellow — hand-curated
+const COLOR_REST   = "#ff9ee0";   // pink   — the resting line dev is measured from
 
 // ── the index ───────────────────────────────────────────────────────────────
 
@@ -280,14 +281,31 @@ function straightVerdicts(items, cl) {
 
 const itemsAt = (items, f) => (items || []).filter(it => it.s <= f && f <= it.e);
 
-// Draw the rule's quantity on the body: the hip line, the head point and the
-// offset between them. `toX/toY` map the pose's pixels to the target canvas.
-function drawCenterLine(ctx, cl, f, col, toX, toY, s = 1) {
+// Draw the rule's quantities on the body: the hip line, the head point and the
+// offset between them (off); and, when the signals are at hand, the RESTING
+// line — where the head has sat over the surrounding 3 s, the rolling median
+// of off that dev is measured from — with a thin bar from it to the head
+// (dev). `toX/toY` map the pose's pixels to the target canvas.
+function drawCenterLine(ctx, cl, f, col, toX, toY, s = 1, series = null) {
   const m = cl.m, fr = f + cl.base;
   const hx = m.hipX[fr], hy = m.hipY[fr], hxHead = m.headX[fr], hyHead = m.headY[fr];
   if (![hx, hy, hxHead, hyHead].every(Number.isFinite)) return;
   const HX = toX(hx), HY = toY(hy), KX = toX(hxHead), KY = toY(hyHead);
   ctx.save();
+  ctx.font = `${Math.round(13 * s)}px ui-monospace, monospace`; ctx.textBaseline = "bottom"; ctx.textAlign = "left";
+  const rest = series && Number.isFinite(series.off[fr]) && Number.isFinite(series.dev[fr]) ? series.off[fr] - series.dev[fr] : NaN;
+  if (Number.isFinite(rest)) {                            // the resting line, and dev from it to the head
+    const RX = toX(hx + rest * m.torso);
+    ctx.strokeStyle = COLOR_REST; ctx.lineWidth = 1.5 * s; ctx.setLineDash([3 * s, 5 * s]);
+    ctx.beginPath(); ctx.moveTo(RX, HY + 20 * s); ctx.lineTo(RX, KY - 60 * s); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 2 * s;
+    ctx.beginPath(); ctx.moveTo(RX, KY + 8 * s); ctx.lineTo(KX, KY + 8 * s); ctx.stroke();
+    ctx.fillStyle = COLOR_REST; ctx.textBaseline = "top";
+    const dv = series.dev[fr];
+    ctx.fillText(`dev ${dv >= 0 ? "+" : ""}${dv.toFixed(2)}`, Math.max(HX, KX, RX) + 10 * s, KY + 4 * s);
+    ctx.textBaseline = "bottom";
+  }
   ctx.strokeStyle = COLOR_FRAME; ctx.lineWidth = 1.5 * s; ctx.setLineDash([6 * s, 6 * s]);
   ctx.beginPath(); ctx.moveTo(HX, HY + 20 * s); ctx.lineTo(HX, KY - 60 * s); ctx.stroke();
   ctx.setLineDash([]);
@@ -295,9 +313,8 @@ function drawCenterLine(ctx, cl, f, col, toX, toY, s = 1) {
   ctx.beginPath(); ctx.moveTo(HX, KY); ctx.lineTo(KX, KY); ctx.stroke();
   ctx.fillStyle = col;
   ctx.beginPath(); ctx.arc(KX, KY, 5 * s, 0, Math.PI * 2); ctx.fill();
-  ctx.font = `${Math.round(13 * s)}px ui-monospace, monospace`; ctx.textBaseline = "bottom"; ctx.textAlign = "left";
   const v = m.off[fr];
-  ctx.fillText(`${v >= 0 ? "+" : ""}${Number.isFinite(v) ? v.toFixed(2) : "—"} torso`, Math.max(HX, KX) + 10 * s, KY - 4 * s);
+  ctx.fillText(`off ${v >= 0 ? "+" : ""}${Number.isFinite(v) ? v.toFixed(2) : "—"} torso`, Math.max(HX, KX) + 10 * s, KY - 4 * s);
   ctx.restore();
 }
 
@@ -646,7 +663,8 @@ function legendHtml() {
     row(sw(COLOR_IN), "so a SLIP block always starts where the head began moving away from its reference with no punch being thrown: either the threshold crossing itself, or the renewed movement after a punch"),
     row(`<span style="color:#ff9e64;font-weight:600;font-size:11px">0.31→</span>`, "the readout at the right: this frame's value; → the head sits to the image's right of its reference, ← to the left; orange when past the threshold"),
     head("On the body"),
-    row(ln(COLOR_FRAME, true), "the hip line: the vertical through the hip midpoint — the boxer's own center line, the reference for <b>off</b>"),
+    row(ln(COLOR_FRAME, true), "the hip line: the vertical through the hip midpoint — the boxer's own center line, the reference for <b>off</b>; the thick bar from it to the head is off, its value written above the head"),
+    row(ln(COLOR_REST, true), "the resting line: where the head has sat over the surrounding 3 s (the rolling median of off) — the reference for <b>dev</b>; the thin pink bar from it to the head is dev, its value written below the head. A head parked off the hip line has the two lines apart and dev near zero"),
     row(`<span class="fa-sw" style="background:${SLIP.lead};border-radius:50%;width:10px;margin-left:3px"></span>`, "the head point (midpoint of the visible head landmarks) with the bar from the hip line to it: the offset, in torso heights, written beside it. Its colour is what the frame sits in — blue / yellow a slip label, green a straight with the head off the line, red one with the head on it, grey another punch, white when nothing is labeled here"),
     row(ln("rgba(122,223,122,0.85)"), "the skeleton, skeleton-only mode: green bones while the facing-angle model has the boxer within ±22.5° of chest-to-camera, white outside; on the footage the bones are faint white"),
     row(sw("transparent", `border:2px solid ${COLOR_MISS};height:8px`), "a red frame around the picture: the video is outside the clip (video mode)"),
@@ -709,7 +727,7 @@ function renderSkeletonFrame() {
   const c = curClip();
   const items = clipLabels(c, d), cl = centerLineFor(d, activeState), verdicts = straightVerdicts(items, cl);
   const fc = frameContext(items, verdicts, f);
-  if (cl) drawCenterLine(ctx, cl, f, fc?.color || "rgba(255,255,255,0.6)", x => x * W / d.width, y => y * H / d.height);
+  if (cl) drawCenterLine(ctx, cl, f, fc?.color || "rgba(255,255,255,0.6)", x => x * W / d.width, y => y * H / d.height, 1, seriesFor(cl, d.fps));
   if (fc) drawBadge(ctx, fc.text, fc.color, 1, 10);
   if (cl) drawBadge(ctx, liveValues(cl, f, d.fps), "#ddd", 1, fc ? 42 : 10);
   const rs = ruleState(d, items, cl, d.fps);
@@ -1369,7 +1387,7 @@ export const SlipExplorationRule = {
     if (d && x) {
       const items = clipLabels(c, d), cl = centerLineFor(d, state), verdicts = straightVerdicts(items, cl);
       const fc = frameContext(items, verdicts, f - x.s);
-      if (cl) drawCenterLine(ctx, cl, f - x.s, fc?.color || "rgba(255,255,255,0.6)", v => v, v => v, s);
+      if (cl) drawCenterLine(ctx, cl, f - x.s, fc?.color || "rgba(255,255,255,0.6)", v => v, v => v, s, seriesFor(cl, state.pose?.fps || d.fps));
       if (fc) drawBadge(ctx, fc.text, fc.color, s, 60);   // under the clip badge + progress bar
       if (cl) drawBadge(ctx, liveValues(cl, f - x.s, state.pose?.fps || d.fps), "#ddd", s, fc ? 92 : 60);
       const rs = ruleState(d, items, cl, state.pose?.fps || d.fps);
