@@ -42,20 +42,22 @@
 // facing, labels and rule lanes; Mathe had it removed — the traces already
 // show all of it, and the footage gets the height.)
 //
-// WHAT SAYS "SLIP"? Under the strip, two traces of the center-line quantity
-// over the clip, each with its own threshold: off (the head's distance from
-// the hip line) and dev (its deviation from the boxer's own resting position,
-// the rolling 3-s median). Five formulations were measured and shown here on
-// 2026-09-06/07 — these two plus rest (distance from the round's most common
+// WHAT SAYS "SLIP"? Under the footage, ONE trace of the center-line quantity
+// over the clip with its threshold: dev, the head's deviation from the
+// boxer's own resting position — off (the head's distance from the hip line)
+// minus its rolling 3-s median. Five formulations were measured and shown here
+// on 2026-09-06/07 — off, dev, rest (distance from the round's most common
 // position), travel (range inside 0.5 s) and vel (change over 0.1 s) — and
-// narrowed to off + dev: position beats movement, rest trails dev. The
-// numbers: ml/research/defense/slip_rule/README.md. Labeled slips are shaded
-// in the traces, frames past a threshold marked under each, the badge names
-// the frame's live values.
+// narrowed to off + dev (position beats movement, rest trails dev), then to
+// dev alone at 0.20 on 2026-09-08: a quarter of the boxers rest with the head
+// off the hip line, so off fires on a head that never moved, and no movement
+// gate fixes that. The numbers: ml/research/defense/slip_rule/README.md.
+// Labeled slips are shaded in the trace, frames past the threshold marked
+// under it, the badge names the frame's live values (off and dev both).
 //
-// THE TWO RULES, FIRING ONLY WHEN NO PUNCH IS BEING THROWN. Each trace row
-// carries its rule's SLIP blocks along its bottom: the off rule and the dev
-// rule. Each fires on a run of ≥ 3 frames past its threshold (gaps ≤ 2
+// THE RULE, FIRING ONLY WHEN NO PUNCH IS BEING THROWN. The trace row carries
+// its SLIP blocks along its bottom. The rule fires on a run of ≥ 3 frames past
+// the threshold (gaps ≤ 2
 // frames bridged) that BEGINS as a movement away from the line while no punch
 // is being thrown. The gate closes the FIRST HALF of each of the Sheet's punch
 // labels — start to midpoint, the midpoint standing in for the impact
@@ -186,13 +188,15 @@ function ensureClip(c) {
 // ── list order + current clip ───────────────────────────────────────────────
 
 const UI_KEY = "cornerman.slip_exploration.v1";
-const UI_DEFAULT_THR = { off: 0.22, dev: 0.24 };
+const UI_DEFAULT_THR = { dev: 0.20 };
+const THR_VERSION = 2;                // bump when a default threshold changes: saved sliders from before are dropped
 const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null, muted: false,
              thr: { ...UI_DEFAULT_THR }, gate: true, gateExt: "half", legendOpen: true };   // speed: the skeleton fallback's clock
 try {
   const saved = JSON.parse(localStorage.getItem(UI_KEY) || "{}");
   Object.assign(ui, saved);
-  ui.thr = { ...UI_DEFAULT_THR, ...(saved.thr || {}) };   // a saved set predating a new row keeps the new default
+  ui.thr = saved.thrVersion === THR_VERSION ? { ...UI_DEFAULT_THR, ...(saved.thr || {}) } : { ...UI_DEFAULT_THR };
+  ui.thrVersion = THR_VERSION;
 } catch {}
 function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch {} }
 
@@ -648,7 +652,7 @@ function legendHtml() {
   const row = (swatch, text) => `<div>${swatch}</div><div>${text}</div>`;
   const head = t => `<div class="fa-lg-h">${t}</div>`;
   return [
-    head("The traces — the clip's timeline, one column per frame, one row per rule. The left gutter names the rule and its threshold (the slider below). Click or drag anywhere to seek."),
+    head("The trace — the clip's timeline, one column per frame: the dev rule. The left gutter names it and its threshold (the slider below). Click or drag anywhere to seek."),
     row(ln(COLOR_FRAME), "the frame you are looking at — the same cyan marker sits on the purple progress bar over the footage"),
     row(ln("rgba(255,255,255,0.85)"), "the quantity's magnitude frame by frame, in torso heights: 0 at the row's bottom, up is away from the reference — a slip to either side goes UP (which side is the arrow in the readout). The row tops out at max(0.8, 1.5 × threshold)"),
     row(ln("rgba(255,255,255,0.5)", true), "the threshold"),
@@ -668,7 +672,7 @@ function legendHtml() {
     row(`<span class="fa-sw" style="background:${SLIP.lead};border-radius:50%;width:10px;margin-left:3px"></span>`, "the head point (midpoint of the visible head landmarks) with the bar from the hip line to it: the offset, in torso heights, written beside it. Its colour is what the frame sits in — blue / yellow a slip label, green a straight with the head off the line, red one with the head on it, grey another punch, white when nothing is labeled here"),
     row(ln("rgba(122,223,122,0.85)"), "the skeleton, skeleton-only mode: green bones while the facing-angle model has the boxer within ±22.5° of chest-to-camera, white outside; on the footage the bones are faint white"),
     row(sw("transparent", `border:2px solid ${COLOR_MISS};height:8px`), "a red frame around the picture: the video is outside the clip (video mode)"),
-    row(`<span style="color:${COLOR_IN};font-weight:600;font-size:10px">CLIP</span>`, `the badges top-left: the clip counter — green inside the clip, red outside; the label this frame sits in, in that label's colour (a straight also says whether the head came off the line); the live |off| · |dev| values; and <span style="color:${COLOR_IN}">SLIP? off rule</span> when a rule fires — green on a labeled slip, red with no label there, purple while the labels load`),
+    row(`<span style="color:${COLOR_IN};font-weight:600;font-size:10px">CLIP</span>`, `the badges top-left: the clip counter — green inside the clip, red outside; the label this frame sits in, in that label's colour (a straight also says whether the head came off the line); the live |off| · |dev| values; and <span style="color:${COLOR_IN}">SLIP? dev rule</span> when the rule fires — green on a labeled slip, red with no label there, purple while the labels load`),
     row(sw(COLOR_CLIP, "height:4px"), "the purple bar under the badges: the clip's extent, the cyan marker your position in it (video mode)"),
     row(`<span style="color:${COLOR_IN};font-weight:600;font-size:11px">−3°</span>`, "the dial top-right: this frame's facing angle from the model. The green wedge is the ±22.5° band; needle and number are green inside it, white outside, “no pose” when there is none"),
     head("Text"),
@@ -754,7 +758,6 @@ function renderSkeletonFrame() {
 // All four rows are magnitudes: a slip to either side goes UP. The side itself
 // is the arrow in the readout (→ head to image right, ← to image left).
 const TRACE_ROWS = [
-  { key: "off", label: "the head's distance from the hip line" },
   { key: "dev", label: "its deviation from the rolling 3 s median (the boxer's own resting position)" },
 ];
 
@@ -771,7 +774,7 @@ function redrawTraces() {
   fitVideo();
 }
 
-// The timeline: rows of the clip's frames, one per rule quantity — its
+// The timeline: a row of the clip's frames per rule quantity (dev alone since 2026-09-08) — its
 // magnitude over the clip, the threshold dashed, labeled slips washed in,
 // punches faint, the gate dimmed, and along the row's bottom the frames past
 // the threshold (orange ticks) over the rule's own SLIP blocks.
@@ -780,7 +783,7 @@ function drawTraces(d, f, items, cl) {
   if (!canvas || !d) return;
   lastTrace = [d, f, items, cl];
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-  const cssW = Math.max(1, canvas.getBoundingClientRect().width), cssH = 140;
+  const cssW = Math.max(1, canvas.getBoundingClientRect().width), cssH = 90;
   if (canvas.width !== Math.round(cssW * dpr)) canvas.width = Math.round(cssW * dpr);
   if (canvas.height !== Math.round(cssH * dpr)) canvas.height = Math.round(cssH * dpr);
   const ctx = canvas.getContext("2d");
@@ -846,9 +849,9 @@ function drawTraces(d, f, items, cl) {
   ctx.fillRect(x0 + Math.max(0, Math.min(d.n - 1, f)) * colW - 1, 0, 2, cssH);
 }
 
-// ── the two rules ───────────────────────────────────────────────────────────
+// ── the rule ────────────────────────────────────────────────────────────────
 
-const RULES = ["off", "dev"];
+const RULES = ["dev"];
 // Clip frames inside a punch label, per frame: GATE_CLOSED for the label's
 // FIRST HALF — start up to midpoint, the midpoint standing in for the impact
 // (the whole label when the extent select says so) — and GATE_AWAY for the
@@ -1201,10 +1204,10 @@ export const SlipExplorationRule = {
           </div>
           <div id="fa-note" class="muted small" style="min-height:1.2em"></div>
           <div id="fa-canvas-wrap"><canvas id="fa-canvas" style="display:block; background:#0e1014; border-radius:6px"></canvas></div>
-          <canvas id="fa-traces" style="display:block; width:100%; height:140px; margin-top:6px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
+          <canvas id="fa-traces" style="display:block; width:100%; height:90px; margin-top:6px; background:#0e1014; border-radius:6px; cursor:pointer; touch-action:none"></canvas>
           <div id="fa-frame" class="small" style="margin-top:3px; font-size:12px"></div>
           <div id="fa-thr" style="display:flex; gap:14px; flex-wrap:wrap; font-size:12px; margin-top:4px">
-            ${["off", "dev"].map(k => `
+            ${RULES.map(k => `
               <label>${k} ≥ <output id="fa-thr-${k}-out">${ui.thr[k].toFixed(2)}</output>
                 <input type="range" id="fa-thr-${k}" min="0" max="1" step="0.01" value="${ui.thr[k]}" style="width:110px; vertical-align:middle"></label>`).join("")}
             <label><input type="checkbox" id="fa-gate" ${ui.gate ? "checked" : ""}> fire only when no punch is being thrown, gate =</label>
@@ -1212,7 +1215,7 @@ export const SlipExplorationRule = {
               <option value="half" ${ui.gateExt !== "full" ? "selected" : ""}>first half of each punch label closed (start → midpoint ≈ impact); a slip may begin in the retraction, but a head that went off the line with the punch counts only once it moves further away</option>
               <option value="full" ${ui.gateExt === "full" ? "selected" : ""}>the whole punch label closed</option>
             </select>
-            <span class="muted small">torso units, magnitudes (a slip to either side goes up; → / ← in the readout is the side); frames past a threshold are marked under each trace; the rules fire on runs ≥ 3 frames outside the gate</span>
+            <span class="muted small">torso units, magnitudes (a slip to either side goes up; → / ← in the readout is the side); frames past the threshold are marked under the trace; the rules fire on runs ≥ 3 frames outside the gate</span>
           </div>
           <details id="fa-legend" ${ui.legendOpen === false ? "" : "open"} style="margin-top:6px">
             <summary class="small" style="cursor:pointer; color:#ddd">Legend — every colour, shade and line, what it means</summary>
@@ -1279,7 +1282,7 @@ export const SlipExplorationRule = {
       if (vs) { vs.value = String(ui.speed); vs.dispatchEvent(new Event("change")); }
       clock = { t0: performance.now(), f0: frame }; renderInfo(); if (mode === "skeleton") renderSkeletonFrame();
     });
-    for (const k of ["off", "dev"]) {
+    for (const k of RULES) {
       root.querySelector(`#fa-thr-${k}`).addEventListener("input", e => {
         ui.thr[k] = parseFloat(e.target.value); saveUi();
         root.querySelector(`#fa-thr-${k}-out`).textContent = ui.thr[k].toFixed(2);
