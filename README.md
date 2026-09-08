@@ -67,8 +67,8 @@ python3 -m http.server 8765
 
 ## Adding a new lens
 
-Each rule module exports an object with `mount(host, state)`,
-`update(state)`, optional `draw(ctx, state)` for canvas decorations, and
-optional `skeletonStyle(state)` for base skeleton overrides. See
-[`js/rules/overview.js`](js/rules/overview.js) for the minimum and
-[`js/rules/guard_drop.js`](js/rules/guard_drop.js) for a full example.
+One module in [js/lenses/](js/lenses/) (`rules` / `models` / `research` /
+`inspect`), one import + one entry in
+[js/lenses/registry.js](js/lenses/registry.js). The contract, what `state`
+holds, the DOM slots, the frame/time convention and the gotchas are in
+[js/lenses/README.md](js/lenses/README.md) — read that before writing one.
