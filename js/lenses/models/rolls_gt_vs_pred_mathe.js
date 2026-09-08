@@ -147,22 +147,30 @@ function matchEvents(gt, pred, mode) {
 }
 
 // ── data ────────────────────────────────────────────────────────────────────
+// Every fetch carries a version so a CDN (GitHub Pages caches for minutes) can never
+// hand back an old index.json next to new round files, or the reverse; the round files
+// are named by a hash of the round id, so a stale pair can only ever be the SAME round.
 async function ensureIndex() {
   if (index || indexError) return;
   try {
-    const res = await fetch(DATA_DIR + "index.json", { cache: "no-store" });
+    const res = await fetch(`${DATA_DIR}index.json?v=${Date.now()}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     index = await res.json();
   } catch (e) { indexError = String(e); }
 }
 
-async function loadDoc(file, key) {
+async function loadDoc(file, key, expect = null) {
   docKey = key; doc = null; docError = null; docFile = file; signals = null; view = null;
   try {
-    const res = await fetch(DATA_DIR + file, { cache: "no-store" });
+    const v = encodeURIComponent(index?.generated || Date.now());
+    const res = await fetch(`${DATA_DIR}${file}?v=${v}`, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const d = await res.json();
     if (docKey !== key) return;
+    if (expect && (stripStem(d.stem) !== stripStem(expect.stem) || Number(d.ri) !== Number(expect.ri))) {
+      throw new Error(`file ${file} holds ${d.stem} r${d.ri}, not ${expect.stem} r${expect.ri} — ` +
+        `stale cached data; hard-reload the page (Cmd/Ctrl+Shift+R)`);
+    }
     doc = d;
     cfg = { threshold: d.decode.threshold, minEventS: d.decode.min_event_s, gapS: d.decode.gap_s };
     syncSliders();
@@ -196,7 +204,7 @@ function refreshScope(state) {
   }
   const sel = host?.querySelector("#rg-round");
   if (sel) sel.value = entry.file;
-  loadDoc(entry.file, key);
+  loadDoc(entry.file, key, { stem: entry.stem, ri: entry.ri });
 }
 
 // ── derive: decode with the sliders, match, tag ─────────────────────────────
@@ -364,7 +372,8 @@ function wireControls() {
   host.querySelector("#rg-round").addEventListener("change", (e) => {
     const file = e.target.value;
     if (!file) return;
-    loadDoc(file, file);
+    const o = e.target.selectedOptions[0];
+    loadDoc(file, file, o?.dataset.stem ? { stem: o.dataset.stem, ri: o.dataset.ri } : null);
   });
 }
 
@@ -414,6 +423,7 @@ function populateRoundPicker() {
   for (const r of rows) {
     const o = document.createElement("option");
     o.value = r.file;
+    o.dataset.stem = r.stem; o.dataset.ri = String(r.ri);
     const p = r.tp + r.fp ? r.tp / (r.tp + r.fp) : 0, rc = r.gt ? r.tp / r.gt : 0;
     const f1 = p + rc ? 2 * p * rc / (p + rc) : 0;
     o.textContent = `${r.stem} · r${r.ri} · F1 ${(f1 * 100).toFixed(0)}% (${r.gt} GT / ${r.tp + r.fp} pred) · fold ${r.fold}`;
