@@ -1,69 +1,69 @@
 {
- "generated": "2026-09-08T22:41:38",
+ "generated": "2026-09-08T22:56:17",
  "run": "v1",
  "labels_sha1": "df21df6c3d",
  "git_commit": "01b77f1",
- "n_rounds": 94,
+ "n_rounds": 193,
  "metrics": {
   "pooled": {
-   "n_gt": 236,
-   "n_pred": 355,
-   "tp": 150,
-   "fp": 205,
-   "fn": 86,
-   "precision": 0.4225352112676056,
-   "recall": 0.635593220338983,
-   "f1": 0.5076142131979695,
-   "center_precision": 0.49577464788732395,
-   "center_recall": 0.7457627118644068,
-   "center_f1": 0.5956006768189509,
-   "start_mae_frames": 4.3133333333333335,
-   "end_mae_frames": 5.086666666666667,
-   "start_bias_frames": -3.6733333333333333,
-   "end_bias_frames": 4.1,
-   "frame_roc_auc": 0.9257332259727745,
-   "frame_pr_auc": 0.5742280872028264
+   "n_gt": 528,
+   "n_pred": 520,
+   "tp": 300,
+   "fp": 220,
+   "fn": 228,
+   "precision": 0.5769230769230769,
+   "recall": 0.5681818181818182,
+   "f1": 0.5725190839694657,
+   "center_precision": 0.6211538461538462,
+   "center_recall": 0.6117424242424242,
+   "center_f1": 0.616412213740458,
+   "start_mae_frames": 3.0533333333333332,
+   "end_mae_frames": 3.6333333333333333,
+   "start_bias_frames": -1.2666666666666666,
+   "end_bias_frames": 1.04,
+   "frame_roc_auc": 0.9340409831519898,
+   "frame_pr_auc": 0.5942660285250628
   },
   "fold_mean_std": {
    "f1": [
-    0.5076142131979695,
-    0.0
+    0.5730245072234896,
+    0.008276305784640614
    ],
    "recall": [
-    0.635593220338983,
-    0.0
+    0.5718017181332715,
+    0.034130485256559095
    ],
    "precision": [
-    0.4225352112676056,
-    0.0
+    0.5766453598484849,
+    0.018051609848484862
    ],
    "center_f1": [
-    0.5956006768189509,
-    0.0
+    0.6160291279171785,
+    0.006273030356202858
    ],
    "center_recall": [
-    0.7457627118644068,
-    0.0
+    0.6140294868818204,
+    0.021563733457162726
    ],
    "center_precision": [
-    0.49577464788732395,
-    0.0
+    0.6206202651515151,
+    0.03468276515151514
    ],
    "start_mae_frames": [
-    4.3133333333333335,
-    0.0
+    3.059685537392544,
+    0.13611865841165205
    ],
    "end_mae_frames": [
-    5.086666666666667,
-    0.0
+    3.6397042447997863,
+    0.13651953142398998
    ],
    "frame_roc_auc": [
-    0.9257332259727745,
-    0.0
+    0.9331150200034717,
+    0.007381794030697109
    ],
    "frame_pr_auc": [
-    0.5742280872028264,
-    0.0
+    0.5975707460691123,
+    0.023342658866285948
    ]
   }
  },
@@ -106,28 +106,28 @@
    "0": {
     "file": "0.json",
     "gt": 10,
-    "tp": 5,
-    "fp": 12,
-    "fn": 5,
+    "tp": 8,
+    "fp": 3,
+    "fn": 2,
     "fold": 0
    }
   },
-  "10 mins Shadow Boxing Workout \u29f8 No Equipment (follow along)": {
+  "10 Min Complete Shadow Boxing Workout \uff5c Become A Better Boxer": {
    "0": {
     "file": "1.json",
     "gt": 0,
     "tp": 0,
-    "fp": 0,
+    "fp": 4,
     "fn": 0,
-    "fold": 0
+    "fold": 1
    },
    "1": {
     "file": "2.json",
     "gt": 0,
     "tp": 0,
-    "fp": 13,
+    "fp": 0,
     "fn": 0,
-    "fold": 0
+    "fold": 1
    },
    "2": {
     "file": "3.json",
@@ -135,73 +135,71 @@
     "tp": 0,
     "fp": 0,
     "fn": 0,
-    "fold": 0
+    "fold": 1
    },
    "3": {
     "file": "4.json",
     "gt": 0,
     "tp": 0,
-    "fp": 12,
+    "fp": 0,
     "fn": 0,
-    "fold": 0
+    "fold": 1
    },
    "4": {
     "file": "5.json",
+    "gt": 1,
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "fold": 1
+   },
+   "5": {
+    "file": "6.json",
+    "gt": 4,
+    "tp": 4,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "6": {
+    "file": "7.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
     "fn": 0,
-    "fold": 0
-   }
-  },
-  "20 Minute Boxing Footwork Heavy bag Workout - Follow along": {
-   "0": {
-    "file": "6.json",
-    "gt": 2,
-    "tp": 2,
-    "fp": 2,
-    "fn": 0,
-    "fold": 0
+    "fold": 1
    },
-   "1": {
-    "file": "7.json",
-    "gt": 4,
-    "tp": 1,
-    "fp": 0,
-    "fn": 3,
-    "fold": 0
-   },
-   "2": {
+   "7": {
     "file": "8.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
     "fn": 0,
-    "fold": 0
+    "fold": 1
    },
-   "3": {
+   "8": {
     "file": "9.json",
-    "gt": 4,
-    "tp": 4,
+    "gt": 1,
+    "tp": 1,
     "fp": 0,
     "fn": 0,
-    "fold": 0
+    "fold": 1
    },
-   "4": {
+   "9": {
     "file": "10.json",
-    "gt": 11,
-    "tp": 11,
-    "fp": 0,
+    "gt": 1,
+    "tp": 1,
+    "fp": 1,
     "fn": 0,
-    "fold": 0
+    "fold": 1
    }
   },
-  "30 Days of Basic Boxing at Home for Beginners #DAY16  #HIENSUNDAY  #BoxingAtHome #HomeWorkout [pTNIAZADJzM]": {
+  "10 mins Shadow Boxing Workout \u29f8 No Equipment (follow along)": {
    "0": {
     "file": "11.json",
     "gt": 0,
     "tp": 0,
-    "fp": 1,
+    "fp": 0,
     "fn": 0,
     "fold": 0
    },
@@ -209,7 +207,7 @@
     "file": "12.json",
     "gt": 0,
     "tp": 0,
-    "fp": 1,
+    "fp": 13,
     "fn": 0,
     "fold": 0
    },
@@ -220,31 +218,17 @@
     "fp": 0,
     "fn": 0,
     "fold": 0
-   }
-  },
-  "30 Days of Basic Boxing at Home for Beginners #DAY5 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [0yO_pkP9Wsc]": {
-   "0": {
+   },
+   "3": {
     "file": "14.json",
     "gt": 0,
     "tp": 0,
-    "fp": 0,
+    "fp": 9,
     "fn": 0,
     "fold": 0
-   }
-  },
-  "30 Days of Basic Boxing at Home for Beginners #DAY6 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [ild-CnHmQeg]": {
-   "0": {
+   },
+   "4": {
     "file": "15.json",
-    "gt": 2,
-    "tp": 1,
-    "fp": 0,
-    "fn": 1,
-    "fold": 0
-   }
-  },
-  "30 Days of Basic Boxing at Home for Beginners #day28     #HIENSUNDAY  #BoxingAtHome #HomeWorkout [PQ8lNBGjxjA]": {
-   "0": {
-    "file": "16.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -252,147 +236,145 @@
     "fold": 0
    }
   },
-  "5 Min Shadow Boxing Workout (Follow Along)": {
+  "13 Shadowboxing Body Shots": {
+   "0": {
+    "file": "16.json",
+    "gt": 22,
+    "tp": 5,
+    "fp": 6,
+    "fn": 17,
+    "fold": 1
+   }
+  },
+  "15 Minutes Heavy Bag Cardio Lower Body Workout Follow Along": {
    "0": {
     "file": "17.json",
-    "gt": 2,
-    "tp": 2,
-    "fp": 2,
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
     "fn": 0,
-    "fold": 0
+    "fold": 1
    },
    "1": {
     "file": "18.json",
-    "gt": 6,
-    "tp": 6,
-    "fp": 3,
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
     "fn": 0,
-    "fold": 0
+    "fold": 1
    },
    "2": {
     "file": "19.json",
     "gt": 0,
     "tp": 0,
-    "fp": 3,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "3": {
+    "file": "20.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "20 Minute Boxing Footwork Heavy bag Workout - Follow along": {
+   "0": {
+    "file": "21.json",
+    "gt": 2,
+    "tp": 0,
+    "fp": 1,
+    "fn": 2,
+    "fold": 0
+   },
+   "1": {
+    "file": "22.json",
+    "gt": 4,
+    "tp": 0,
+    "fp": 0,
+    "fn": 4,
+    "fold": 0
+   },
+   "2": {
+    "file": "23.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
     "fn": 0,
     "fold": 0
    },
    "3": {
-    "file": "20.json",
-    "gt": 8,
-    "tp": 8,
-    "fp": 6,
-    "fn": 0,
+    "file": "24.json",
+    "gt": 4,
+    "tp": 3,
+    "fp": 0,
+    "fn": 1,
     "fold": 0
    },
    "4": {
-    "file": "21.json",
-    "gt": 3,
-    "tp": 2,
-    "fp": 2,
-    "fn": 1,
-    "fold": 0
-   }
-  },
-  "Any criticism is welcome, can't move around as much as I'd like due to limited space [mbhlc4]": {
-   "0": {
-    "file": "22.json",
-    "gt": 13,
-    "tp": 4,
-    "fp": 6,
-    "fn": 9,
-    "fold": 0
-   }
-  },
-  "Bag work [4tcg5x]": {
-   "0": {
-    "file": "23.json",
-    "gt": 9,
-    "tp": 1,
-    "fp": 5,
-    "fn": 8,
-    "fold": 0
-   }
-  },
-  "Bag work video [vB6MEMMlkGo]": {
-   "0": {
-    "file": "24.json",
-    "gt": 22,
-    "tp": 16,
-    "fp": 14,
-    "fn": 6,
-    "fold": 0
-   }
-  },
-  "Bagwork critique [aA1G_V-Gj64]": {
-   "0": {
     "file": "25.json",
-    "gt": 6,
-    "tp": 4,
-    "fp": 9,
-    "fn": 2,
+    "gt": 11,
+    "tp": 6,
+    "fp": 0,
+    "fn": 5,
     "fold": 0
    }
   },
-  "Bagwork, little improvement but more of an update [Ps-arwZbCx0]": {
+  "20 Minute Shadowboxing for Beginners \uff5c Trainer of the Month Club \uff5c Well+Good": {
    "0": {
     "file": "26.json",
-    "gt": 25,
-    "tp": 15,
-    "fp": 9,
-    "fn": 10,
-    "fold": 0
-   }
-  },
-  "Boxing combo workout on the heavy bag": {
-   "0": {
+    "gt": 12,
+    "tp": 0,
+    "fp": 0,
+    "fn": 12,
+    "fold": 1
+   },
+   "1": {
     "file": "27.json",
     "gt": 0,
     "tp": 0,
-    "fp": 1,
+    "fp": 0,
     "fn": 0,
-    "fold": 0
-   }
-  },
-  "Boxing combo workout on the heavy bag [IBZf2QyFV2Q]": {
-   "0": {
+    "fold": 1
+   },
+   "2": {
     "file": "28.json",
-    "gt": 1,
-    "tp": 1,
-    "fp": 1,
-    "fn": 0,
-    "fold": 0
+    "gt": 4,
+    "tp": 0,
+    "fp": 0,
+    "fn": 4,
+    "fold": 1
    }
   },
-  "Boxing workout on the bag (with an app) [aC-ta0If6MQ]": {
+  "30 Days of Basic Boxing at Home for Beginners #DAY15  #HIENSUNDAY  #BoxingAtHome #HomeWorkout [XKm4qpYIwl8]": {
    "0": {
     "file": "29.json",
     "gt": 0,
     "tp": 0,
-    "fp": 1,
+    "fp": 0,
     "fn": 0,
-    "fold": 0
-   }
-  },
-  "Follow Along 20-Minute Shadow Boxing Workout": {
-   "0": {
-    "file": "30.json",
-    "gt": 5,
-    "tp": 5,
-    "fp": 3,
-    "fn": 0,
-    "fold": 0
+    "fold": 1
    },
    "1": {
+    "file": "30.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "2": {
     "file": "31.json",
-    "gt": 17,
-    "tp": 16,
-    "fp": 4,
-    "fn": 1,
-    "fold": 0
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
    }
   },
-  "Heavy Bag Workout #2 \uff5c 3 PUNCH COMBOS  \uff5c FOLLOW ALONG Less than 10mins": {
+  "30 Days of Basic Boxing at Home for Beginners #DAY16  #HIENSUNDAY  #BoxingAtHome #HomeWorkout [pTNIAZADJzM]": {
    "0": {
     "file": "32.json",
     "gt": 0,
@@ -416,169 +398,11 @@
     "fp": 0,
     "fn": 0,
     "fold": 0
-   },
-   "3": {
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #DAY5 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [0yO_pkP9Wsc]": {
+   "0": {
     "file": "35.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "4": {
-    "file": "36.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "5": {
-    "file": "37.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "6": {
-    "file": "38.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "7": {
-    "file": "39.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "8": {
-    "file": "40.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "9": {
-    "file": "41.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "10": {
-    "file": "42.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "11": {
-    "file": "43.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "12": {
-    "file": "44.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "13": {
-    "file": "45.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "14": {
-    "file": "46.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "15": {
-    "file": "47.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "16": {
-    "file": "48.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "17": {
-    "file": "49.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "18": {
-    "file": "50.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "19": {
-    "file": "51.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "20": {
-    "file": "52.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "21": {
-    "file": "53.json",
-    "gt": 1,
-    "tp": 0,
-    "fp": 0,
-    "fn": 1,
-    "fold": 0
-   },
-   "22": {
-    "file": "54.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 0,
-    "fn": 0,
-    "fold": 0
-   },
-   "23": {
-    "file": "55.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -586,9 +410,835 @@
     "fold": 0
    }
   },
-  "Heavy Bag Workout \uff5c 15 Minute Follow Along Boxing Workout": {
+  "30 Days of Basic Boxing at Home for Beginners #DAY6 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [ild-CnHmQeg]": {
+   "0": {
+    "file": "36.json",
+    "gt": 2,
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
+    "fold": 0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day24     #HIENSUNDAY  #BoxingAtHome #HomeWorkout [pbcyfMtMlgU]": {
+   "0": {
+    "file": "37.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "1": {
+    "file": "38.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "2": {
+    "file": "39.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day25    #HIENSUNDAY  #BoxingAtHome #HomeWorkout [Ln83hGcv0x4]": {
+   "0": {
+    "file": "40.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day27     #HIENSUNDAY  #BoxingAtHome #HomeWorkout [iRA1LJb0Jz4]": {
+   "0": {
+    "file": "41.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "fold": 1
+   },
+   "1": {
+    "file": "42.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day28     #HIENSUNDAY  #BoxingAtHome #HomeWorkout [PQ8lNBGjxjA]": {
+   "0": {
+    "file": "43.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   }
+  },
+  "30 MIN SHADOWBOXING FOR FAT LOSS \u29f8 Equipment Optional \uff5c Jeremy Sry": {
+   "0": {
+    "file": "44.json",
+    "gt": 27,
+    "tp": 19,
+    "fp": 4,
+    "fn": 8,
+    "fold": 1
+   },
+   "1": {
+    "file": "45.json",
+    "gt": 26,
+    "tp": 19,
+    "fp": 4,
+    "fn": 7,
+    "fold": 1
+   }
+  },
+  "4 Set-ups for the Shovel Hook \uff5c Land More Body Shots": {
+   "0": {
+    "file": "46.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "5 Min Shadow Boxing Workout (Follow Along)": {
+   "0": {
+    "file": "47.json",
+    "gt": 2,
+    "tp": 2,
+    "fp": 2,
+    "fn": 0,
+    "fold": 0
+   },
+   "1": {
+    "file": "48.json",
+    "gt": 6,
+    "tp": 6,
+    "fp": 1,
+    "fn": 0,
+    "fold": 0
+   },
+   "2": {
+    "file": "49.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "fold": 0
+   },
+   "3": {
+    "file": "50.json",
+    "gt": 8,
+    "tp": 7,
+    "fp": 2,
+    "fn": 1,
+    "fold": 0
+   },
+   "4": {
+    "file": "51.json",
+    "gt": 3,
+    "tp": 3,
+    "fp": 2,
+    "fn": 0,
+    "fold": 0
+   }
+  },
+  "A little help with form and flow [zATbn5Ry40M]": {
+   "0": {
+    "file": "52.json",
+    "gt": 32,
+    "tp": 21,
+    "fp": 16,
+    "fn": 11,
+    "fold": 1
+   }
+  },
+  "A short clip of my shadowboxing-any critiques [sc0nbwk383vf1]": {
+   "0": {
+    "file": "53.json",
+    "gt": 3,
+    "tp": 0,
+    "fp": 0,
+    "fn": 3,
+    "fold": 1
+   }
+  },
+  "Any criticism is welcome, can't move around as much as I'd like due to limited space [mbhlc4]": {
+   "0": {
+    "file": "54.json",
+    "gt": 13,
+    "tp": 2,
+    "fp": 2,
+    "fn": 11,
+    "fold": 0
+   }
+  },
+  "Bag work [4tcg5x]": {
+   "0": {
+    "file": "55.json",
+    "gt": 9,
+    "tp": 1,
+    "fp": 3,
+    "fn": 8,
+    "fold": 0
+   }
+  },
+  "Bag work video [vB6MEMMlkGo]": {
    "0": {
     "file": "56.json",
+    "gt": 22,
+    "tp": 18,
+    "fp": 8,
+    "fn": 4,
+    "fold": 0
+   }
+  },
+  "Bagwork critique [aA1G_V-Gj64]": {
+   "0": {
+    "file": "57.json",
+    "gt": 6,
+    "tp": 3,
+    "fp": 4,
+    "fn": 3,
+    "fold": 0
+   }
+  },
+  "Bagwork critique [amZPoRM3s78]": {
+   "0": {
+    "file": "58.json",
+    "gt": 60,
+    "tp": 35,
+    "fp": 18,
+    "fn": 25,
+    "fold": 1
+   }
+  },
+  "Bagwork opinions appreciated [1u86mz]": {
+   "0": {
+    "file": "59.json",
+    "gt": 1,
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "fold": 1
+   },
+   "1": {
+    "file": "60.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "2": {
+    "file": "61.json",
+    "gt": 3,
+    "tp": 0,
+    "fp": 1,
+    "fn": 3,
+    "fold": 1
+   },
+   "3": {
+    "file": "62.json",
+    "gt": 2,
+    "tp": 0,
+    "fp": 0,
+    "fn": 2,
+    "fold": 1
+   },
+   "4": {
+    "file": "63.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "Bagwork, little improvement but more of an update [Ps-arwZbCx0]": {
+   "0": {
+    "file": "64.json",
+    "gt": 25,
+    "tp": 17,
+    "fp": 3,
+    "fn": 8,
+    "fold": 0
+   }
+  },
+  "Been Working on previous advice. Grateful for any pointers to improve form. thanks! [zafts3]": {
+   "0": {
+    "file": "65.json",
+    "gt": 14,
+    "tp": 6,
+    "fp": 2,
+    "fn": 8,
+    "fold": 1
+   }
+  },
+  "Beginner Heavy Bag Workout \uff5c 15 Min Fat-Burning Boxing Follow Along With Igor Matejski": {
+   "0": {
+    "file": "66.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "1": {
+    "file": "67.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "2": {
+    "file": "68.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "3": {
+    "file": "69.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "4": {
+    "file": "70.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "5": {
+    "file": "71.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "6": {
+    "file": "72.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "7": {
+    "file": "73.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "8": {
+    "file": "74.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "9": {
+    "file": "75.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "10": {
+    "file": "76.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "11": {
+    "file": "77.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "12": {
+    "file": "78.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "13": {
+    "file": "79.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "14": {
+    "file": "80.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "Beginner Shadow Boxing Workout In 5 Minutes \uff5c Working The Jab (Follow Along)": {
+   "0": {
+    "file": "81.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 3,
+    "fn": 0,
+    "fold": 1
+   },
+   "1": {
+    "file": "82.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "fold": 1
+   },
+   "2": {
+    "file": "83.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 4,
+    "fn": 0,
+    "fold": 1
+   },
+   "3": {
+    "file": "84.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "fold": 1
+   },
+   "4": {
+    "file": "85.json",
+    "gt": 1,
+    "tp": 0,
+    "fp": 1,
+    "fn": 1,
+    "fold": 1
+   },
+   "5": {
+    "file": "86.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "6": {
+    "file": "87.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "7": {
+    "file": "88.json",
+    "gt": 1,
+    "tp": 0,
+    "fp": 1,
+    "fn": 1,
+    "fold": 1
+   }
+  },
+  "Best boxing app to practice boxing on the bag [AbS33zei-_A]": {
+   "0": {
+    "file": "89.json",
+    "gt": 2,
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "Boxing app that calls out punches [YP9dAExiSWg]": {
+   "0": {
+    "file": "90.json",
+    "gt": 6,
+    "tp": 2,
+    "fp": 2,
+    "fn": 4,
+    "fold": 1
+   }
+  },
+  "Boxing combo workout on the heavy bag": {
+   "0": {
+    "file": "91.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "fold": 0
+   }
+  },
+  "Boxing combo workout on the heavy bag [IBZf2QyFV2Q]": {
+   "0": {
+    "file": "92.json",
+    "gt": 1,
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   }
+  },
+  "Boxing workout on the bag (with an app) [aC-ta0If6MQ]": {
+   "0": {
+    "file": "93.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   }
+  },
+  "Follow Along 15 Minute Punching Bag Routine\uff1a Heavy Bag BOXING Workout Leg Exercises included": {
+   "0": {
+    "file": "94.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "Follow Along 20-Minute Shadow Boxing Workout": {
+   "0": {
+    "file": "95.json",
+    "gt": 5,
+    "tp": 5,
+    "fp": 1,
+    "fn": 0,
+    "fold": 0
+   },
+   "1": {
+    "file": "96.json",
+    "gt": 17,
+    "tp": 17,
+    "fp": 1,
+    "fn": 0,
+    "fold": 0
+   }
+  },
+  "Follow Along Shadow Boxing Workout At  Home": {
+   "0": {
+    "file": "97.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "1": {
+    "file": "98.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "2": {
+    "file": "99.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "fold": 1
+   },
+   "3": {
+    "file": "100.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "Follow along light shadow boxing session [5m74QKDR1W4]": {
+   "0": {
+    "file": "101.json",
+    "gt": 4,
+    "tp": 3,
+    "fp": 0,
+    "fn": 1,
+    "fold": 1
+   }
+  },
+  "Guided shadow boxing with an app": {
+   "0": {
+    "file": "102.json",
+    "gt": 13,
+    "tp": 3,
+    "fp": 1,
+    "fn": 10,
+    "fold": 1
+   }
+  },
+  "HOOKS \ud83e\ude9d & FOOTWORK \ud83e\udd4a. Shadow Boxing Drill (female boxing) #boxingworkout #shadowboxing #shorts": {
+   "0": {
+    "file": "103.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "Heavy Bag Workout #2 \uff5c 3 PUNCH COMBOS  \uff5c FOLLOW ALONG Less than 10mins": {
+   "0": {
+    "file": "104.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "1": {
+    "file": "105.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "2": {
+    "file": "106.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "3": {
+    "file": "107.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "4": {
+    "file": "108.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "5": {
+    "file": "109.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "6": {
+    "file": "110.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "7": {
+    "file": "111.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "8": {
+    "file": "112.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "9": {
+    "file": "113.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "10": {
+    "file": "114.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "11": {
+    "file": "115.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "12": {
+    "file": "116.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "13": {
+    "file": "117.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "14": {
+    "file": "118.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "15": {
+    "file": "119.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "16": {
+    "file": "120.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "17": {
+    "file": "121.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "18": {
+    "file": "122.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "19": {
+    "file": "123.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "20": {
+    "file": "124.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "21": {
+    "file": "125.json",
+    "gt": 1,
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "fold": 0
+   },
+   "22": {
+    "file": "126.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   },
+   "23": {
+    "file": "127.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 0
+   }
+  },
+  "Heavy Bag Workout #3 \uff5c 4 PUNCH COMBOS  \uff5c FOLLOW ALONG Less than 10mins": {
+   "0": {
+    "file": "128.json",
+    "gt": 1,
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "1": {
+    "file": "129.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "fold": 1
+   },
+   "2": {
+    "file": "130.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "Heavy Bag Workout \uff5c 15 Minute Follow Along Boxing Workout": {
+   "0": {
+    "file": "131.json",
     "gt": 0,
     "tp": 0,
     "fp": 4,
@@ -596,7 +1246,7 @@
     "fold": 0
    },
    "1": {
-    "file": "57.json",
+    "file": "132.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -606,7 +1256,7 @@
   },
   "Heavy Bag Workout \uff5c 25 Minute Follow Along For Beginners": {
    "0": {
-    "file": "58.json",
+    "file": "133.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -614,15 +1264,15 @@
     "fold": 0
    },
    "1": {
-    "file": "59.json",
+    "file": "134.json",
     "gt": 0,
     "tp": 0,
-    "fp": 3,
+    "fp": 2,
     "fn": 0,
     "fold": 0
    },
    "2": {
-    "file": "60.json",
+    "file": "135.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -630,15 +1280,15 @@
     "fold": 0
    },
    "3": {
-    "file": "61.json",
+    "file": "136.json",
     "gt": 0,
     "tp": 0,
-    "fp": 1,
+    "fp": 0,
     "fn": 0,
     "fold": 0
    },
    "4": {
-    "file": "62.json",
+    "file": "137.json",
     "gt": 0,
     "tp": 0,
     "fp": 2,
@@ -648,17 +1298,27 @@
   },
   "Heavy Bag Workout \uff5c Follow along Boxing Workout": {
    "0": {
-    "file": "63.json",
+    "file": "138.json",
     "gt": 10,
     "tp": 3,
-    "fp": 3,
+    "fp": 0,
     "fn": 7,
     "fold": 0
    }
   },
+  "Heavy bag boxing workout, pro training with an app [W9LPEvLxtO8]": {
+   "0": {
+    "file": "139.json",
+    "gt": 2,
+    "tp": 1,
+    "fp": 1,
+    "fn": 1,
+    "fold": 1
+   }
+  },
   "Heavybag boxing workout (with an app) [dBF1SFDm3zA]": {
    "0": {
-    "file": "64.json",
+    "file": "140.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -666,19 +1326,29 @@
     "fold": 0
    }
   },
+  "Heavybag workout with the best boxing app out there [sV5OwLep5UA]": {
+   "0": {
+    "file": "141.json",
+    "gt": 2,
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
   "Hi guys. Just a 17 year old kid here. Just want to know what you can say about my form Things I can work on [7iygp0ewec241]": {
    "0": {
-    "file": "65.json",
+    "file": "142.json",
     "gt": 3,
-    "tp": 1,
+    "tp": 0,
     "fp": 3,
-    "fn": 2,
+    "fn": 3,
     "fold": 0
    }
   },
   "INTENSE 10 Miniute Shadow boxing workout #boxing [7PCYxd3uhVY]": {
    "0": {
-    "file": "66.json",
+    "file": "143.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -686,7 +1356,7 @@
     "fold": 0
    },
    "1": {
-    "file": "67.json",
+    "file": "144.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -694,7 +1364,7 @@
     "fold": 0
    },
    "2": {
-    "file": "68.json",
+    "file": "145.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -702,7 +1372,7 @@
     "fold": 0
    },
    "3": {
-    "file": "69.json",
+    "file": "146.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -712,53 +1382,145 @@
   },
   "Keeping active since the gym closed - 3 round shadowboxing": {
    "0": {
-    "file": "70.json",
+    "file": "147.json",
     "gt": 3,
-    "tp": 1,
-    "fp": 4,
-    "fn": 2,
+    "tp": 0,
+    "fp": 3,
+    "fn": 3,
     "fold": 0
    },
    "1": {
-    "file": "71.json",
+    "file": "148.json",
     "gt": 9,
     "tp": 4,
-    "fp": 6,
+    "fp": 4,
     "fn": 5,
     "fold": 0
    },
    "2": {
-    "file": "72.json",
+    "file": "149.json",
     "gt": 7,
-    "tp": 5,
+    "tp": 4,
     "fp": 1,
-    "fn": 2,
+    "fn": 3,
     "fold": 0
+   }
+  },
+  "Killer Heavy Bag Workout \uff5c I talk you through it, so let's do it!": {
+   "0": {
+    "file": "150.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "1": {
+    "file": "151.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "2": {
+    "file": "152.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "3": {
+    "file": "153.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "4": {
+    "file": "154.json",
+    "gt": 2,
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
+    "fold": 1
+   },
+   "5": {
+    "file": "155.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "6": {
+    "file": "156.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "7": {
+    "file": "157.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "8": {
+    "file": "158.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "9": {
+    "file": "159.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "Learn This Deadly Boxing Combo": {
+   "0": {
+    "file": "160.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
    }
   },
   "Learn This Deadly Boxing Combo\ud83e\udd4a\ud83d\udca5 [zRBL7ISpYGk]": {
    "0": {
-    "file": "73.json",
+    "file": "161.json",
     "gt": 0,
     "tp": 0,
-    "fp": 1,
+    "fp": 0,
     "fn": 0,
     "fold": 0
    }
   },
   "MUST KNOW BOXING COMBOS FOR BEGINNERS! \ud83e\udd4a\ud83d\udd25 #boxing #boxingtraining #boxingworkout #boxingdrills": {
    "0": {
-    "file": "74.json",
+    "file": "162.json",
     "gt": 0,
     "tp": 0,
-    "fp": 4,
+    "fp": 2,
     "fn": 0,
     "fold": 0
    }
   },
   "Need honest feedback and advice. Started 3 months ago. I want to do better. Please be kind [cm6PEb-79Zc]": {
    "0": {
-    "file": "75.json",
+    "file": "163.json",
     "gt": 2,
     "tp": 1,
     "fp": 5,
@@ -768,27 +1530,27 @@
   },
   "Not very serious vid but what critique yous got Feet are almost obscured and no room for lateral movement but give it a shot [ea_eD3w89N8]": {
    "0": {
-    "file": "76.json",
+    "file": "164.json",
     "gt": 16,
-    "tp": 8,
-    "fp": 5,
-    "fn": 8,
+    "tp": 6,
+    "fp": 1,
+    "fn": 10,
     "fold": 0
    }
   },
   "Punching Bag Workout Upgrade": {
    "0": {
-    "file": "77.json",
+    "file": "165.json",
     "gt": 0,
     "tp": 0,
-    "fp": 1,
+    "fp": 0,
     "fn": 0,
     "fold": 0
    }
   },
   "Punching Bag Workout Upgrade [xIi9ePIdqVM]": {
    "0": {
-    "file": "78.json",
+    "file": "166.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -798,27 +1560,81 @@
   },
   "Punching bag workout focused on the jab [DunmTU8vdCw]": {
    "0": {
-    "file": "79.json",
+    "file": "167.json",
     "gt": 7,
-    "tp": 5,
-    "fp": 4,
-    "fn": 2,
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
     "fold": 0
+   }
+  },
+  "Quick Shadow Boxing Tutorial by Olympian [J4j3AOVWuHE]": {
+   "0": {
+    "file": "168.json",
+    "gt": 4,
+    "tp": 1,
+    "fp": 0,
+    "fn": 3,
+    "fold": 1
+   },
+   "1": {
+    "file": "169.json",
+    "gt": 3,
+    "tp": 0,
+    "fp": 2,
+    "fn": 3,
+    "fold": 1
+   }
+  },
+  "Shadow Box Workout \uff5c Let me Coach You for 11 Minutes": {
+   "0": {
+    "file": "170.json",
+    "gt": 6,
+    "tp": 4,
+    "fp": 8,
+    "fn": 2,
+    "fold": 1
    }
   },
   "Shadow Boxing Combos - Follow Along [Uoj0tmC0y_c]": {
    "0": {
-    "file": "80.json",
+    "file": "171.json",
     "gt": 5,
     "tp": 3,
-    "fp": 4,
+    "fp": 3,
     "fn": 2,
     "fold": 0
    }
   },
+  "Shadow Boxing Work Out for Better Boxing": {
+   "0": {
+    "file": "172.json",
+    "gt": 25,
+    "tp": 24,
+    "fp": 0,
+    "fn": 1,
+    "fold": 1
+   },
+   "1": {
+    "file": "173.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   },
+   "2": {
+    "file": "174.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "fold": 1
+   }
+  },
   "Shadow Boxing Workout \u2013 25 Min Follow Along (No Talking)": {
    "0": {
-    "file": "81.json",
+    "file": "175.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -826,19 +1642,59 @@
     "fold": 0
    }
   },
+  "Shadow boxing alone on the ring, using an app [T6TQYsi5Dz0]": {
+   "0": {
+    "file": "176.json",
+    "gt": 3,
+    "tp": 1,
+    "fp": 0,
+    "fn": 2,
+    "fold": 1
+   }
+  },
+  "Shadow boxing session with an app [yAjmq7GZnEg]": {
+   "0": {
+    "file": "177.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "fold": 1
+   }
+  },
+  "Shadow boxing with a focus on movement [S4r8334a0v8]": {
+   "0": {
+    "file": "178.json",
+    "gt": 1,
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "fold": 1
+   }
+  },
+  "Shadow boxing workout, with combos being called out by an app [nxpuoPycpp0]": {
+   "0": {
+    "file": "179.json",
+    "gt": 3,
+    "tp": 1,
+    "fp": 1,
+    "fn": 2,
+    "fold": 1
+   }
+  },
   "Shadowboxing critique [0T75blmMW50]": {
    "0": {
-    "file": "82.json",
+    "file": "180.json",
     "gt": 10,
-    "tp": 5,
-    "fp": 18,
-    "fn": 5,
+    "tp": 6,
+    "fp": 12,
+    "fn": 4,
     "fold": 0
    }
   },
   "Shadowboxing workout at the boxing gym": {
    "0": {
-    "file": "83.json",
+    "file": "181.json",
     "gt": 9,
     "tp": 7,
     "fp": 2,
@@ -848,7 +1704,7 @@
   },
   "Tabata Bag Workout  \uff5c Follow Along": {
    "0": {
-    "file": "84.json",
+    "file": "182.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -856,7 +1712,7 @@
     "fold": 0
    },
    "1": {
-    "file": "85.json",
+    "file": "183.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -864,7 +1720,7 @@
     "fold": 0
    },
    "2": {
-    "file": "86.json",
+    "file": "184.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -872,15 +1728,15 @@
     "fold": 0
    },
    "3": {
-    "file": "87.json",
+    "file": "185.json",
     "gt": 0,
     "tp": 0,
-    "fp": 1,
+    "fp": 0,
     "fn": 0,
     "fold": 0
    },
    "4": {
-    "file": "88.json",
+    "file": "186.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -888,7 +1744,7 @@
     "fold": 0
    },
    "5": {
-    "file": "89.json",
+    "file": "187.json",
     "gt": 0,
     "tp": 0,
     "fp": 0,
@@ -898,38 +1754,48 @@
   },
   "This boxing app is like having your own coach #boxingcoach": {
    "0": {
-    "file": "90.json",
+    "file": "188.json",
     "gt": 4,
-    "tp": 3,
+    "tp": 2,
     "fp": 1,
-    "fn": 1,
+    "fn": 2,
     "fold": 0
+   }
+  },
+  "This is my sand bag training, I started learning boxing from May 2025. [A2Xd55D6yTs]": {
+   "0": {
+    "file": "189.json",
+    "gt": 0,
+    "tp": 0,
+    "fp": 9,
+    "fn": 0,
+    "fold": 1
    }
   },
   "Virtual boxing pad work on the beach [lFksLLfAtFE]": {
    "0": {
-    "file": "91.json",
+    "file": "190.json",
     "gt": 0,
     "tp": 0,
-    "fp": 5,
+    "fp": 3,
     "fn": 0,
     "fold": 0
    }
   },
   "{Stream For Free} Boxing Workout For Beginners 4 Rounds": {
    "0": {
-    "file": "92.json",
+    "file": "191.json",
     "gt": 0,
     "tp": 0,
-    "fp": 9,
+    "fp": 6,
     "fn": 0,
     "fold": 0
    },
    "1": {
-    "file": "93.json",
+    "file": "192.json",
     "gt": 0,
     "tp": 0,
-    "fp": 8,
+    "fp": 2,
     "fn": 0,
     "fold": 0
    }
