@@ -29,6 +29,7 @@ export const COLOR = {
   rear: "#ffd95c",    // yellow     — rear_slip
 };
 export const SLIP_KIND = { lead_slip: "lead", rear_slip: "rear" };
+export const ROLL_KIND = { lead_roll: "lead", rear_roll: "rear" };
 
 // The Sheet's other rows: defensive moves and round/rest markers. A punch is
 // anything that is neither (jab_head, cross_head, lead_hook_head, …).
@@ -99,19 +100,26 @@ export function ensureSlipLabels(basename, { force = false } = {}) {
 
 // ── slip rows → this round's frames ─────────────────────────────────────────
 
-let sc = { pose: null, rows: null, entryStem: undefined };
+let sc = { pose: null, rows: null, entryStem: undefined, kindMap: null };
 
 // { slips: [{kind, s, e, startSec, endSec, uuid, stance, curated}], nLead,
 //   nRear, nOut, nVideo } — null while labels are not in. `curated` = the
 // slip's midpoint lies inside a curated frontal span.
 export function computeSlips(c) {
+  return computeLabelSpans(c, SLIP_KIND);
+}
+
+// Same shape as computeSlips, for a different label pair (e.g. ROLL_KIND).
+// `slips_gt.js` and `rolls_gt.js` are the same lens over a different kindMap.
+export function computeLabelSpans(c, kindMap) {
   if (!c || labels.status !== "ok") return null;
-  if (sc.pose === c.pose && sc.rows === labels.rows && sc.entryStem === c.entryStem) return sc;
+  if (sc.pose === c.pose && sc.rows === labels.rows && sc.entryStem === c.entryStem
+      && sc.kindMap === kindMap) return sc;
   const startFrame = Math.floor(c.startSec * c.fps);
   const slips = [];
   let nVideo = 0;
   for (const r of labels.rows) {
-    const kind = SLIP_KIND[r.label];
+    const kind = kindMap[r.label];
     if (!kind) continue;
     nVideo++;
     const s = Math.floor(r.start_sec * c.fps) - startFrame;
@@ -126,7 +134,7 @@ export function computeSlips(c) {
   }
   slips.sort((a, b) => a.s - b.s || a.e - b.e);
   const nLead = slips.filter(x => x.kind === "lead").length;
-  sc = { pose: c.pose, rows: labels.rows, entryStem: c.entryStem,
+  sc = { pose: c.pose, rows: labels.rows, entryStem: c.entryStem, kindMap,
          slips, nLead, nRear: slips.length - nLead,
          nOut: slips.filter(x => !x.curated).length, nVideo };
   return sc;

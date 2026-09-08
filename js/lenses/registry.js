@@ -47,6 +47,7 @@ import { AudioImpactLensRule } from "./models/audio_impact.js";
 import { ImpactSpotterLensRule } from "./models/impact_spotter.js";
 import { PunchPredictionsRule } from "./models/punch_predictions.js";
 import { RollDuckLensRule } from "./research/roll_duck.js";
+import { RollsGtRule } from "./research/rolls_gt.js";
 
 // Overview stays first as the default; the rest are alphabetical by label.
 export const RULES = [
@@ -79,6 +80,7 @@ export const RULES = [
   PunchClassifierRule,
   PunchPredictionsRule,
   RollDuckLensRule,
+  RollsGtRule,
   ShoulderGateRule,
   SideSetRule,
   SkeletonCompareRule,
