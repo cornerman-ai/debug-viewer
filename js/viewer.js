@@ -12,6 +12,7 @@ const BUILD = "2026-08-03.2";
   if (el) el.textContent = `build ${BUILD}`;
 }
 
+import "./theme.js";
 import { loadPose, loadGloveWrists, loadPtsArray, loadBlaze33 } from "./pose-loader.js";
 import { loadPunches } from "./punches-loader.js";
 import { fetchLiveLabels } from "./sheet-labels.js";

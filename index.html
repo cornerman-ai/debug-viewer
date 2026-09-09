@@ -5,15 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cornerman · Rule Debug Viewer</title>
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    // Applied synchronously (before first paint) so a saved theme choice
+    // doesn't flash the system-default theme for a moment. With nothing
+    // saved, [data-theme] stays unset and the CSS media query alone
+    // decides — i.e. the default is "follow the OS".
+    try {
+      var t = localStorage.getItem("cornerman-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <header>
-    <h1>Cornerman rule debug viewer <span id="build-tag" class="muted small">build …</span></h1>
-    <p class="sub">Frame-by-frame inspection of BlazePose Drive caches against the rules engine. Pick a video and its matching <code>.npy</code> + <code>_meta.json</code> pair to begin.</p>
+    <div>
+      <h1>Cornerman rule debug viewer <span id="build-tag" class="muted small">build …</span></h1>
+      <p class="sub">Frame-by-frame inspection of BlazePose Drive caches against the rules engine. Pick a video and its matching <code>.npy</code> + <code>_meta.json</code> pair to begin.</p>
+    </div>
+    <button type="button" id="theme-toggle" class="theme-toggle" title="Toggle color theme"></button>
   </header>
 
   <section id="picker-card" class="card">
-    <details id="drive-section" open>
+    <details id="drive-section">
       <summary><span class="section-label">Drive folder</span> <span id="drive-status" class="muted small">— not connected</span></summary>
       <p class="section-desc">
         One-time grant, then videos + caches + punches load straight from
@@ -49,7 +62,7 @@
       </p>
     </details>
 
-    <details id="pick-section" open>
+    <details id="pick-section">
       <summary><span class="section-label">Video &amp; lens</span> <span class="muted small">— choose what to view</span></summary>
       <div class="lens-row">
         <label>

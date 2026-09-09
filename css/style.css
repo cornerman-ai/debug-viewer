@@ -1,4 +1,42 @@
+/* Light is the default palette. Dark is applied automatically when the OS
+   is in dark mode (prefers-color-scheme), and can be forced either way with
+   [data-theme] — set by js/theme.js from a saved choice, or synchronously
+   by the inline script in <head> to avoid a flash on load. */
 :root {
+  --bg: #f4f5f7;
+  --bg-card: #ffffff;
+  --bg-elev: #eef0f3;
+  --fg: #1b1e24;
+  --fg-muted: #5b6472;
+  --fg-dim: #8a93a3;
+  --accent: #0969da;
+  --accent-ink: #ffffff;
+  --good: #1a8f4c;
+  --bad: #d33a3a;
+  --border: #d8dce2;
+  --border-soft: #e7e9ed;
+  --border-strong: #b9c0cb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1014;
+    --bg-card: #161a21;
+    --bg-elev: #1d222b;
+    --fg: #e6e9ef;
+    --fg-muted: #8a93a3;
+    --fg-dim: #5b6473;
+    --accent: #7ec8ff;
+    --accent-ink: #0b1018;
+    --good: #5fd97a;
+    --bad: #e85a5a;
+    --border: #262c37;
+    --border-soft: #1f242d;
+    --border-strong: #3a4250;
+  }
+}
+
+:root[data-theme="dark"] {
   --bg: #0e1014;
   --bg-card: #161a21;
   --bg-elev: #1d222b;
@@ -6,10 +44,12 @@
   --fg-muted: #8a93a3;
   --fg-dim: #5b6473;
   --accent: #7ec8ff;
+  --accent-ink: #0b1018;
   --good: #5fd97a;
   --bad: #e85a5a;
   --border: #262c37;
   --border-soft: #1f242d;
+  --border-strong: #3a4250;
 }
 
 * { box-sizing: border-box; }
@@ -23,11 +63,32 @@ html, body {
 }
 
 header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   padding: 22px 28px 10px;
   border-bottom: 1px solid var(--border-soft);
 }
 header h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.2px; }
 header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
+
+.theme-toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.theme-toggle:hover { color: var(--fg); border-color: var(--border-strong); }
 
 .card {
   margin: 20px 28px;
@@ -77,7 +138,7 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
 }
 #drive-connect {
   background: var(--accent);
-  color: #0b1018;
+  color: var(--accent-ink);
   border: none;
   border-radius: 6px;
   padding: 8px 14px;
@@ -238,7 +299,7 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
   cursor: pointer;
   white-space: nowrap;
 }
-.stage-pick button:hover { border-color: #3a4250; }
+.stage-pick button:hover { border-color: var(--border-strong); }
 .stage-pick button:disabled { opacity: 0.5; cursor: default; }
 
 .video-wrap {
@@ -286,7 +347,7 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
   font: inherit;
   cursor: pointer;
 }
-.controls button:hover { border-color: #3a4250; }
+.controls button:hover { border-color: var(--border-strong); }
 .controls #scrubber {
   flex: 1;
   accent-color: var(--accent);
@@ -606,17 +667,17 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
   background: var(--bg-elev); color: var(--fg-muted); border: 1px solid var(--border);
   border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; white-space: nowrap;
 }
-#export-dialog .rng-row button:hover { color: var(--fg); border-color: #3a4250; }
+#export-dialog .rng-row button:hover { color: var(--fg); border-color: var(--border-strong); }
 #export-dialog .hint { color: var(--fg-muted); font-size: 12px; margin: 6px 0 0; line-height: 1.5; }
 #export-dialog .hint code {
   background: var(--bg); border: 1px solid var(--border-soft);
   border-radius: 4px; padding: 0 4px; color: var(--fg);
 }
-#export-dialog .export-err { color: #ff8a8a; font-size: 13px; min-height: 18px; margin: 10px 0 0; }
+#export-dialog .export-err { color: var(--bad); font-size: 13px; min-height: 18px; margin: 10px 0 0; }
 #export-dialog .export-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 14px 0 0; padding: 0; }
 #export-dialog .export-actions button {
   background: var(--bg-elev); color: var(--fg); border: 1px solid var(--border);
   border-radius: 6px; padding: 7px 16px; font: inherit; cursor: pointer;
 }
-#export-dialog .export-actions button:hover { border-color: #3a4250; }
-#export-dialog .export-actions button.primary { background: var(--accent); color: #06121d; border-color: var(--accent); font-weight: 600; }
+#export-dialog .export-actions button:hover { border-color: var(--border-strong); }
+#export-dialog .export-actions button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
