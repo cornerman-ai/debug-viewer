@@ -1187,11 +1187,16 @@ export const SlipExplorationRule = {
          the stage loses its video / round mirrors and the meta line, the side
          panel goes. Lens lives inside the Video & lens <details> now, so pull
          it out of that wrapper (forcing it visible even collapsed) instead of
-         keeping the wrapper itself. */
-      #picker-card > *:not(#pick-section):not(#drive-section) { display:none !important; }
+         keeping the wrapper itself. Drive folder now lives inside the "From a
+         folder" .alt-group capsule alongside Cache folder — keep just Drive,
+         pulled out the same way, and drop the capsule chrome (bg/border/
+         padding) around it so it doesn't read as a box with one lone item. */
+      #picker-card > *:not(#pick-section):not(.alt-group:has(#drive-section)) { display:none !important; }
+      .alt-group:has(#drive-section) { background:none !important; border:none !important; padding:0 !important; }
+      .alt-group:has(#drive-section) > *:not(#drive-section) { display:none !important; }
       #pick-section > *:not(.lens-row) { display:none !important; }
       #pick-section > .lens-row { display:block !important; margin:0 !important; }
-      #picker-card.fa-drive-ok > #drive-section { display:none !important; }
+      #picker-card.fa-drive-ok .alt-group:has(#drive-section) { display:none !important; }
       #picker-card { padding-bottom:6px !important; }
       .stage-pick, #meta, .controls, #frame-label { display:none !important; }
       #side { display:none !important; }
@@ -1210,6 +1215,12 @@ export const SlipExplorationRule = {
       #fa-legend .fa-ln { display:inline-block; width:16px; height:0; vertical-align:middle; margin-top:3px; }
     `;
     slot.appendChild(base);
+    // The picker card is foldable now; its own summary is hidden by the
+    // rule above (it's not #pick-section or the Drive alt-group), so force
+    // it open here rather than leave Drive folder / the lens row invisible
+    // if the user had folded the whole card before switching to this lens.
+    const pickerCardEl = document.getElementById("picker-card");
+    if (pickerCardEl) pickerCardEl.open = true;
     takeoverStage = document.createElement("style");
     takeoverStage.textContent = `#stage > *:not(#stage-extras) { display:none !important; }`;
     slot.appendChild(takeoverStage);

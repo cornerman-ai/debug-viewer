@@ -85,6 +85,18 @@ const els = {
   odStatus:      document.getElementById("od-status"),
 };
 
+// Sets a status line's text and, via `data-state`, how it reads at a
+// glance — css/style.css colors "busy" (with a spinner), "success",
+// "warn", and "error" differently from plain muted text. `state` is
+// falsy/omitted for the neutral default. Purely presentational: every
+// call site already had the text, this just stops throwing away the
+// "is this thing working, loading, or broken" signal that text implies.
+function setStatus(el, text, state) {
+  if (!el) return;
+  el.textContent = text;
+  el.dataset.state = state || "";
+}
+
 // Cache index built from the folder picker (or the Drive folder walker):
 //   Map<videoBasename, Map<roundN, { yolo?: {npy,meta,punches?}, vision?: ... }>>
 // Slot values are EITHER File objects (manual picker) OR
@@ -191,11 +203,11 @@ if (els.fbSignout)       els.fbSignout.addEventListener("click", () => firebaseS
 firebaseSource.onAuthChange((user) => {
   if (!els.fbUser) return;
   if (user) {
-    els.fbUser.textContent = `— signed in as ${user.email}`;
+    setStatus(els.fbUser, `— signed in as ${user.email}`, "success");
     if (els.fbSignin) els.fbSignin.hidden = true;
     if (els.fbSignout) els.fbSignout.hidden = false;
   } else {
-    els.fbUser.textContent = "— use the phone's account, or the debug admin";
+    setStatus(els.fbUser, "— use the phone's account, or the debug admin", "");
     if (els.fbSignin) els.fbSignin.hidden = false;
     if (els.fbSignout) els.fbSignout.hidden = true;
   }
@@ -206,11 +218,16 @@ firebaseSource.onAuthChange((user) => {
 firebaseSource.completeRedirectSignIn();
 
 async function onFirebaseSignIn() {
+  if (els.fbSignin) els.fbSignin.disabled = true;
   try {
     await firebaseSource.signIn();
+    // onAuthChange fires from the SDK once the sign-in resolves and takes
+    // over els.fbUser; nothing else to set here on success.
   } catch (err) {
     console.error("[firebase sign-in]", err);
-    els.fbStatus.textContent = `— sign-in failed: ${err.message}`;
+    setStatus(els.fbStatus, `— sign-in failed: ${err.message}`, "error");
+  } finally {
+    if (els.fbSignin) els.fbSignin.disabled = false;
   }
 }
 
@@ -238,19 +255,25 @@ async function initDriveSection() {
 
 function setDriveStatus(state, name) {
   if (!els.driveStatus) return;
+  // Disabled only while actively scanning — every other state leaves the
+  // button clickable (it's also how you retry after "denied").
+  if (els.driveConnect) els.driveConnect.disabled = state === "scanning";
   switch (state) {
     case "idle":
       els.driveStatus.textContent = "— not connected";
+      els.driveStatus.dataset.state = "";
       if (els.driveConnect)    els.driveConnect.textContent = "Connect Drive folder";
       if (els.driveDisconnect) els.driveDisconnect.hidden = true;
       break;
     case "needs-permission":
       els.driveStatus.innerHTML = `— need permission for <code>${name || "folder"}</code>`;
+      els.driveStatus.dataset.state = "warn";
       if (els.driveConnect)    els.driveConnect.textContent = "Reconnect";
       if (els.driveDisconnect) els.driveDisconnect.hidden = false;
       break;
     case "scanning":
       els.driveStatus.innerHTML = `— scanning <code>${name || ""}</code>…`;
+      els.driveStatus.dataset.state = "busy";
       if (els.driveDisconnect) els.driveDisconnect.hidden = false;
       break;
     case "connected": {
@@ -258,12 +281,14 @@ function setDriveStatus(state, name) {
       const nVideos = driveVideos?.size || 0;
       els.driveStatus.innerHTML =
         `— connected to <code>${name || "folder"}</code> · ${nVideos} videos · ${nRounds} round caches`;
+      els.driveStatus.dataset.state = "success";
       if (els.driveConnect)    els.driveConnect.textContent = "Pick a different folder";
       if (els.driveDisconnect) els.driveDisconnect.hidden = false;
       break;
     }
     case "denied":
       els.driveStatus.innerHTML = `— permission denied for <code>${name || "folder"}</code>`;
+      els.driveStatus.dataset.state = "error";
       if (els.driveConnect)    els.driveConnect.textContent = "Reconnect";
       if (els.driveDisconnect) els.driveDisconnect.hidden = false;
       break;
@@ -632,6 +657,7 @@ function onCacheClear() {
 }
 
 function refreshCacheStatus() {
+  const pickBox = els.cacheFolder?.closest(".folder-pick");
   const nVideos = cacheIndex?.size || 0;
   let nRounds = 0, nYolo = 0, nVision = 0, nVision3D = 0, nCombined = 0, nV6 = 0;
   for (const rounds of cacheIndex?.values() || []) {
@@ -653,12 +679,18 @@ function refreshCacheStatus() {
     if (nV6)        parts.push(`${nV6} v6`);
     els.cacheStatus.textContent =
       `— ${nRounds} rounds across ${nVideos} videos (${parts.join(" + ")})`;
+    els.cacheStatus.dataset.state = "success";
+    pickBox?.classList.add("is-ready");
+    pickBox?.classList.remove("is-error");
     if (els.cacheSection) els.cacheSection.open = false;
     els.cacheClear.hidden = false;
   } else {
     els.cacheStatus.textContent = cacheIndex
       ? "— no `_<engine>_r{N}.npy + _meta.json` pairs found in that folder"
       : "— pick once per session";
+    els.cacheStatus.dataset.state = cacheIndex ? "error" : "";
+    pickBox?.classList.remove("is-ready");
+    pickBox?.classList.toggle("is-error", !!cacheIndex);
     els.cacheClear.hidden = true;
   }
 }
@@ -766,13 +798,14 @@ async function onFirebaseLoad() {
   const sessionId = els.fbSessionId.value.trim();
   const roundN = parseInt(els.fbRound.value, 10);
   if (!sessionId || Number.isNaN(roundN)) {
-    els.fbStatus.textContent = "— enter a session id and round number";
+    setStatus(els.fbStatus, "— enter a session id and round number", "warn");
     return;
   }
 
-  els.fbStatus.textContent = `— fetching ${sessionId} r${roundN}…`;
+  setStatus(els.fbStatus, `— fetching ${sessionId} r${roundN}…`, "busy");
   els.loadStatus.textContent = `Loading ${sessionId} / round ${roundN} from Firebase…`;
   const token = ++currentLoadToken;
+  if (els.fbLoad) els.fbLoad.disabled = true;
 
   try {
     const blobs = await firebaseSource.fetchRoundBlobs(sessionId, roundN);
@@ -781,8 +814,10 @@ async function onFirebaseLoad() {
   } catch (err) {
     if (token !== currentLoadToken) return;
     console.error("[firebase load]", err);
-    els.fbStatus.textContent = `— error: ${err.message}`;
+    setStatus(els.fbStatus, `— error: ${err.message}`, "error");
     els.loadStatus.textContent = `Firebase load failed: ${err.message}`;
+  } finally {
+    if (els.fbLoad && token === currentLoadToken) els.fbLoad.disabled = false;
   }
 }
 
@@ -832,7 +867,7 @@ async function startOnDeviceRound(blobs, idLabel, roundN, statusEl, token) {
   const sidecarNote = analysis
     ? `with on-device analysis (${Object.keys(analysis.rules).length} rules${punchNote})`
     : `no analysis sidecar`;
-  if (statusEl) statusEl.textContent = `— loaded ${idLabel} r${roundN}, ${sidecarNote}`;
+  if (statusEl) setStatus(statusEl, `— loaded ${idLabel} r${roundN}, ${sidecarNote}`, "success");
   els.loadStatus.textContent = "";
 }
 
@@ -844,14 +879,15 @@ async function onLocalOnDeviceLoad() {
   const skeletonFile = els.odSkeleton.files?.[0];
   const analysisFile = els.odAnalysis.files?.[0] ?? null;
   if (!videoFile || !skeletonFile) {
-    els.odStatus.textContent = "— pick at least a video + skeleton JSON";
+    setStatus(els.odStatus, "— pick at least a video + skeleton JSON", "warn");
     return;
   }
   const roundN = parseInt(els.odRound.value, 10) || 0;
   const idLabel = videoFile.name.replace(/\.mp4$/i, "");
-  els.odStatus.textContent = `— loading ${videoFile.name}…`;
+  setStatus(els.odStatus, `— loading ${videoFile.name}…`, "busy");
   els.loadStatus.textContent = "Loading on-device round from local files…";
   const token = ++currentLoadToken;
+  if (els.odLoad) els.odLoad.disabled = true;
   try {
     await startOnDeviceRound(
       { videoBlob: videoFile, skeletonBlob: skeletonFile, analysisBlob: analysisFile },
@@ -860,13 +896,16 @@ async function onLocalOnDeviceLoad() {
   } catch (err) {
     if (token !== currentLoadToken) return;
     console.error("[local on-device load]", err);
-    els.odStatus.textContent = `— error: ${err.message}`;
+    setStatus(els.odStatus, `— error: ${err.message}`, "error");
     els.loadStatus.textContent = `Local load failed: ${err.message}`;
+  } finally {
+    if (els.odLoad && token === currentLoadToken) els.odLoad.disabled = false;
   }
 }
 
 async function onFirebaseListRecent() {
-  els.fbStatus.textContent = "— fetching session list…";
+  setStatus(els.fbStatus, "— fetching session list…", "busy");
+  if (els.fbListRecent) els.fbListRecent.disabled = true;
   try {
     const sessions = await firebaseSource.listRecentSessions(20);
     els.fbRecent.innerHTML = '<option value="">— pick a recent session —</option>';
@@ -881,12 +920,16 @@ async function onFirebaseListRecent() {
       els.fbRecent.appendChild(opt);
     }
     els.fbRecent.hidden = sessions.length === 0;
-    els.fbStatus.textContent = sessions.length
-      ? `— ${sessions.length} recent sessions`
-      : `— no sessions found`;
+    setStatus(
+      els.fbStatus,
+      sessions.length ? `— ${sessions.length} recent sessions` : `— no sessions found`,
+      sessions.length ? "success" : "warn",
+    );
   } catch (err) {
     console.error("[firebase list]", err);
-    els.fbStatus.textContent = `— list error: ${err.message}`;
+    setStatus(els.fbStatus, `— list error: ${err.message}`, "error");
+  } finally {
+    if (els.fbListRecent) els.fbListRecent.disabled = false;
   }
 }
 

@@ -208,8 +208,11 @@ function renderShell() {
        it visible even collapsed) instead of hiding the wrapper wholesale. */
     #pick-section > *:not(.lens-row) { display:none !important; }
     #pick-section > .lens-row { display:block !important; margin:0 !important; }
-    #firebase-section, #ondevice-section, .manual-fallback,
-    #drive-section, #cache-section { display:none !important; }
+    /* Drive/Cache and Firebase/On-device/Manual now each live inside an
+       .alt-group capsule — hiding the capsule takes its contents (and the
+       "or" dividers between them) with it, instead of hiding each section
+       individually and leaving an empty bordered box behind. */
+    .alt-group, .section-group-label { display:none !important; }
     body > header { display:none !important; }
     #picker-card { margin:0 !important; padding:6px 10px !important; }
     .layout { display:block !important; }
@@ -279,6 +282,11 @@ function renderShell() {
       grid-template-rows:minmax(52vh,1fr) auto;overflow:auto}}
   `;
   slot.appendChild(takeover);
+  // The picker card is foldable now — force it open so #pick-section's
+  // lens row (the only way back out, with #side hidden) isn't invisible
+  // just because the user had folded the whole card earlier.
+  const pickerCardEl = document.getElementById("picker-card");
+  if (pickerCardEl) pickerCardEl.open = true;
 
   const panel = document.createElement("div");
   panel.id = "bp-panel";

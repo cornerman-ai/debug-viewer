@@ -16,6 +16,7 @@
   --border: #d8dce2;
   --border-soft: #e7e9ed;
   --border-strong: #b9c0cb;
+  --warn: #9a6700;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -33,6 +34,7 @@
     --border: #262c37;
     --border-soft: #1f242d;
     --border-strong: #3a4250;
+    --warn: #e0a940;
   }
 }
 
@@ -50,6 +52,7 @@
   --border: #262c37;
   --border-soft: #1f242d;
   --border-strong: #3a4250;
+  --warn: #e0a940;
 }
 
 * { box-sizing: border-box; }
@@ -96,9 +99,35 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 .card h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
 .card.loaded { padding: 14px 18px; }
+
+/* The whole card is itself a <details> now, foldable down to "Data and
+   lens selection" — its own summary sits outside the `#picker-card
+   details summary` rule below (that one only matches a `details`
+   *descendant* of #picker-card, and #picker-card being a details doesn't
+   make it its own descendant), so it gets a matching look here instead. */
+#picker-card > summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 4px 8px;
+  margin: 0 -8px;
+  border-radius: 6px;
+  color: var(--fg);
+  transition: background-color .12s ease;
+}
+#picker-card > summary:hover { background: var(--bg-elev); }
+#picker-card > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+#picker-card > summary .muted { font-weight: 400; }
+@media (prefers-reduced-motion: reduce) {
+  #picker-card > summary { transition: none; }
+}
 
 /* Uniform vertical rhythm: one gap size between the picker card's top-level
    sections, a smaller one between a section's summary/body elements. Scoped
@@ -106,24 +135,94 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
    (which stay unscoped because .folder-pick/.hint/.manual-fallback are
    reused by lens rule-panels outside this card). */
 #picker-card > * + * { margin-top: 16px; }
+#picker-card > summary + * { margin-top: 10px; }
 #picker-card details > * + * { margin-top: 10px; }
 #picker-card .folder-pick,
 #picker-card .hint,
 #picker-card .lens-row { margin: 0; }
-/* .manual-fallback keeps no override: its only own rule is margin-top,
-   which the rhythm rule above already outranks (id+combinator beats a bare
-   class) — adding it here would out-rank *that* rule instead and collapse
-   the gap before this section to 0. */
+/* .manual-fallback keeps no override here: its only own rule is
+   margin-top, which the alt-group rhythm rule below already outranks
+   (id+2 classes beats a bare class) — adding it to this list would
+   out-rank *that* rule instead and collapse the gap above it to 0. */
 #picker-card .status:empty { margin: 0; min-height: 0; }
+
+/* Group headers ("From a folder" / "Load one round directly") that split
+   the six sections into the two ways of getting to a round. Pulled closer
+   to the section right after them than the standard 16px rhythm, and
+   given extra room from whatever came before — a label reads as
+   belonging to the group below it, not floating between two groups. */
+#picker-card > .section-group-label {
+  margin-top: 28px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+}
+/* The very first group label used to be :first-child before #picker-card
+   grew its own <summary> — that summary is the true first child now, so
+   target "right after the summary" instead of "first child" to keep this
+   label from inheriting the master toggle's spacing rhythm (10px) instead
+   of its own 28px meant for separating it from a *previous section*. */
+#picker-card > summary + .section-group-label { margin-top: 10px; }
+#picker-card > .section-group-label + details,
+#picker-card > .section-group-label + .alt-group { margin-top: 8px; }
+
+/* A set of sections that are direct alternatives — same outcome, different
+   path (Drive folder vs. Cache folder both build the same video/cache
+   index; Firebase vs. On-device round vs. Manual file pick all load one
+   round directly, just from a different place) — gets bundled into one
+   visible capsule instead of just a divider between otherwise-identical
+   top-level cards. That's the actual point: at a glance, "these belong
+   together as one choice" vs. "Video & lens is the next, unrelated step". */
+#picker-card > .alt-group {
+  background: var(--bg-elev);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+#picker-card > .alt-group > * + * { margin-top: 10px; }
+
+/* "or" divider between two alternatives inside a capsule. */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg-dim);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.or-divider::before,
+.or-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
 
 #picker-card details summary {
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
   padding: 4px 0;
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 6px;
   color: var(--fg);
+  transition: background-color .12s ease;
+}
+#picker-card details summary:hover { background: var(--bg-elev); }
+#picker-card details summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 #picker-card details summary .muted { font-weight: 400; }
+@media (prefers-reduced-motion: reduce) {
+  #picker-card details summary { transition: none; }
+}
 
 .section-desc {
   color: var(--fg-muted);
@@ -153,6 +252,7 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
 }
 .btn:hover { border-color: var(--border-strong); }
 .btn:disabled { opacity: 0.5; cursor: default; }
+.btn:active:not(:disabled) { transform: scale(0.97); }
 .btn-primary {
   background: var(--accent);
   color: var(--accent-ink);
@@ -160,6 +260,61 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
   font-weight: 600;
 }
 .btn-primary:hover { border-color: var(--accent); filter: brightness(1.08); }
+
+/* Smooth, understated motion on every interactive control — state changes
+   (hover, focus, disabled, a status turning green/red) read as a change
+   instead of a jump cut. Kept short (Apple HIG: transitions communicate,
+   they don't perform) and skipped for users who've asked for less motion. */
+.btn,
+input,
+select,
+input[type="file"]::file-selector-button {
+  transition: border-color .15s ease, background-color .15s ease,
+              color .15s ease, opacity .15s ease, transform .08s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn, input, select, input[type="file"]::file-selector-button,
+  .btn:active:not(:disabled) { transition: none; transform: none; }
+}
+.btn:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Live status text (drive/cache/firebase/on-device status lines, sign-in
+   state, …) carries a `data-state` set from JS alongside its existing
+   text, so the same line also reads as busy/success/error/warn at a
+   glance — a spinner while a fetch is in flight, green once something is
+   confirmed working, red on failure — instead of only ever sitting there
+   as flat muted text no matter what's actually happening. */
+[data-state] { transition: color .15s ease; }
+[data-state="busy"] { color: var(--accent); }
+[data-state="success"] { color: var(--good); }
+[data-state="warn"] { color: var(--warn); }
+[data-state="error"] { color: var(--bad); }
+[data-state="busy"]::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  animation: spin .7s linear infinite;
+  vertical-align: -1px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  [data-state="busy"]::before { animation: none; }
+}
+
+/* The literal "this field is okay" signal the cache-folder input gets
+   once it has found rounds in the picked folder. */
+.folder-pick.is-ready input[type="file"] { border-color: var(--good); }
+.folder-pick.is-error input[type="file"] { border-color: var(--bad); }
 
 /* Native file inputs only let us restyle the button part — leave the
    filename text ("No file chosen" etc.) as the browser renders it, but

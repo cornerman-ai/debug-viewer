@@ -25,38 +25,44 @@
     <button type="button" id="theme-toggle" class="theme-toggle" title="Toggle color theme"></button>
   </header>
 
-  <section id="picker-card" class="card">
-    <details id="drive-section">
-      <summary><span class="section-label">Drive folder</span> <span id="drive-status" class="muted small">— not connected</span></summary>
-      <p class="section-desc">
-        Give the app one-time, read-only access to your Drive folder and
-        it'll pick up your videos, caches, and punches automatically on
-        every visit — no more choosing files by hand. Point it at the
-        folder that holds your data, e.g. <code>My Drive/Cornerman/data/</code>;
-        we'll find <code>skeleton_data/blazepose/</code> and
-        <code>raw_videos/</code> inside it on our own. Chrome and Edge
-        only — on Safari or Firefox, use the manual picker at the bottom
-        instead.
-      </p>
-      <div class="section-actions">
-        <button type="button" id="drive-connect" class="btn btn-primary">Connect Drive folder</button>
-        <button type="button" id="drive-disconnect" class="btn" hidden>Disconnect</button>
-      </div>
-    </details>
+  <details id="picker-card" class="card" open>
+    <summary><span class="section-label">Data and lens selection</span> <span class="muted small">— pick a source, then what to view</span></summary>
+    <p class="section-group-label">From a folder</p>
+    <div class="alt-group">
+      <details id="drive-section">
+        <summary><span class="section-label">Drive folder</span> <span id="drive-status" class="muted small">— not connected</span></summary>
+        <p class="section-desc">
+          Give the app one-time, read-only access to your Drive folder and
+          it'll pick up your videos, caches, and punches automatically on
+          every visit — no more choosing files by hand. Point it at the
+          folder that holds your data, e.g. <code>My Drive/Cornerman/data/</code>;
+          we'll find <code>skeleton_data/blazepose/</code> and
+          <code>raw_videos/</code> inside it on our own. Chrome and Edge
+          only — on Safari or Firefox, use the manual picker at the bottom
+          instead.
+        </p>
+        <div class="section-actions">
+          <button type="button" id="drive-connect" class="btn btn-primary">Connect Drive folder</button>
+          <button type="button" id="drive-disconnect" class="btn" hidden>Disconnect</button>
+        </div>
+      </details>
 
-    <details id="cache-section">
-      <summary><span class="section-label">Cache folder</span> <span id="cache-status" class="muted small">— pick once per session</span></summary>
-      <p class="section-desc">
-        Don't want to grant Drive access? Point this at your cache folder
-        instead — pick <code>skeleton_data/blazepose/</code> (legacy
-        <code>archive/</code> caches work too). Pick again anytime to
-        merge in another folder.
-      </p>
-      <label class="folder-pick">
-        <input type="file" id="cache-folder" webkitdirectory directory multiple>
-        <button type="button" id="cache-clear" class="btn" hidden>Clear index</button>
-      </label>
-    </details>
+      <div class="or-divider" role="separator"><span>or</span></div>
+
+      <details id="cache-section">
+        <summary><span class="section-label">Cache folder</span> <span id="cache-status" class="muted small">— pick once per session</span></summary>
+        <p class="section-desc">
+          Don't want to grant Drive access? Point this at your cache folder
+          instead — pick <code>skeleton_data/blazepose/</code> (legacy
+          <code>archive/</code> caches work too). Pick again anytime to
+          merge in another folder.
+        </p>
+        <label class="folder-pick">
+          <input type="file" id="cache-folder" webkitdirectory directory multiple>
+          <button type="button" id="cache-clear" class="btn" hidden>Clear index</button>
+        </label>
+      </details>
+    </div>
 
     <details id="pick-section">
       <summary><span class="section-label">Video &amp; lens</span> <span class="muted small">— choose what to view</span></summary>
@@ -88,84 +94,91 @@
       </div>
     </details>
 
-    <details id="firebase-section">
-      <summary><span class="section-label">Firebase (on-device sessions)</span> <span id="fb-status" class="muted small">— enter a session id and round number</span></summary>
-      <p class="section-desc">
-        Load a round straight from Firebase Storage, the way the iOS app
-        recorded it — video, skeleton, and the on-device analysis sidecar
-        all included. Sign in below, then enter the session ID and round
-        number. Afterward, switch to the <em>On-device analysis (from
-        phone)</em> lens to see the sidecar's exact numbers.
-      </p>
-      <div class="section-actions">
-        <button type="button" id="fb-signin" class="btn">Sign in with Google</button>
-        <button type="button" id="fb-signout" class="btn" hidden>Sign out</button>
-        <span id="fb-user" class="muted small">— use the phone's account, or the debug admin</span>
-      </div>
-      <label class="folder-pick">
-        <span>Session id</span>
-        <input type="text" id="fb-session-id" placeholder="e.g. session_1779803489515" style="max-width:380px">
-      </label>
-      <label class="folder-pick">
-        <span>Round</span>
-        <input type="number" id="fb-round" min="0" value="0" style="width:80px">
-      </label>
-      <div class="section-actions">
-        <button type="button" id="fb-load" class="btn btn-primary">Load</button>
-        <button type="button" id="fb-list-recent" class="btn">Recent…</button>
-      </div>
-      <select id="fb-recent-sessions" hidden style="max-width:600px">
-        <option value="">— pick a recent session —</option>
-      </select>
-    </details>
-
-    <details id="ondevice-section">
-      <summary><span class="section-label">On-device round (local files)</span> <span id="od-status" class="muted small">— pick the video + skeleton (analysis optional)</span></summary>
-      <p class="section-desc">
-        Got a round pulled straight off the phone, or one whose upload
-        never finished? Same data as the Firebase loader, just read from
-        disk instead — no sign-in needed. Pick the round's video, its
-        skeleton file, and optionally the analysis sidecar below.
-      </p>
-      <label class="folder-pick">
-        <span>Video <code>.mp4</code></span>
-        <input type="file" id="od-video" accept="video/*">
-      </label>
-      <label class="folder-pick">
-        <span>Skeleton <code>_skeleton.json</code></span>
-        <input type="file" id="od-skeleton" accept=".json,application/json">
-      </label>
-      <label class="folder-pick">
-        <span>Analysis sidecar <span class="muted">(optional)</span></span>
-        <input type="file" id="od-analysis" accept=".json,application/json">
-      </label>
-      <div class="section-actions">
-        <label style="display:flex; gap:6px; align-items:center">
-          <span>Round</span>
-          <input type="number" id="od-round" min="0" value="1" style="width:80px">
+    <p class="section-group-label">Load one round directly</p>
+    <div class="alt-group">
+      <details id="firebase-section">
+        <summary><span class="section-label">Firebase (on-device sessions)</span> <span id="fb-status" class="muted small">— enter a session id and round number</span></summary>
+        <p class="section-desc">
+          Load a round straight from Firebase Storage, the way the iOS app
+          recorded it — video, skeleton, and the on-device analysis sidecar
+          all included. Sign in below, then enter the session ID and round
+          number. Afterward, switch to the <em>On-device analysis (from
+          phone)</em> lens to see the sidecar's exact numbers.
+        </p>
+        <div class="section-actions">
+          <button type="button" id="fb-signin" class="btn">Sign in with Google</button>
+          <button type="button" id="fb-signout" class="btn" hidden>Sign out</button>
+          <span id="fb-user" class="muted small">— use the phone's account, or the debug admin</span>
+        </div>
+        <label class="folder-pick">
+          <span>Session id</span>
+          <input type="text" id="fb-session-id" placeholder="e.g. session_1779803489515" style="max-width:380px">
         </label>
-        <button type="button" id="od-load" class="btn btn-primary">Load</button>
-      </div>
-    </details>
+        <label class="folder-pick">
+          <span>Round</span>
+          <input type="number" id="fb-round" min="0" value="0" style="width:80px">
+        </label>
+        <div class="section-actions">
+          <button type="button" id="fb-load" class="btn btn-primary">Load</button>
+          <button type="button" id="fb-list-recent" class="btn">Recent…</button>
+        </div>
+        <select id="fb-recent-sessions" hidden style="max-width:600px">
+          <option value="">— pick a recent session —</option>
+        </select>
+      </details>
 
-    <details class="manual-fallback">
-      <summary>Manual file pick (no folder)</summary>
-      <p class="section-desc">
-        No Drive folder, no cache folder — just pick the video and its
-        matching pose cache files yourself.
-      </p>
-      <label>
-        <span>Video <span class="muted">(re-pick to load another round)</span></span>
-        <input type="file" id="video-file" accept="video/*">
-      </label>
-      <label>
-        <span>Pose cache <code>.npy</code> + <code>_meta.json</code></span>
-        <input type="file" id="pose-file" accept=".npy,.json,application/json" multiple>
-      </label>
-    </details>
+      <div class="or-divider" role="separator"><span>or</span></div>
+
+      <details id="ondevice-section">
+        <summary><span class="section-label">On-device round (local files)</span> <span id="od-status" class="muted small">— pick the video + skeleton (analysis optional)</span></summary>
+        <p class="section-desc">
+          Got a round pulled straight off the phone, or one whose upload
+          never finished? Same data as the Firebase loader, just read from
+          disk instead — no sign-in needed. Pick the round's video, its
+          skeleton file, and optionally the analysis sidecar below.
+        </p>
+        <label class="folder-pick">
+          <span>Video <code>.mp4</code></span>
+          <input type="file" id="od-video" accept="video/*">
+        </label>
+        <label class="folder-pick">
+          <span>Skeleton <code>_skeleton.json</code></span>
+          <input type="file" id="od-skeleton" accept=".json,application/json">
+        </label>
+        <label class="folder-pick">
+          <span>Analysis sidecar <span class="muted">(optional)</span></span>
+          <input type="file" id="od-analysis" accept=".json,application/json">
+        </label>
+        <div class="section-actions">
+          <label style="display:flex; gap:6px; align-items:center">
+            <span>Round</span>
+            <input type="number" id="od-round" min="0" value="1" style="width:80px">
+          </label>
+          <button type="button" id="od-load" class="btn btn-primary">Load</button>
+        </div>
+      </details>
+
+      <div class="or-divider" role="separator"><span>or</span></div>
+
+      <details class="manual-fallback">
+        <summary>Manual file pick (no folder)</summary>
+        <p class="section-desc">
+          No Drive folder, no cache folder — just pick the video and its
+          matching pose cache files yourself.
+        </p>
+        <label>
+          <span>Video <span class="muted">(re-pick to load another round)</span></span>
+          <input type="file" id="video-file" accept="video/*">
+        </label>
+        <label>
+          <span>Pose cache <code>.npy</code> + <code>_meta.json</code></span>
+          <input type="file" id="pose-file" accept=".npy,.json,application/json" multiple>
+        </label>
+      </details>
+    </div>
 
     <p id="load-status" class="status"></p>
-  </section>
+  </details>
 
   <section id="viewer" hidden>
     <div class="layout">
