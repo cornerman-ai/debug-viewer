@@ -136,28 +136,50 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
   align-items: center;
   flex-wrap: wrap;
 }
-#drive-connect {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border: none;
+
+/* Shared button look for every picker-card action (and the handful of
+   rule-panel buttons, e.g. #sps-refresh, that opt in) — one primary
+   (filled accent) and one secondary (outlined) variant, instead of each
+   section growing its own bespoke or entirely unstyled <button>. */
+.btn {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 14px;
   font: inherit;
-  font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
-#drive-connect:hover { filter: brightness(1.08); }
-#drive-disconnect, #sps-refresh {
-  background: transparent;
+.btn:hover { border-color: var(--border-strong); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn-primary:hover { border-color: var(--accent); filter: brightness(1.08); }
+
+/* Native file inputs only let us restyle the button part — leave the
+   filename text ("No file chosen" etc.) as the browser renders it, but
+   make that button match .btn so it doesn't look like a foreign control
+   dropped into an otherwise-themed page. */
+input[type="file"] {
+  font: inherit;
   color: var(--fg-muted);
+}
+input[type="file"]::file-selector-button {
+  background: var(--bg-elev);
+  color: var(--fg);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 7px 12px;
   font: inherit;
   cursor: pointer;
+  margin-right: 10px;
 }
-#drive-disconnect:hover, #sps-refresh:hover { color: var(--fg); }
-#sps-refresh:disabled { opacity: 0.5; cursor: progress; }
+input[type="file"]::file-selector-button:hover { border-color: var(--border-strong); }
 
 .picker-row {
   display: grid;
@@ -168,13 +190,23 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
 .folder-pick {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
   font-size: 12px;
   color: var(--fg-muted);
 }
 .folder-pick { margin-bottom: 14px; }
-.picker-row input[type="file"],
+/* flex-direction:column defaults to align-items:stretch, which would
+   otherwise blow up any <button> inside a .folder-pick (e.g. "Clear
+   index") into a full-width bar. Everything else here (the file input,
+   the descriptive <span>) still wants the full width. */
 .folder-pick input[type="file"],
+.folder-pick > span,
+.picker-row label input,
+.picker-row label select { align-self: stretch; }
+.picker-row input,
+.folder-pick input,
+.section-actions input,
 .picker-row select {
   background: var(--bg-elev);
   color: var(--fg);

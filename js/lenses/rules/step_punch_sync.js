@@ -240,7 +240,7 @@ function template() {
       tightly synced they are.</p>
 
     <div id="sps-source-pill" class="hint" style="margin-bottom:8px"></div>
-    <button type="button" id="sps-refresh" class="muted small" style="margin-bottom:8px">Refresh from Sheet</button>
+    <button type="button" id="sps-refresh" class="btn" style="margin-bottom:8px">Refresh from Sheet</button>
 
     <h3>Stance</h3>
     <select id="sps-stance">

@@ -29,44 +29,44 @@
     <details id="drive-section">
       <summary><span class="section-label">Drive folder</span> <span id="drive-status" class="muted small">— not connected</span></summary>
       <p class="section-desc">
-        One-time grant, then videos + caches + punches load straight from
-        your Drive-for-Desktop synced folder on every reload — no more
-        per-session file picking. Permission is read-only and lives in
-        your browser only.
+        Give the app one-time, read-only access to your Drive folder and
+        it'll pick up your videos, caches, and punches automatically on
+        every visit — no more choosing files by hand. Point it at the
+        folder that holds your data, e.g. <code>My Drive/Cornerman/data/</code>;
+        we'll find <code>skeleton_data/blazepose/</code> and
+        <code>raw_videos/</code> inside it on our own. Chrome and Edge
+        only — on Safari or Firefox, use the manual picker at the bottom
+        instead.
       </p>
       <div class="section-actions">
-        <button type="button" id="drive-connect">Connect Drive folder</button>
-        <button type="button" id="drive-disconnect" class="muted small" hidden>Disconnect</button>
+        <button type="button" id="drive-connect" class="btn btn-primary">Connect Drive folder</button>
+        <button type="button" id="drive-disconnect" class="btn" hidden>Disconnect</button>
       </div>
-      <p class="hint">
-        Point at the folder that contains your videos + cache subfolders
-        (e.g. <code>My Drive/Cornerman/data/</code>). Sub-directories are
-        walked recursively, so <code>skeleton_data/blazepose/</code> and
-        <code>raw_videos/</code> both get picked up in one grant. Chrome
-        and Edge only — Safari/Firefox use the manual picker below.
-      </p>
     </details>
 
     <details id="cache-section">
       <summary><span class="section-label">Cache folder</span> <span id="cache-status" class="muted small">— pick once per session</span></summary>
-      <label class="folder-pick">
-        <span class="muted">Viewer auto-matches videos against this folder. Pick again to add another folder; the index merges.</span>
-        <input type="file" id="cache-folder" webkitdirectory directory multiple>
-        <button type="button" id="cache-clear" class="muted small" hidden>Clear index</button>
-      </label>
-      <p class="hint">
-        Use this when you don't want a persistent Drive-folder grant.
-        Pick <code>Cornerman/data/skeleton_data/blazepose/</code> (legacy
-        engine caches from <code>Cornerman/archive/</code> can be added
-        the same way); picking again merges into one index.
+      <p class="section-desc">
+        Don't want to grant Drive access? Point this at your cache folder
+        instead — pick <code>skeleton_data/blazepose/</code> (legacy
+        <code>archive/</code> caches work too). Pick again anytime to
+        merge in another folder.
       </p>
+      <label class="folder-pick">
+        <input type="file" id="cache-folder" webkitdirectory directory multiple>
+        <button type="button" id="cache-clear" class="btn" hidden>Clear index</button>
+      </label>
     </details>
 
     <details id="pick-section">
       <summary><span class="section-label">Video &amp; lens</span> <span class="muted small">— choose what to view</span></summary>
+      <p class="section-desc">
+        Pick a lens first — it narrows the video list down to footage it
+        can actually render.
+      </p>
       <div class="lens-row">
         <label>
-          <span>Lens <span class="muted">(pick first to see only the videos it can render)</span></span>
+          <span>Lens</span>
           <select id="lens-pick"></select>
         </label>
         <p id="lens-pick-status" class="muted small"></p>
@@ -74,13 +74,13 @@
 
       <div class="picker-row">
         <label>
-          <span>Video <span class="muted">(from Drive folder)</span></span>
+          <span>Video <span class="muted">(from your Drive folder)</span></span>
           <select id="video-pick" disabled>
             <option value="">— connect a Drive folder to populate —</option>
           </select>
         </label>
         <label>
-          <span>Round <span class="muted">(only if multiple match)</span></span>
+          <span>Round <span class="muted">(shown only if more than one matches)</span></span>
           <select id="round-select" disabled>
             <option value="">—</option>
           </select>
@@ -91,15 +91,16 @@
     <details id="firebase-section">
       <summary><span class="section-label">Firebase (on-device sessions)</span> <span id="fb-status" class="muted small">— enter a session id and round number</span></summary>
       <p class="section-desc">
-        Loads a session the iOS app recorded — fetches video, skeleton,
-        and the on-device analysis sidecar straight from Storage. Use
-        the <em>On-device analysis (from phone)</em> lens to render the
-        sidecar's exact per-frame numbers.
+        Load a round straight from Firebase Storage, the way the iOS app
+        recorded it — video, skeleton, and the on-device analysis sidecar
+        all included. Sign in below, then enter the session ID and round
+        number. Afterward, switch to the <em>On-device analysis (from
+        phone)</em> lens to see the sidecar's exact numbers.
       </p>
       <div class="section-actions">
-        <button type="button" id="fb-signin">Sign in with Google</button>
-        <button type="button" id="fb-signout" class="muted small" hidden>Sign out</button>
-        <span id="fb-user" class="muted small">— sign in with the account used on the phone (or the debug admin)</span>
+        <button type="button" id="fb-signin" class="btn">Sign in with Google</button>
+        <button type="button" id="fb-signout" class="btn" hidden>Sign out</button>
+        <span id="fb-user" class="muted small">— use the phone's account, or the debug admin</span>
       </div>
       <label class="folder-pick">
         <span>Session id</span>
@@ -110,8 +111,8 @@
         <input type="number" id="fb-round" min="0" value="0" style="width:80px">
       </label>
       <div class="section-actions">
-        <button type="button" id="fb-load">Load</button>
-        <button type="button" id="fb-list-recent" class="muted small">Recent…</button>
+        <button type="button" id="fb-load" class="btn btn-primary">Load</button>
+        <button type="button" id="fb-list-recent" class="btn">Recent…</button>
       </div>
       <select id="fb-recent-sessions" hidden style="max-width:600px">
         <option value="">— pick a recent session —</option>
@@ -121,11 +122,10 @@
     <details id="ondevice-section">
       <summary><span class="section-label">On-device round (local files)</span> <span id="od-status" class="muted small">— pick the video + skeleton (analysis optional)</span></summary>
       <p class="section-desc">
-        For a round pulled off the phone (or whose cloud upload didn't
-        finish). Same data as the Firebase loader but read straight from
-        disk — no Storage auth needed. Pick the <code>round_N.mp4</code>,
-        its <code>_skeleton.json</code>, and optionally the
-        <code>_ondevice_analysis.json</code> sidecar.
+        Got a round pulled straight off the phone, or one whose upload
+        never finished? Same data as the Firebase loader, just read from
+        disk instead — no sign-in needed. Pick the round's video, its
+        skeleton file, and optionally the analysis sidecar below.
       </p>
       <label class="folder-pick">
         <span>Video <code>.mp4</code></span>
@@ -144,12 +144,16 @@
           <span>Round</span>
           <input type="number" id="od-round" min="0" value="1" style="width:80px">
         </label>
-        <button type="button" id="od-load">Load</button>
+        <button type="button" id="od-load" class="btn btn-primary">Load</button>
       </div>
     </details>
 
     <details class="manual-fallback">
       <summary>Manual file pick (no folder)</summary>
+      <p class="section-desc">
+        No Drive folder, no cache folder — just pick the video and its
+        matching pose cache files yourself.
+      </p>
       <label>
         <span>Video <span class="muted">(re-pick to load another round)</span></span>
         <input type="file" id="video-file" accept="video/*">

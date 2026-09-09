@@ -195,7 +195,7 @@ firebaseSource.onAuthChange((user) => {
     if (els.fbSignin) els.fbSignin.hidden = true;
     if (els.fbSignout) els.fbSignout.hidden = false;
   } else {
-    els.fbUser.textContent = "— sign in with the account used on the phone (or the debug admin)";
+    els.fbUser.textContent = "— use the phone's account, or the debug admin";
     if (els.fbSignin) els.fbSignin.hidden = false;
     if (els.fbSignout) els.fbSignout.hidden = true;
   }
