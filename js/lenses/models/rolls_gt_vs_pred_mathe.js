@@ -23,6 +23,10 @@
 // way the impact spotter lens does, and the timeline runs in viewer frames like the
 // punch lens.
 //
+// The video and round dropdowns show ONLY footage that has held-out predictions
+// (`requiresVideo` / `requires`, answered from index.json; the viewer re-filters when the
+// index lands via the lens-filter-changed event, and shows everything if it failed to load).
+//
 // Decode is re-run HERE from the probabilities, with the fold's LOFO decode as the
 // sliders' default — the same runs-above-threshold / gap-fill / min-event rule as the
 // evaluator (roll_model_mathe.decode_events) and the same one-to-one matching
@@ -150,13 +154,31 @@ function matchEvents(gt, pred, mode) {
 // Every fetch carries a version so a CDN (GitHub Pages caches for minutes) can never
 // hand back an old index.json next to new round files, or the reverse; the round files
 // are named by a hash of the round id, so a stale pair can only ever be the SAME round.
-async function ensureIndex() {
-  if (index || indexError) return;
-  try {
-    const res = await fetch(`${DATA_DIR}index.json?v=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    index = await res.json();
-  } catch (e) { indexError = String(e); }
+let indexLoading = null;
+function ensureIndex() {
+  if (index || indexError) return Promise.resolve();
+  if (!indexLoading) {
+    indexLoading = (async () => {
+      try {
+        const res = await fetch(`${DATA_DIR}index.json?v=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        index = await res.json();
+      } catch (e) { indexError = String(e); }
+      // the dropdowns asked requiresVideo() before the index was in — re-filter them now
+      window.dispatchEvent(new Event("lens-filter-changed"));
+    })();
+  }
+  return indexLoading;
+}
+
+// index.videos entry for a cache basename: exact stem first, then substring either way
+// (a cache stem may carry _h264 or differ by a suffix from the export's stem).
+function videoEntry(base) {
+  if (!index || !base) return null;
+  const want = stripStem(base);
+  if (index.videos[want]) return { stem: want, rounds: index.videos[want] };
+  const hit = Object.keys(index.videos).find(k => want.includes(k) || k.includes(want));
+  return hit ? { stem: hit, rounds: index.videos[hit] } : null;
 }
 
 async function loadDoc(file, key, expect = null) {
@@ -181,16 +203,10 @@ async function loadDoc(file, key, expect = null) {
 }
 
 function entryFor(state) {
-  if (!index || !state || !state.cacheBasename || state.cacheRound == null) return null;
-  const want = stripStem(state.cacheBasename);
-  let vid = index.videos[want];
-  let stem = want;
-  if (!vid) {                                   // fuzzy, like the punch lens
-    const hit = Object.keys(index.videos).find(k => want.includes(k) || k.includes(want));
-    if (hit) { vid = index.videos[hit]; stem = hit; }
-  }
-  const e = vid && vid[String(state.cacheRound)];
-  return e ? { ...e, stem, ri: state.cacheRound } : null;
+  if (!state || state.cacheRound == null) return null;
+  const v = videoEntry(state.cacheBasename);
+  const e = v && v.rounds[String(state.cacheRound)];
+  return e ? { ...e, stem: v.stem, ri: state.cacheRound } : null;
 }
 
 function refreshScope(state) {
@@ -257,6 +273,20 @@ function probAtFrame(state, f) {
 export const RollsGtVsPredMatheRule = {
   id: "rolls_gt_vs_pred_mathe",
   label: "Rolls GT vs Pred (Mathe)",
+
+  // Only videos / rounds with held-out predictions are offered. Before the index is in:
+  // nothing (the load re-filters the dropdowns); if it failed to load: everything.
+  requiresVideo(base) {
+    if (indexError) return true;
+    if (!index) { ensureIndex(); return false; }
+    return !!videoEntry(base);
+  },
+  requires(slot, { base, round } = {}) {
+    if (indexError) return true;
+    if (!index) { ensureIndex(); return false; }
+    const v = videoEntry(base);
+    return !!(v && v.rounds[String(round)]);
+  },
 
   mount(_host, state) {
     host = _host;
