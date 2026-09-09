@@ -195,8 +195,13 @@ function renderShell() {
        video/round picker only invites the question of why choosing one changes
        nothing. The LENS select stays — it is the only way back out, since
        #side (which holds the other one) is hidden. Everything below the picker
-       is a different way to load a round, equally irrelevant here. */
-    .picker-row, #firebase-section, #ondevice-section, .manual-fallback,
+       is a different way to load a round, equally irrelevant here. Lens now
+       lives inside the Video & lens <details> alongside the video/round row,
+       so pull it out of that wrapper (forcing it visible even collapsed)
+       instead of hiding the wrapper wholesale. */
+    #pick-section > *:not(.lens-row) { display:none !important; }
+    #pick-section > .lens-row { display:block !important; margin:0 !important; }
+    #firebase-section, #ondevice-section, .manual-fallback,
     #drive-section, #cache-section
       { display:none !important; }
     /* Collapse the page header and the setup card's padding too, so the frame

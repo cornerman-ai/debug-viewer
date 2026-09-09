@@ -31,33 +31,49 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
 
 .card {
   margin: 20px 28px;
-  padding: 20px 22px;
+  padding: 18px 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
 }
 .card h2 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
 .card.loaded { padding: 14px 18px; }
-.card.loaded #cache-section { margin-bottom: 8px; }
 
-#cache-section, #drive-section { margin-bottom: 14px; }
-#cache-section summary, #drive-section summary {
+/* Uniform vertical rhythm: one gap size between the picker card's top-level
+   sections, a smaller one between a section's summary/body elements. Scoped
+   with the #picker-card id so it wins over the plain-class rules below
+   (which stay unscoped because .folder-pick/.hint/.manual-fallback are
+   reused by lens rule-panels outside this card). */
+#picker-card > * + * { margin-top: 16px; }
+#picker-card details > * + * { margin-top: 10px; }
+#picker-card .folder-pick,
+#picker-card .hint,
+#picker-card .lens-row { margin: 0; }
+/* .manual-fallback keeps no override: its only own rule is margin-top,
+   which the rhythm rule above already outranks (id+combinator beats a bare
+   class) — adding it here would out-rank *that* rule instead and collapse
+   the gap before this section to 0. */
+#picker-card .status:empty { margin: 0; min-height: 0; }
+
+#picker-card details summary {
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
   padding: 4px 0;
+  color: var(--fg);
 }
-#cache-section summary .section-label,
-#drive-section summary .section-label { color: var(--fg); }
-#cache-section .folder-pick,
-#drive-section .folder-pick { margin: 10px 0 0; }
-#cache-status, #drive-status { font-weight: 400; }
+#picker-card details summary .muted { font-weight: 400; }
 
-.drive-row {
+.section-desc {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.section-actions {
   display: flex;
   gap: 10px;
   align-items: center;
-  margin: 4px 0 0;
+  flex-wrap: wrap;
 }
 #drive-connect {
   background: var(--accent);

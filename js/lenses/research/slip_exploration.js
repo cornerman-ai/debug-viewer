@@ -1185,8 +1185,12 @@ export const SlipExplorationRule = {
       /* Nothing about choosing footage: the picker card keeps only the lens
          row (and the Drive connect section while the folder is not connected),
          the stage loses its video / round mirrors and the meta line, the side
-         panel goes. */
-      #picker-card > *:not(.lens-row):not(#drive-section) { display:none !important; }
+         panel goes. Lens lives inside the Video & lens <details> now, so pull
+         it out of that wrapper (forcing it visible even collapsed) instead of
+         keeping the wrapper itself. */
+      #picker-card > *:not(#pick-section):not(#drive-section) { display:none !important; }
+      #pick-section > *:not(.lens-row) { display:none !important; }
+      #pick-section > .lens-row { display:block !important; margin:0 !important; }
       #picker-card.fa-drive-ok > #drive-section { display:none !important; }
       #picker-card { padding-bottom:6px !important; }
       .stage-pick, #meta, .controls, #frame-label { display:none !important; }

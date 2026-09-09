@@ -203,8 +203,12 @@ function renderShell() {
     #side { display:none !important; }
     /* Renders 700 fixed comparisons and never reads a round, so every way of
        loading one is noise. The LENS select stays — with #side hidden it is the
-       only way back out. */
-    .picker-row, #firebase-section, #ondevice-section, .manual-fallback,
+       only way back out. It now lives inside the Video & lens <details>
+       alongside the video/round row, so pull it out of that wrapper (forcing
+       it visible even collapsed) instead of hiding the wrapper wholesale. */
+    #pick-section > *:not(.lens-row) { display:none !important; }
+    #pick-section > .lens-row { display:block !important; margin:0 !important; }
+    #firebase-section, #ondevice-section, .manual-fallback,
     #drive-section, #cache-section { display:none !important; }
     body > header { display:none !important; }
     #picker-card { margin:0 !important; padding:6px 10px !important; }

@@ -15,17 +15,15 @@
   <section id="picker-card" class="card">
     <details id="drive-section" open>
       <summary><span class="section-label">Drive folder</span> <span id="drive-status" class="muted small">— not connected</span></summary>
-      <div class="folder-pick">
-        <p class="muted small" style="margin:0 0 6px">
-          One-time grant, then videos + caches + punches load straight from
-          your Drive-for-Desktop synced folder on every reload — no more
-          per-session file picking. Permission is read-only and lives in
-          your browser only.
-        </p>
-        <div class="drive-row">
-          <button type="button" id="drive-connect">Connect Drive folder</button>
-          <button type="button" id="drive-disconnect" class="muted small" hidden>Disconnect</button>
-        </div>
+      <p class="section-desc">
+        One-time grant, then videos + caches + punches load straight from
+        your Drive-for-Desktop synced folder on every reload — no more
+        per-session file picking. Permission is read-only and lives in
+        your browser only.
+      </p>
+      <div class="section-actions">
+        <button type="button" id="drive-connect">Connect Drive folder</button>
+        <button type="button" id="drive-disconnect" class="muted small" hidden>Disconnect</button>
       </div>
       <p class="hint">
         Point at the folder that contains your videos + cache subfolders
@@ -51,38 +49,41 @@
       </p>
     </details>
 
-    <div class="lens-row">
-      <label>
-        <span>Lens <span class="muted">(pick first to see only the videos it can render)</span></span>
-        <select id="lens-pick"></select>
-      </label>
-      <p id="lens-pick-status" class="muted small"></p>
-    </div>
+    <details id="pick-section" open>
+      <summary><span class="section-label">Video &amp; lens</span> <span class="muted small">— choose what to view</span></summary>
+      <div class="lens-row">
+        <label>
+          <span>Lens <span class="muted">(pick first to see only the videos it can render)</span></span>
+          <select id="lens-pick"></select>
+        </label>
+        <p id="lens-pick-status" class="muted small"></p>
+      </div>
 
-    <div class="picker-row">
-      <label>
-        <span>Video <span class="muted">(from Drive folder)</span></span>
-        <select id="video-pick" disabled>
-          <option value="">— connect a Drive folder to populate —</option>
-        </select>
-      </label>
-      <label>
-        <span>Round <span class="muted">(only if multiple match)</span></span>
-        <select id="round-select" disabled>
-          <option value="">—</option>
-        </select>
-      </label>
-    </div>
+      <div class="picker-row">
+        <label>
+          <span>Video <span class="muted">(from Drive folder)</span></span>
+          <select id="video-pick" disabled>
+            <option value="">— connect a Drive folder to populate —</option>
+          </select>
+        </label>
+        <label>
+          <span>Round <span class="muted">(only if multiple match)</span></span>
+          <select id="round-select" disabled>
+            <option value="">—</option>
+          </select>
+        </label>
+      </div>
+    </details>
 
     <details id="firebase-section">
       <summary><span class="section-label">Firebase (on-device sessions)</span> <span id="fb-status" class="muted small">— enter a session id and round number</span></summary>
-      <p class="muted small" style="margin:0 0 8px">
+      <p class="section-desc">
         Loads a session the iOS app recorded — fetches video, skeleton,
         and the on-device analysis sidecar straight from Storage. Use
         the <em>On-device analysis (from phone)</em> lens to render the
         sidecar's exact per-frame numbers.
       </p>
-      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px">
+      <div class="section-actions">
         <button type="button" id="fb-signin">Sign in with Google</button>
         <button type="button" id="fb-signout" class="muted small" hidden>Sign out</button>
         <span id="fb-user" class="muted small">— sign in with the account used on the phone (or the debug admin)</span>
@@ -95,18 +96,18 @@
         <span>Round</span>
         <input type="number" id="fb-round" min="0" value="0" style="width:80px">
       </label>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px">
+      <div class="section-actions">
         <button type="button" id="fb-load">Load</button>
         <button type="button" id="fb-list-recent" class="muted small">Recent…</button>
       </div>
-      <select id="fb-recent-sessions" hidden style="margin-top:8px; max-width:600px">
+      <select id="fb-recent-sessions" hidden style="max-width:600px">
         <option value="">— pick a recent session —</option>
       </select>
     </details>
 
     <details id="ondevice-section">
       <summary><span class="section-label">On-device round (local files)</span> <span id="od-status" class="muted small">— pick the video + skeleton (analysis optional)</span></summary>
-      <p class="muted small" style="margin:0 0 8px">
+      <p class="section-desc">
         For a round pulled off the phone (or whose cloud upload didn't
         finish). Same data as the Firebase loader but read straight from
         disk — no Storage auth needed. Pick the <code>round_N.mp4</code>,
@@ -125,7 +126,7 @@
         <span>Analysis sidecar <span class="muted">(optional)</span></span>
         <input type="file" id="od-analysis" accept=".json,application/json">
       </label>
-      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px">
+      <div class="section-actions">
         <label style="display:flex; gap:6px; align-items:center">
           <span>Round</span>
           <input type="number" id="od-round" min="0" value="1" style="width:80px">
