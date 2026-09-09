@@ -369,9 +369,11 @@ function template() {
 
     <h3>Timeline</h3>
     <p class="hint">Below the video: GT rolls (green = found · yellow-green = center-hit only ·
-      red striped = missed), predicted rolls (orange = true · hatched = false alarm ·
-      yellow = center-hit only), and the p(roll) graph with the threshold line. Click to
-      seek · wheel to zoom · drag to pan · double-click to fit.</p>
+      red striped = missed), a thin row of John's OTHER defense labels (blue: duck, slip,
+      step back, pull back — not rolls, shown so a false alarm can be read against them),
+      predicted rolls (orange = true · hatched = false alarm · yellow = center-hit only),
+      and the p(roll) graph with the threshold line. Click to seek · wheel to zoom · drag
+      to pan · double-click to fit.</p>
   `;
 }
 
@@ -508,9 +510,11 @@ function renderFrameLine(state) {
   if (!el || !signals) return;
   const f = state.frame;
   const p = probAtFrame(state, f);
-  const g = findEvent(signals.gt, f), pr = findEvent(signals.pred, f);
+  const g = findEvent(signals.gt, f), pr = findEvent(signals.pred, f), o = findEvent(signals.other, f);
   el.innerHTML = `f${f} · t ${fmtTime(frameToSec(state, f), true)} · p(roll) <b>${fmt(p, 2)}</b> · ` +
-    `GT ${g ? `<span style="color:${gtColor(g)}">${g.label} (${g.status})</span>` : "<span class=\"muted\">idle</span>"} · ` +
+    `GT ${g ? `<span style="color:${gtColor(g)}">${g.label} (${g.status})</span>`
+            : o ? `<span style="color:#7ec8ff">${o.label}</span> <span class="muted">(not a roll)</span>`
+            : "<span class=\"muted\">idle</span>"} · ` +
     `pred ${pr ? `<span style="color:${predColor(pr, g)}">${pr.status} · ${fmt(pr.score, 2)}</span>` : "<span class=\"muted\">idle</span>"}`;
 }
 
@@ -545,8 +549,8 @@ function mountStageTimeline() {
   wrap.appendChild(header);
   const canvas = document.createElement("canvas");
   canvas.id = "rg-timeline";
-  canvas.style.cssText = "display:block;width:100%;height:150px";
-  canvas.width = 800; canvas.height = 150;
+  canvas.style.cssText = "display:block;width:100%;height:166px";
+  canvas.width = 800; canvas.height = 166;
   wrap.appendChild(canvas);
   slot.appendChild(wrap);
 
@@ -655,14 +659,15 @@ function drawTimeline(canvas, frame) {
   updateZoomLabel();
   const { v0, v1 } = viewRange();
   const trackW = W - LABEL_W - PAD_R;
-  const gap = 4, trackTop = 4, axisH = 16, barH = 20;
-  const graphH = Math.max(30, H - trackTop - axisH - 2 * (barH + gap));
+  const gap = 4, trackTop = 4, axisH = 16, barH = 18, otherH = 12;
+  const graphH = Math.max(30, H - trackTop - axisH - 2 * (barH + gap) - (otherH + gap));
   const rows = [
     { y: trackTop, h: barH, label: "GT rolls" },
-    { y: trackTop + barH + gap, h: barH, label: "Pred" },
-    { y: trackTop + 2 * (barH + gap), h: graphH, label: "p(roll)" },
+    { y: trackTop + barH + gap, h: otherH, label: "other" },            // John's ducks / slips / …
+    { y: trackTop + barH + gap + otherH + gap, h: barH, label: "Pred" },
+    { y: trackTop + 2 * (barH + gap) + otherH + gap, h: graphH, label: "p(roll)" },
   ];
-  const rowsBottom = rows[2].y + rows[2].h;
+  const rowsBottom = rows[3].y + rows[3].h;
   ctx.font = "10px ui-monospace, monospace";
   for (const r of rows) {
     ctx.fillStyle = COLORS.rowBg; ctx.fillRect(LABEL_W, r.y, trackW, r.h);
@@ -674,14 +679,8 @@ function drawTimeline(canvas, frame) {
     const x2 = Math.min(Math.max(x1 + 2, frameToX(ev.vf1 + 1, W)), W - PAD_R + 2);
     return [x1, x2];
   };
-  // GT track: other defense labels faint, then the rolls
+  // GT track: the labeled rolls only
   clip(rows[0], () => {
-    if (showOther) for (const o of signals.other) {
-      if (o.vf1 < v0 - 1 || o.vf0 > v1 + 1) continue;
-      const [x1, x2] = barX(o);
-      ctx.fillStyle = COLORS.other; ctx.fillRect(x1, rows[0].y + 1, x2 - x1, rows[0].h - 2);
-      if (x2 - x1 > 34) { ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.font = "9px ui-monospace, monospace"; ctx.fillText(o.label, x1 + 4, rows[0].y + rows[0].h / 2 + 3.5); }
-    }
     for (const g of signals.gt) {
       if (g.vf1 < v0 - 1 || g.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(g);
@@ -689,24 +688,37 @@ function drawTimeline(canvas, frame) {
                    g.label.replace(/_roll$/, ""));
     }
   });
-  // Pred track (+ the geometric baseline, dashed)
+  // other defense labels (duck / slip / step_back / pull_back): their own thin row, named
   clip(rows[1], () => {
+    if (!showOther) return;
+    for (const o of signals.other) {
+      if (o.vf1 < v0 - 1 || o.vf0 > v1 + 1) continue;
+      const [x1, x2] = barX(o);
+      ctx.fillStyle = COLORS.other; ctx.fillRect(x1, rows[1].y + 1, x2 - x1, rows[1].h - 2);
+      if (x2 - x1 > 30) {
+        ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "8px ui-monospace, monospace";
+        ctx.fillText(o.label.replace(/^(lead_|rear_)/, "$1").replace("_", " "), x1 + 3, rows[1].y + rows[1].h / 2 + 3);
+      }
+    }
+  });
+  // Pred track (+ the geometric baseline, dashed)
+  clip(rows[2], () => {
     for (const p of signals.pred) {
       if (p.vf1 < v0 - 1 || p.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(p);
-      drawEventBar(ctx, x1, rows[1].y, x2 - x1, rows[1].h, predColor(p, null), p.status === "fa", COLORS.predFAStripe,
+      drawEventBar(ctx, x1, rows[2].y, x2 - x1, rows[2].h, predColor(p, null), p.status === "fa", COLORS.predFAStripe,
                    p.status === "fa" ? `false+ ${p.score.toFixed(2)}` : p.score.toFixed(2));
     }
     if (showBase) for (const b of signals.base) {
       if (b.vf1 < v0 - 1 || b.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(b);
       ctx.save(); ctx.setLineDash([3, 2]); ctx.strokeStyle = COLORS.baseline; ctx.lineWidth = 1.5;
-      ctx.strokeRect(x1 + 0.5, rows[1].y + 2.5, Math.max(1, x2 - x1 - 1), rows[1].h - 5); ctx.restore();
+      ctx.strokeRect(x1 + 0.5, rows[2].y + 2.5, Math.max(1, x2 - x1 - 1), rows[2].h - 5); ctx.restore();
     }
   });
   // p(roll) graph: area + line, threshold, y ticks
-  clip(rows[2], () => {
-    const gy = (v) => rows[2].y + rows[2].h - 2 - v * (rows[2].h - 6);
+  clip(rows[3], () => {
+    const gy = (v) => rows[3].y + rows[3].h - 2 - v * (rows[3].h - 6);
     ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
     for (const v of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.moveTo(LABEL_W, gy(v)); ctx.lineTo(W - PAD_R, gy(v)); ctx.stroke(); }
     const fps = latestState.fps || 30;
@@ -790,7 +802,7 @@ function predColor(p, g) {
 // ── on-video HUD (the punch lens's box, one hand → one roll) ────────────────
 function drawCanvasHud(ctx, state) {
   const f = state.frame, s = state.renderScale || 1;
-  const g = findEvent(signals.gt, f), p = findEvent(signals.pred, f);
+  const g = findEvent(signals.gt, f), p = findEvent(signals.pred, f), o = findEvent(signals.other, f);
   const prob = probAtFrame(state, f);
   const fontPx = Math.round(13 * s);
   ctx.save();
@@ -801,7 +813,8 @@ function drawCanvasHud(ctx, state) {
     : `roll ${p.score.toFixed(2)} (false+)`;
   const lines = [
     { text: `Roll  p=${fmt(prob, 2)}  thr ${cfg.threshold.toFixed(2)}`, color: prob >= cfg.threshold ? COLORS.pred : "#dddddd" },
-    { text: `GT:   ${g ? `${g.label}${g.status === "miss" ? " (missed)" : ""}` : "idle"}`, color: g ? gtColor(g) : "#888888" },
+    { text: `GT:   ${g ? `${g.label}${g.status === "miss" ? " (missed)" : ""}` : o ? `${o.label} (not a roll)` : "idle"}`,
+      color: g ? gtColor(g) : o ? "#7ec8ff" : "#888888" },
     { text: `Pred: ${predText}`, color: predColor(p, g) },
   ];
   const pad = 5 * s, lineH = fontPx + 4 * s;
