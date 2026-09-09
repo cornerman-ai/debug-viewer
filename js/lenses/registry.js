@@ -48,6 +48,7 @@ import { ImpactSpotterLensRule } from "./models/impact_spotter.js";
 import { PunchPredictionsRule } from "./models/punch_predictions.js";
 import { RollDuckLensRule } from "./research/roll_duck.js";
 import { RollsGtVsPredMatheRule } from "./models/rolls_gt_vs_pred_mathe.js";
+import { RollsGtVsPredAlexRule } from "./models/rolls_gt_vs_pred_alex.js";
 import { RollsGtRule } from "./research/rolls_gt.js";
 
 // Overview stays first as the default; the rest are alphabetical by label.
@@ -81,6 +82,7 @@ export const RULES = [
   PunchClassifierRule,
   PunchPredictionsRule,
   RollDuckLensRule,
+  RollsGtVsPredAlexRule,
   RollsGtVsPredMatheRule,
   RollsGtRule,
   ShoulderGateRule,
