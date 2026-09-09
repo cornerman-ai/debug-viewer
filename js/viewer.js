@@ -657,7 +657,6 @@ function onCacheClear() {
 }
 
 function refreshCacheStatus() {
-  const pickBox = els.cacheFolder?.closest(".folder-pick");
   const nVideos = cacheIndex?.size || 0;
   let nRounds = 0, nYolo = 0, nVision = 0, nVision3D = 0, nCombined = 0, nV6 = 0;
   for (const rounds of cacheIndex?.values() || []) {
@@ -680,8 +679,6 @@ function refreshCacheStatus() {
     els.cacheStatus.textContent =
       `— ${nRounds} rounds across ${nVideos} videos (${parts.join(" + ")})`;
     els.cacheStatus.dataset.state = "success";
-    pickBox?.classList.add("is-ready");
-    pickBox?.classList.remove("is-error");
     if (els.cacheSection) els.cacheSection.open = false;
     els.cacheClear.hidden = false;
   } else {
@@ -689,8 +686,6 @@ function refreshCacheStatus() {
       ? "— no `_<engine>_r{N}.npy + _meta.json` pairs found in that folder"
       : "— pick once per session";
     els.cacheStatus.dataset.state = cacheIndex ? "error" : "";
-    pickBox?.classList.remove("is-ready");
-    pickBox?.classList.toggle("is-error", !!cacheIndex);
     els.cacheClear.hidden = true;
   }
 }

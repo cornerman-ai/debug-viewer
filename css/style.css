@@ -175,8 +175,12 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
    visible capsule instead of just a divider between otherwise-identical
    top-level cards. That's the actual point: at a glance, "these belong
    together as one choice" vs. "Video & lens is the next, unrelated step". */
+/* No fill: --bg-elev is also what inputs/buttons use for their own
+   surface, and filling the capsule with it flattened every field and
+   button inside into the same gray as its background — nothing read as
+   an actual control anymore. A border-only capsule still groups the
+   alternatives at a glance without fighting its contents for contrast. */
 #picker-card > .alt-group {
-  background: var(--bg-elev);
   border: 1px solid var(--border-soft);
   border-radius: 10px;
   padding: 10px 12px;
@@ -310,11 +314,6 @@ select:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   [data-state="busy"]::before { animation: none; }
 }
-
-/* The literal "this field is okay" signal the cache-folder input gets
-   once it has found rounds in the picked folder. */
-.folder-pick.is-ready input[type="file"] { border-color: var(--good); }
-.folder-pick.is-error input[type="file"] { border-color: var(--bad); }
 
 /* Native file inputs only let us restyle the button part — leave the
    filename text ("No file chosen" etc.) as the browser renders it, but
