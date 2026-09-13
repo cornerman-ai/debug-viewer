@@ -64,15 +64,17 @@
 // footage that removes 1 event in 102). The rule fires on a run of ≥ 3 frames past
 // the threshold (gaps ≤ 2
 // frames bridged) that BEGINS as a movement away from the line while no punch
-// is being thrown. The gate closes the FIRST HALF of each of the Sheet's punch
-// labels — start to midpoint, the midpoint standing in for the impact
-// (2026-09-07): a slip that closes a combo is thrown while the last punch
-// retracts, so the retraction half stays open. A head that went off the line
-// inside the closed half is the punch's: it does not count while it stays
-// there, while it returns with the arm, or after the label ends — only a
-// further movement away (REARM, 0.08 torso) starts a slip (the onset rule in
-// ruleEvents; Mathe's three cases of the same evening). A select under the
-// traces closes the whole label instead, for comparison (±0.25 s widening
+// is being thrown. The gate closes each of the Sheet's punch labels WHOLE
+// (2026-09-13): with only the first half closed, a lean that crossed the
+// threshold after the midpoint read as a slip on its way back to the line —
+// 21 of the dev rule's 60 false alarms on the frontal set, at no cost in
+// recall, since the labels hold no slip thrown during a retraction. The select
+// under the trace still offers the first-half gate (start to midpoint, the
+// midpoint standing in for the impact) for the 1-2-slip. A head that went off
+// the line inside the closed gate is the punch's: it does not count while it
+// stays there, while it returns with the arm, or after the label ends — only
+// a further movement away (REARM, 0.08 torso) starts a slip (the onset rule in
+// ruleEvents). (±0.25 s widening under the old rule
 // swallowed most of the labeled slips and is gone). The Sheet's
 // labels are the gate for now because the measured skeleton cue (2D arm
 // extension) does not see punches thrown at the camera, and a depth-aware one
@@ -194,14 +196,17 @@ function ensureClip(c) {
 
 const UI_KEY = "cornerman.slip_exploration.v1";
 const UI_DEFAULT_THR = { dev: 0.20 };
-const THR_VERSION = 2;                // bump when a default threshold changes: saved sliders from before are dropped
+const UI_DEFAULT_GATE_EXT = "full";   // the whole punch label closed (2026-09-13; "half" leaves the retraction open for the 1-2-slip)
+const DEFAULTS_VERSION = 3;           // bump when a default threshold or gate changes: the saved slider / gate from before is dropped
 const ui = { sort: "video", outsideOnly: false, speed: 1, lastId: null, muted: false,
-             thr: { ...UI_DEFAULT_THR }, gate: true, gateExt: "half", legendOpen: true };   // speed: the skeleton fallback's clock
+             thr: { ...UI_DEFAULT_THR }, gate: true, gateExt: UI_DEFAULT_GATE_EXT, legendOpen: true };   // speed: the skeleton fallback's clock
 try {
   const saved = JSON.parse(localStorage.getItem(UI_KEY) || "{}");
   Object.assign(ui, saved);
-  ui.thr = saved.thrVersion === THR_VERSION ? { ...UI_DEFAULT_THR, ...(saved.thr || {}) } : { ...UI_DEFAULT_THR };
-  ui.thrVersion = THR_VERSION;
+  const fresh = saved.defaultsVersion !== DEFAULTS_VERSION;
+  ui.thr = fresh ? { ...UI_DEFAULT_THR } : { ...UI_DEFAULT_THR, ...(saved.thr || {}) };
+  if (fresh) ui.gateExt = UI_DEFAULT_GATE_EXT;
+  ui.defaultsVersion = DEFAULTS_VERSION;
 } catch {}
 function saveUi() { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch {} }
 
@@ -672,8 +677,8 @@ function legendHtml() {
     row(sw(COLOR_CLIP), "a purple SLIP block: the labels are still loading — not judged yet"),
     row(sw(SLIP.lead, "opacity:.35"), "a wash over the whole row: a labeled slip from the Sheet — blue lead, yellow rear"),
     row(sw("rgba(255,255,255,0.14)"), "a faint wash: a punch label from the Sheet (any type)"),
-    row(shade(0.45), "dark shade: the punch gate is closed — the first half of a punch label (start → midpoint ≈ impact), or the whole label when the select says so. No slip can begin here, and a head that went off the line in here belongs to the punch: it does not count while it stays off, while it returns with the arm, or after the label ends — only a further movement away (≥ 0.08 torso from where it settled) starts a slip"),
-    row(shade(0.22), "lighter shade: the retraction half of a punch label — open: a slip may begin here (the 1-2-slip)"),
+    row(shade(0.45), "dark shade: the punch gate is closed — the whole punch label (or only its first half, start → midpoint ≈ impact, when the select says so). No slip can begin here, and a head that went off the line in here belongs to the punch: it does not count while it stays off, while it returns with the arm, or after the label ends — only a further movement away (≥ 0.08 torso from where it settled) starts a slip"),
+    row(shade(0.22), "lighter shade (first-half mode only): the retraction half of a punch label — open: a slip may begin here (the 1-2-slip)"),
     row(sw(COLOR_IN), "so a SLIP block always starts where the head began moving away from its reference with no punch being thrown: either the threshold crossing itself, or the renewed movement after a punch"),
     row(`<span style="color:#ff9e64;font-weight:600;font-size:11px">0.31→</span>`, "the readout at the right: this frame's value; → the head sits to the image's right of its reference, ← to the left; orange when past the threshold"),
     head("On the body"),
@@ -862,13 +867,15 @@ function drawTraces(d, f, items, cl) {
 // ── the rule ────────────────────────────────────────────────────────────────
 
 const RULES = ["dev"];
-// Clip frames inside a punch label, per frame: GATE_CLOSED for the label's
-// FIRST HALF — start up to midpoint, the midpoint standing in for the impact
-// (the whole label when the extent select says so) — and GATE_AWAY for the
-// retraction half, which is open: the slip that closes a combo is thrown while
-// the last punch retracts (1-2-slip). What the closed half does to a head
-// that went off the line in it is ruleEvents' onset rule. In a combo the next
-// punch's own first half closes the gate again (closed wins over away).
+// Clip frames inside a punch label, per frame: GATE_CLOSED for the WHOLE
+// label (the default since 2026-09-13 — a lean that crosses the threshold late
+// in the punch, after the midpoint, read as a slip on its way back; the labels
+// hold no slip thrown during a retraction to protect). With the extent select
+// on "half" only the first half closes — start up to midpoint, the midpoint
+// standing in for the impact — and the retraction half is GATE_AWAY, open for
+// the 1-2-slip. What a closed stretch does to a head that went off the line
+// in it is ruleEvents' onset rule. In a combo the next punch's own gate closes
+// again (closed wins over away).
 const GATE_OPEN = 0, GATE_AWAY = 1, GATE_CLOSED = 2;
 function punchGate(items, n) {
   const g = new Uint8Array(n);
@@ -891,8 +898,8 @@ function punchGate(items, n) {
 // head stays there, not while it returns with the arm, and not after the label
 // ends (Mathe, 2026-09-07) — unless the head then moves a further REARM torso
 // away from where it settled, which is a new movement and starts an event
-// there. The closed gate cuts a running event; the retraction half is open.
-// Runs are bridged over gaps ≤ 2 frames; events shorter than 3 frames drop.
+// there. The closed gate cuts a running event. Runs are bridged over gaps ≤ 2
+// frames; events shorter than 3 frames drop.
 function ruleEvents(series, key, thr, gate, items, base, n) {
   const arr = series?.[key];
   if (!arr) return [];
@@ -1260,8 +1267,8 @@ export const SlipExplorationRule = {
                 <input type="range" id="fa-thr-${k}" min="0" max="1" step="0.01" value="${ui.thr[k]}" style="width:110px; vertical-align:middle"></label>`).join("")}
             <label><input type="checkbox" id="fa-gate" ${ui.gate ? "checked" : ""}> fire only when no punch is being thrown, gate =</label>
             <select id="fa-gate-ext">
-              <option value="half" ${ui.gateExt !== "full" ? "selected" : ""}>first half of each punch label closed (start → midpoint ≈ impact); a slip may begin in the retraction, but a head that went off the line with the punch counts only once it moves further away</option>
               <option value="full" ${ui.gateExt === "full" ? "selected" : ""}>the whole punch label closed</option>
+              <option value="half" ${ui.gateExt !== "full" ? "selected" : ""}>only the first half of each punch label closed (start → midpoint ≈ impact); a slip may begin in the retraction, but a head that went off the line with the punch counts only once it moves further away</option>
             </select>
             <span class="muted small">torso units, magnitudes (a slip to either side goes up; → / ← in the readout is the side); frames past the threshold are marked under the trace; the rules fire on runs ≥ 3 frames outside the gate</span>
           </div>
