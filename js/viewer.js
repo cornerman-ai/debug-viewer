@@ -1643,6 +1643,9 @@ if (els.lensPick) {
 // video" toggle). The lens calls window.__viewerRedraw() — small hack vs.
 // inventing a richer rule API.
 window.__viewerRedraw = () => redraw();
+// Lens timelines export a drag-selected frame range through the same path as
+// the Export dialog (js/lenses/shared/timeline_selection.js).
+window.__viewerExportRange = (startFrame, endFrame) => exportRange(startFrame, endFrame);
 
 // ── Frame navigation ────────────────────────────────────────────────────────
 els.prevFrame.addEventListener("click", () => seekToFrame(state.frame - 1));

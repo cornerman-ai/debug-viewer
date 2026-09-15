@@ -41,6 +41,8 @@
 // are the evaluator's numbers, and moving a slider shows what a different operating
 // point would do on this round.
 
+import { createRangeSelection } from "../shared/timeline_selection.js";
+
 const DATA_DIR = "./lens_data/roll_detector_alex/";
 const GRID_FPS = 30;
 const IOU_MATCH = 0.5;
@@ -71,6 +73,7 @@ let showOther = true, showBase = false;
 let latestState = null;
 let view = null;               // zoom window in viewer frames; null = whole round
 let lastFrame = 0, lastDrawnFrame = -1, lastZoomLabel = "";
+let selection = null;         // drag-selected frame range (shared/timeline_selection.js)
 
 // ── clock helpers (same convention as the impact spotter lens) ──────────────
 function stripStem(s) { return String(s || "").replace(/_h264$/, ""); }
@@ -190,6 +193,7 @@ function videoEntry(base) {
 
 async function loadDoc(file, key, expect = null) {
   docKey = key; doc = null; docError = null; docFile = file; signals = null; view = null;
+  selection?.clear();
   try {
     const v = encodeURIComponent(index?.generated || Date.now());
     const res = await fetch(`${DATA_DIR}${file}?v=${v}`, { cache: "no-store" });
@@ -222,6 +226,7 @@ function refreshScope(state) {
   if (key === docKey) return;
   if (!entry) {
     docKey = key; doc = null; docFile = null; signals = null; view = null;
+    selection?.clear();
     renderAll();
     return;
   }
@@ -379,8 +384,8 @@ function template() {
       red striped = missed), a thin row of John's OTHER defense labels (blue: duck, slip,
       step back, pull back — not rolls, shown so a false alarm can be read against them),
       predicted rolls (orange = true · hatched = false alarm · yellow = center-hit only),
-      and the p(roll) graph with the threshold line. Click to seek · wheel to zoom · drag
-      to pan · double-click to fit.</p>
+      and the p(roll) graph with the threshold line. Click to seek · drag to select a range (then Export /
+      Zoom to in the timeline header) · shift-drag to pan · wheel to zoom · double-click to fit.</p>
   `;
 }
 
@@ -527,7 +532,7 @@ function renderFrameLine(state) {
 
 // ── stage timeline (zoom / pan / seek machinery mirrors the punch lens) ──────
 const LABEL_W = 64, PAD_R = 4, MIN_SPAN_FRAMES = 30;
-const ZOOM_HINT = "click = seek · wheel = zoom · drag = pan · double-click = fit";
+const ZOOM_HINT = "click = seek · drag = select · shift-drag = pan · wheel = zoom · double-click = fit";
 
 function mountStageTimeline() {
   const slot = document.getElementById("stage-extras");
@@ -553,6 +558,11 @@ function mountStageTimeline() {
   mkBtn("−", "Zoom out", () => zoomStep(0.5));
   mkBtn("+", "Zoom in on the playhead", () => zoomStep(2));
   mkBtn("Fit", "Show the whole round", () => { view = null; redrawTimelineNow(); });
+  selection = createRangeSelection({
+    header, frameToX, xToFrame,
+    frameToSec: f => frameToSec(latestState, f), nFrames: () => nFrames(latestState),
+    seek: f => seekHack(f), zoomTo: zoomToRange, redraw: redrawTimelineNow,
+  });
   wrap.appendChild(header);
   const canvas = document.createElement("canvas");
   canvas.id = "rg-timeline";
@@ -573,20 +583,14 @@ function mountStageTimeline() {
     if (!signals || e.button !== 0) return;
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
+    if (!e.shiftKey) { selection.beginDrag(e, rect); return; }   // drag = select a range · click = seek
+    // shift-drag = pan the zoom window
     const fpp = framesPerPx(rect.width);
-    const originX = e.clientX;
-    let lastX = e.clientX, moved = false;
-    const onMove = ev => {
-      if (Math.abs(ev.clientX - originX) > 3) moved = true;
-      if (moved) panBy((lastX - ev.clientX) * fpp);
-      lastX = ev.clientX;
-    };
-    const onUp = ev => {
+    let lastX = e.clientX;
+    const onMove = ev => { panBy((lastX - ev.clientX) * fpp); lastX = ev.clientX; };
+    const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      if (!signals || (moved && view)) return;
-      const f = Math.round(xToFrame(ev.clientX - rect.left, rect.width));
-      seekHack(Math.max(0, Math.min(nFrames(latestState) - 1, f)));
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -610,6 +614,16 @@ function zoomAt(factor, anchorFrame) {
   if (span >= full) { view = null; redrawTimelineNow(); return; }
   let start = anchorFrame - (anchorFrame - v0) * (span / (v1 - v0));
   start = Math.max(0, Math.min(full - span, start));
+  view = { start, end: start + span };
+  redrawTimelineNow();
+}
+// Fit the zoom window to a frame range (the selection toolbar's "Zoom to").
+function zoomToRange(a, b) {
+  if (!signals) return;
+  const full = Math.max(1, nFrames(latestState) - 1);
+  const span = Math.max(Math.min(MIN_SPAN_FRAMES, full), Math.min(full, b - a + 1));
+  if (span >= full) { view = null; redrawTimelineNow(); return; }
+  const start = Math.max(0, Math.min(full - span, a - (span - (b - a + 1)) / 2));
   view = { start, end: start + span };
   redrawTimelineNow();
 }
@@ -756,6 +770,7 @@ function drawTimeline(canvas, frame) {
     void fps;
   });
   drawTimeAxis(ctx, W, trackTop, rowsBottom);
+  selection?.draw(ctx, W, LABEL_W, W - PAD_R, trackTop, rowsBottom);
   if (frame >= v0 - 0.5 && frame <= v1 + 0.5) {
     const ph = frameToX(frame, W);
     ctx.strokeStyle = COLORS.playhead; ctx.lineWidth = 1;

@@ -117,6 +117,9 @@ the skeleton one frame off at hard cuts. Caches are 24 / 30 / 60 fps, so never a
 - `shared/punch_detections.js` = which punches a lens analyzes (GT labels, else the
   classifier's); `shared/rules_score.js` = the mistake → quality mapping of
   `rules_config.json`.
+- `shared/timeline_selection.js` = drag-to-select a frame range on a stage timeline,
+  with Export (the viewer's clip export via `window.__viewerExportRange`) / Zoom to /
+  clear in the timeline header; the two `models/rolls_gt_vs_pred_*.js` lenses use it.
 
 ## Gotchas that have cost time
 
