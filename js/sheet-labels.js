@@ -64,6 +64,8 @@ export function clearCache() {
   cachedFetchedAt = 0;
   cachedFormByUuid = null;
   cachedGlove = null;
+  cachedTrackingVideos = null;
+  cachedLabelerRowsByLink.clear();
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -560,6 +562,75 @@ export async function fetchCombinedRowsForStem(cacheBasename, { force = false } 
     rows = await pull(match.name);
     return { source_video: match.name, match_confidence: match.confidence,
              n_rows: rows.length, rows };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+// ── Labeler web app: the per-labeler tabs, live ─────────────────────────────
+//
+// `listForeign&labeler=admin&video=<Drive link>` is the punch labeler's
+// admin-mode read: every person's `Labeled Data <name>` tab (not Combined Data,
+// not the Review / Archive tabs), one video's rows tagged with the tab they came
+// from. Unreviewed rows included, times in seconds, no uuid. A video is
+// addressed by its Drive link; `listTrackingVideos` (the labeling tracker's
+// `progress` tab: video name without extension → link) turns a cache basename
+// into one. The catalog is one ~3 s call per session; the walk is ~15 s per
+// video (the script's own cache only keeps payloads under ~90 KB, and a labeled
+// video's rows are more). Cached per video for the session; `force` re-pulls.
+
+let cachedTrackingVideos = null;             // Map<video name, Drive link>
+const cachedLabelerRowsByLink = new Map();   // Drive link → { labelers, rows }
+
+export async function fetchTrackingVideos({ force = false } = {}) {
+  if (!force && cachedTrackingVideos) return cachedTrackingVideos;
+  const j = await webAppGet({ action: "listTrackingVideos" });
+  const m = new Map();
+  for (const v of j.videos || []) if (v.name && v.link) m.set(v.name, v.link);
+  cachedTrackingVideos = m;
+  return m;
+}
+
+// Every labeler's rows for the video behind a cache basename:
+//   { source_video, link, match_confidence, labelers: [name, …] (tab order),
+//     rows: [{ label, start_sec, end_sec, labeler, id }] }
+// with times in source-video SECONDS, or { error }.
+export async function fetchLabelerRowsForStem(cacheBasename, { force = false } = {}) {
+  if (!cacheBasename) return { error: "no cache basename to match" };
+  const stem = cacheBasename.replace(/_(yolo|vision)_r\d+$/i, "");
+  try {
+    const catalog = await fetchTrackingVideos({ force });
+    // Exact first (tracker names carry no extension), then the fuzzy match and
+    // short-name guard of fetchCombinedRowsForStem.
+    const stemN = normalize(stem);
+    let name = [...catalog.keys()].find(n => normalize(n) === stemN) || null;
+    let confidence = "exact";
+    if (!name) {
+      const counts = new Map([...catalog.keys()].map(n => [n, 1]));
+      const match = pickSourceByCounts(counts, cacheBasename);
+      const nTokens = stemN.split(" ").filter(Boolean).length;
+      if (!match || (match.confidence !== "exact" && nTokens < 3)) {
+        return { error: "video not in the labeling tracker (listTrackingVideos)", cacheBasename };
+      }
+      name = match.name; confidence = match.confidence;
+    }
+    const link = catalog.get(name);
+    let hit = force ? null : cachedLabelerRowsByLink.get(link);
+    if (!hit) {
+      const j = await webAppGet({ action: "listForeign", labeler: "admin", video: link });
+      const rows = [], labelers = [];
+      for (const r of j.foreign_punch_labels || []) {
+        const labeler = String(r.sheet || "").replace(/^Labeled Data /, "");
+        const label = String(r.punch || "").trim().toLowerCase();
+        const start_sec = Number(r.startTime), end_sec = Number(r.endTime);
+        if (!labeler || !label || !Number.isFinite(start_sec) || !Number.isFinite(end_sec)) continue;
+        if (!labelers.includes(labeler)) labelers.push(labeler);
+        rows.push({ label, start_sec, end_sec, labeler, id: r.id ?? null });
+      }
+      hit = { labelers, rows };
+      cachedLabelerRowsByLink.set(link, hit);
+    }
+    return { source_video: name, link, match_confidence: confidence, labelers: hit.labelers, rows: hit.rows };
   } catch (err) {
     return { error: err.message };
   }

@@ -1,6 +1,7 @@
 // Rolls GT vs Pred (Mathe) — the punch classifier's GT-vs-Pred lens, for rolls:
-// John's labeled rolls against the ST-GCN roll detector's HELD-OUT predictions
-// (video 5-fold), with the per-frame p(roll) graph and live decode sliders.
+// labeled rolls (the run's GT, or any labeler's live tab) against the ST-GCN roll
+// detector's HELD-OUT predictions (video 5-fold), with the per-frame p(roll) graph
+// and live decode sliders.
 //
 // Data: lens_data/roll_detector_mathe/ (index.json + one JSON per round), written by
 //   cd ~/code/cornerman-backend && .venv/bin/python \
@@ -33,10 +34,26 @@
 // (IoU ≥ 0.5, then center-hit, greedy by score), so at the defaults the round stats
 // are the evaluator's numbers, and moving a slider shows what a different operating
 // point would do on this round.
+//
+// GT sources (the "GT rolls" checkboxes): the export's own GT — John's reviewed rolls
+// frozen at the run, the evaluator's numbers — or, live, any combination of the
+// labelers' tabs (John / Arianne / Mathe), read through the labeler web app
+// (sheet-labels.js fetchLabelerRowsForStem: `listForeign` as admin walks every
+// `Labeled Data <name>` tab; unreviewed rows included; ~15 s per video, then cached
+// for the session). Each checked labeler is its own GT lane, matched to the same
+// predictions on its own; a prediction is a false alarm only when no checked labeler
+// has a roll there; the round stats list one value per lane. The rounds offered stay
+// the held-out ones (the run's pool), whoever labels them.
+
+import { fetchLabelerRowsForStem } from "../../sheet-labels.js";
 
 const DATA_DIR = "./lens_data/roll_detector_mathe/";
 const GRID_FPS = 30;
 const IOU_MATCH = 0.5;
+const ROLL_LABELS = new Set(["lead_roll", "rear_roll"]);
+const OTHER_DEFENSE = new Set(["duck", "lead_slip", "rear_slip", "pull_back", "step_back"]);
+const LIVE_LABELERS = ["John", "Arianne", "Mathe"];   // the tabs offered; a further tab seen on the video is added
+const BTN_CSS = "background:var(--bg-elev);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:2px 9px;cursor:pointer;font:inherit;font-size:12px";
 
 const COLORS = {
   gtHit:        "#5fd97a",
@@ -61,6 +78,9 @@ let doc = null, docKey = null, docError = null, docFile = null;
 let signals = null;            // decoded + matched events for the scoped round
 let cfg = { threshold: 0.5, minEventS: 0.27, gapS: 0.17 };
 let showOther = true, showBase = false;
+let gtSources = ["run"];       // ["run"] = the export's GT, else the checked labelers (LIVE_LABELERS order)
+let live = { key: null, status: "idle", rows: null, labelers: [], error: null, source: null };  // one video's tabs
+let liveToken = 0;
 let latestState = null;
 let view = null;               // zoom window in viewer frames; null = whole round
 let lastFrame = 0, lastDrawnFrame = -1, lastZoomLabel = "";
@@ -210,6 +230,7 @@ function entryFor(state) {
 }
 
 function refreshScope(state) {
+  if (isLive()) ensureLive();
   const entry = entryFor(state);
   const key = entry ? entry.file : `none:${state?.cacheBasename}|${state?.cacheRound}`;
   if (key === docKey) return;
@@ -223,38 +244,62 @@ function refreshScope(state) {
   loadDoc(entry.file, key, { stem: entry.stem, ri: entry.ri });
 }
 
-// ── derive: decode with the sliders, match, tag ─────────────────────────────
+// ── derive: decode with the sliders, match each GT lane, tag ────────────────
+function isLive() { return gtSources[0] !== "run"; }
+function initialOf(src) { return src === "run" ? "run" : src.charAt(0).toUpperCase(); }
+function knownLabelers() { return [...LIVE_LABELERS, ...live.labelers.filter(l => !LIVE_LABELERS.includes(l))]; }
+function inRound(r) { const t1 = doc.t0 + doc.n * doc.dt; return r.start_sec < t1 && r.end_sec > doc.t0; }
+function liveRows(labeler, keep) {
+  return (live.rows || []).filter(r => r.labeler === labeler && keep(r.label) && inRound(r))
+    .map(r => ({ s: r.start_sec, e: r.end_sec, label: r.label }));
+}
+// A source's GT rolls + its other defense labels: the export's (run) or a labeler's live rows.
+function sourceEvents(src) {
+  if (src === "run") return { gt: doc.gt, other: doc.other || [], pending: false };
+  if (live.status !== "ok") return { gt: [], other: [], pending: true };
+  return { gt: liveRows(src, l => ROLL_LABELS.has(l)), other: liveRows(src, l => OTHER_DEFENSE.has(l)), pending: false };
+}
+
 function derive() {
   if (!doc || !latestState) { signals = null; return; }
   const st = latestState;
   const toGrid = (sec) => Math.round((sec - doc.t0) / doc.dt);
-  const gt = doc.gt.map(g => ({ ...g, sf: toGrid(g.s), ef: Math.max(toGrid(g.s) + 1, toGrid(g.e)) }));
+  const vf = (ev) => ({ vf0: secToFrame(st, ev.s), vf1: Math.max(secToFrame(st, ev.s), secToFrame(st, ev.e) - 1) });
   const pred = decodeEvents(doc.probs, cfg.threshold, cfg.minEventS, cfg.gapS).map(p => ({
     ...p, s: doc.t0 + p.sf * doc.dt, e: doc.t0 + p.ef * doc.dt }));
-  const iou = matchEvents(gt, pred, "iou");
-  const center = matchEvents(gt, pred, "center");
-  const predByGtIou = new Set(iou.values()), predByGtCenter = new Set(center.values());
-  const gtTagged = gt.map((g, gi) => ({
-    ...g, status: iou.has(gi) ? "hit" : center.has(gi) ? "center" : "miss",
-    vf0: secToFrame(st, g.s), vf1: Math.max(secToFrame(st, g.s), secToFrame(st, g.e) - 1),
-  }));
+  // every lane is matched to the same predictions on its own; a prediction is
+  // "correct" when any lane claims it, a false alarm when none does
+  const predIou = new Set(), predCenter = new Set();
+  const lanes = gtSources.map(src => {
+    const ev = sourceEvents(src);
+    const gt = ev.gt.map(g => ({ ...g, sf: toGrid(g.s), ef: Math.max(toGrid(g.s) + 1, toGrid(g.e)) }));
+    const iou = matchEvents(gt, pred, "iou");
+    const center = matchEvents(gt, pred, "center");
+    for (const pi of iou.values()) predIou.add(pi);
+    for (const pi of center.values()) predCenter.add(pi);
+    const tagged = gt.map((g, gi) => ({
+      ...g, status: iou.has(gi) ? "hit" : center.has(gi) ? "center" : "miss", ...vf(g) }));
+    const tp = iou.size, fp = pred.length - tp, fn = gt.length - tp;
+    const p = tp + fp ? tp / (tp + fp) : null, r = gt.length ? tp / gt.length : null;
+    let sErr = 0, eErr = 0;
+    for (const [gi, pi] of iou) { sErr += Math.abs(pred[pi].sf - gt[gi].sf); eErr += Math.abs(pred[pi].ef - gt[gi].ef); }
+    return {
+      src, name: src === "run" ? "GT rolls" : `GT ${src}`, initial: initialOf(src), pending: ev.pending,
+      gt: tagged, other: ev.other,
+      stats: { nGt: gt.length, nPred: pred.length, tp, fp, fn, precision: p, recall: r,
+               f1: p != null && r != null && p + r ? 2 * p * r / (p + r) : (gt.length || pred.length ? 0 : null),
+               centerRecall: gt.length ? center.size / gt.length : null,
+               startMae: tp ? sErr / tp : null, endMae: tp ? eErr / tp : null },
+    };
+  });
   const predTagged = pred.map((p, pi) => ({
-    ...p, status: predByGtIou.has(pi) ? "correct" : predByGtCenter.has(pi) ? "center" : "fa",
-    vf0: secToFrame(st, p.s), vf1: Math.max(secToFrame(st, p.s), secToFrame(st, p.e) - 1),
-  }));
-  const other = (doc.other || []).map(o => ({ ...o, vf0: secToFrame(st, o.s), vf1: Math.max(secToFrame(st, o.s), secToFrame(st, o.e) - 1) }));
-  const base = (doc.baseline || []).map(b => ({ ...b, vf0: secToFrame(st, b.s), vf1: Math.max(secToFrame(st, b.s), secToFrame(st, b.e) - 1) }));
-  const tp = iou.size, fp = pred.length - tp, fn = gt.length - tp;
-  const ctp = center.size;
-  const p = tp + fp ? tp / (tp + fp) : null, r = gt.length ? tp / gt.length : null;
-  let sErr = 0, eErr = 0;
-  for (const [gi, pi] of iou) { sErr += Math.abs(pred[pi].sf - gt[gi].sf); eErr += Math.abs(pred[pi].ef - gt[gi].ef); }
+    ...p, status: predIou.has(pi) ? "correct" : predCenter.has(pi) ? "center" : "fa", ...vf(p) }));
+  // the lanes' other defense labels share one thin row (named by lane when there are several)
+  const other = [];
+  for (const lane of lanes) for (const o of lane.other) other.push({ ...o, lane, ...vf(o) });
+  const base = (doc.baseline || []).map(b => ({ ...b, ...vf(b) }));
   signals = {
-    gt: gtTagged, pred: predTagged, other, base,
-    stats: { nGt: gt.length, nPred: pred.length, tp, fp, fn, precision: p, recall: r,
-             f1: p != null && r != null && p + r ? 2 * p * r / (p + r) : (gt.length || pred.length ? 0 : null),
-             centerRecall: gt.length ? ctp / gt.length : null,
-             startMae: tp ? sErr / tp : null, endMae: tp ? eErr / tp : null },
+    lanes, pred: predTagged, other, base,
     atDefault: cfg.threshold === doc.decode.threshold && cfg.minEventS === doc.decode.min_event_s && cfg.gapS === doc.decode.gap_s,
   };
 }
@@ -294,6 +339,7 @@ export const RollsGtVsPredMatheRule = {
     host.innerHTML = template();
     mountStageTimeline();
     wireControls();
+    renderSourcePicker();
     ensureIndex().then(() => {
       const sel = document.getElementById("rule-select");
       if (sel && sel.value && sel.value !== "rolls_gt_vs_pred_mathe") return;
@@ -324,7 +370,7 @@ export const RollsGtVsPredMatheRule = {
 function template() {
   return `
     <h2>Rolls — GT vs Pred (Mathe)</h2>
-    <p class="hint">John's labeled rolls against the roll detector's held-out predictions
+    <p class="hint">Labeled rolls against the roll detector's held-out predictions
       for this round (video 5-fold; the model never trained on this video), with the
       per-frame p(roll) graph. Auto-scopes to the loaded video + round.</p>
 
@@ -334,6 +380,10 @@ function template() {
     <h3>Round</h3>
     <select id="rg-round" disabled><option value="">— loading —</option></select>
     <p class="hint" id="rg-round-hint"></p>
+
+    <h3>GT rolls</h3>
+    <div id="rg-src" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:2px 0 4px"></div>
+    <p class="hint" id="rg-src-hint"></p>
 
     <h3>Decode</h3>
     <label class="slider">
@@ -368,12 +418,13 @@ function template() {
     <p class="hint" id="rg-frame-line"></p>
 
     <h3>Timeline</h3>
-    <p class="hint">Below the video: GT rolls (green = found · yellow-green = center-hit only ·
-      red striped = missed), a thin row of John's OTHER defense labels (blue: duck, slip,
-      step back, pull back — not rolls, shown so a false alarm can be read against them),
-      predicted rolls (orange = true · hatched = false alarm · yellow = center-hit only),
-      and the p(roll) graph with the threshold line. Click to seek · wheel to zoom · drag
-      to pan · double-click to fit.</p>
+    <p class="hint">Below the video: GT rolls, one lane per checked source (green = found ·
+      yellow-green = center-hit only · red striped = missed), a thin row of the sources'
+      OTHER defense labels (blue: duck, slip, step back, pull back — not rolls, shown so a
+      false alarm can be read against them), predicted rolls (orange = true · hatched =
+      false alarm, no checked source has a roll there · yellow = center-hit only), and the
+      p(roll) graph with the threshold line. Click to seek · wheel to zoom · drag to pan ·
+      double-click to fit.</p>
   `;
 }
 
@@ -401,12 +452,84 @@ function wireControls() {
   other.checked = showOther; base.checked = showBase;
   other.addEventListener("change", () => { showOther = other.checked; redrawTimelineNow(); });
   base.addEventListener("change", () => { showBase = base.checked; redrawTimelineNow(); });
+  host.querySelector("#rg-src").addEventListener("change", (e) => {
+    const box = e.target;
+    if (box instanceof HTMLInputElement && box.dataset.src) setSources(box.dataset.src, box.checked);
+  });
+  host.querySelector("#rg-src").addEventListener("click", (e) => {
+    if (e.target.id === "rg-live-refresh") { ensureLive(true); renderSourcePicker(); renderAll(); }
+  });
   host.querySelector("#rg-round").addEventListener("change", (e) => {
     const file = e.target.value;
     if (!file) return;
     const o = e.target.selectedOptions[0];
     loadDoc(file, file, o?.dataset.stem ? { stem: o.dataset.stem, ri: o.dataset.ri } : null);
   });
+}
+
+// ── GT sources: the run's GT, or the labelers' live tabs ────────────────────
+function setSources(src, checked) {
+  let next;
+  if (src === "run") next = checked ? ["run"] : gtSources.filter(s => s !== "run");
+  else {
+    const set = new Set(gtSources.filter(s => s !== "run"));
+    if (checked) set.add(src); else set.delete(src);
+    next = [...set];
+  }
+  if (!next.length) next = ["run"];                 // never nothing: back to the run's GT
+  const order = ["run", ...knownLabelers()];
+  gtSources = next.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  if (isLive()) ensureLive();
+  renderSourcePicker();
+  derive(); renderAll();
+  if (window.__viewerRedraw) window.__viewerRedraw();
+}
+
+// One fetch per video (its rounds share it); `force` re-reads the tabs.
+function ensureLive(force = false) {
+  const key = latestState?.cacheBasename || null;
+  if (!key) { live = { key: null, status: "error", rows: null, labelers: [], error: "load a video first", source: null }; return; }
+  if (!force && live.key === key && live.status !== "idle") return;
+  const t = ++liveToken;
+  live = { key, status: "loading", rows: null, labelers: [], error: null, source: null };
+  fetchLabelerRowsForStem(key, { force }).then(res => {
+    if (t !== liveToken) return;                     // another video was loaded meanwhile
+    live = res.error
+      ? { key, status: "error", rows: null, labelers: [], error: res.error, source: null }
+      : { key, status: "ok", rows: res.rows, labelers: res.labelers, error: null, source: res.source_video };
+    renderSourcePicker();
+    derive(); renderAll();
+    if (window.__viewerRedraw) window.__viewerRedraw();
+  });
+}
+
+function renderSourcePicker() {
+  const box = host?.querySelector("#rg-src");
+  if (!box) return;
+  const items = [["run", "run GT (John, frozen)"], ...knownLabelers().map(l => [l, l])];
+  box.innerHTML = items.map(([src, text]) =>
+    `<label class="muted small" style="cursor:pointer"><input type="checkbox" data-src="${src}"` +
+    `${gtSources.includes(src) ? " checked" : ""}> ${text}</label>`).join("") +
+    (isLive() ? `<button type="button" id="rg-live-refresh" title="Re-read the labelers' tabs for this video" style="${BTN_CSS}">re-pull</button>` : "");
+}
+
+function renderSourceHint() {
+  const el = host?.querySelector("#rg-src-hint");
+  if (!el) return;
+  if (!isLive()) {
+    el.innerHTML = `the run's GT: John's reviewed rolls on the pool videos, frozen at the run` +
+      (index?.labels_sha1 ? ` <span class="muted">(labels ${index.labels_sha1})</span>` : "") + ` — the evaluator's verdicts`;
+    return;
+  }
+  if (live.status === "loading") {
+    el.innerHTML = `reading the labelers' tabs for this video… <span class="muted">(~15 s; unreviewed rows included)</span>`;
+    return;
+  }
+  if (live.status !== "ok") { el.innerHTML = `<span style="color:${COLORS.gtMiss}">live labels: ${live.error || "not loaded"}</span>`; return; }
+  const counts = doc ? knownLabelers().map(l => `${l} ${liveRows(l, x => ROLL_LABELS.has(x)).length}`) : [];
+  el.innerHTML = `live tabs of <code>${live.source}</code>` +
+    (counts.length ? ` · rolls in this round: ${counts.join(" · ")}` : "") +
+    ` <span class="muted">(${live.rows.length} rows on the video; one lane and one stats value per checked name)</span>`;
 }
 
 function syncSliders() {
@@ -468,6 +591,7 @@ function renderAll() {
   if (!host) return;
   renderStats();
   renderRoundHint();
+  renderSourceHint();
   const st = latestState;
   if (st) { drawTimeline(document.getElementById("rg-timeline"), st.frame); renderFrameLine(st); }
 }
@@ -487,8 +611,9 @@ function renderRoundHint() {
   el.innerHTML = `scoped to <code>${doc.stem} · r${doc.ri}</code> · fold ${doc.fold} · ${doc.training_type || "?"} · ` +
     `${doc.stance} · ${doc.src_fps} fps source · fold decode thr ${d.threshold} / min ${d.min_event_s} s / gap ${d.gap_s} s`;
   const note = host.querySelector("#rg-decode-note");
-  if (note) note.textContent = signals?.atDefault ? "= the evaluator's decode for this fold (its verdicts)"
-                                                  : "changed — stats below are this round re-decoded";
+  if (note) note.textContent = !signals?.atDefault ? "changed — stats below are this round re-decoded"
+    : isLive() ? "= the evaluator's decode for this fold (GT: the live tabs, not the run's)"
+    : "= the evaluator's decode for this fold (its verdicts)";
 }
 
 function renderStats() {
@@ -498,11 +623,20 @@ function renderStats() {
     set("rg-stat-line", "");
     return;
   }
-  const s = signals.stats;
-  set("rg-recall", pct(s.recall)); set("rg-precision", pct(s.precision)); set("rg-f1", pct(s.f1));
-  set("rg-center", pct(s.centerRecall)); set("rg-counts", `${s.nGt} / ${s.nPred}`);
-  set("rg-mae", s.startMae == null ? "—" : `${s.startMae.toFixed(1)} / ${s.endMae.toFixed(1)}`);
-  set("rg-stat-line", `<span class="muted small">true ${s.tp} · missed ${s.fn} · false + ${s.fp}</span>`);
+  // one value per GT lane, prefixed with the lane's initial when there are several
+  const L = signals.lanes, many = L.length > 1;
+  const val = (fn) => L.map(ln => (many ? `<span class="muted small">${ln.initial}</span> ` : "") +
+                                  (ln.pending ? "…" : fn(ln.stats))).join(" · ");
+  set("rg-recall", val(s => pct(s.recall))); set("rg-precision", val(s => pct(s.precision))); set("rg-f1", val(s => pct(s.f1)));
+  set("rg-center", val(s => pct(s.centerRecall))); set("rg-counts", val(s => `${s.nGt} / ${s.nPred}`));
+  set("rg-mae", val(s => s.startMae == null ? "—" : `${s.startMae.toFixed(1)} / ${s.endMae.toFixed(1)}`));
+  set("rg-stat-line", L.map(ln => `<span class="muted small">${many ? ln.initial + ": " : ""}` +
+    (ln.pending ? "loading…" : `true ${ln.stats.tp} · missed ${ln.stats.fn} · false+ ${ln.stats.fp}`) + `</span>`).join(" · "));
+}
+
+function firstGt(f) {
+  for (const ln of signals.lanes) { const g = findEvent(ln.gt, f); if (g) return g; }
+  return null;
 }
 
 function renderFrameLine(state) {
@@ -510,16 +644,21 @@ function renderFrameLine(state) {
   if (!el || !signals) return;
   const f = state.frame;
   const p = probAtFrame(state, f);
-  const g = findEvent(signals.gt, f), pr = findEvent(signals.pred, f), o = findEvent(signals.other, f);
-  el.innerHTML = `f${f} · t ${fmtTime(frameToSec(state, f), true)} · p(roll) <b>${fmt(p, 2)}</b> · ` +
-    `GT ${g ? `<span style="color:${gtColor(g)}">${g.label} (${g.status})</span>`
-            : o ? `<span style="color:#7ec8ff">${o.label}</span> <span class="muted">(not a roll)</span>`
-            : "<span class=\"muted\">idle</span>"} · ` +
-    `pred ${pr ? `<span style="color:${predColor(pr, g)}">${pr.status} · ${fmt(pr.score, 2)}</span>` : "<span class=\"muted\">idle</span>"}`;
+  const pr = findEvent(signals.pred, f), g0 = firstGt(f);
+  const many = signals.lanes.length > 1;
+  const gt = signals.lanes.map(ln => {
+    const g = findEvent(ln.gt, f), o = findEvent(ln.other, f);
+    return (many ? `${ln.initial} ` : "") + (g ? `<span style="color:${gtColor(g)}">${g.label} (${g.status})</span>`
+      : o ? `<span style="color:#7ec8ff">${o.label}</span> <span class="muted">(not a roll)</span>`
+      : `<span class="muted">${ln.pending ? "loading…" : "idle"}</span>`);
+  }).join(" · ");
+  el.innerHTML = `f${f} · t ${fmtTime(frameToSec(state, f), true)} · p(roll) <b>${fmt(p, 2)}</b> · GT ${gt} · ` +
+    `pred ${pr ? `<span style="color:${predColor(pr, g0)}">${pr.status} · ${fmt(pr.score, 2)}</span>` : "<span class=\"muted\">idle</span>"}`;
 }
 
 // ── stage timeline (zoom / pan / seek machinery mirrors the punch lens) ──────
 const LABEL_W = 64, PAD_R = 4, MIN_SPAN_FRAMES = 30;
+const TL_TOP = 4, TL_GAP = 4, BAR_H = 18, OTHER_H = 12, GRAPH_H = 86, AXIS_H = 16;   // 166 px with one GT lane
 const ZOOM_HINT = "click = seek · wheel = zoom · drag = pan · double-click = fit";
 
 function mountStageTimeline() {
@@ -636,6 +775,9 @@ function updateZoomLabel() {
 function drawTimeline(canvas, frame) {
   if (!canvas) return;
   const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const laneN = signals ? signals.lanes.length : 1;
+  const wantH = TL_TOP + laneN * (BAR_H + TL_GAP) + (OTHER_H + TL_GAP) + (BAR_H + TL_GAP) + GRAPH_H + AXIS_H;
+  if (canvas.style.height !== `${wantH}px`) canvas.style.height = `${wantH}px`;
   const cssW = Math.max(1, canvas.getBoundingClientRect().width);
   const cssH = Math.max(1, canvas.getBoundingClientRect().height);
   if (canvas.width !== Math.round(cssW * dpr)) canvas.width = Math.round(cssW * dpr);
@@ -659,17 +801,15 @@ function drawTimeline(canvas, frame) {
   updateZoomLabel();
   const { v0, v1 } = viewRange();
   const trackW = W - LABEL_W - PAD_R;
-  const gap = 4, trackTop = 4, axisH = 16, barH = 18, otherH = 12;
-  const graphH = Math.max(30, H - trackTop - axisH - 2 * (barH + gap) - (otherH + gap));
-  const rows = [
-    { y: trackTop, h: barH, label: "GT rolls" },
-    { y: trackTop + barH + gap, h: otherH, label: "other" },            // John's ducks / slips / …
-    { y: trackTop + barH + gap + otherH + gap, h: barH, label: "Pred" },
-    { y: trackTop + 2 * (barH + gap) + otherH + gap, h: graphH, label: "p(roll)" },
-  ];
-  const rowsBottom = rows[3].y + rows[3].h;
+  const gap = TL_GAP, trackTop = TL_TOP, barH = BAR_H, otherH = OTHER_H;
+  let y = trackTop;
+  const gtRows = signals.lanes.map(lane => { const r = { y, h: barH, label: lane.name, lane }; y += barH + gap; return r; });
+  const otherRow = { y, h: otherH, label: "other" }; y += otherH + gap;   // the lanes' ducks / slips / …
+  const predRow = { y, h: barH, label: "Pred" }; y += barH + gap;
+  const graphRow = { y, h: GRAPH_H, label: "p(roll)" };
+  const rowsBottom = graphRow.y + graphRow.h;
   ctx.font = "10px ui-monospace, monospace";
-  for (const r of rows) {
+  for (const r of [...gtRows, otherRow, predRow, graphRow]) {
     ctx.fillStyle = COLORS.rowBg; ctx.fillRect(LABEL_W, r.y, trackW, r.h);
     ctx.fillStyle = "#8a93a3"; ctx.fillText(r.label, 4, r.y + Math.min(r.h - 4, 14));
   }
@@ -679,46 +819,52 @@ function drawTimeline(canvas, frame) {
     const x2 = Math.min(Math.max(x1 + 2, frameToX(ev.vf1 + 1, W)), W - PAD_R + 2);
     return [x1, x2];
   };
-  // GT track: the labeled rolls only
-  clip(rows[0], () => {
-    for (const g of signals.gt) {
+  // GT lanes: each checked source's labeled rolls
+  for (const r of gtRows) clip(r, () => {
+    if (r.lane.pending) {
+      ctx.fillStyle = "#8a93a3"; ctx.font = "10px ui-monospace, monospace";
+      ctx.fillText(live.status === "error" ? `no live labels — ${live.error}` : "reading the labelers' tabs…", LABEL_W + 6, r.y + 13);
+      return;
+    }
+    for (const g of r.lane.gt) {
       if (g.vf1 < v0 - 1 || g.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(g);
-      drawEventBar(ctx, x1, rows[0].y, x2 - x1, rows[0].h, gtColor(g), g.status === "miss", COLORS.gtMissStripe,
+      drawEventBar(ctx, x1, r.y, x2 - x1, r.h, gtColor(g), g.status === "miss", COLORS.gtMissStripe,
                    g.label.replace(/_roll$/, ""));
     }
   });
-  // other defense labels (duck / slip / step_back / pull_back): their own thin row, named
-  clip(rows[1], () => {
+  // other defense labels (duck / slip / step_back / pull_back): one thin row, named
+  clip(otherRow, () => {
     if (!showOther) return;
+    const many = signals.lanes.length > 1;
     for (const o of signals.other) {
       if (o.vf1 < v0 - 1 || o.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(o);
-      ctx.fillStyle = COLORS.other; ctx.fillRect(x1, rows[1].y + 1, x2 - x1, rows[1].h - 2);
+      ctx.fillStyle = COLORS.other; ctx.fillRect(x1, otherRow.y + 1, x2 - x1, otherRow.h - 2);
       if (x2 - x1 > 30) {
         ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "8px ui-monospace, monospace";
-        ctx.fillText(o.label.replace(/^(lead_|rear_)/, "$1").replace("_", " "), x1 + 3, rows[1].y + rows[1].h / 2 + 3);
+        ctx.fillText((many ? `${o.lane.initial} ` : "") + o.label.replace("_", " "), x1 + 3, otherRow.y + otherRow.h / 2 + 3);
       }
     }
   });
   // Pred track (+ the geometric baseline, dashed)
-  clip(rows[2], () => {
+  clip(predRow, () => {
     for (const p of signals.pred) {
       if (p.vf1 < v0 - 1 || p.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(p);
-      drawEventBar(ctx, x1, rows[2].y, x2 - x1, rows[2].h, predColor(p, null), p.status === "fa", COLORS.predFAStripe,
+      drawEventBar(ctx, x1, predRow.y, x2 - x1, predRow.h, predColor(p, null), p.status === "fa", COLORS.predFAStripe,
                    p.status === "fa" ? `false+ ${p.score.toFixed(2)}` : p.score.toFixed(2));
     }
     if (showBase) for (const b of signals.base) {
       if (b.vf1 < v0 - 1 || b.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(b);
       ctx.save(); ctx.setLineDash([3, 2]); ctx.strokeStyle = COLORS.baseline; ctx.lineWidth = 1.5;
-      ctx.strokeRect(x1 + 0.5, rows[2].y + 2.5, Math.max(1, x2 - x1 - 1), rows[2].h - 5); ctx.restore();
+      ctx.strokeRect(x1 + 0.5, predRow.y + 2.5, Math.max(1, x2 - x1 - 1), predRow.h - 5); ctx.restore();
     }
   });
   // p(roll) graph: area + line, threshold, y ticks
-  clip(rows[3], () => {
-    const gy = (v) => rows[3].y + rows[3].h - 2 - v * (rows[3].h - 6);
+  clip(graphRow, () => {
+    const gy = (v) => graphRow.y + graphRow.h - 2 - v * (graphRow.h - 6);
     ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
     for (const v of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.moveTo(LABEL_W, gy(v)); ctx.lineTo(W - PAD_R, gy(v)); ctx.stroke(); }
     const fps = latestState.fps || 30;
@@ -802,7 +948,7 @@ function predColor(p, g) {
 // ── on-video HUD (the punch lens's box, one hand → one roll) ────────────────
 function drawCanvasHud(ctx, state) {
   const f = state.frame, s = state.renderScale || 1;
-  const g = findEvent(signals.gt, f), p = findEvent(signals.pred, f), o = findEvent(signals.other, f);
+  const p = findEvent(signals.pred, f), g = firstGt(f);
   const prob = probAtFrame(state, f);
   const fontPx = Math.round(13 * s);
   ctx.save();
@@ -811,10 +957,17 @@ function drawCanvasHud(ctx, state) {
     : p.status === "correct" ? `roll ${p.score.toFixed(2)} ✓`
     : p.status === "center" ? `roll ${p.score.toFixed(2)} (center-hit)`
     : `roll ${p.score.toFixed(2)} (false+)`;
+  const many = signals.lanes.length > 1;
+  const gtLines = signals.lanes.map((ln, i) => {       // one line per GT lane
+    const lg = findEvent(ln.gt, f), o = findEvent(ln.other, f);
+    const what = lg ? `${lg.label}${lg.status === "miss" ? " (missed)" : ""}`
+      : o ? `${o.label} (not a roll)` : ln.pending ? "loading…" : "idle";
+    return { text: `${i ? "     " : "GT:  "} ${many ? ln.initial + " " : ""}${what}`,
+             color: lg ? gtColor(lg) : o ? "#7ec8ff" : "#888888" };
+  });
   const lines = [
     { text: `Roll  p=${fmt(prob, 2)}  thr ${cfg.threshold.toFixed(2)}`, color: prob >= cfg.threshold ? COLORS.pred : "#dddddd" },
-    { text: `GT:   ${g ? `${g.label}${g.status === "miss" ? " (missed)" : ""}` : o ? `${o.label} (not a roll)` : "idle"}`,
-      color: g ? gtColor(g) : o ? "#7ec8ff" : "#888888" },
+    ...gtLines,
     { text: `Pred: ${predText}`, color: predColor(p, g) },
   ];
   const pad = 5 * s, lineH = fontPx + 4 * s;

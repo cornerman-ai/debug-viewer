@@ -105,6 +105,10 @@ the skeleton one frame off at hard cuts. Caches are 24 / 30 / 60 fps, so never a
 - The Sheet is read through `js/sheet-labels.js` (`state.labels`) or, for the
   defense rows of the labeler web app, `shared/slip_labels.js` (`ensureSlipLabels`,
   `computeLabelSpans(c, kindMap)` — `rolls_gt.js` is `slips_gt.js` over `ROLL_KIND`).
+- Per-labeler rows (John / Arianne / Mathe, unreviewed included, no uuid) come from
+  `sheet-labels.js` `fetchLabelerRowsForStem` — the labeler web app's `listForeign` as
+  admin, every `Labeled Data <name>` tab, ~15 s per video, cached for the session.
+  `models/rolls_gt_vs_pred_mathe.js` reads it for its GT-rolls picker.
 - Curated sets (frontal / side) and their source-second → cache-frame conversion live
   in `shared/segment_set.js` (`shared/frontal_set.js`, `shared/side_set.js`).
 - A model's outputs: one JSON per round + an `index.json` under `/lens_data/<name>/`,
