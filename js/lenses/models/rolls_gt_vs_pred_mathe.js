@@ -12,10 +12,11 @@
 //   index.json  { generated, run, labels_sha1, metrics: { pooled, fold_mean_std },
 //                 geometric, videos: { <stem>: { <ri>: { file, gt, tp, fp, fn, fold } } } }
 //   <i>.json    { round_id, stem, ri, fold, training_type, stance, src_fps, t0, dt, n,
-//                 decode: { threshold, min_event_s, gap_s },   the fold's LOFO decode
+//                 decode: { threshold, min_event_s, gap_s, delta },  the fold's LOFO decode
 //                 probs: [n],                                  p(roll) at t0 + i·dt (30 fps)
+//                 probs_lead: [n] | null,                      the side head's p(lead roll); rear = probs − lead
 //                 gt:   [{ s, e, label, verdict, peak }],      the evaluator's verdicts
-//                 pred: [{ s, e, score, verdict }],
+//                 pred: [{ s, e, score, verdict, side }],
 //                 other: [{ s, e, label }],                    John's ducks / slips / pull_backs
 //                 baseline: [{ s, e, score }],                 the geometric rule's events
 //                 counts: { gt, tp, fp, fn } }
@@ -29,8 +30,10 @@
 // index lands via the lens-filter-changed event, and shows everything if it failed to load).
 //
 // Decode is re-run HERE from the probabilities, with the fold's LOFO decode as the
-// sliders' default — the same runs-above-threshold / gap-fill / min-event rule as the
-// evaluator (roll_model_mathe.decode_events) and the same one-to-one matching
+// sliders' default — the same runs-above-threshold / gap-fill / valley-split / min-event
+// rule as the evaluator (roll_model_mathe.decode_events; δ fixed at the fold's value), run
+// PER SIDE when the run is the side head (lead and rear curves decoded on their own and
+// merged, each bar tagged L / R — roll_model_mathe.decode_any), and the same one-to-one matching
 // (IoU ≥ 0.5, then center-hit, greedy by score), so at the defaults the round stats
 // are the evaluator's numbers, and moving a slider shows what a different operating
 // point would do on this round.
@@ -67,6 +70,8 @@ const COLORS = {
   baseline:     "#b48cff",
   prob:         "#8ab4f8",
   probFill:     "rgba(138,180,248,0.25)",
+  probLead:     "#ff8fa3",           // the side head's two curves over the summed area
+  probRear:     "#7ee0c0",
   thr:          "rgba(255,255,255,0.45)",
   playhead:     "rgba(255,255,255,0.85)",
   rowBg:        "#1d222b",
@@ -117,10 +122,22 @@ function fmtTime(sec, withTenths = false) {
 }
 
 // ── decode + matching (ports of roll_model_mathe.decode_events / roll_metrics_mathe) ──
-function decodeEvents(probs, thr, minEventS, gapS) {
+// the punch pipeline's valley split (punch_detector._split_at_valleys): cut [s, e) at its
+// deepest internal minimum when that dip is at least `delta` below the lower flanking peak
+function splitAtValleys(probs, s, e, delta) {
+  if (delta == null || e - s < 3) return [[s, e]];
+  let m = s + 1, mv = probs[m];
+  for (let i = s + 2; i < e - 1; i++) if (probs[i] < mv) { mv = probs[i]; m = i; }
+  let left = -Infinity, right = -Infinity;
+  for (let i = s; i < m; i++) left = Math.max(left, probs[i]);
+  for (let i = m + 1; i < e; i++) right = Math.max(right, probs[i]);
+  if (Math.min(left, right) - mv < delta) return [[s, e]];
+  return [...splitAtValleys(probs, s, m + 1, delta), ...splitAtValleys(probs, m + 1, e, delta)];
+}
+function decodeEvents(probs, thr, minEventS, gapS, delta = null) {
   const gap = Math.round(gapS * GRID_FPS);
   const minLen = Math.max(1, Math.round(minEventS * GRID_FPS));
-  const runs = [];
+  let runs = [];
   let i = 0;
   const n = probs.length;
   while (i < n) {
@@ -132,6 +149,7 @@ function decodeEvents(probs, thr, minEventS, gapS) {
       i = j;
     } else i++;
   }
+  if (delta != null) runs = runs.flatMap(([s, e]) => splitAtValleys(probs, s, e, delta));
   const out = [];
   for (const [s, e] of runs) {
     if (e - s < minLen) continue;
@@ -141,6 +159,18 @@ function decodeEvents(probs, thr, minEventS, gapS) {
   }
   return out;
 }
+// the run's events under the sliders: per side for the side head (roll_model_mathe.decode_any),
+// the summed curve otherwise; δ is the fold's, not a slider
+function decodePred(d, c) {
+  const delta = d.decode && d.decode.delta != null ? d.decode.delta : null;
+  if (!d.probs_lead) return decodeEvents(d.probs, c.threshold, c.minEventS, c.gapS, delta);
+  const rear = d.probs.map((v, i) => Math.max(0, v - d.probs_lead[i]));
+  const lead = decodeEvents(d.probs_lead, c.threshold, c.minEventS, c.gapS, delta).map(p => ({ ...p, side: "lead_roll" }));
+  const rr = decodeEvents(rear, c.threshold, c.minEventS, c.gapS, delta).map(p => ({ ...p, side: "rear_roll" }));
+  return [...lead, ...rr].sort((a, b) => a.sf - b.sf);
+}
+function sideWord(p) { return p && p.side === "lead_roll" ? "lead roll" : p && p.side === "rear_roll" ? "rear roll" : "roll"; }
+function sideTag(p) { return p && p.side === "lead_roll" ? "L " : p && p.side === "rear_roll" ? "R " : ""; }
 function spanIou(a0, a1, b0, b1) {
   const inter = Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
   const union = (a1 - a0) + (b1 - b0) - inter;
@@ -193,12 +223,19 @@ function ensureIndex() {
 
 // index.videos entry for a cache basename: exact stem first, then substring either way
 // (a cache stem may carry _h264 or differ by a suffix from the export's stem).
+// a round is worth opening when it has a labeled roll or a predicted one (Mathe, 2026-09-15):
+// the all-background rounds where nothing fired stay out of the dropdowns
+function hasRolls(e) { return !!e && (e.gt > 0 || e.tp + e.fp > 0); }
 function videoEntry(base) {
   if (!index || !base) return null;
   const want = stripStem(base);
-  if (index.videos[want]) return { stem: want, rounds: index.videos[want] };
+  const pick = (k) => {
+    const rounds = Object.fromEntries(Object.entries(index.videos[k]).filter(([, e]) => hasRolls(e)));
+    return Object.keys(rounds).length ? { stem: k, rounds } : null;
+  };
+  if (index.videos[want]) return pick(want);
   const hit = Object.keys(index.videos).find(k => want.includes(k) || k.includes(want));
-  return hit ? { stem: hit, rounds: index.videos[hit] } : null;
+  return hit ? pick(hit) : null;
 }
 
 async function loadDoc(file, key, expect = null) {
@@ -265,7 +302,7 @@ function derive() {
   const st = latestState;
   const toGrid = (sec) => Math.round((sec - doc.t0) / doc.dt);
   const vf = (ev) => ({ vf0: secToFrame(st, ev.s), vf1: Math.max(secToFrame(st, ev.s), secToFrame(st, ev.e) - 1) });
-  const pred = decodeEvents(doc.probs, cfg.threshold, cfg.minEventS, cfg.gapS).map(p => ({
+  const pred = decodePred(doc, cfg).map(p => ({
     ...p, s: doc.t0 + p.sf * doc.dt, e: doc.t0 + p.ef * doc.dt }));
   // every lane is matched to the same predictions on its own; a prediction is
   // "correct" when any lane claims it, a false alarm when none does
@@ -313,14 +350,21 @@ function probAtFrame(state, f) {
   const i = Math.round((frameToSec(state, f) - doc.t0) / doc.dt);
   return i >= 0 && i < doc.n ? doc.probs[i] : NaN;
 }
+function sideProbsAtFrame(state, f) {        // { lead, rear } for the side head, else null
+  if (!doc || !doc.probs_lead) return null;
+  const i = Math.round((frameToSec(state, f) - doc.t0) / doc.dt);
+  if (i < 0 || i >= doc.n) return null;
+  return { lead: doc.probs_lead[i], rear: Math.max(0, doc.probs[i] - doc.probs_lead[i]) };
+}
 
 // ── mount / template ────────────────────────────────────────────────────────
 export const RollsGtVsPredMatheRule = {
   id: "rolls_gt_vs_pred_mathe",
   label: "Rolls GT vs Pred (Mathe)",
 
-  // Only videos / rounds with held-out predictions are offered. Before the index is in:
-  // nothing (the load re-filters the dropdowns); if it failed to load: everything.
+  // Only videos / rounds with held-out predictions AND at least one labeled or predicted
+  // roll are offered. Before the index is in: nothing (the load re-filters the dropdowns);
+  // if it failed to load: everything.
   requiresVideo(base) {
     if (indexError) return true;
     if (!index) { ensureIndex(); return false; }
@@ -572,7 +616,7 @@ function populateRoundPicker() {
   sel.appendChild(ph);
   const rows = [];
   for (const [stem, rounds] of Object.entries(index.videos)) {
-    for (const [ri, e] of Object.entries(rounds)) rows.push({ stem, ri: Number(ri), ...e });
+    for (const [ri, e] of Object.entries(rounds)) if (hasRolls(e)) rows.push({ stem, ri: Number(ri), ...e });
   }
   rows.sort((a, b) => a.stem.localeCompare(b.stem) || a.ri - b.ri);
   for (const r of rows) {
@@ -652,8 +696,10 @@ function renderFrameLine(state) {
       : o ? `<span style="color:#7ec8ff">${o.label}</span> <span class="muted">(not a roll)</span>`
       : `<span class="muted">${ln.pending ? "loading…" : "idle"}</span>`);
   }).join(" · ");
-  el.innerHTML = `f${f} · t ${fmtTime(frameToSec(state, f), true)} · p(roll) <b>${fmt(p, 2)}</b> · GT ${gt} · ` +
-    `pred ${pr ? `<span style="color:${predColor(pr, g0)}">${pr.status} · ${fmt(pr.score, 2)}</span>` : "<span class=\"muted\">idle</span>"}`;
+  const sp = sideProbsAtFrame(state, f);
+  el.innerHTML = `f${f} · t ${fmtTime(frameToSec(state, f), true)} · p(roll) <b>${fmt(p, 2)}</b>` +
+    (sp ? ` <span class="muted">(lead ${fmt(sp.lead, 2)} · rear ${fmt(sp.rear, 2)})</span>` : "") + ` · GT ${gt} · ` +
+    `pred ${pr ? `<span style="color:${predColor(pr, g0)}">${sideWord(pr)} · ${pr.status} · ${fmt(pr.score, 2)}</span>` : "<span class=\"muted\">idle</span>"}`;
 }
 
 // ── stage timeline (zoom / pan / seek machinery mirrors the punch lens) ──────
@@ -853,7 +899,7 @@ function drawTimeline(canvas, frame) {
       if (p.vf1 < v0 - 1 || p.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(p);
       drawEventBar(ctx, x1, predRow.y, x2 - x1, predRow.h, predColor(p, null), p.status === "fa", COLORS.predFAStripe,
-                   p.status === "fa" ? `false+ ${p.score.toFixed(2)}` : p.score.toFixed(2));
+                   p.status === "fa" ? `false+ ${sideTag(p)}${p.score.toFixed(2)}` : `${sideTag(p)}${p.score.toFixed(2)}`);
     }
     if (showBase) for (const b of signals.base) {
       if (b.vf1 < v0 - 1 || b.vf0 > v1 + 1) continue;
@@ -886,6 +932,22 @@ function drawTimeline(canvas, frame) {
     if (pts.length > 1) {
       ctx.lineTo(pts[pts.length - 1][0], gy(0)); ctx.lineTo(pts[0][0], gy(0)); ctx.closePath();
       ctx.fillStyle = COLORS.probFill; ctx.fill();
+    }
+    if (doc.probs_lead) {                        // the side head: lead and rear over the summed area
+      for (const [color, at] of [[COLORS.probLead, (i) => doc.probs_lead[i]],
+                                 [COLORS.probRear, (i) => Math.max(0, doc.probs[i] - doc.probs_lead[i])]]) {
+        ctx.beginPath(); let f = true;
+        for (let i = f0; i <= f1; i += perPx) {
+          let v = at(i);
+          for (let k = 1; k < perPx && i + k <= f1; k++) v = Math.max(v, at(i + k));
+          const x = frameToX(secToFrameF(latestState, doc.t0 + i * doc.dt), W);
+          if (f) { ctx.moveTo(x, gy(v)); f = false; } else ctx.lineTo(x, gy(v));
+        }
+        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.stroke();
+      }
+      ctx.font = "9px ui-monospace, monospace";
+      ctx.fillStyle = COLORS.probLead; ctx.fillText("lead", LABEL_W + 4, graphRow.y + 10);
+      ctx.fillStyle = COLORS.probRear; ctx.fillText("rear", LABEL_W + 32, graphRow.y + 10);
     }
     ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = COLORS.thr; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(LABEL_W, gy(cfg.threshold)); ctx.lineTo(W - PAD_R, gy(cfg.threshold)); ctx.stroke(); ctx.restore();
@@ -954,9 +1016,9 @@ function drawCanvasHud(ctx, state) {
   ctx.save();
   ctx.font = `bold ${fontPx}px ui-monospace, "SF Mono", monospace`;
   const predText = !p ? (g ? "MISS" : "idle")
-    : p.status === "correct" ? `roll ${p.score.toFixed(2)} ✓`
-    : p.status === "center" ? `roll ${p.score.toFixed(2)} (center-hit)`
-    : `roll ${p.score.toFixed(2)} (false+)`;
+    : p.status === "correct" ? `${sideWord(p)} ${p.score.toFixed(2)} ✓`
+    : p.status === "center" ? `${sideWord(p)} ${p.score.toFixed(2)} (center-hit)`
+    : `${sideWord(p)} ${p.score.toFixed(2)} (false+)`;
   const many = signals.lanes.length > 1;
   const gtLines = signals.lanes.map((ln, i) => {       // one line per GT lane
     const lg = findEvent(ln.gt, f), o = findEvent(ln.other, f);

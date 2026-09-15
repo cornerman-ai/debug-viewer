@@ -1,8 +1,8 @@
 {
- "generated": "2026-09-15T15:52:12",
+ "generated": "2026-09-15T16:30:35",
  "run": "v4_side_colab",
  "labels_sha1": "b343e4dc5e",
- "git_commit": "2f1aeb2",
+ "git_commit": "b72d0f1",
  "n_rounds": 531,
  "metrics": {
   "pooled": {
