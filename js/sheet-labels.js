@@ -493,14 +493,26 @@ const LABELER_WEBAPP_URL =
 let cachedVideoCounts = null;          // Map<video_name, n_labels>
 const cachedRowsByName = new Map();    // video_name → rows (seconds parsed)
 
-async function webAppGet(params) {
+// One retry after a pause: the web app answers through a one-shot
+// script.googleusercontent.com redirect that now and then 404s (and a clasp
+// deploy from the labeler repo makes the script briefly unavailable), so a
+// single failed hop is not a verdict. The action rides in the error so the
+// lens can say which call failed.
+async function webAppGet(params, { retries = 1 } = {}) {
   const url = new URL(LABELER_WEBAPP_URL);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const r = await fetch(url, { cache: "no-store" });
-  if (!r.ok) throw new Error(`HTTP ${r.status} from the labeler web app`);
-  const j = await r.json();
-  if (j.status !== "ok") throw new Error(j.message || "labeler web app error");
-  return j;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status} from the labeler web app (${params.action})`);
+      const j = await r.json();
+      if (j.status !== "ok") throw new Error(j.message || `labeler web app error (${params.action})`);
+      return j;
+    } catch (err) {
+      if (attempt >= retries) throw err;
+      await new Promise(res => setTimeout(res, 1500));
+    }
+  }
 }
 
 export async function fetchCombinedVideoCounts({ force = false } = {}) {
