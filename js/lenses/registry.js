@@ -41,6 +41,7 @@ import { PunchClassifierRule } from "./models/punch_classifier.js";
 import { OnDeviceLensRule } from "./inspect/ondevice.js";
 import { PoseCoverageLensRule } from "./inspect/pose_coverage.js";
 import { SkeletonCompareRule } from "./inspect/skeleton_compare.js";
+import { SkeletonUsabilityRule } from "./research/skeleton_usability.js";
 import { StanceWidthLensRule } from "./rules/stance_width.js";
 import { StanceDepthSideRule } from "./rules/stance_depth_side.js";
 import { AudioImpactLensRule } from "./models/audio_impact.js";
@@ -88,6 +89,7 @@ export const RULES = [
   ShoulderGateRule,
   SideSetRule,
   SkeletonCompareRule,
+  SkeletonUsabilityRule,
   SlipExplorationRule,
   SlipsGtRule,
   StanceWidthLensRule,

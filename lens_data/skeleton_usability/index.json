@@ -1,0 +1,4582 @@
+{
+ "generated": "2026-09-18T12:16:08",
+ "source": "ml/research/skeleton_usability/no_skeleton.py",
+ "detector": "no skeleton inside the round (every landmark NaN)",
+ "shelf": "/Users/mathewieme/Google Drive/My Drive/Ambo/data/skeleton_data/blazepose",
+ "n_rounds": 571,
+ "totals": {
+  "n_in_round": 1168249,
+  "n_no_skeleton": 21834,
+  "n_stretches": 3804,
+  "n_rounds_touched": 196
+ },
+ "videos": {
+  "(Critique me!) How do I roll out properly [e34mi6P3MOg]": {
+   "0": {
+    "file": "8899e9c5c488.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.008
+   }
+  },
+  "1 Minute, Simple Combos (Punching Bag Boxing Workout)": {
+   "0": {
+    "file": "e210efcc6e2f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "10 Combos Every Fighter Must Know": {
+   "0": {
+    "file": "8c076a2669c6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.003
+   }
+  },
+  "10 Combos in 10 Minutes \uff5c Boxing Workout": {
+   "0": {
+    "file": "f8da89e87235.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "6e29b4c6211e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "a156c7a462e7.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "f0093f0fe815.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "2c3d092227ab.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "10 Min Complete Shadow Boxing Workout \uff5c Become A Better Boxer": {
+   "0": {
+    "file": "e057fc10bfaf.json",
+    "n_no_skeleton": 11,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.183,
+    "uncovered_tail_sec": 0.001
+   },
+   "1": {
+    "file": "0ed8e3605508.json",
+    "n_no_skeleton": 8,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.133,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "b0f5847431c1.json",
+    "n_no_skeleton": 9,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.15,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "a3665c3f539e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "270dc5c9242e.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.017,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "6461d9b3da85.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "85b02aa5c881.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "7": {
+    "file": "0306e38e11e2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "8": {
+    "file": "eba05e039a69.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "9": {
+    "file": "8cfb052ea259.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "10 Minute Shadow Boxing Workout At Home": {
+   "0": {
+    "file": "86488ce2d084.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "561ac4326fb6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "2d415a57db5d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "99f98693064f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "32b309633a31.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "10 Rounds 10 Combos \uff5c Boxing Training \uff5c jabs, hooks, crosses, uppercuts, overhands, shovel hooks": {
+   "0": {
+    "file": "c75c9db0132a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "1f279014f15e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "3ed64f7a21e5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "fd72bd0f5689.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "e44faac11010.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "9dadd54022d2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "01ee331d904c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "7": {
+    "file": "b2d70a81d746.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "8": {
+    "file": "f4ccaecde50f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "9": {
+    "file": "b48b7a3b0e78.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "10 min FAT LOSS Shadowboxing Workout for Beginners at Home (Follow Along!) (2020)": {
+   "0": {
+    "file": "ee7b286b05c5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "538e85a5525b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "36087c43b3dd.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "10 mins Shadow Boxing Workout \u29f8 No Equipment (follow along)": {
+   "0": {
+    "file": "fe4cc18a73b6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "b6d202b7f58d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "2905cd3c3bd7.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "0a7c5c89d082.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "bae89e302bcc.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "11 minute Aqua Bag 3 rounds Fundamentals Workout [z6B7OIK6LO4]": {
+   "0": {
+    "file": "aff2ae3c6497.json",
+    "n_no_skeleton": 17,
+    "n_stretches": 5,
+    "no_skeleton_sec": 0.567,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "01ca2ca88dc1.json",
+    "n_no_skeleton": 55,
+    "n_stretches": 10,
+    "no_skeleton_sec": 1.833,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "12 Mins Boxing Heavy Bag Workout Complete Beginner (Follow Along)": {
+   "0": {
+    "file": "d2c667d5a37b.json",
+    "n_no_skeleton": 10,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.333,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "141005c017c0.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "13 Shadowboxing Body Shots": {
+   "0": {
+    "file": "c78f58c904c8.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 111.0
+   }
+  },
+  "15 MIN SHADOWBOXING WORKOUT SLIPPING PUNCHES": {
+   "0": {
+    "file": "0cf9d357e57d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.017
+   },
+   "1": {
+    "file": "8ed6fa4c406a.json",
+    "n_no_skeleton": 234,
+    "n_stretches": 1,
+    "no_skeleton_sec": 7.8,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "15 MINUTE FAT BURNING BOXING BAG WORKOUT [FOLLOW ALONG]": {
+   "0": {
+    "file": "f7146e0f2283.json",
+    "n_no_skeleton": 467,
+    "n_stretches": 96,
+    "no_skeleton_sec": 19.478,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "620eab1e70a9.json",
+    "n_no_skeleton": 1099,
+    "n_stretches": 313,
+    "no_skeleton_sec": 45.838,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "4c9f5cdb2205.json",
+    "n_no_skeleton": 838,
+    "n_stretches": 200,
+    "no_skeleton_sec": 34.952,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "15 Mins Beginner Boxing Fitness HIIT Bag Workout (Follow Along)": {
+   "0": {
+    "file": "e10ea582b017.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "a41432f7670c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "02be8941f199.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "b89e719c53b2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "7d0e9cc3221f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "15 Minute Shadowboxing Workout for Beginners with Justin Blackwell \uff5c Get Fit \uff5c Livestrong.com": {
+   "0": {
+    "file": "0fa947a9c164.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "65277a50cd7b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "9b62a35aebfc.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "697a77e894bf.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "9825cd0a443e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "15 Minutes Heavy Bag Cardio Lower Body Workout Follow Along": {
+   "0": {
+    "file": "6220b335c60a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "0a92d3892c84.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "7992698a4aec.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "27148d85d67d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "15 mins Home Boxing Heavy Bag Workout (Follow Along)": {
+   "0": {
+    "file": "18415a12a0b1.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "d33a540e5d81.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "eb318975123c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "36b71359a8cc.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "2 rounds bagwork, working on balance [r1puy8]": {
+   "0": {
+    "file": "e65708e1b67e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "2e218ad56b7b.json",
+    "n_no_skeleton": 18,
+    "n_stretches": 11,
+    "no_skeleton_sec": 0.6,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "2 rounds of bagwork from a current judge\u29f8beginner coach. Why reviewin... [yKxUxPR5kgk]": {
+   "0": {
+    "file": "770b858f74af.json",
+    "n_no_skeleton": 58,
+    "n_stretches": 7,
+    "no_skeleton_sec": 1.933,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "09528dbdfc64.json",
+    "n_no_skeleton": 53,
+    "n_stretches": 9,
+    "no_skeleton_sec": 1.767,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "20 Minute Boxing Footwork Heavy bag Workout - Follow along": {
+   "0": {
+    "file": "a5eb08cbbc14.json",
+    "n_no_skeleton": 296,
+    "n_stretches": 11,
+    "no_skeleton_sec": 4.938,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "7d2a25c91cd8.json",
+    "n_no_skeleton": 187,
+    "n_stretches": 87,
+    "no_skeleton_sec": 3.12,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "744253c1217b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "1163d303af30.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "a2ac041d1ca9.json",
+    "n_no_skeleton": 115,
+    "n_stretches": 43,
+    "no_skeleton_sec": 1.919,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "20 Minute Punching Bag Workout For A Total Body Workout!": {
+   "0": {
+    "file": "5931389988af.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "58681a9fbb62.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "f2baf6e12077.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "20 Minute Shadowboxing for Beginners \uff5c Trainer of the Month Club \uff5c Well+Good": {
+   "0": {
+    "file": "e26232f9d8ed.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.042,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "350c471576fd.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "f0ed12ffb9b6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "3 BODY SHOT COMBOS YOU NEED TO TRY \uff5c Boxing Training": {
+   "0": {
+    "file": "f6693d8bfecd.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.042,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "3 Basic Boxing Combos For Southpaws #boxing #combos #viral": {
+   "0": {
+    "file": "95ef98640812.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.003
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #DAY10 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [UJyeAXZjwVk]": {
+   "0": {
+    "file": "2e340e20bebc.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "27e412694d51.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "55adf56a8557.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "92c97bbccecb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #DAY12  #HIENSUNDAY  #BoxingAtHome #HomeWorkout [lXDh7KG3t80]": {
+   "0": {
+    "file": "c15b9427c31a.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #DAY13  #HIENSUNDAY  #BoxingAtHome #HomeWorkout [Mk_ZkHfwhSY]": {
+   "0": {
+    "file": "7bd71875411b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #DAY15  #HIENSUNDAY  #BoxingAtHome #HomeWorkout [XKm4qpYIwl8]": {
+   "0": {
+    "file": "3bd37fc0951c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.019
+   },
+   "1": {
+    "file": "17346199e4f3.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "37475cd8f2b6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #DAY16  #HIENSUNDAY  #BoxingAtHome #HomeWorkout [pTNIAZADJzM]": {
+   "0": {
+    "file": "35c85810ff0e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.033
+   },
+   "1": {
+    "file": "02edf69c6a69.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "d3a743d99a91.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #DAY5 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [0yO_pkP9Wsc]": {
+   "0": {
+    "file": "767015e48254.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #DAY6 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [ild-CnHmQeg]": {
+   "0": {
+    "file": "666bb5e73be2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #DAY9 #HIENSUNDAY  #BoxingAtHome #HomeWorkout [w8F2vAo991k]": {
+   "0": {
+    "file": "261bd77d9bf2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day20    #HIENSUNDAY  #BoxingAtHome #HomeWorkout [L32whtDKX5M]": {
+   "0": {
+    "file": "ce66d2fe401b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "1b48da06984a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "fe47549651b2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day21    #HIENSUNDAY  #BoxingAtHome #HomeWorkout [RWi1NxgXQVM]": {
+   "0": {
+    "file": "4d77a62b2ac2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "85a25abd5149.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day23     #HIENSUNDAY  #BoxingAtHome #HomeWorkout [Vc3qK2Ftju8]": {
+   "0": {
+    "file": "8d36b9ab5192.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "e430b1a8d017.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day24     #HIENSUNDAY  #BoxingAtHome #HomeWorkout [pbcyfMtMlgU]": {
+   "0": {
+    "file": "61dde9465129.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.01
+   },
+   "1": {
+    "file": "4421c3238f22.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "4f0f06f439a3.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day25    #HIENSUNDAY  #BoxingAtHome #HomeWorkout [Ln83hGcv0x4]": {
+   "0": {
+    "file": "d60eae0a17a9.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day26    #HIENSUNDAY  #BoxingAtHome #HomeWorkout [VBP5WcOgpjA]": {
+   "0": {
+    "file": "c48239aa03b3.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "5d5f8edd7ecf.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day27     #HIENSUNDAY  #BoxingAtHome #HomeWorkout [iRA1LJb0Jz4]": {
+   "0": {
+    "file": "cc7f7d9ce1af.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "40c1a87c7edb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day28     #HIENSUNDAY  #BoxingAtHome #HomeWorkout [PQ8lNBGjxjA]": {
+   "0": {
+    "file": "7daccb1407da.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day29    #HIENSUNDAY  #BoxingAtHome #HomeWorkout [cRJbJpJDOGk]": {
+   "0": {
+    "file": "a986bf4d99fb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "f0fdd0d501b0.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Days of Basic Boxing at Home for Beginners #day30    #HIENSUNDAY  #BoxingAtHome #HomeWorkout [bzkW9CIRNfI]": {
+   "0": {
+    "file": "6cec0222a8b5.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 MIN SHADOWBOXING FOR FAT LOSS \u29f8 Equipment Optional \uff5c Jeremy Sry": {
+   "0": {
+    "file": "764334408575.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "9d9d1f8ed186.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Minute Boxing HIIT Workout with a Heavy Bag [Round 2] 2022_h264": {
+   "0": {
+    "file": "f96dc7ae8c90.json",
+    "n_no_skeleton": 226,
+    "n_stretches": 4,
+    "no_skeleton_sec": 9.417,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "5a54b3df6484.json",
+    "n_no_skeleton": 211,
+    "n_stretches": 1,
+    "no_skeleton_sec": 8.792,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "ba6dd52d9fc5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "f0341c696671.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "606803a42e2a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "c7c7b089df1f.json",
+    "n_no_skeleton": 77,
+    "n_stretches": 1,
+    "no_skeleton_sec": 3.208,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "e02b6adb9139.json",
+    "n_no_skeleton": 77,
+    "n_stretches": 1,
+    "no_skeleton_sec": 3.208,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Minute Follow Along Boxing Workout": {
+   "0": {
+    "file": "0e780fc4943e.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.067,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "b5ebabee83f2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "7e286807b932.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "b8b96eaf5ad8.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.133,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Minute Heavy Bag Boxing Workout at Home \uff5c 10 Round Follow Along": {
+   "0": {
+    "file": "f4cd14e0baf3.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "3320ff8811cf.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "a0efadd2f772.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "13f1c5403bd7.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "ff5809f2ddb6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "6f6f96f781ca.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "daee3e785ae5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "7": {
+    "file": "972fc6cf5573.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "30 Minutes FULL Boxing Workout \uff5c Follow Along": {
+   "0": {
+    "file": "43458eafbbcd.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.067,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "8677fbeb7f67.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "0e9b86187ef4.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "e912d8e99a47.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "4 EFFECTIVE BOXING COMBOS BEGINNER BOXERS SHOULD LEARN! \ud83e\udd4a #boxing #boxingtraining #boxingworkout": {
+   "0": {
+    "file": "2807fad66fad.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.017,
+    "uncovered_tail_sec": 0.067
+   }
+  },
+  "4 Round Boxing Workout At-Home with Coach PJ": {
+   "0": {
+    "file": "ec33809ed067.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.125,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "8e1d194c569c.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.042,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "e9c10fa54406.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.125,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "4 Set-ups for the Shovel Hook \uff5c Land More Body Shots": {
+   "0": {
+    "file": "9055b2d5ef27.json",
+    "n_no_skeleton": 5,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.083,
+    "uncovered_tail_sec": 0.015
+   }
+  },
+  "4 mo in, here\u2019s some shadowboxing, would love some feedback. [Zruiz3YJ9VU]": {
+   "0": {
+    "file": "d458c2c8dcb9.json",
+    "n_no_skeleton": 176,
+    "n_stretches": 24,
+    "no_skeleton_sec": 5.867,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "5 Min Shadow Boxing Workout (Follow Along)": {
+   "0": {
+    "file": "c0af00af825c.json",
+    "n_no_skeleton": 107,
+    "n_stretches": 1,
+    "no_skeleton_sec": 3.57,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "2c8de632e2cc.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "893b5ea5d270.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "95ba47aa1ab7.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "0248a6579d92.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "7th Round of hitting the AquaBag. Couple months since my last bag cri... [ietnlh]": {
+   "0": {
+    "file": "eb35a68e3697.json",
+    "n_no_skeleton": 485,
+    "n_stretches": 83,
+    "no_skeleton_sec": 16.183,
+    "uncovered_tail_sec": 0.02
+   }
+  },
+  "9 Months into boxing, Possibly first amateur fight this year! Excited [d7btg1ijf0sc1]": {
+   "0": {
+    "file": "93c1544234b6.json",
+    "n_no_skeleton": 42,
+    "n_stretches": 23,
+    "no_skeleton_sec": 1.4,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "A little help with form and flow [zATbn5Ry40M]": {
+   "0": {
+    "file": "3e07ec1db3c2.json",
+    "n_no_skeleton": 49,
+    "n_stretches": 6,
+    "no_skeleton_sec": 1.64,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "A short clip of my shadowboxing-any critiques [sc0nbwk383vf1]": {
+   "0": {
+    "file": "b484787bb61c.json",
+    "n_no_skeleton": 254,
+    "n_stretches": 3,
+    "no_skeleton_sec": 8.467,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "Advice on my Shadow Boxing [KLX3xfCo9Cw]": {
+   "0": {
+    "file": "0c53058207b2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.033
+   },
+   "1": {
+    "file": "1e9b6e1fbb96.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Advice request on my bag work. [EglbwnGsod8]": {
+   "0": {
+    "file": "0547587f61a1.json",
+    "n_no_skeleton": 83,
+    "n_stretches": 34,
+    "no_skeleton_sec": 2.967,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "All Critiques Welcome! Shadowboxing and Heavy Bag Work [72xhx3]_h264": {
+   "0": {
+    "file": "c94fc504e8e8.json",
+    "n_no_skeleton": 129,
+    "n_stretches": 14,
+    "no_skeleton_sec": 4.304,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "74f168be5c54.json",
+    "n_no_skeleton": 97,
+    "n_stretches": 28,
+    "no_skeleton_sec": 3.237,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "All around technique advice \ud83d\ude4f\ud83c\udffd [vXa5BicbiUQ]": {
+   "0": {
+    "file": "92b99fe5a7c6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.049
+   }
+  },
+  "Any criticism is welcome, can't move around as much as I'd like due to limited space [mbhlc4]": {
+   "0": {
+    "file": "cd59754cf368.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Any feedback or tips [cvc0rz8um1s41]": {
+   "0": {
+    "file": "2bc6abe55550.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Any tips on shadowboxing [USPC7xOgp0M]": {
+   "0": {
+    "file": "ddb143959ebb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Any ways to improve my bag work [nL-g1t3-jWQ]": {
+   "0": {
+    "file": "3f5ac7dc429f.json",
+    "n_no_skeleton": 22,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.367,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "App calling out boxing punches - heavybag workout [XgQc4qIc9Hw]": {
+   "0": {
+    "file": "6245451d4ccf.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Appreciate feedback on my shadowboxing (10\u29f807\u29f82020) [Lol86i3-BOM]_h264": {
+   "0": {
+    "file": "087678e8026a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.038
+   },
+   "1": {
+    "file": "438650a015c9.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "BEGINNER SHADOW BOXING DRILLS": {
+   "0": {
+    "file": "6e65783c1df2.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 4,
+    "no_skeleton_sec": 0.167,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "b37f6131b8d7.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.125,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bag Work Critique [40d_0gj9Wtw]": {
+   "0": {
+    "file": "3bcb401b60c8.json",
+    "n_no_skeleton": 50,
+    "n_stretches": 23,
+    "no_skeleton_sec": 1.667,
+    "uncovered_tail_sec": 0.032
+   }
+  },
+  "Bag Work [br1mwNQClcE]": {
+   "0": {
+    "file": "56a660934d4c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.025
+   }
+  },
+  "Bag Work..Critiques are appreciated! [SjpW55P_gq0]": {
+   "0": {
+    "file": "ef4b315d6049.json",
+    "n_no_skeleton": 13,
+    "n_stretches": 4,
+    "no_skeleton_sec": 0.542,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "5c982d9a000f.json",
+    "n_no_skeleton": 318,
+    "n_stretches": 21,
+    "no_skeleton_sec": 13.25,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "1b5b4c9c2a52.json",
+    "n_no_skeleton": 89,
+    "n_stretches": 8,
+    "no_skeleton_sec": 3.708,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bag work Critique [kqEqCspY3Hw]": {
+   "0": {
+    "file": "175e2e163727.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bag work [4tcg5x]": {
+   "0": {
+    "file": "3e7a4b546d31.json",
+    "n_no_skeleton": 1332,
+    "n_stretches": 206,
+    "no_skeleton_sec": 22.2,
+    "uncovered_tail_sec": 0.016
+   }
+  },
+  "Bag work critique (this is my 4th round on the bag, just decided to r... [y-S5b0-gdPc]": {
+   "0": {
+    "file": "703b5cce65cf.json",
+    "n_no_skeleton": 1137,
+    "n_stretches": 168,
+    "no_skeleton_sec": 37.9,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bag work video [vB6MEMMlkGo]": {
+   "0": {
+    "file": "c9f7cd172a1f.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.025
+   }
+  },
+  "Bag work- beginner [no8qav]": {
+   "0": {
+    "file": "962582636242.json",
+    "n_no_skeleton": 42,
+    "n_stretches": 15,
+    "no_skeleton_sec": 1.401,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "0eb10b0960a2.json",
+    "n_no_skeleton": 48,
+    "n_stretches": 12,
+    "no_skeleton_sec": 1.602,
+    "uncovered_tail_sec": 0.003
+   }
+  },
+  "Bag-work Critique Submission [pg2FHkwvvso]": {
+   "0": {
+    "file": "9c89812e3545.json",
+    "n_no_skeleton": 14,
+    "n_stretches": 11,
+    "no_skeleton_sec": 0.467,
+    "uncovered_tail_sec": 0.052
+   }
+  },
+  "Bagwork Critique - would love some Pointers :) [f1if7zb7k9oz]": {
+   "0": {
+    "file": "948fb51bd7fe.json",
+    "n_no_skeleton": 68,
+    "n_stretches": 20,
+    "no_skeleton_sec": 2.267,
+    "uncovered_tail_sec": 0.033
+   }
+  },
+  "Bagwork Critique [UyZ77aEugUA]": {
+   "0": {
+    "file": "60e830eb2161.json",
+    "n_no_skeleton": 60,
+    "n_stretches": 18,
+    "no_skeleton_sec": 2.0,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "Bagwork Critique. been training going on 2 years now. I appreciate an... [v9vwvm]": {
+   "0": {
+    "file": "81ed5e998eca.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "Bagwork Feedback Please [i-fCORcEuOA]": {
+   "0": {
+    "file": "0dde9dda786e.json",
+    "n_no_skeleton": 10,
+    "n_stretches": 5,
+    "no_skeleton_sec": 0.333,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "30ff2ff1428e.json",
+    "n_no_skeleton": 13,
+    "n_stretches": 5,
+    "no_skeleton_sec": 0.433,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "e8a4fe8a4c96.json",
+    "n_no_skeleton": 7,
+    "n_stretches": 5,
+    "no_skeleton_sec": 0.233,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bagwork Focused on Head movement [NukaT9gyxq0]": {
+   "0": {
+    "file": "e9aa7b4d4ad2.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.05,
+    "uncovered_tail_sec": 0.007
+   }
+  },
+  "Bagwork Submission 97 - 201lbs - 62 [WGxiSon2QgQ]": {
+   "0": {
+    "file": "8e284b0b0e7a.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "524a3980d612.json",
+    "n_no_skeleton": 11,
+    "n_stretches": 5,
+    "no_skeleton_sec": 0.367,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bagwork and shadowboxing. Please let me know what flaws you see, apar... [nO9KBfYvv2c]": {
+   "0": {
+    "file": "87539b9f008b.json",
+    "n_no_skeleton": 1090,
+    "n_stretches": 118,
+    "no_skeleton_sec": 36.333,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "ced665d9a954.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bagwork critique Trying to work on 1-2's, being stable in my stance,... [ZXgLU9cSe58]": {
+   "0": {
+    "file": "8908521c1248.json",
+    "n_no_skeleton": 88,
+    "n_stretches": 7,
+    "no_skeleton_sec": 2.936,
+    "uncovered_tail_sec": 0.056
+   }
+  },
+  "Bagwork critique [HJ7tFAs8fzI]": {
+   "0": {
+    "file": "ecad78b29d04.json",
+    "n_no_skeleton": 401,
+    "n_stretches": 72,
+    "no_skeleton_sec": 13.38,
+    "uncovered_tail_sec": 0.006
+   }
+  },
+  "Bagwork critique [UbiBUlHY1GE]": {
+   "0": {
+    "file": "ad4678ef4449.json",
+    "n_no_skeleton": 17,
+    "n_stretches": 6,
+    "no_skeleton_sec": 0.283,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bagwork critique [aA1G_V-Gj64]": {
+   "0": {
+    "file": "3836e57ad570.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.033
+   }
+  },
+  "Bagwork critique [amZPoRM3s78]": {
+   "0": {
+    "file": "4237ee35d74d.json",
+    "n_no_skeleton": 75,
+    "n_stretches": 42,
+    "no_skeleton_sec": 2.5,
+    "uncovered_tail_sec": 0.069
+   }
+  },
+  "Bagwork critique [kuzxwb]": {
+   "0": {
+    "file": "ff462b32235f.json",
+    "n_no_skeleton": 1008,
+    "n_stretches": 69,
+    "no_skeleton_sec": 33.6,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bagwork critique [pIKBU2tYzPw]": {
+   "0": {
+    "file": "1fa3da83c934.json",
+    "n_no_skeleton": 327,
+    "n_stretches": 83,
+    "no_skeleton_sec": 5.45,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bagwork critique [u-pU_enJtiU]": {
+   "0": {
+    "file": "b9abf2044fd5.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.133,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "50a609da2227.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 4,
+    "no_skeleton_sec": 0.133,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bagwork critique please mainly focusing on trying [espwgn]": {
+   "0": {
+    "file": "a53f52aedcee.json",
+    "n_no_skeleton": 88,
+    "n_stretches": 8,
+    "no_skeleton_sec": 2.936,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bagwork lookin for critique! [784eVwj8cTY]": {
+   "0": {
+    "file": "8933969782a2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.024
+   }
+  },
+  "Bagwork opinions appreciated [1u86mz]": {
+   "0": {
+    "file": "fc003c6307ce.json",
+    "n_no_skeleton": 40,
+    "n_stretches": 3,
+    "no_skeleton_sec": 1.334,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "4a8d3a83e26b.json",
+    "n_no_skeleton": 15,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.5,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "707c00b1057c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "14c9b5f886f6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "2dd32750e9a0.json",
+    "n_no_skeleton": 76,
+    "n_stretches": 4,
+    "no_skeleton_sec": 2.536,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Bagwork posted one and fixed a few things in reference to the comments [5Ui5RYJRUFk]": {
+   "0": {
+    "file": "ee113afe9187.json",
+    "n_no_skeleton": 203,
+    "n_stretches": 13,
+    "no_skeleton_sec": 6.767,
+    "uncovered_tail_sec": 0.032
+   }
+  },
+  "Bagwork, little improvement but more of an update [Ps-arwZbCx0]": {
+   "0": {
+    "file": "76fcaa4805f0.json",
+    "n_no_skeleton": 24,
+    "n_stretches": 11,
+    "no_skeleton_sec": 0.4,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Basic Boxing Combos To MASTER! Part 1": {
+   "0": {
+    "file": "5004c471514d.json",
+    "n_no_skeleton": 7,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.233,
+    "uncovered_tail_sec": 0.003
+   }
+  },
+  "Basic boxing combo\ud83e\udd4a #boxing #kickboxing #mma #training #usa #martialarts": {
+   "0": {
+    "file": "b91cba3ec3fc.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.067,
+    "uncovered_tail_sec": 0.03
+   }
+  },
+  "Been Working on previous advice. Grateful for any pointers to improve form. thanks! [zafts3]": {
+   "0": {
+    "file": "5af2b46b841f.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.067,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Beginner Heavy Bag Workout \uff5c 15 Min Fat-Burning Boxing Follow Along With Igor Matejski": {
+   "0": {
+    "file": "7076fd335214.json",
+    "n_no_skeleton": 212,
+    "n_stretches": 8,
+    "no_skeleton_sec": 3.533,
+    "uncovered_tail_sec": 0.003
+   },
+   "1": {
+    "file": "4efa0017f6ee.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "041c65a0aff8.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "ae0d8ec2dd2a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "f2c5be3d6c93.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "90e16f44a3ad.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "3d6a6c29c5b6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.003
+   },
+   "7": {
+    "file": "c47f713fde7c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "8": {
+    "file": "23b88c45ab16.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "9": {
+    "file": "a681ec7cdb61.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "10": {
+    "file": "4f052114f4fa.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "11": {
+    "file": "b45c918e520e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "12": {
+    "file": "7a20ade31ae8.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "13": {
+    "file": "141eac702535.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "14": {
+    "file": "a893cf92a7af.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Beginner Shadow Boxing Workout In 5 Minutes \uff5c Working The Jab (Follow Along)": {
+   "0": {
+    "file": "23ab3d16289b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "def4b5515d0b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "ca27b19fac56.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "e742dba45840.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "e6fa122179f6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "59d02b7fd2f1.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "b31355c2a655.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "7": {
+    "file": "b5a47dd2654d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Beginner Shadow Boxing. Looking for critique on punch technique. [dqk25q]": {
+   "0": {
+    "file": "6f0e6fd48012.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.007
+   }
+  },
+  "Beginner shadowboxing - looking for honest critique [PMQpEkaf9h4]": {
+   "0": {
+    "file": "2b782d4411c9.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "f646b6f41d76.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Beginners Boxing Combos To Improve Your Shadow Boxing\ud83e\udd4a #boxing #beginners #combo": {
+   "0": {
+    "file": "71d197db2e36.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.007
+   }
+  },
+  "Best app for the punching bag #boxing [vol35Zr8sJk]": {
+   "0": {
+    "file": "f97582a22f1b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "Best boxing app to practice boxing on the bag [AbS33zei-_A]": {
+   "0": {
+    "file": "8c0dfe4e196f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Best boxing workout app to call out combos and train at home or at the gym": {
+   "0": {
+    "file": "c8cdf8d148da.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.06
+   }
+  },
+  "Boxing app that calls out combos [v0zp04Ilqio]": {
+   "0": {
+    "file": "2ab8747d9301.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Boxing app that calls out punches [YP9dAExiSWg]": {
+   "0": {
+    "file": "07058a140c7b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Boxing app workout": {
+   "0": {
+    "file": "6ee5855498bd.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "fa7cfd8ad418.json",
+    "n_no_skeleton": 59,
+    "n_stretches": 8,
+    "no_skeleton_sec": 0.983,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "3f068cc51357.json",
+    "n_no_skeleton": 296,
+    "n_stretches": 19,
+    "no_skeleton_sec": 4.933,
+    "uncovered_tail_sec": 0.005
+   }
+  },
+  "Boxing bag workout with an app [mJDjsdWZSlk]": {
+   "0": {
+    "file": "c3e7f43bc2ac.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Boxing combo - 1 - 2 - 1 - 2 (learn it with an app) [VtQDsD98ErU]": {
+   "0": {
+    "file": "6d730cbce6c4.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.042,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Boxing combo workout on the heavy bag": {
+   "0": {
+    "file": "34e18421add4.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.049
+   }
+  },
+  "Boxing combo workout on the heavy bag [IBZf2QyFV2Q]": {
+   "0": {
+    "file": "9ee13e7c7c84.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Boxing combos \u2714\ufe0f\ud83e\udd4a #boxingtraining #boxing #boxingcombos #shadowboxing #shadowbox #boxingcombos": {
+   "0": {
+    "file": "cd4bddaf03ef.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.003
+   }
+  },
+  "Boxing drill with an app [MLsP9OG6WrA]": {
+   "0": {
+    "file": "0ca744f886a0.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Boxing training using app \u29f8 shadowboxing explosive workout with app": {
+   "0": {
+    "file": "ec4ea263324f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "8395f9011891.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "2609caf22d77.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "12d3aae3c407.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "481b9676302b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Boxing training with the best workout app": {
+   "0": {
+    "file": "9d3cef95f193.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.05
+   }
+  },
+  "Boxing warmup and workout with a mobile app [syvYRmyxByQ]": {
+   "0": {
+    "file": "5bd9ab6dd8dc.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "ecfdc240851c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.062
+   }
+  },
+  "Boxing workout on the bag (with an app) [aC-ta0If6MQ]": {
+   "0": {
+    "file": "6e04494554fa.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Can I please get some critique-advice on my shadowboxing [nzaxd9]": {
+   "0": {
+    "file": "b616a409171a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "dfe8c8da3370.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "496ac1d0cdc2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Can you guys give me some tips to improve my shadow boxing I have be... [c03ekbdds1241]": {
+   "0": {
+    "file": "37cfe53eab2b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Christmas Bagwork [fhe2b0]": {
+   "0": {
+    "file": "0c6349a972a5.json",
+    "n_no_skeleton": 121,
+    "n_stretches": 27,
+    "no_skeleton_sec": 4.037,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Combos ideas for the heavy bag (boxing)": {
+   "0": {
+    "file": "aa5712987e11.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Critique My Bagwork [vt60g764rj401]": {
+   "0": {
+    "file": "8919e6b8d751.json",
+    "n_no_skeleton": 86,
+    "n_stretches": 24,
+    "no_skeleton_sec": 2.867,
+    "uncovered_tail_sec": 0.007
+   }
+  },
+  "Critique heavy bag work [Myom6sQfFvU]": {
+   "0": {
+    "file": "f45499947e75.json",
+    "n_no_skeleton": 471,
+    "n_stretches": 85,
+    "no_skeleton_sec": 7.85,
+    "uncovered_tail_sec": 0.031
+   }
+  },
+  "Critique my bagwork and suggest some improvement drills. [e7rt8]": {
+   "0": {
+    "file": "77e572eba3e5.json",
+    "n_no_skeleton": 132,
+    "n_stretches": 41,
+    "no_skeleton_sec": 4.412,
+    "uncovered_tail_sec": 0.014
+   }
+  },
+  "Critique on shadowboxing [xbj8rs]": {
+   "0": {
+    "file": "10367bb18997.json",
+    "n_no_skeleton": 10,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.333,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Dmitry Bivol silky shadow boxing skills #dmitrybivol #bivol #boxing": {
+   "0": {
+    "file": "31ccb51732cf.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Do This 5 Minute Shadow Boxing Workout For A Strong Left Hook": {
+   "0": {
+    "file": "71e2dac9e9fb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "5a5799444c4a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "839c303c5eeb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "aeb7ca1bf9b3.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "9158637aa263.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "03eecc9f60a2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "28ca31d97dd8.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "7": {
+    "file": "26735634e47a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Do a full round practicing a combo. Today\uff1a 1 - 2 - 3 - Slip left - 3 body [z8nHPsrrsmw]": {
+   "0": {
+    "file": "82545e3fd2d0.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Easy shadow boxing session in the garage": {
+   "0": {
+    "file": "08aac9538a88.json",
+    "n_no_skeleton": 5,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.168,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "ef4ec24980ac.json",
+    "n_no_skeleton": 5,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.168,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "9a0ab534357a.json",
+    "n_no_skeleton": 78,
+    "n_stretches": 22,
+    "no_skeleton_sec": 2.616,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "a1879eb43bbd.json",
+    "n_no_skeleton": 103,
+    "n_stretches": 30,
+    "no_skeleton_sec": 3.454,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "ac9ce4961cbe.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.034,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "a86bcba731b4.json",
+    "n_no_skeleton": 7,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.235,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Exercise- Hook and uppercuts (shadow boxing)": {
+   "0": {
+    "file": "a853ed6c842e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "e87ab98af2ec.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Fight Ready! My pre BOXING match SHADOWBOXING Routine [hJ1IYx4DXwg]_h264": {
+   "0": {
+    "file": "1fe88b477700.json",
+    "n_no_skeleton": 18,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.3,
+    "uncovered_tail_sec": 0.01
+   },
+   "1": {
+    "file": "a124d5badea1.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Follow Along 15 Minute Punching Bag Routine\uff1a Heavy Bag BOXING Workout Leg Exercises included": {
+   "0": {
+    "file": "ad5870cad897.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.022
+   }
+  },
+  "Follow Along 20-Minute Shadow Boxing Workout": {
+   "0": {
+    "file": "8301cda59f0e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "16d1314f8a4b.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Follow Along Heavy Bag Workout \uff5c 10 minutes": {
+   "0": {
+    "file": "3762d3e7ed1f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "6f3279a466d6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "33290998a1e5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "7c416ba1e320.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Follow Along Shadow Boxing Workout At  Home": {
+   "0": {
+    "file": "bf5af716650b.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.042,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "1b9885f5e964.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "ebf5ea672c4b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "d011fc2ce993.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.083,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Follow along light shadow boxing session [5m74QKDR1W4]": {
+   "0": {
+    "file": "24174ea7e601.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.054
+   }
+  },
+  "Footwork freestyle on the bag. [Ybfd_FFfZyY]": {
+   "0": {
+    "file": "38ae7e860f16.json",
+    "n_no_skeleton": 71,
+    "n_stretches": 10,
+    "no_skeleton_sec": 2.367,
+    "uncovered_tail_sec": 0.031
+   }
+  },
+  "Form feedback [XGBz3869mMY]": {
+   "0": {
+    "file": "46e343b42eee.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Full Body in 10 Minutes \uff5c Shadow Boxing Workout": {
+   "0": {
+    "file": "2c70a0af1d2e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Full POWER Bag Work \uff5c Follow Along Session": {
+   "0": {
+    "file": "5c7743f72572.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.067,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "361e7c1daaae.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.133,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "358b390cbe7f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "5e1873090140.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.067,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Getting back to Boxing; please critique bag-work. [yUYekjZyi4s]": {
+   "0": {
+    "file": "685bcd51019e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Grateful for any feedback, thanks! [h5egk6]": {
+   "0": {
+    "file": "6a1efc58dead.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Guided shadow boxing with an app": {
+   "0": {
+    "file": "632065dd6627.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "HOOKS \ud83e\ude9d & FOOTWORK \ud83e\udd4a. Shadow Boxing Drill (female boxing) #boxingworkout #shadowboxing #shorts": {
+   "0": {
+    "file": "45f5adae592b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.057
+   }
+  },
+  "Heavy Bag Punching Bag workout \uff5c Audio call outs \uff5c Session 2 [gJ_W4rviWDs]": {
+   "0": {
+    "file": "459532b81846.json",
+    "n_no_skeleton": 32,
+    "n_stretches": 10,
+    "no_skeleton_sec": 1.333,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "58aa7373fcd3.json",
+    "n_no_skeleton": 240,
+    "n_stretches": 41,
+    "no_skeleton_sec": 10.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "763b023c175b.json",
+    "n_no_skeleton": 69,
+    "n_stretches": 31,
+    "no_skeleton_sec": 2.875,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "0b1402ead8b1.json",
+    "n_no_skeleton": 29,
+    "n_stretches": 15,
+    "no_skeleton_sec": 1.208,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "0de6f0fc4f3f.json",
+    "n_no_skeleton": 189,
+    "n_stretches": 43,
+    "no_skeleton_sec": 7.875,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "590596046ef6.json",
+    "n_no_skeleton": 132,
+    "n_stretches": 27,
+    "no_skeleton_sec": 5.5,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Heavy Bag Workout #2 \uff5c 3 PUNCH COMBOS  \uff5c FOLLOW ALONG Less than 10mins": {
+   "0": {
+    "file": "c35cb1f756d1.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "615d4a0c3388.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "f80e7b34b225.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "5510983180b5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "a970e77e9dbe.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "04818edb70f6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "93dba96b7f9f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "7": {
+    "file": "8813a1f89c72.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "8": {
+    "file": "114aab5c3769.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "9": {
+    "file": "c7c3dd849d43.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "10": {
+    "file": "3b1e1e30356a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "11": {
+    "file": "93e66a81c4cb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "12": {
+    "file": "84ba0285b873.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "13": {
+    "file": "12f005fd69ce.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "14": {
+    "file": "a9c16625c716.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "15": {
+    "file": "227acf1d1713.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "16": {
+    "file": "a5c7e5b52380.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "17": {
+    "file": "2c2b07b0f81d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "18": {
+    "file": "a945c8ddef0c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "19": {
+    "file": "1bc5c4923b24.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "20": {
+    "file": "67f6fecf4265.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "21": {
+    "file": "c7c62eaad005.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "22": {
+    "file": "e5e091613866.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "23": {
+    "file": "17d640f3eed2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Heavy Bag Workout #3 \uff5c 4 PUNCH COMBOS  \uff5c FOLLOW ALONG Less than 10mins": {
+   "0": {
+    "file": "1604dc58f1fc.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "8ee07ff9c157.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "a1a67f0e9dee.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Heavy Bag Workout \uff5c 10 Minute Follow Along Boxing Workout [Ik2coTPVOVI]": {
+   "0": {
+    "file": "5aed3c3bba4b.json",
+    "n_no_skeleton": 73,
+    "n_stretches": 5,
+    "no_skeleton_sec": 1.218,
+    "uncovered_tail_sec": 0.015
+   },
+   "1": {
+    "file": "3dace516e33f.json",
+    "n_no_skeleton": 11,
+    "n_stretches": 9,
+    "no_skeleton_sec": 0.184,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "df255e7c2938.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "d144a93f291f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Heavy Bag Workout \uff5c 15 Minute Follow Along Boxing Workout": {
+   "0": {
+    "file": "9ab2227c4f2b.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.042,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "9e0249234eb5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Heavy Bag Workout \uff5c 25 Minute Follow Along For Beginners": {
+   "0": {
+    "file": "7916b4339423.json",
+    "n_no_skeleton": 7,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.233,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "fb6c0232f736.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "cbe30d6b48a4.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.133,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "c2c5f8970146.json",
+    "n_no_skeleton": 5,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.167,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "28c89901f901.json",
+    "n_no_skeleton": 8,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.267,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Heavy Bag Workout \uff5c Follow along Boxing Workout": {
+   "0": {
+    "file": "b60dad23ff17.json",
+    "n_no_skeleton": 102,
+    "n_stretches": 26,
+    "no_skeleton_sec": 3.403,
+    "uncovered_tail_sec": 0.02
+   }
+  },
+  "Heavy bag boxing workout, pro training with an app [W9LPEvLxtO8]": {
+   "0": {
+    "file": "4de8f8cd495f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.064
+   }
+  },
+  "Heavy bag feedback [GaYkij79kDw]": {
+   "0": {
+    "file": "667583da9fce.json",
+    "n_no_skeleton": 64,
+    "n_stretches": 20,
+    "no_skeleton_sec": 2.133,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "3135045a9bb5.json",
+    "n_no_skeleton": 131,
+    "n_stretches": 24,
+    "no_skeleton_sec": 4.367,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Heavy bag workout with the best boxing app [R76RFSR7V2I]": {
+   "0": {
+    "file": "41f23a341038.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Heavybag boxing workout (with an app) [dBF1SFDm3zA]": {
+   "0": {
+    "file": "dbf471cad606.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "Heavybag workout with the best boxing app out there [sV5OwLep5UA]": {
+   "0": {
+    "file": "6f1a378864f5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.058
+   }
+  },
+  "Hello I'd like some bag critique, I'm 21 and started boxing at 17 now... [2GXRH1-h-oE]": {
+   "0": {
+    "file": "06cd157d0a97.json",
+    "n_no_skeleton": 10,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.333,
+    "uncovered_tail_sec": 0.069
+   }
+  },
+  "Hey, -r-amateur_boxing ! Could you guys critique-make suggestions on ... [uaMUvfWwNaY]": {
+   "0": {
+    "file": "70adf104df70.json",
+    "n_no_skeleton": 377,
+    "n_stretches": 13,
+    "no_skeleton_sec": 12.567,
+    "uncovered_tail_sec": 0.012
+   }
+  },
+  "Hi guys. Just a 17 year old kid here. Just want to know what you can say about my form Things I can work on [7iygp0ewec241]": {
+   "0": {
+    "file": "b47b0a6123e5.json",
+    "n_no_skeleton": 14,
+    "n_stretches": 7,
+    "no_skeleton_sec": 0.467,
+    "uncovered_tail_sec": 0.032
+   }
+  },
+  "High Intensity Fat Burning Heavy Bag Workout (20-Minute Follow Along)": {
+   "0": {
+    "file": "d06c3c016258.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.032
+   }
+  },
+  "Home workout with a boxing app": {
+   "0": {
+    "file": "54885fa3f2b8.json",
+    "n_no_skeleton": 9,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.3,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "2d603f639cc9.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "aeb5de617615.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "316c72a4e7d9.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "How is my shadow boxing\uff1f Tried to add leg movements and ducking. [8Jouyceljjc]": {
+   "0": {
+    "file": "debbd3fd24da.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.083,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "How to Slip Punches": {
+   "0": {
+    "file": "dcbe200aad40.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.042
+   }
+  },
+  "How to Target the Body (Boxing 101)": {
+   "0": {
+    "file": "9570c58df636.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "3295e293ab4a.json",
+    "n_no_skeleton": 11,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.459,
+    "uncovered_tail_sec": 0.045
+   }
+  },
+  "How to get better at #shadowboxing": {
+   "0": {
+    "file": "20b05262ab7d.json",
+    "n_no_skeleton": 10,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.333,
+    "uncovered_tail_sec": 0.003
+   }
+  },
+  "I got a lot of great feedback here. Time for another critique of my shadow boxing -- after 3 years [BSmTYUs5vdQ]": {
+   "0": {
+    "file": "bdc4cd454718.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "IMG_6694": {
+   "0": {
+    "file": "23e04e91fe7c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "INTENSE 10 Miniute Shadow boxing workout #boxing [7PCYxd3uhVY]": {
+   "0": {
+    "file": "201b0018a5b5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "e70143c93af6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "1a7eb15560f7.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "bbb749d560f1.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Isolated punches on the bag with an app [mNvCVXk12oI]": {
+   "0": {
+    "file": "6f3615c61a23.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Just bagwork looking for more critique as always [yDN-JKY7RnQ]": {
+   "0": {
+    "file": "fd6b1698e095.json",
+    "n_no_skeleton": 86,
+    "n_stretches": 27,
+    "no_skeleton_sec": 2.893,
+    "uncovered_tail_sec": 0.047
+   }
+  },
+  "Keeping active since the gym closed - 3 round shadowboxing": {
+   "0": {
+    "file": "851a00c885c2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "45df5dfc095a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "e01b1532def1.json",
+    "n_no_skeleton": 5,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.085,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Killer Heavy Bag Workout \uff5c I talk you through it, so let's do it!": {
+   "0": {
+    "file": "fade2947ad41.json",
+    "n_no_skeleton": 5,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.208,
+    "uncovered_tail_sec": 0.001
+   },
+   "1": {
+    "file": "ed168ba5c399.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "39b35b1d1619.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "06b224430652.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "8f0f3cce0674.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "ee7da9409432.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "7531d95d25cf.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "7": {
+    "file": "6b437f217d6a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "8": {
+    "file": "70ddce46d708.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "9": {
+    "file": "a89cf5b9f8c1.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "LEFT LIVER PUNCH (7) - RIGHT LIVER PUNCH (8) C\u00da \u0110\u1ea4M V\u00c0O GAN #Boxing #BoxingForBeginners #Liverpunch [IK0s0u5nrR8]": {
+   "0": {
+    "file": "f22bd1b83765.json",
+    "n_no_skeleton": 137,
+    "n_stretches": 3,
+    "no_skeleton_sec": 4.567,
+    "uncovered_tail_sec": 0.033
+   },
+   "1": {
+    "file": "d41ab4896d6c.json",
+    "n_no_skeleton": 5,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.167,
+    "uncovered_tail_sec": 0.032
+   }
+  },
+  "LEFT UPPERCUT (5) - RIGHT UPPERCUT (6) C\u00da \u0110\u1ea4M M\u00d3C T\u1eea D\u01af\u1edaI L\u00caN  #BoxingTraining #BoxingForBeginners [hfImXp1YjgE]": {
+   "0": {
+    "file": "41609084b2d8.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "01d264cb9ef5.json",
+    "n_no_skeleton": 10,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.333,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Learn This Deadly Boxing Combo": {
+   "0": {
+    "file": "55e696826468.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.057
+   }
+  },
+  "Learn This Deadly Boxing Combo\ud83e\udd4a\ud83d\udca5 [zRBL7ISpYGk]": {
+   "0": {
+    "file": "c96072449913.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.02
+   }
+  },
+  "Light shadow boxing session with an app #boxingAI [sROssWEONVU]": {
+   "0": {
+    "file": "c15e2cb6605e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Little bit shadow boxing [ebtmdx9j0mvg1]": {
+   "0": {
+    "file": "6669b945aa8a.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.033
+   }
+  },
+  "Little formal training, looking for constructive criticism [VcVH4gpsJKM]": {
+   "0": {
+    "file": "82471be9578a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Looking for Critique on my Shadowboxing [xhd4dp]": {
+   "0": {
+    "file": "ce5e3ca1c17f.json",
+    "n_no_skeleton": 207,
+    "n_stretches": 14,
+    "no_skeleton_sec": 6.907,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "Looking for feedback on my shadowboxing (04\u29f804\u29f82020) [epCtnieanRg]": {
+   "0": {
+    "file": "2b6180125843.json",
+    "n_no_skeleton": 6,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.2,
+    "uncovered_tail_sec": 0.021
+   }
+  },
+  "Looking for some bag work critique please. How can i improve [KJAYq1ybYes]": {
+   "0": {
+    "file": "2da349024af7.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.068
+   }
+  },
+  "MUST KNOW BOXING COMBOS FOR BEGINNERS! \ud83e\udd4a\ud83d\udd25 #boxing #boxingtraining #boxingworkout #boxingdrills": {
+   "0": {
+    "file": "216bf92c8249.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.003
+   }
+  },
+  "March 21, 2026 [l2TPCicxhk8]": {
+   "0": {
+    "file": "384043ee7369.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "9dc32592005d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "7b8b148e2cff.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.103,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "NHC Cardio Boxing Bag Work Follow Along Video 8 Minutes": {
+   "0": {
+    "file": "c39156abf17b.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Need honest feedback and advice. Started 3 months ago. I want to do better. Please be kind [cm6PEb-79Zc]": {
+   "0": {
+    "file": "f0b77370de71.json",
+    "n_no_skeleton": 14,
+    "n_stretches": 5,
+    "no_skeleton_sec": 0.467,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Need tips and advice for my bagwork [TPalCFHyrd8]": {
+   "0": {
+    "file": "627d8bbe6eef.json",
+    "n_no_skeleton": 38,
+    "n_stretches": 4,
+    "no_skeleton_sec": 0.633,
+    "uncovered_tail_sec": 0.012
+   }
+  },
+  "Not very serious vid but what critique yous got Feet are almost obscured and no room for lateral movement but give it a shot [ea_eD3w89N8]": {
+   "0": {
+    "file": "b7a1243a406d.json",
+    "n_no_skeleton": 237,
+    "n_stretches": 76,
+    "no_skeleton_sec": 3.95,
+    "uncovered_tail_sec": 0.007
+   }
+  },
+  "November 15, 2020": {
+   "0": {
+    "file": "d3b32b759ccc.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.016
+   },
+   "1": {
+    "file": "c18e5ce32bb0.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "6c59652fc79e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Old school shadowboxing tip [4NHjLCXGftc]": {
+   "0": {
+    "file": "5f893e0aa5e6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "b2647c9e5272.json",
+    "n_no_skeleton": 20,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.667,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "a175689d0a8e.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "19888901ecad.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "One round of shadowboxing (I promise I go to the body more in sparrin... [ktbuo8]": {
+   "0": {
+    "file": "86525e5b7e18.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "PUNCHING Bag Workout \uff5c Combination Audio \uff5c punching bag for boxing [KatBVp2YqtA]": {
+   "0": {
+    "file": "5ba79e999cd2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "41a196b8fddb.json",
+    "n_no_skeleton": 18,
+    "n_stretches": 13,
+    "no_skeleton_sec": 0.75,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "d8dcdf49a093.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.083,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "38861bd3223c.json",
+    "n_no_skeleton": 54,
+    "n_stretches": 23,
+    "no_skeleton_sec": 2.25,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "828b082da024.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.167,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "3e7406f6f809.json",
+    "n_no_skeleton": 9,
+    "n_stretches": 4,
+    "no_skeleton_sec": 0.375,
+    "uncovered_tail_sec": 0.0
+   },
+   "6": {
+    "file": "014156fdfa34.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.083,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Please critique my bag work! I'm stuck training at home so I don't wa... [-9aggP8Tpvs]": {
+   "0": {
+    "file": "de6e6bed4a74.json",
+    "n_no_skeleton": 128,
+    "n_stretches": 32,
+    "no_skeleton_sec": 4.267,
+    "uncovered_tail_sec": 0.068
+   }
+  },
+  "Please critique my jab cross [cc3722]": {
+   "0": {
+    "file": "9806698fa30d.json",
+    "n_no_skeleton": 242,
+    "n_stretches": 11,
+    "no_skeleton_sec": 4.037,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Please critique my shadow boxing! [GssD9NHsOj8]": {
+   "0": {
+    "file": "e89525bc61f4.json",
+    "n_no_skeleton": 7,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.233,
+    "uncovered_tail_sec": 0.027
+   }
+  },
+  "Please critique my shadowboxing [p73VKCmq3oA]": {
+   "0": {
+    "file": "17084ca19020.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.067,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Please feedback on my shadow boxing [G3bY4I6crUQ]": {
+   "0": {
+    "file": "b090a785252a.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.133,
+    "uncovered_tail_sec": 0.021
+   }
+  },
+  "Pointers for a beginner on my bag work [T7Yw7FRqnp0]": {
+   "0": {
+    "file": "2e3b2c0a98ee.json",
+    "n_no_skeleton": 12,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.402,
+    "uncovered_tail_sec": 0.01
+   }
+  },
+  "Punching Bag Workout Upgrade": {
+   "0": {
+    "file": "538cc5710b34.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.053
+   }
+  },
+  "Punching Bag Workout Upgrade [xIi9ePIdqVM]": {
+   "0": {
+    "file": "b04b7fc8613a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.053
+   }
+  },
+  "Punching bag workout focused on the jab [DunmTU8vdCw]": {
+   "0": {
+    "file": "862924e40aad.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "Punching bag workout with an app [BqDHnW7DdxE]": {
+   "0": {
+    "file": "ce122bf69ada.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Quick Shadow Boxing Tutorial by Olympian [J4j3AOVWuHE]": {
+   "0": {
+    "file": "42efc11be858.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.042,
+    "uncovered_tail_sec": 0.022
+   },
+   "1": {
+    "file": "cf1ac8fae9bf.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.125,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Rate my bagwork [VIlZcBcZfdU]": {
+   "0": {
+    "file": "bea9a235239a.json",
+    "n_no_skeleton": 244,
+    "n_stretches": 72,
+    "no_skeleton_sec": 8.206,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Review my shadow boxing, been boxing about 6months, no fights, sparri... [rgo38Gc7XaE]": {
+   "0": {
+    "file": "1a67c231f46d.json",
+    "n_no_skeleton": 64,
+    "n_stretches": 28,
+    "no_skeleton_sec": 2.133,
+    "uncovered_tail_sec": 0.01
+   }
+  },
+  "Round 2 of Elite Challenge Boxing Combos \u2b07\ufe0f #boxing #boxingtraining #motivation": {
+   "0": {
+    "file": "f3a0e5242809.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.012
+   }
+  },
+  "Seeking for bagwork critique [b4DWLhyKrsw]": {
+   "0": {
+    "file": "775d45b7ccd5.json",
+    "n_no_skeleton": 2023,
+    "n_stretches": 371,
+    "no_skeleton_sec": 67.433,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow Box Workout \uff5c Let me Coach You for 11 Minutes": {
+   "0": {
+    "file": "544331c99c61.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow Boxing Combos - Follow Along [Uoj0tmC0y_c]": {
+   "0": {
+    "file": "14bbfab0b204.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow Boxing Combo\ud83e\udd4a #boxing #boxingtraining #shadowboxing [LMhVqtK3p_Y]": {
+   "0": {
+    "file": "327247897886.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.017
+   }
+  },
+  "Shadow Boxing Critique #1.. I've been Self Training for 2 Weeks and i... [hk30ar]": {
+   "0": {
+    "file": "3ef1cc504f64.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "7388e9d6b3d0.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow Boxing Drill for Home \uff5c Tom Yankello's Drill #1": {
+   "0": {
+    "file": "83b8832555ab.json",
+    "n_no_skeleton": 2,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.067,
+    "uncovered_tail_sec": 0.032
+   },
+   "1": {
+    "file": "31b5372196dc.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "a7b420b99bed.json",
+    "n_no_skeleton": 91,
+    "n_stretches": 1,
+    "no_skeleton_sec": 3.033,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow Boxing Technique Feedback [w0znsi]": {
+   "0": {
+    "file": "8231a676fb66.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow Boxing Work Out for Better Boxing": {
+   "0": {
+    "file": "40e3a214d972.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "5f7f98402331.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "c81f4fd1ab9c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow Boxing Workout \u2013 25 Min Follow Along (No Talking)": {
+   "0": {
+    "file": "52b4653714d1.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow Boxing Workout \uff5c Follow Along": {
+   "0": {
+    "file": "9bfc21be5c2a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "4ae8187162f8.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "7e42b8d8421d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "13f6873907ce.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "77777def2f7a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow Boxing Workout \uff5c Let me coach you for 12 minutes": {
+   "0": {
+    "file": "80ff16f2e4b5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "b15e153b6b59.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing (simple combos & defenses) #boxing #boxingapp [0e4Xi1xnKM0]": {
+   "0": {
+    "file": "8d5d364bc073.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.049
+   }
+  },
+  "Shadow boxing after a run, any feedback? [hswpxs]": {
+   "0": {
+    "file": "5e2dae81a4ac.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing again [xHmeLZpW0z0]": {
+   "0": {
+    "file": "a211d8d5ff57.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.021
+   }
+  },
+  "Shadow boxing alone on the ring, using an app [T6TQYsi5Dz0]": {
+   "0": {
+    "file": "3236b723c9c5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing critique (help me get better) [38mhwk]": {
+   "0": {
+    "file": "689064a7c82b.json",
+    "n_no_skeleton": 18,
+    "n_stretches": 4,
+    "no_skeleton_sec": 0.601,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "9dc719ed77df.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing critique [Ry5z_nGOD0Y]": {
+   "0": {
+    "file": "bf2bc8500ca6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.001
+   },
+   "1": {
+    "file": "f9b39b48012f.json",
+    "n_no_skeleton": 13,
+    "n_stretches": 5,
+    "no_skeleton_sec": 0.433,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "dde3a17c633c.json",
+    "n_no_skeleton": 14,
+    "n_stretches": 9,
+    "no_skeleton_sec": 0.467,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing critique [m1OSabQpZw8]": {
+   "0": {
+    "file": "8b69da6348f9.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.1,
+    "uncovered_tail_sec": 0.002
+   },
+   "1": {
+    "file": "c736b109a5e5.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 4,
+    "no_skeleton_sec": 0.133,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing critique [zsku4k0ugxjg1]": {
+   "0": {
+    "file": "6e5897a04077.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.033
+   },
+   "1": {
+    "file": "2c25fc15db00.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing critique? Thanks [IXVMB7YgKWc]": {
+   "0": {
+    "file": "bbe1a87b577a.json",
+    "n_no_skeleton": 10,
+    "n_stretches": 2,
+    "no_skeleton_sec": 0.333,
+    "uncovered_tail_sec": 0.032
+   }
+  },
+  "Shadow boxing in Thailand with an app [_1hGgWysMq4]": {
+   "0": {
+    "file": "9f041cab3c15.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "Shadow boxing second opinion [WzwH0YlP3Mg]": {
+   "0": {
+    "file": "c7acb41e7e37.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "Shadow boxing session indoor": {
+   "0": {
+    "file": "fa0eddf37ad6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "edc93a82faf7.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "950d2584c39a.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "0fd61c4ae6f7.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing session with a virtual coach app [3n4uYSFrHTw]": {
+   "0": {
+    "file": "ed6783e933c6.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing session with an app [yAjmq7GZnEg]": {
+   "0": {
+    "file": "317494305b2f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing warmup with an app calling out combos [0MpEsaShfNw]": {
+   "0": {
+    "file": "9b1392df84fb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing with a focus on movement [S4r8334a0v8]": {
+   "0": {
+    "file": "529e5f9e8e5f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing with an app": {
+   "0": {
+    "file": "ef4c14b851b0.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "866ffba47b04.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "6019e18a2b33.json",
+    "n_no_skeleton": 16,
+    "n_stretches": 4,
+    "no_skeleton_sec": 0.534,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "2bd514ad2c42.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.059
+   }
+  },
+  "Shadow boxing with an app that calls out punches and combos [AWbyo4D5VCA]": {
+   "0": {
+    "file": "a7fae356aa93.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing workout with an app": {
+   "0": {
+    "file": "9a3e77a1a08f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "1b83349b092c.json",
+    "n_no_skeleton": 5,
+    "n_stretches": 5,
+    "no_skeleton_sec": 0.167,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "a3f1f93a674d.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.1,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "3bbaf2f7d2b3.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing workout, with combos being called out by an app [nxpuoPycpp0]": {
+   "0": {
+    "file": "44203d7245df.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing, following callouts from an app [3vl9FIwtiD0]": {
+   "0": {
+    "file": "6f2754119b55.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadow boxing\u2026 jab cross feels awk\u2026 any advice? [mfdzUZpVMY4]": {
+   "0": {
+    "file": "1eec010fa1b4.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.001
+   },
+   "1": {
+    "file": "95fb39356f02.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadowboxing (Critique) [kvgDoAiMXiQ]": {
+   "0": {
+    "file": "9dc96b2a1a6c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadowboxing Advice - 5\u20195\u201d boxer of 1month [7cwhX40pfCs]": {
+   "0": {
+    "file": "a2dec4040753.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.017
+   }
+  },
+  "Shadowboxing Looking for Critique and Suggestions [nwLU8An_c_0]": {
+   "0": {
+    "file": "f370023a94d0.json",
+    "n_no_skeleton": 29,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.967,
+    "uncovered_tail_sec": 0.032
+   }
+  },
+  "Shadowboxing and cobra bag. Advice always appreciated! [vtF7kJKP5_k]": {
+   "0": {
+    "file": "7b1c87c4cc54.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "73947059a543.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "90fdf87e3b6d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "8bd71fac67d2.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadowboxing before non-essentials lock up tonight [rYuH4nGOvnM]": {
+   "0": {
+    "file": "8b6c7406dda8.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.032
+   }
+  },
+  "Shadowboxing critique (5 months into boxing) - have any advices \uff1f [-DrpuwJe-8k]": {
+   "0": {
+    "file": "5b3027c70b19.json",
+    "n_no_skeleton": 76,
+    "n_stretches": 5,
+    "no_skeleton_sec": 3.167,
+    "uncovered_tail_sec": 0.057
+   }
+  },
+  "Shadowboxing critique [0T75blmMW50]": {
+   "0": {
+    "file": "f02b2308dcd5.json",
+    "n_no_skeleton": 159,
+    "n_stretches": 12,
+    "no_skeleton_sec": 5.305,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadowboxing critique [KQuR88CSgls]": {
+   "0": {
+    "file": "288214e706c7.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.016
+   },
+   "1": {
+    "file": "95800b11d825.json",
+    "n_no_skeleton": 90,
+    "n_stretches": 29,
+    "no_skeleton_sec": 3.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadowboxing critique [l0SIMhIpG2o]": {
+   "0": {
+    "file": "d6503f68df13.json",
+    "n_no_skeleton": 179,
+    "n_stretches": 24,
+    "no_skeleton_sec": 5.985,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadowboxing critique [q4fped]": {
+   "0": {
+    "file": "cb9a5063f5d5.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "4a5393b080d7.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadowboxing critique please [s2r3bx]": {
+   "0": {
+    "file": "4c09e7b37870.json",
+    "n_no_skeleton": 7,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.233,
+    "uncovered_tail_sec": 0.058
+   }
+  },
+  "Shadowboxing the RIGHT Way (Most Boxers Get This Wrong) [_NaHLrJhwLs]_h264": {
+   "0": {
+    "file": "c7c0cd95cd52.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.125,
+    "uncovered_tail_sec": 0.008
+   }
+  },
+  "Shadowboxing with about 3 months of progress now, hoping to be able t... [jwIUBDatpRo]": {
+   "0": {
+    "file": "83ac0c30f0cb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Shadowboxing workout at the boxing gym": {
+   "0": {
+    "file": "db39e182856f.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.063
+   }
+  },
+  "Shadowboxing workout at the boxing gym [GFKmYChP8vY]": {
+   "0": {
+    "file": "e357530bfa00.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Simple boxing combos on the bag [vEgwC_TIb-0]": {
+   "0": {
+    "file": "82f04c107ba4.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Simple combos on the bag. Training with the Shadow Boxing App [sJCFajWqeOM]": {
+   "0": {
+    "file": "3792a137d271.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.048
+   }
+  },
+  "Some bagwork on the power bag in my new gym [dbLv99_NiRg]": {
+   "0": {
+    "file": "089cfdf0e641.json",
+    "n_no_skeleton": 73,
+    "n_stretches": 6,
+    "no_skeleton_sec": 2.433,
+    "uncovered_tail_sec": 0.05
+   }
+  },
+  "Some post leg day shadow boxing to cool down [lut82eh1wtmg1]": {
+   "0": {
+    "file": "55e428bd5d6d.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.016
+   }
+  },
+  "Tabata Bag Workout  \uff5c Follow Along": {
+   "0": {
+    "file": "90c80716d401.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "4454192aae89.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "2": {
+    "file": "9295f365af05.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "3": {
+    "file": "f28735509aef.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "4": {
+    "file": "2809f1b8b105.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "5": {
+    "file": "cb8d6ad858d0.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "The Shadow Boxing App in Action.": {
+   "0": {
+    "file": "30e304806fe4.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.057
+   }
+  },
+  "This boxing app is like having your own coach #boxingcoach": {
+   "0": {
+    "file": "84ea2f505394.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.078
+   }
+  },
+  "This is my sand bag training, I started learning boxing from May 2025. [A2Xd55D6yTs]": {
+   "0": {
+    "file": "4f70e4e2ddfb.json",
+    "n_no_skeleton": 265,
+    "n_stretches": 23,
+    "no_skeleton_sec": 4.417,
+    "uncovered_tail_sec": 0.012
+   }
+  },
+  "Up to 90kg now, Southpaw - Shadowboxing critique welcome :) [9vkp8o]": {
+   "0": {
+    "file": "a406a60f0e61.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.033
+   }
+  },
+  "Updated Shadow Boxing.... Ignore my dogs Vietnam flashback [k0g7hf]": {
+   "0": {
+    "file": "2c2245e540ff.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Using a boxing app to stay focused when practicing alone [-ryDDDMCxXM]": {
+   "0": {
+    "file": "5227422ed3bd.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.125,
+    "uncovered_tail_sec": 0.051
+   }
+  },
+  "Virtual boxing pad work on the beach [lFksLLfAtFE]": {
+   "0": {
+    "file": "7f6ddd358323.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "Virtual boxing pad work with an app [oFglukhR2t8]": {
+   "0": {
+    "file": "0ab61f39f564.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.051
+   }
+  },
+  "WOW!  These Boxing Combos Are Amazing \uff5c Follow Along Training": {
+   "0": {
+    "file": "01d2b2f0f1f9.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "f6601e0356e9.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.026
+   }
+  },
+  "Was disappointed w- my last vid, so here's another round of bag work.... [r8szJk-cFDc]": {
+   "0": {
+    "file": "06f905c2107c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "What can I improve [kxDM077ciw4]": {
+   "0": {
+    "file": "3c6d19aa56bb.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.06
+   }
+  },
+  "What else can I improve?? [Om03wcdotXg]": {
+   "0": {
+    "file": "6da57165b567.json",
+    "n_no_skeleton": 410,
+    "n_stretches": 72,
+    "no_skeleton_sec": 13.667,
+    "uncovered_tail_sec": 0.021
+   }
+  },
+  "[Heavy Bag Critique] Appreciate any feedback on my bagwork from today [7xh661]": {
+   "0": {
+    "file": "c98899f841d7.json",
+    "n_no_skeleton": 8,
+    "n_stretches": 5,
+    "no_skeleton_sec": 0.267,
+    "uncovered_tail_sec": 0.025
+   }
+  },
+  "bagwork critique  -) [c97cyKPd-5I]": {
+   "0": {
+    "file": "d0034c7d97d3.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "42b5f5813a90.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "bagwork give critiques (months boxing) [Yn01ebDSzms]": {
+   "0": {
+    "file": "4f1604db7446.json",
+    "n_no_skeleton": 47,
+    "n_stretches": 27,
+    "no_skeleton_sec": 1.567,
+    "uncovered_tail_sec": 0.038
+   }
+  },
+  "first week boxing shadow boxing need as much constructive criticism as possible ! [e84o1g0z6i8h1]": {
+   "0": {
+    "file": "3aa2346af3df.json",
+    "n_no_skeleton": 1,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.033,
+    "uncovered_tail_sec": 0.013
+   }
+  },
+  "heavy bag feedback [NYj77w-i718]": {
+   "0": {
+    "file": "90159c221248.json",
+    "n_no_skeleton": 107,
+    "n_stretches": 19,
+    "no_skeleton_sec": 3.575,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "fd6cdcab027c.json",
+    "n_no_skeleton": 77,
+    "n_stretches": 24,
+    "no_skeleton_sec": 2.572,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "i've been boxing since about march or so i'm good at bag work and spa... [OXZnqWWKh-s]": {
+   "0": {
+    "file": "cfb5911d6721.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.033
+   }
+  },
+  "in need of some bag-work critique. i am 100% self trained, but have b... [bmrBcAARcC0]": {
+   "0": {
+    "file": "6f4d027d2474.json",
+    "n_no_skeleton": 1031,
+    "n_stretches": 147,
+    "no_skeleton_sec": 17.183,
+    "uncovered_tail_sec": 0.001
+   }
+  },
+  "shadowboxing vid need advice [6zF0sRsqwSM]": {
+   "0": {
+    "file": "5e61e1787bca.json",
+    "n_no_skeleton": 4,
+    "n_stretches": 1,
+    "no_skeleton_sec": 0.133,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "some at-home shadowboxing [v1rz41y5blc41]": {
+   "0": {
+    "file": "7340784a587c.json",
+    "n_no_skeleton": 34,
+    "n_stretches": 19,
+    "no_skeleton_sec": 1.133,
+    "uncovered_tail_sec": 0.0
+   }
+  },
+  "{Stream For Free} Boxing Workout For Beginners 4 Rounds": {
+   "0": {
+    "file": "04d495e9cdd0.json",
+    "n_no_skeleton": 3,
+    "n_stretches": 3,
+    "no_skeleton_sec": 0.125,
+    "uncovered_tail_sec": 0.0
+   },
+   "1": {
+    "file": "17911d0f937c.json",
+    "n_no_skeleton": 0,
+    "n_stretches": 0,
+    "no_skeleton_sec": 0.0,
+    "uncovered_tail_sec": 0.0
+   }
+  }
+ }
+}
