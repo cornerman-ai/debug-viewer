@@ -10,9 +10,11 @@
 //                 tail of a round the cache never reached (decoder stopped)
 //   jump          between consecutive DETECTED frames the core (shoulders + hips centre) moved more
 //                 than a torso within 0.25 s — the tracker landed on someone else
-//   other person  jumps cut the round into segments; the segment with the most frames seeds the
-//                 boxer, segments near it in position and torso size join, the rest are another
-//                 person (the home position / torso the decision was made against is shown)
+//   other person  big steps (jumps, and far re-acquisitions after a gap) cut the round into segments;
+//                 the segment with the most frames seeds the boxer, segments near it in position and
+//                 torso size join, and so does a segment entering through the image edge after the
+//                 boxer left through it (a walk out and back); the rest are another person (the home
+//                 position / torso the decision was made against is shown)
 //   frozen        a fully detected 5 s window in which no joint travels more than 0.1 torso — the
 //                 tracker locked on a painting, a statue, a poster
 // Nothing learned yet: the labelers' unusable_start / unusable_end markers are the target of the
@@ -23,7 +25,7 @@
 // (jumps.py's and frozen.py's thresholds can be passed through; the index records them).
 //
 // Schema:
-//   index.json   { generated, source, detectors: { no_skeleton: { min_frames }, jumps: { jump_torso, max_dt_s, pos_tol, scale },
+//   index.json   { generated, source, detectors: { no_skeleton: { min_frames }, jumps: { jump_torso, max_dt_s, pos_tol, scale, edge_torso },
 //                  frozen: { window_s, tol } }, shelf, n_rounds,
 //                  totals: { n_in_round, n_no_skeleton, n_stretches, n_rounds_touched, n_jumps, n_rounds_with_jumps,
 //                            n_other, n_rounds_with_other, n_frozen, n_rounds_with_frozen, declared_sec },
@@ -31,8 +33,8 @@
 //                                              n_jumps, other_sec, frozen_sec, declared_sec } } } }
 //   <hash>.json  { round_id, stem, ri, start_sec, end_sec, fps, n_frames, n_in_round, torso,
 //                  n_no_skeleton, no_skeleton_sec, stretches: [{ s, e, n, f0, f1 }], n_blips_ignored, uncovered_tail_sec,
-//                  jumps: [{ s, e, f0, f1, gap, dt, step, torso_ratio }],     from frame f0 (time s) to the landing frame f1 (time e)
-//                  other: [{ s, e, n, f0, f1, cx, cy, torso }], home: { cx, cy, torso } | null, n_other, other_sec,
+//                  jumps: [{ s, e, f0, f1, gap, dt, step, torso_ratio, from_edge, to_edge }],   from frame f0 (time s) to the landing frame f1 (time e)
+//                  other: [{ s, e, n, f0, f1, cx, cy, torso, enters_edge, exits_edge }], home: { cx, cy, torso } | null, n_other, other_sec,
 //                  frozen: [{ s, e, n, f0, f1, motion }], n_frozen, frozen_sec, min_motion,
 //                  declared_sec, declared_frac }                              the union of every kind, plus the tail
 // s / e are source-video seconds of a stretch's FIRST and LAST frame, f0 / f1 those frames' indices in
@@ -217,7 +219,8 @@ function template() {
       <b style="color:${C.jump}">jumps</b> (the core moved more than a torso within 0.25 s between
       consecutive detected frames — the tracker landed on someone else),
       <b style="color:${C.other}">other person</b> (the segments between jumps that are not the boxer
-      by position and torso size) and <b style="color:${C.frozen}">frozen</b> (no joint moved more than
+      by position and torso size; a walk out through the image edge and back in keeps the boxer) and
+      <b style="color:${C.frozen}">frozen</b> (no joint moved more than
       0.1 torso for 5 s — a painting, a statue), plus the tail of a round the cache never reached. The
       pre-roll before round_start is not judged. Untick a kind to review the others on their own: the
       dropdowns then list only rounds where a ticked kind declared something.</p>
@@ -341,9 +344,11 @@ function listItems() {
   const out = [];
   if (show.nosk) doc.stretches.forEach((s, i) => out.push({ kind: "nosk", i, it: s, t: s.s, len: s.n / doc.fps, txt: `${s.n} f · f${s.f0}–f${s.f1}` }));
   if (show.jump) doc.jumps.forEach((j, i) => out.push({ kind: "jump", i, it: j, t: j.e, len: j.dt,
-    txt: `${j.step.toFixed(1)} torso · ×${j.torso_ratio.toFixed(2)} · f${j.f0} → f${j.f1}` }));
+    txt: `${j.step.toFixed(1)} torso · ×${j.torso_ratio.toFixed(2)} · f${j.f0} → f${j.f1}` +
+         (j.from_edge ? " · from the edge" : "") + (j.to_edge ? " · to the edge" : "") }));
   if (show.other) doc.other.forEach((o, i) => out.push({ kind: "other", i, it: o, t: o.s, len: o.n / doc.fps,
-    txt: `${o.n} f · at (${o.cx.toFixed(2)}, ${o.cy.toFixed(2)}) torso ${o.torso.toFixed(3)}` }));
+    txt: `${o.n} f · at (${o.cx.toFixed(2)}, ${o.cy.toFixed(2)}) torso ${o.torso.toFixed(3)}` +
+         (o.enters_edge ? " · enters at the edge" : "") + (o.exits_edge ? " · exits at the edge" : "") }));
   if (show.frozen) doc.frozen.forEach((z, i) => out.push({ kind: "frozen", i, it: z, t: z.s, len: z.n / doc.fps,
     txt: `${z.n} f · stillest window ${z.motion.toFixed(3)} torso` }));
   return out.sort((a, b) => a.t - b.t);

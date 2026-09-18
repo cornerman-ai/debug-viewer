@@ -1,5 +1,5 @@
 {
- "generated": "2026-09-18T15:08:51",
+ "generated": "2026-09-18T15:31:12",
  "source": "ml/research/skeleton_usability/lens_export.py",
  "detectors": {
   "no_skeleton": {
@@ -12,7 +12,9 @@
    "scale": [
     0.8,
     1.25
-   ]
+   ],
+   "edge_torso": 0.5,
+   "stray_s": 2.0
   },
   "frozen": {
    "window_s": 5.0,
@@ -28,11 +30,11 @@
   "n_rounds_touched": 142,
   "n_jumps": 725,
   "n_rounds_with_jumps": 90,
-  "n_other": 43234,
-  "n_rounds_with_other": 67,
+  "n_other": 43770,
+  "n_rounds_with_other": 80,
   "n_frozen": 218,
   "n_rounds_with_frozen": 1,
-  "declared_sec": 2057.192
+  "declared_sec": 2095.901
  },
  "videos": {
   "(Critique me!) How do I roll out properly [e34mi6P3MOg]": {
@@ -597,7 +599,7 @@
     "no_skeleton_sec": 16.35,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 9,
-    "other_sec": 39.623,
+    "other_sec": 37.913,
     "frozen_sec": 0.0,
     "declared_sec": 51.051
    },
@@ -608,9 +610,9 @@
     "no_skeleton_sec": 35.327,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 46,
-    "other_sec": 100.392,
+    "other_sec": 33.534,
     "frozen_sec": 0.0,
-    "declared_sec": 103.562
+    "declared_sec": 71.113
    },
    "2": {
     "file": "4c9f5cdb2205.json",
@@ -619,9 +621,9 @@
     "no_skeleton_sec": 30.447,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 33,
-    "other_sec": 94.928,
+    "other_sec": 50.175,
     "frozen_sec": 0.0,
-    "declared_sec": 100.893
+    "declared_sec": 81.123
    }
   },
   "15 Mins Beginner Boxing Fitness HIIT Bag Workout (Follow Along)": {
@@ -862,9 +864,9 @@
     "no_skeleton_sec": 1.867,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 0.0,
+    "other_sec": 0.2,
     "frozen_sec": 0.0,
-    "declared_sec": 2.0
+    "declared_sec": 2.133
    },
    "1": {
     "file": "09528dbdfc64.json",
@@ -873,9 +875,9 @@
     "no_skeleton_sec": 1.6,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 1,
-    "other_sec": 0.0,
+    "other_sec": 0.467,
     "frozen_sec": 0.0,
-    "declared_sec": 1.7
+    "declared_sec": 2.133
    }
   },
   "20 Minute Boxing Footwork Heavy bag Workout - Follow along": {
@@ -886,9 +888,9 @@
     "no_skeleton_sec": 4.872,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 1,
-    "other_sec": 0.0,
+    "other_sec": 2.269,
     "frozen_sec": 0.0,
-    "declared_sec": 4.905
+    "declared_sec": 5.205
    },
    "1": {
     "file": "7d2a25c91cd8.json",
@@ -1484,9 +1486,9 @@
     "no_skeleton_sec": 8.792,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 0,
-    "other_sec": 0.0,
+    "other_sec": 30.792,
     "frozen_sec": 0.0,
-    "declared_sec": 8.792
+    "declared_sec": 39.583
    },
    "2": {
     "file": "ba6dd52d9fc5.json",
@@ -1758,9 +1760,9 @@
     "no_skeleton_sec": 0.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 15.432,
+    "other_sec": 13.347,
     "frozen_sec": 0.0,
-    "declared_sec": 15.516
+    "declared_sec": 13.472
    },
    "2": {
     "file": "e9c10fa54406.json",
@@ -1769,9 +1771,9 @@
     "no_skeleton_sec": 0.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 3,
-    "other_sec": 25.526,
+    "other_sec": 22.105,
     "frozen_sec": 0.0,
-    "declared_sec": 25.692
+    "declared_sec": 22.356
    }
   },
   "4 Set-ups for the Shovel Hook \uff5c Land More Body Shots": {
@@ -1795,9 +1797,9 @@
     "no_skeleton_sec": 5.167,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 3,
-    "other_sec": 2.933,
+    "other_sec": 0.0,
     "frozen_sec": 0.0,
-    "declared_sec": 7.167
+    "declared_sec": 5.4
    }
   },
   "5 Min Shadow Boxing Workout (Follow Along)": {
@@ -1865,9 +1867,9 @@
     "no_skeleton_sec": 14.314,
     "uncovered_tail_sec": 0.02,
     "n_jumps": 14,
-    "other_sec": 9.309,
+    "other_sec": 48.649,
     "frozen_sec": 0.0,
-    "declared_sec": 23.323
+    "declared_sec": 61.695
    }
   },
   "9 Months into boxing, Possibly first amateur fight this year! Excited [d7btg1ijf0sc1]": {
@@ -1878,7 +1880,7 @@
     "no_skeleton_sec": 0.633,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 5,
-    "other_sec": 3.033,
+    "other_sec": 2.833,
     "frozen_sec": 0.0,
     "declared_sec": 3.533
    }
@@ -1941,9 +1943,9 @@
     "no_skeleton_sec": 1.966,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 14,
-    "other_sec": 7.722,
+    "other_sec": 8.08,
     "frozen_sec": 0.0,
-    "declared_sec": 9.617
+    "declared_sec": 10.654
    }
   },
   "All Critiques Welcome! Shadowboxing and Heavy Bag Work [72xhx3]_h264": {
@@ -1965,9 +1967,9 @@
     "no_skeleton_sec": 2.336,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 0.0,
+    "other_sec": 0.334,
     "frozen_sec": 0.0,
-    "declared_sec": 2.503
+    "declared_sec": 2.703
    }
   },
   "All around technique advice \ud83d\ude4f\ud83c\udffd [vXa5BicbiUQ]": {
@@ -2080,7 +2082,7 @@
     "no_skeleton_sec": 0.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 4,
-    "other_sec": 10.01,
+    "other_sec": 9.885,
     "frozen_sec": 0.0,
     "declared_sec": 10.135
    },
@@ -2091,7 +2093,7 @@
     "no_skeleton_sec": 0.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 4,
-    "other_sec": 14.431,
+    "other_sec": 14.389,
     "frozen_sec": 0.0,
     "declared_sec": 14.64
    }
@@ -2130,9 +2132,9 @@
     "no_skeleton_sec": 0.375,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 1,
-    "other_sec": 0.0,
+    "other_sec": 0.208,
     "frozen_sec": 0.0,
-    "declared_sec": 0.5
+    "declared_sec": 0.667
    },
    "1": {
     "file": "5c982d9a000f.json",
@@ -2141,9 +2143,9 @@
     "no_skeleton_sec": 13.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 0.208,
+    "other_sec": 13.833,
     "frozen_sec": 0.0,
-    "declared_sec": 13.292
+    "declared_sec": 27.0
    },
    "2": {
     "file": "1b5b4c9c2a52.json",
@@ -2152,9 +2154,9 @@
     "no_skeleton_sec": 3.667,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 1,
-    "other_sec": 0.0,
+    "other_sec": 4.125,
     "frozen_sec": 0.0,
-    "declared_sec": 3.75
+    "declared_sec": 7.833
    }
   },
   "Bag work Critique [kqEqCspY3Hw]": {
@@ -2178,9 +2180,9 @@
     "no_skeleton_sec": 19.767,
     "uncovered_tail_sec": 0.016,
     "n_jumps": 64,
-    "other_sec": 22.583,
+    "other_sec": 49.317,
     "frozen_sec": 0.0,
-    "declared_sec": 34.317
+    "declared_sec": 63.767
    }
   },
   "Bag work critique (this is my 4th round on the bag, just decided to r... [y-S5b0-gdPc]": {
@@ -2191,9 +2193,9 @@
     "no_skeleton_sec": 34.533,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 27,
-    "other_sec": 56.233,
+    "other_sec": 67.833,
     "frozen_sec": 0.0,
-    "declared_sec": 77.733
+    "declared_sec": 87.8
    }
   },
   "Bag work video [vB6MEMMlkGo]": {
@@ -2217,7 +2219,7 @@
     "no_skeleton_sec": 1.001,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 0.434,
+    "other_sec": 0.334,
     "frozen_sec": 0.0,
     "declared_sec": 1.401
    },
@@ -2228,7 +2230,7 @@
     "no_skeleton_sec": 1.301,
     "uncovered_tail_sec": 0.003,
     "n_jumps": 3,
-    "other_sec": 0.133,
+    "other_sec": 0.067,
     "frozen_sec": 0.0,
     "declared_sec": 1.602
    }
@@ -2254,9 +2256,9 @@
     "no_skeleton_sec": 1.8,
     "uncovered_tail_sec": 0.033,
     "n_jumps": 4,
-    "other_sec": 0.0,
+    "other_sec": 0.267,
     "frozen_sec": 0.0,
-    "declared_sec": 2.167
+    "declared_sec": 2.367
    }
   },
   "Bagwork Critique [UyZ77aEugUA]": {
@@ -2267,9 +2269,9 @@
     "no_skeleton_sec": 1.533,
     "uncovered_tail_sec": 0.001,
     "n_jumps": 3,
-    "other_sec": 3.3,
+    "other_sec": 3.233,
     "frozen_sec": 0.0,
-    "declared_sec": 4.567
+    "declared_sec": 4.7
    }
   },
   "Bagwork Critique. been training going on 2 years now. I appreciate an... [v9vwvm]": {
@@ -2365,9 +2367,9 @@
     "no_skeleton_sec": 33.867,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 18.467,
+    "other_sec": 33.067,
     "frozen_sec": 0.0,
-    "declared_sec": 50.767
+    "declared_sec": 62.233
    },
    "1": {
     "file": "ced665d9a954.json",
@@ -2402,9 +2404,9 @@
     "no_skeleton_sec": 11.612,
     "uncovered_tail_sec": 0.006,
     "n_jumps": 8,
-    "other_sec": 18.919,
+    "other_sec": 12.479,
     "frozen_sec": 0.0,
-    "declared_sec": 25.993
+    "declared_sec": 23.09
    }
   },
   "Bagwork critique [UbiBUlHY1GE]": {
@@ -2415,7 +2417,7 @@
     "no_skeleton_sec": 0.233,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 4,
-    "other_sec": 0.483,
+    "other_sec": 0.417,
     "frozen_sec": 0.0,
     "declared_sec": 0.633
    }
@@ -2454,9 +2456,9 @@
     "no_skeleton_sec": 32.433,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 3,
-    "other_sec": 0.0,
+    "other_sec": 0.233,
     "frozen_sec": 0.0,
-    "declared_sec": 32.7
+    "declared_sec": 32.9
    }
   },
   "Bagwork critique [pIKBU2tYzPw]": {
@@ -2467,9 +2469,9 @@
     "no_skeleton_sec": 4.283,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 23,
-    "other_sec": 40.35,
+    "other_sec": 47.85,
     "frozen_sec": 0.0,
-    "declared_sec": 43.983
+    "declared_sec": 52.033
    }
   },
   "Bagwork critique [u-pU_enJtiU]": {
@@ -2491,7 +2493,7 @@
     "no_skeleton_sec": 0.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 1,
-    "other_sec": 7.2,
+    "other_sec": 7.167,
     "frozen_sec": 0.0,
     "declared_sec": 7.233
    }
@@ -2504,7 +2506,7 @@
     "no_skeleton_sec": 2.736,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 3,
-    "other_sec": 0.868,
+    "other_sec": 0.834,
     "frozen_sec": 0.0,
     "declared_sec": 3.737
    }
@@ -2574,9 +2576,9 @@
     "no_skeleton_sec": 2.469,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 0,
-    "other_sec": 0.0,
+    "other_sec": 0.467,
     "frozen_sec": 0.0,
-    "declared_sec": 2.469
+    "declared_sec": 2.936
    }
   },
   "Bagwork posted one and fixed a few things in reference to the comments [5Ui5RYJRUFk]": {
@@ -2587,9 +2589,9 @@
     "no_skeleton_sec": 6.7,
     "uncovered_tail_sec": 0.032,
     "n_jumps": 6,
-    "other_sec": 0.4,
+    "other_sec": 10.5,
     "frozen_sec": 0.0,
-    "declared_sec": 7.333
+    "declared_sec": 17.367
    }
   },
   "Bagwork, little improvement but more of an update [Ps-arwZbCx0]": {
@@ -2600,7 +2602,7 @@
     "no_skeleton_sec": 0.217,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 4,
-    "other_sec": 0.367,
+    "other_sec": 0.35,
     "frozen_sec": 0.0,
     "declared_sec": 0.75
    }
@@ -3046,9 +3048,9 @@
     "no_skeleton_sec": 4.767,
     "uncovered_tail_sec": 0.005,
     "n_jumps": 0,
-    "other_sec": 0.0,
+    "other_sec": 0.017,
     "frozen_sec": 0.0,
-    "declared_sec": 4.767
+    "declared_sec": 4.783
    }
   },
   "Boxing bag workout with an app [mJDjsdWZSlk]": {
@@ -3072,9 +3074,9 @@
     "no_skeleton_sec": 0.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 14.792,
+    "other_sec": 0.0,
     "frozen_sec": 0.0,
-    "declared_sec": 14.917
+    "declared_sec": 0.208
    }
   },
   "Boxing combo workout on the heavy bag [IBZf2QyFV2Q]": {
@@ -3292,9 +3294,9 @@
     "no_skeleton_sec": 3.403,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 7,
-    "other_sec": 126.668,
+    "other_sec": 2.002,
     "frozen_sec": 0.0,
-    "declared_sec": 127.302
+    "declared_sec": 4.804
    }
   },
   "Combos ideas for the heavy bag (boxing)": {
@@ -3318,9 +3320,9 @@
     "no_skeleton_sec": 2.167,
     "uncovered_tail_sec": 0.007,
     "n_jumps": 7,
-    "other_sec": 3.233,
+    "other_sec": 30.067,
     "frozen_sec": 0.0,
-    "declared_sec": 5.3
+    "declared_sec": 32.4
    }
   },
   "Critique heavy bag work [Myom6sQfFvU]": {
@@ -3331,9 +3333,9 @@
     "no_skeleton_sec": 7.033,
     "uncovered_tail_sec": 0.031,
     "n_jumps": 22,
-    "other_sec": 21.683,
+    "other_sec": 23.133,
     "frozen_sec": 0.0,
-    "declared_sec": 26.3
+    "declared_sec": 28.283
    }
   },
   "Critique my bagwork and suggest some improvement drills. [e7rt8]": {
@@ -3357,9 +3359,9 @@
     "no_skeleton_sec": 0.233,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 3.1,
+    "other_sec": 0.033,
     "frozen_sec": 0.0,
-    "declared_sec": 3.2
+    "declared_sec": 0.467
    }
   },
   "Dmitry Bivol silky shadow boxing skills #dmitrybivol #bivol #boxing": {
@@ -3508,9 +3510,9 @@
     "no_skeleton_sec": 2.079,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 1,
-    "other_sec": 0.0,
+    "other_sec": 8.014,
     "frozen_sec": 0.0,
-    "declared_sec": 2.146
+    "declared_sec": 9.993
    },
    "3": {
     "file": "a1879eb43bbd.json",
@@ -3519,9 +3521,9 @@
     "no_skeleton_sec": 2.817,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 4,
-    "other_sec": 1.308,
+    "other_sec": 1.274,
     "frozen_sec": 0.0,
-    "declared_sec": 4.225
+    "declared_sec": 4.259
    },
    "4": {
     "file": "ac9ce4961cbe.json",
@@ -3744,9 +3746,9 @@
     "no_skeleton_sec": 1.933,
     "uncovered_tail_sec": 0.031,
     "n_jumps": 2,
-    "other_sec": 0.0,
+    "other_sec": 12.4,
     "frozen_sec": 0.0,
-    "declared_sec": 2.2
+    "declared_sec": 14.567
    }
   },
   "Form feedback [XGBz3869mMY]": {
@@ -3881,9 +3883,9 @@
     "no_skeleton_sec": 1.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 5,
-    "other_sec": 45.208,
+    "other_sec": 42.042,
     "frozen_sec": 0.0,
-    "declared_sec": 45.5
+    "declared_sec": 42.583
    },
    "1": {
     "file": "58aa7373fcd3.json",
@@ -3892,9 +3894,9 @@
     "no_skeleton_sec": 9.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 20,
-    "other_sec": 103.208,
+    "other_sec": 87.542,
     "frozen_sec": 0.0,
-    "declared_sec": 103.583
+    "declared_sec": 93.083
    },
    "2": {
     "file": "763b023c175b.json",
@@ -3903,9 +3905,9 @@
     "no_skeleton_sec": 1.625,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 8,
-    "other_sec": 105.792,
+    "other_sec": 85.833,
     "frozen_sec": 0.0,
-    "declared_sec": 106.5
+    "declared_sec": 87.875
    },
    "3": {
     "file": "0b1402ead8b1.json",
@@ -3925,9 +3927,9 @@
     "no_skeleton_sec": 6.583,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 19,
-    "other_sec": 112.958,
+    "other_sec": 113.583,
     "frozen_sec": 0.0,
-    "declared_sec": 116.583
+    "declared_sec": 119.333
    },
    "5": {
     "file": "590596046ef6.json",
@@ -3936,9 +3938,9 @@
     "no_skeleton_sec": 4.958,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 10,
-    "other_sec": 49.083,
+    "other_sec": 33.208,
     "frozen_sec": 0.0,
-    "declared_sec": 49.833
+    "declared_sec": 36.458
    }
   },
   "Heavy Bag Workout #2 \uff5c 3 PUNCH COMBOS  \uff5c FOLLOW ALONG Less than 10mins": {
@@ -4250,7 +4252,7 @@
     "no_skeleton_sec": 1.201,
     "uncovered_tail_sec": 0.015,
     "n_jumps": 2,
-    "other_sec": 1.818,
+    "other_sec": 0.717,
     "frozen_sec": 0.0,
     "declared_sec": 1.835
    },
@@ -4261,7 +4263,7 @@
     "no_skeleton_sec": 0.05,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 0.117,
+    "other_sec": 0.1,
     "frozen_sec": 0.0,
     "declared_sec": 0.217
    },
@@ -4377,7 +4379,7 @@
     "no_skeleton_sec": 2.703,
     "uncovered_tail_sec": 0.02,
     "n_jumps": 4,
-    "other_sec": 28.762,
+    "other_sec": 28.362,
     "frozen_sec": 0.0,
     "declared_sec": 31.298
    }
@@ -4414,9 +4416,9 @@
     "no_skeleton_sec": 3.767,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 0,
-    "other_sec": 0.0,
+    "other_sec": 6.067,
     "frozen_sec": 0.0,
-    "declared_sec": 3.767
+    "declared_sec": 9.4
    }
   },
   "Heavy bag workout with the best boxing app [R76RFSR7V2I]": {
@@ -4466,7 +4468,7 @@
     "no_skeleton_sec": 0.2,
     "uncovered_tail_sec": 0.069,
     "n_jumps": 2,
-    "other_sec": 23.8,
+    "other_sec": 23.533,
     "frozen_sec": 0.0,
     "declared_sec": 23.833
    }
@@ -4479,9 +4481,9 @@
     "no_skeleton_sec": 12.4,
     "uncovered_tail_sec": 0.012,
     "n_jumps": 3,
-    "other_sec": 3.067,
+    "other_sec": 7.367,
     "frozen_sec": 0.0,
-    "declared_sec": 13.567
+    "declared_sec": 15.0
    }
   },
   "Hi guys. Just a 17 year old kid here. Just want to know what you can say about my form Things I can work on [7iygp0ewec241]": {
@@ -4712,9 +4714,9 @@
     "no_skeleton_sec": 2.085,
     "uncovered_tail_sec": 0.047,
     "n_jumps": 2,
-    "other_sec": 0.0,
+    "other_sec": 2.388,
     "frozen_sec": 0.0,
-    "declared_sec": 2.321
+    "declared_sec": 4.642
    }
   },
   "Keeping active since the gym closed - 3 round shadowboxing": {
@@ -4872,9 +4874,9 @@
     "no_skeleton_sec": 4.567,
     "uncovered_tail_sec": 0.033,
     "n_jumps": 0,
-    "other_sec": 0.0,
+    "other_sec": 2.533,
     "frozen_sec": 0.0,
-    "declared_sec": 4.567
+    "declared_sec": 5.0
    },
    "1": {
     "file": "d41ab4896d6c.json",
@@ -5111,7 +5113,7 @@
     "no_skeleton_sec": 2.9,
     "uncovered_tail_sec": 0.007,
     "n_jumps": 22,
-    "other_sec": 2.817,
+    "other_sec": 2.483,
     "frozen_sec": 0.0,
     "declared_sec": 5.433
    }
@@ -5240,7 +5242,7 @@
     "no_skeleton_sec": 0.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 71.042,
+    "other_sec": 71.0,
     "frozen_sec": 0.0,
     "declared_sec": 71.125
    },
@@ -5251,9 +5253,9 @@
     "no_skeleton_sec": 1.167,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 7,
-    "other_sec": 1.042,
+    "other_sec": 0.0,
     "frozen_sec": 0.0,
-    "declared_sec": 2.417
+    "declared_sec": 2.125
    },
    "4": {
     "file": "828b082da024.json",
@@ -5297,9 +5299,9 @@
     "no_skeleton_sec": 3.3,
     "uncovered_tail_sec": 0.068,
     "n_jumps": 3,
-    "other_sec": 1.033,
+    "other_sec": 51.967,
     "frozen_sec": 0.0,
-    "declared_sec": 4.367
+    "declared_sec": 55.167
    }
   },
   "Please critique my jab cross [cc3722]": {
@@ -5310,7 +5312,7 @@
     "no_skeleton_sec": 3.987,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 1,
-    "other_sec": 13.647,
+    "other_sec": 13.547,
     "frozen_sec": 0.0,
     "declared_sec": 17.551
    }
@@ -5451,9 +5453,9 @@
     "no_skeleton_sec": 6.524,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 1.11,
+    "other_sec": 0.773,
     "frozen_sec": 0.0,
-    "declared_sec": 7.23
+    "declared_sec": 7.197
    }
   },
   "Review my shadow boxing, been boxing about 6months, no fights, sparri... [rgo38Gc7XaE]": {
@@ -5490,9 +5492,9 @@
     "no_skeleton_sec": 60.4,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 100,
-    "other_sec": 31.433,
+    "other_sec": 55.333,
     "frozen_sec": 0.0,
-    "declared_sec": 79.867
+    "declared_sec": 103.2
    }
   },
   "Shadow Box Workout \uff5c Let me Coach You for 11 Minutes": {
@@ -5795,7 +5797,7 @@
     "no_skeleton_sec": 0.534,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 0.2,
+    "other_sec": 0.033,
     "frozen_sec": 0.0,
     "declared_sec": 0.701
    },
@@ -5830,7 +5832,7 @@
     "no_skeleton_sec": 0.333,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 0.867,
+    "other_sec": 0.8,
     "frozen_sec": 0.0,
     "declared_sec": 1.067
    },
@@ -5841,7 +5843,7 @@
     "no_skeleton_sec": 0.167,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 4,
-    "other_sec": 2.0,
+    "other_sec": 1.8,
     "frozen_sec": 0.0,
     "declared_sec": 2.2
    }
@@ -6305,9 +6307,9 @@
     "no_skeleton_sec": 5.138,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 1,
-    "other_sec": 6.006,
+    "other_sec": 8.876,
     "frozen_sec": 0.0,
-    "declared_sec": 11.211
+    "declared_sec": 11.578
    }
   },
   "Shadowboxing critique [KQuR88CSgls]": {
@@ -6331,7 +6333,7 @@
     "n_jumps": 9,
     "other_sec": 0.433,
     "frozen_sec": 0.0,
-    "declared_sec": 3.133
+    "declared_sec": 3.3
    }
   },
   "Shadowboxing critique [l0SIMhIpG2o]": {
@@ -6342,7 +6344,7 @@
     "no_skeleton_sec": 5.483,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 3,
-    "other_sec": 2.04,
+    "other_sec": 1.973,
     "frozen_sec": 0.0,
     "declared_sec": 6.353
    }
@@ -6590,9 +6592,9 @@
     "no_skeleton_sec": 4.283,
     "uncovered_tail_sec": 0.012,
     "n_jumps": 3,
-    "other_sec": 4.15,
+    "other_sec": 4.6,
     "frozen_sec": 0.0,
-    "declared_sec": 5.767
+    "declared_sec": 6.3
    }
   },
   "Up to 90kg now, Southpaw - Shadowboxing critique welcome :) [9vkp8o]": {
@@ -6718,9 +6720,9 @@
     "no_skeleton_sec": 12.033,
     "uncovered_tail_sec": 0.021,
     "n_jumps": 25,
-    "other_sec": 67.3,
+    "other_sec": 51.067,
     "frozen_sec": 0.0,
-    "declared_sec": 71.8
+    "declared_sec": 59.9
    }
   },
   "[Heavy Bag Critique] Appreciate any feedback on my bagwork from today [7xh661]": {
@@ -6731,7 +6733,7 @@
     "no_skeleton_sec": 0.133,
     "uncovered_tail_sec": 0.025,
     "n_jumps": 4,
-    "other_sec": 57.124,
+    "other_sec": 57.057,
     "frozen_sec": 0.0,
     "declared_sec": 57.424
    }
@@ -6794,9 +6796,9 @@
     "no_skeleton_sec": 3.307,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 2,
-    "other_sec": 12.06,
+    "other_sec": 12.561,
     "frozen_sec": 0.0,
-    "declared_sec": 14.833
+    "declared_sec": 15.368
    },
    "1": {
     "file": "fd6cdcab027c.json",
@@ -6831,9 +6833,9 @@
     "no_skeleton_sec": 15.4,
     "uncovered_tail_sec": 0.001,
     "n_jumps": 62,
-    "other_sec": 16.917,
+    "other_sec": 13.483,
     "frozen_sec": 0.0,
-    "declared_sec": 26.6
+    "declared_sec": 28.217
    }
   },
   "shadowboxing vid need advice [6zF0sRsqwSM]": {
@@ -6870,7 +6872,7 @@
     "no_skeleton_sec": 0.0,
     "uncovered_tail_sec": 0.0,
     "n_jumps": 3,
-    "other_sec": 15.849,
+    "other_sec": 15.807,
     "frozen_sec": 0.0,
     "declared_sec": 16.058
    },
