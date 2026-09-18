@@ -45,6 +45,8 @@
 // The video and round dropdowns offer only rounds where a SHOWN kind declared something; everything
 // if the index failed to load.
 
+import { createRangeSelection } from "../shared/timeline_selection.js";
+
 const DATA_DIR = "./lens_data/skeleton_usability/";
 const LENS_ID = "skeleton_usability";
 const EARLY_END_SEC = 0.5;    // an uncovered tail above this = the cache stops before the round does (no_skeleton.EARLY_END_SEC)
@@ -75,6 +77,9 @@ let host = null, latestState = null;
 let index = null, indexError = null, indexLoading = null;
 let doc = null, docKey = null, docError = null;
 let show = { nosk: true, jump: true, other: true, frozen: true };   // the kind toggles, kept for the session
+let view = null;               // zoom window in viewer frames {start, end}; null = the whole round
+let selection = null;          // drag-selected frame range (shared/timeline_selection.js)
+let lastFrame = 0, lastDrawnFrame = -1, lastZoomLabel = "";
 
 // ── clock (the impact spotter lens's convention) ─────────────────────────────
 function stripStem(s) { return String(s || "").replace(/_h264$/, ""); }
@@ -152,7 +157,8 @@ function refreshScope(state) {
   const entry = entryFor(state);
   const key = entry ? entry.file : `none:${state?.cacheBasename}|${state?.cacheRound}`;
   if (key === docKey) return;
-  docKey = key; doc = null; docError = null;
+  docKey = key; doc = null; docError = null; view = null;
+  selection?.clear();
   if (!entry) { renderAll(); return; }
   loadDoc(entry.file, key, entry);
 }
@@ -223,7 +229,8 @@ function template() {
       <b style="color:${C.frozen}">frozen</b> (no joint moved more than
       0.1 torso for 5 s — a painting, a statue), plus the tail of a round the cache never reached. The
       pre-roll before round_start is not judged. Untick a kind to review the others on their own: the
-      dropdowns then list only rounds where a ticked kind declared something.</p>
+      dropdowns then list only rounds where a ticked kind declared something. On the timeline: click = seek,
+      drag = select (then Zoom to / Export), shift-drag = pan, wheel = zoom, double-click = fit.</p>
     <div style="font-size:12px;margin-bottom:8px"><span class="muted">show</span> ${KINDS.map(cb).join("")}</div>
     <div id="su-scope" class="muted small" style="margin-bottom:6px"></div>
     <div id="su-stats" style="font-size:13px;line-height:1.6;margin-bottom:8px"></div>
@@ -387,89 +394,228 @@ function renderShelf() {
 }
 
 // ── stage timeline: three lanes over the round in viewer frames — no skeleton (red), other person
-// (purple), frozen (blue); jumps as yellow ticks through all; the never-decoded tail hatched orange ──
+// (purple), frozen (blue); jumps as yellow ticks through all; the never-decoded tail hatched orange.
+// Zoom / pan / select / seek machinery mirrors the rolls lenses (shared/timeline_selection.js). ──
 const LANES = ["nosk", "other", "frozen"];
+const LABEL_W = 64, PAD_R = 4, MIN_SPAN_FRAMES = 30;
+const TL_TOP = 4, LANE_H = 16, LANE_GAP = 3, AXIS_H = 14;
+const ZOOM_HINT = "click = seek · drag = select · shift-drag = pan · wheel = zoom · double-click = fit";
+
 function mountStageTimeline() {
   const slot = document.getElementById("stage-extras");
   if (!slot) return;
   slot.innerHTML = "";
   const wrap = document.createElement("div");
-  wrap.style.cssText = "margin-top:6px";
-  const cv = document.createElement("canvas");
-  cv.id = "su-timeline";
-  cv.style.cssText = "display:block;width:100%;height:82px;cursor:pointer";
-  wrap.appendChild(cv);
-  slot.appendChild(wrap);
-  cv.addEventListener("click", (e) => {
-    if (!latestState || !doc) return;
-    const rect = cv.getBoundingClientRect();
-    const total = nFrames(latestState) + tailFrames(latestState);
-    const f = Math.round(((e.clientX - rect.left) / Math.max(1, rect.width)) * total);
-    seekFrame(Math.min(nFrames(latestState) - 1, Math.max(0, f)));
+  wrap.style.cssText = "margin-top:12px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px";
+  const header = document.createElement("div");
+  header.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
+  const label = document.createElement("div");
+  label.id = "su-tl-label";
+  label.className = "muted small";
+  label.style.cssText = "flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+  label.textContent = `Skeleton usability timeline — ${ZOOM_HINT}`;
+  header.appendChild(label);
+  const btnCss = "background:var(--bg-elev);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:2px 9px;cursor:pointer;font:inherit;font-size:12px;line-height:1.4";
+  const mkBtn = (text, title, onClick) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = text; b.title = title; b.style.cssText = btnCss;
+    b.addEventListener("click", onClick); header.appendChild(b);
+  };
+  mkBtn("−", "Zoom out", () => zoomStep(0.5));
+  mkBtn("+", "Zoom in on the playhead", () => zoomStep(2));
+  mkBtn("Fit", "Show the whole round", () => { view = null; redrawTimelineNow(); });
+  selection = createRangeSelection({
+    header, frameToX, xToFrame,
+    frameToSec: f => frameToSec(latestState, f), nFrames: () => nFrames(latestState),
+    seek: f => seekFrame(f), zoomTo: zoomToRange, redraw: redrawTimelineNow,
   });
+  wrap.appendChild(header);
+  const canvas = document.createElement("canvas");
+  canvas.id = "su-timeline";
+  const cssH = TL_TOP + LANES.length * (LANE_H + LANE_GAP) + AXIS_H;
+  canvas.style.cssText = `display:block;width:100%;height:${cssH}px;cursor:crosshair`;
+  canvas.width = 800; canvas.height = cssH;
+  wrap.appendChild(canvas);
+  slot.appendChild(wrap);
+
+  canvas.addEventListener("wheel", e => {
+    if (!doc) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) { panBy(e.deltaX * framesPerPx(rect.width)); return; }
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    zoomAt(Math.exp(-dy * 0.002), xToFrame(e.clientX - rect.left, rect.width));
+  }, { passive: false });
+  canvas.addEventListener("mousedown", e => {
+    if (!doc || e.button !== 0) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    if (!e.shiftKey) { selection.beginDrag(e, rect); return; }   // drag = select a range · click = seek
+    const fpp = framesPerPx(rect.width);                          // shift-drag = pan the zoom window
+    let lastX = e.clientX;
+    const onMove = ev => { panBy((lastX - ev.clientX) * fpp); lastX = ev.clientX; };
+    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  });
+  canvas.addEventListener("dblclick", e => { e.preventDefault(); view = null; redrawTimelineNow(); });
 }
 
-function sizeCanvas(cv) {
-  const rect = cv.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  const w = Math.max(50, Math.round(rect.width * dpr)), h = Math.max(30, Math.round(rect.height * dpr));
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-  return { ctx: cv.getContext("2d"), W: w, H: h, dpr };
+// the axis runs over the cache's frames plus the never-decoded tail
+function axisFrames() { return Math.max(2, nFrames(latestState) + (latestState ? tailFrames(latestState) : 0)); }
+function viewRange() {
+  if (!view) return { v0: 0, v1: axisFrames() - 1 };
+  return { v0: view.start, v1: view.end };
+}
+function frameToX(f, cssW) { const { v0, v1 } = viewRange(); return LABEL_W + ((f - v0) / Math.max(1e-6, v1 - v0)) * (cssW - LABEL_W - PAD_R); }
+function xToFrame(x, cssW) { const { v0, v1 } = viewRange(); return v0 + ((x - LABEL_W) / Math.max(1, cssW - LABEL_W - PAD_R)) * (v1 - v0); }
+function framesPerPx(cssW) { const { v0, v1 } = viewRange(); return (v1 - v0) / Math.max(1, cssW - LABEL_W - PAD_R); }
+function zoomAt(factor, anchorFrame) {
+  if (!doc) return;
+  const full = axisFrames() - 1;
+  const { v0, v1 } = viewRange();
+  const span = Math.max(Math.min(MIN_SPAN_FRAMES, full), Math.min(full, (v1 - v0) / factor));
+  if (span >= full) { view = null; redrawTimelineNow(); return; }
+  let start = anchorFrame - (anchorFrame - v0) * (span / (v1 - v0));
+  start = Math.max(0, Math.min(full - span, start));
+  view = { start, end: start + span };
+  redrawTimelineNow();
+}
+function zoomToRange(a, b) {                       // the selection toolbar's "Zoom to"
+  if (!doc) return;
+  const full = axisFrames() - 1;
+  const span = Math.max(Math.min(MIN_SPAN_FRAMES, full), Math.min(full, b - a + 1));
+  if (span >= full) { view = null; redrawTimelineNow(); return; }
+  const start = Math.max(0, Math.min(full - span, a - (span - (b - a + 1)) / 2));
+  view = { start, end: start + span };
+  redrawTimelineNow();
+}
+function zoomStep(factor) {
+  if (!doc) return;
+  const { v0, v1 } = viewRange();
+  zoomAt(factor, (lastFrame >= v0 && lastFrame <= v1) ? lastFrame : (v0 + v1) / 2);
+}
+function panBy(dFrames) {
+  if (!doc || !view || !dFrames) return;
+  const full = axisFrames() - 1;
+  const span = view.end - view.start;
+  const start = Math.max(0, Math.min(full - span, view.start + dFrames));
+  view = { start, end: start + span };
+  redrawTimelineNow();
+}
+function redrawTimelineNow() { if (latestState) drawTimeline(latestState); }
+function timelineCounts() {
+  const parts = [];
+  if (show.nosk) parts.push(`no skeleton ${fmtSec(doc.no_skeleton_sec)} (${doc.stretches.length})`);
+  if (show.jump) parts.push(`${doc.jumps.length} jumps`);
+  if (show.other) parts.push(`other person ${fmtSec(doc.other_sec || 0)} (${doc.other.length})`);
+  if (show.frozen) parts.push(`frozen ${fmtSec(doc.frozen_sec || 0)} (${doc.frozen.length})`);
+  if (tailSec()) parts.push(`cache ends ${fmtSec(doc.uncovered_tail_sec)} early`);
+  parts.push(`declared ${fmtSec(declaredSec(latestState))}`);
+  return parts.join(" · ");
+}
+function updateZoomLabel() {
+  const el = document.getElementById("su-tl-label");
+  if (!el || !doc || !latestState) return;
+  let text = `${timelineCounts()} — ${ZOOM_HINT}`;
+  if (view) {
+    const full = axisFrames() - 1, fps = latestState.fps || 30;
+    const zoom = full / (view.end - view.start);
+    text = `showing ${fmtTime(frameToSec(latestState, view.start))}–${fmtTime(frameToSec(latestState, view.end))} of ` +
+      `${fmtTime(frameToSec(latestState, full))} · ${zoom >= 10 ? zoom.toFixed(0) : zoom.toFixed(1)}× — ${ZOOM_HINT}`;
+  }
+  if (text !== lastZoomLabel) { lastZoomLabel = text; el.textContent = text; }
+}
+
+function drawAxis(ctx, state, W, y) {
+  const { v0, v1 } = viewRange();
+  const fps = state.fps || 30, base = Math.floor(startSec(state) * fps);
+  const t0 = frameToSec(state, v0), t1 = frameToSec(state, v1);
+  const target = Math.max(3, Math.floor((W - LABEL_W - PAD_R) / 80));
+  const step = [0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600].find(s => (t1 - t0) / s <= target) || 600;
+  ctx.fillStyle = C.muted; ctx.strokeStyle = "#3a3f48"; ctx.lineWidth = 1;
+  for (let t = Math.ceil(t0 / step) * step; t <= t1 + 1e-9; t += step) {
+    const x = frameToX(t * fps - base - 0.5, W);                 // frameToSec's inverse
+    if (x < LABEL_W || x > W - PAD_R) continue;
+    ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, y); ctx.lineTo(Math.round(x) + 0.5, y + 4); ctx.stroke();
+    ctx.fillText(fmtTime(t), x + 3, y + AXIS_H - 3);
+  }
 }
 
 function drawTimeline(state) {
   const cv = document.getElementById("su-timeline");
   if (!cv) return;
-  const { ctx, W, H, dpr } = sizeCanvas(cv);
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const rect = cv.getBoundingClientRect();
+  const W = Math.max(1, rect.width), H = Math.max(1, rect.height);
+  if (cv.width !== Math.round(W * dpr)) cv.width = Math.round(W * dpr);
+  if (cv.height !== Math.round(H * dpr)) cv.height = Math.round(H * dpr);
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
-  ctx.font = `${10 * dpr}px monospace`;
+  ctx.font = "10px ui-monospace, monospace";
   if (!doc) {
     ctx.fillStyle = C.muted;
-    ctx.fillText(docError ? "skeleton usability: export error (see panel)" : "skeleton usability: no export for this round", 12 * dpr, 20 * dpr);
+    ctx.fillText(docError ? "skeleton usability: export error (see panel)" : "skeleton usability: no export for this round", LABEL_W, 20);
     return;
   }
-  const n = nFrames(state), tail = tailFrames(state), total = Math.max(1, n + tail);
-  const x = (f) => (f / total) * W;
-  const y0 = 14 * dpr, laneH = (H - y0 - 4 * dpr) / LANES.length, gap = 1 * dpr;
+  const frame = state.frame, full = axisFrames() - 1;
+  if (view && frame !== lastDrawnFrame && (frame < view.start || frame > view.end)) {   // the view follows the playhead
+    const span = view.end - view.start;
+    const start = Math.max(0, Math.min(full - span, frame - span / 2));
+    view = { start, end: start + span };
+  }
+  lastDrawnFrame = frame;
+  updateZoomLabel();
+  const trackW = W - LABEL_W - PAD_R;
+  const n = nFrames(state), tail = tailFrames(state);
   const roundF = Math.min(n, Math.max(0, secToFrame(state, doc.start_sec)));
-  const laneY = (k) => y0 + LANES.indexOf(k) * laneH;
-  for (const k of LANES) {                                                   // every lane: pre-roll dark, round grey
-    ctx.fillStyle = C.preroll; ctx.fillRect(0, laneY(k), x(roundF), laneH - gap);
-    ctx.fillStyle = show[k] ? C.round : "#1f242c"; ctx.fillRect(x(roundF), laneY(k), x(n) - x(roundF), laneH - gap);
-    ctx.fillStyle = show[k] ? C.muted : "#3a3f48"; ctx.fillText(KIND[k].short, 4 * dpr, laneY(k) + laneH - 5 * dpr);
-  }
+  const clipTrack = (y, h, fn) => { ctx.save(); ctx.beginPath(); ctx.rect(LABEL_W, y, trackW, h); ctx.clip(); fn(); ctx.restore(); };
+  const rows = {};
+  let y = TL_TOP;
+  for (const k of LANES) { rows[k] = { y, h: LANE_H }; y += LANE_H + LANE_GAP; }
+  const rowsBottom = y - LANE_GAP;
   for (const k of LANES) {
-    if (!show[k]) continue;
-    ctx.fillStyle = KIND[k].color;
-    for (const it of KIND[k].items(doc)) { const [a, b] = framesOf(state, it); ctx.fillRect(x(a), laneY(k), Math.max(1.5 * dpr, x(b + 1) - x(a)), laneH - gap); }
+    const r = rows[k];
+    ctx.fillStyle = show[k] ? C.muted : "#3a3f48";
+    ctx.fillText(KIND[k].short, 4, r.y + 12);
+    clipTrack(r.y, r.h, () => {
+      const x0 = frameToX(0, W), xr = frameToX(roundF, W), xn = frameToX(n, W);
+      ctx.fillStyle = C.preroll; ctx.fillRect(x0, r.y, xr - x0, r.h);                    // the pre-roll, not judged
+      ctx.fillStyle = show[k] ? C.round : "#1f242c"; ctx.fillRect(xr, r.y, xn - xr, r.h);  // the round the cache holds
+      if (show[k]) {
+        ctx.fillStyle = KIND[k].color;
+        for (const it of KIND[k].items(doc)) {
+          const [a, b] = framesOf(state, it);
+          const x1 = frameToX(a, W), x2 = Math.max(x1 + 1.5, frameToX(b + 1, W));
+          if (x2 < LABEL_W || x1 > W - PAD_R) continue;
+          ctx.fillRect(x1, r.y, x2 - x1, r.h);
+        }
+      }
+      if (tail) {                                                                          // hatched: never decoded
+        const xt = frameToX(n + tail, W);
+        ctx.fillStyle = "rgba(245,162,60,0.25)"; ctx.fillRect(xn, r.y, xt - xn, r.h);
+        ctx.strokeStyle = C.tail; ctx.lineWidth = 1;
+        ctx.save(); ctx.beginPath(); ctx.rect(xn, r.y, xt - xn, r.h); ctx.clip();
+        ctx.beginPath();
+        for (let px = xn - r.h; px < xt; px += 8) { ctx.moveTo(px, r.y + r.h); ctx.lineTo(px + r.h, r.y); }
+        ctx.stroke(); ctx.restore();
+      }
+    });
   }
-  if (show.jump) {
+  if (show.jump) clipTrack(TL_TOP - 2, rowsBottom - TL_TOP + 2, () => {
     ctx.fillStyle = C.jump;
-    for (const j of doc.jumps) { const [, b] = framesOf(state, j); ctx.fillRect(x(b) - 1 * dpr, y0 - 3 * dpr, 2 * dpr, LANES.length * laneH + 3 * dpr); }
-  }
-  if (tail) {                                                                  // hatched: never decoded
-    ctx.save();
-    const hAll = LANES.length * laneH - gap;
-    ctx.fillStyle = "rgba(245,162,60,0.25)"; ctx.fillRect(x(n), y0, W - x(n), hAll);
-    ctx.strokeStyle = C.tail; ctx.lineWidth = 1 * dpr;
-    ctx.beginPath();
-    for (let px = x(n) - hAll; px < W; px += 8 * dpr) { ctx.moveTo(px, y0 + hAll); ctx.lineTo(px + hAll, y0); }
-    ctx.clip(); ctx.stroke(); ctx.restore();
-    ctx.fillStyle = C.tail;
-    ctx.fillText(`cache ends · round continues ${fmtSec(doc.uncovered_tail_sec)}`, x(n) + 4 * dpr, 10 * dpr);
-  }
-  ctx.fillStyle = C.text;
-  const head = [];
-  if (show.nosk) head.push(`no skeleton ${fmtSec(doc.no_skeleton_sec)} (${doc.stretches.length})`);
-  if (show.jump) head.push(`${doc.jumps.length} jumps`);
-  if (show.other) head.push(`other person ${fmtSec(doc.other_sec || 0)} (${doc.other.length})`);
-  if (show.frozen) head.push(`frozen ${fmtSec(doc.frozen_sec || 0)} (${doc.frozen.length})`);
-  head.push(`declared ${fmtSec(declaredSec(state))}`);
-  ctx.fillText(head.join(" · "), 4 * dpr, 10 * dpr);
+    for (const j of doc.jumps) { const [, b] = framesOf(state, j); ctx.fillRect(frameToX(b, W) - 1, TL_TOP - 2, 2, rowsBottom - TL_TOP + 2); }
+  });
+  drawAxis(ctx, state, W, rowsBottom + 1);
+  selection?.draw(ctx, W, LABEL_W, W - PAD_R, TL_TOP, rowsBottom);
   const cur = currentAt(state);
-  ctx.strokeStyle = cur.jump ? C.jump : cur.other ? C.other : cur.frozen ? C.frozen : cur.nosk ? C.miss : C.playhead; ctx.lineWidth = 1.5 * dpr;
-  ctx.beginPath(); ctx.moveTo(x(state.frame), 0); ctx.lineTo(x(state.frame), H); ctx.stroke();
+  const px = frameToX(frame, W);
+  if (px >= LABEL_W - 1 && px <= W - PAD_R + 1) {
+    ctx.strokeStyle = cur.jump ? C.jump : cur.other ? C.other : cur.frozen ? C.frozen : cur.nosk ? C.miss : C.playhead; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, rowsBottom + 2); ctx.stroke();
+  }
 }
 
 // ── on-video: a border in the kind's colour and a HUD line per declared (shown) kind ──
@@ -528,6 +674,7 @@ export const SkeletonUsabilityRule = {
 
   update(state) {
     latestState = state;
+    lastFrame = state.frame;
     if (!index) return;
     refreshScope(state);
     renderFrameLine(state);
