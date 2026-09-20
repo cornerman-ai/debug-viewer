@@ -15,6 +15,7 @@
 //                 decode: { threshold, min_event_s, gap_s, delta },  the fold's LOFO decode
 //                 probs: [n],                                  p(roll) at t0 + i·dt (30 fps)
 //                 probs_lead: [n] | null,                      the side head's p(lead roll); rear = probs − lead
+//                 dip: [n] | null,                             head drop below its own 2-s baseline, torso units (roll_data_mathe.head_dip)
 //                 gt:   [{ s, e, label, verdict, peak }],      the evaluator's verdicts
 //                 pred: [{ s, e, score, verdict, side }],
 //                 other: [{ s, e, label }],                    John's ducks / slips / pull_backs
@@ -55,6 +56,7 @@ import { createRangeSelection } from "../shared/timeline_selection.js";
 const DATA_DIR = "./lens_data/roll_detector_mathe/";
 const GRID_FPS = 30;
 const IOU_MATCH = 0.5;
+const DIP_MAX = 0.5;             // the head-dip curve's full scale on the p(roll) graph, torso units
 const ROLL_LABELS = new Set(["lead_roll", "rear_roll"]);
 const OTHER_DEFENSE = new Set(["duck", "lead_slip", "rear_slip", "pull_back", "step_back"]);
 const LIVE_LABELERS = ["John", "Arianne", "Mathe"];   // the tabs offered; a further tab seen on the video is added
@@ -74,6 +76,8 @@ const COLORS = {
   probFill:     "rgba(138,180,248,0.25)",
   probLead:     "#ff8fa3",           // the side head's two curves over the summed area
   probRear:     "#7ee0c0",
+  dip:          "#5fd3e0",           // the head-dip curve (torso units, 0..DIP_MAX over the graph)
+  gated:        "#4d5764",           // an event under the min-dip gate: neither a roll nor an alarm
   thr:          "rgba(255,255,255,0.45)",
   playhead:     "rgba(255,255,255,0.85)",
   rowBg:        "#1d222b",
@@ -83,7 +87,7 @@ let host = null;
 let index = null, indexError = null;
 let doc = null, docKey = null, docError = null, docFile = null;
 let signals = null;            // decoded + matched events for the scoped round
-let cfg = { threshold: 0.5, minEventS: 0.27, gapS: 0.17 };
+let cfg = { threshold: 0.5, minEventS: 0.27, gapS: 0.17, minDip: 0 };   // minDip 0 = no gate
 let showOther = true, showBase = false;
 let gtSources = ["run"];       // ["run"] = the export's GT, else the checked labelers (LIVE_LABELERS order)
 let live = { key: null, status: "idle", rows: null, labelers: [], error: null, source: null };  // one video's tabs
@@ -302,47 +306,62 @@ function sourceEvents(src) {
   return { gt: liveRows(src, l => ROLL_LABELS.has(l)), other: liveRows(src, l => OTHER_DEFENSE.has(l)), pending: false };
 }
 
+function dipOf(sf, ef) {                  // the max head dip inside a grid span; null without the series
+  if (!doc || !doc.dip) return null;
+  let m = -Infinity;
+  for (let i = Math.max(0, sf); i < Math.min(doc.n, Math.max(sf + 1, ef)); i++) if (doc.dip[i] > m) m = doc.dip[i];
+  return Number.isFinite(m) ? m : null;
+}
+function gated(ev) { return cfg.minDip > 0 && ev.dip != null && ev.dip < cfg.minDip; }
+
 function derive() {
   if (!doc || !latestState) { signals = null; return; }
   const st = latestState;
   const toGrid = (sec) => Math.round((sec - doc.t0) / doc.dt);
   const vf = (ev) => ({ vf0: secToFrame(st, ev.s), vf1: Math.max(secToFrame(st, ev.s), secToFrame(st, ev.e) - 1) });
   const pred = decodePred(doc, cfg).map(p => ({
-    ...p, s: doc.t0 + p.sf * doc.dt, e: doc.t0 + p.ef * doc.dt }));
+    ...p, s: doc.t0 + p.sf * doc.dt, e: doc.t0 + p.ef * doc.dt, dip: dipOf(p.sf, p.ef) }));
+  // the min-dip gate: an event under it is neither a roll nor an alarm — drawn grey, out of the matching
+  const predKeep = pred.map((_, i) => i).filter(i => !gated(pred[i]));
+  const predKept = predKeep.map(i => pred[i]);
   // every lane is matched to the same predictions on its own; a prediction is
   // "correct" when any lane claims it, a false alarm when none does
   const predIou = new Set(), predCenter = new Set();
   const lanes = gtSources.map(src => {
     const ev = sourceEvents(src);
-    const gt = ev.gt.map(g => ({ ...g, sf: toGrid(g.s), ef: Math.max(toGrid(g.s) + 1, toGrid(g.e)) }));
-    const iou = matchEvents(gt, pred, "iou");
-    const center = matchEvents(gt, pred, "center");
-    for (const pi of iou.values()) predIou.add(pi);
-    for (const pi of center.values()) predCenter.add(pi);
-    const tagged = gt.map((g, gi) => ({
-      ...g, status: iou.has(gi) ? "hit" : center.has(gi) ? "center" : "miss", ...vf(g) }));
-    const tp = iou.size, fp = pred.length - tp, fn = gt.length - tp;
-    const p = tp + fp ? tp / (tp + fp) : null, r = gt.length ? tp / gt.length : null;
+    const gt = ev.gt.map(g => { const sf = toGrid(g.s), ef = Math.max(toGrid(g.s) + 1, toGrid(g.e)); return { ...g, sf, ef, dip: dipOf(sf, ef) }; });
+    const gtKeep = gt.map((_, i) => i).filter(i => !gated(gt[i]));
+    const gtKept = gtKeep.map(i => gt[i]);
+    const iou = matchEvents(gtKept, predKept, "iou");
+    const center = matchEvents(gtKept, predKept, "center");
+    for (const pi of iou.values()) predIou.add(predKeep[pi]);
+    for (const pi of center.values()) predCenter.add(predKeep[pi]);
+    const status = new Map();
+    gtKeep.forEach((gi, k) => status.set(gi, iou.has(k) ? "hit" : center.has(k) ? "center" : "miss"));
+    const tagged = gt.map((g, gi) => ({ ...g, status: status.get(gi) || "gated", ...vf(g) }));
+    const tp = iou.size, fp = predKept.length - tp, fn = gtKept.length - tp;
+    const p = tp + fp ? tp / (tp + fp) : null, r = gtKept.length ? tp / gtKept.length : null;
     let sErr = 0, eErr = 0;
-    for (const [gi, pi] of iou) { sErr += Math.abs(pred[pi].sf - gt[gi].sf); eErr += Math.abs(pred[pi].ef - gt[gi].ef); }
+    for (const [k, pk] of iou) { sErr += Math.abs(predKept[pk].sf - gtKept[k].sf); eErr += Math.abs(predKept[pk].ef - gtKept[k].ef); }
     return {
       src, name: src === "run" ? "GT rolls" : `GT ${src}`, initial: initialOf(src), pending: ev.pending,
       gt: tagged, other: ev.other,
-      stats: { nGt: gt.length, nPred: pred.length, tp, fp, fn, precision: p, recall: r,
-               f1: p != null && r != null && p + r ? 2 * p * r / (p + r) : (gt.length || pred.length ? 0 : null),
-               centerRecall: gt.length ? center.size / gt.length : null,
-               startMae: tp ? sErr / tp : null, endMae: tp ? eErr / tp : null },
+      stats: { nGt: gtKept.length, nPred: predKept.length, tp, fp, fn, precision: p, recall: r,
+               f1: p != null && r != null && p + r ? 2 * p * r / (p + r) : (gtKept.length || predKept.length ? 0 : null),
+               centerRecall: gtKept.length ? center.size / gtKept.length : null,
+               startMae: tp ? sErr / tp : null, endMae: tp ? eErr / tp : null,
+               gatedGt: gt.length - gtKept.length, gatedPred: pred.length - predKept.length },
     };
   });
   const predTagged = pred.map((p, pi) => ({
-    ...p, status: predIou.has(pi) ? "correct" : predCenter.has(pi) ? "center" : "fa", ...vf(p) }));
+    ...p, status: gated(p) ? "gated" : predIou.has(pi) ? "correct" : predCenter.has(pi) ? "center" : "fa", ...vf(p) }));
   // the lanes' other defense labels share one thin row (named by lane when there are several)
   const other = [];
   for (const lane of lanes) for (const o of lane.other) other.push({ ...o, lane, ...vf(o) });
   const base = (doc.baseline || []).map(b => ({ ...b, ...vf(b) }));
   signals = {
     lanes, pred: predTagged, other, base,
-    atDefault: cfg.threshold === doc.decode.threshold && cfg.minEventS === doc.decode.min_event_s && cfg.gapS === doc.decode.gap_s,
+    atDefault: cfg.threshold === doc.decode.threshold && cfg.minEventS === doc.decode.min_event_s && cfg.gapS === doc.decode.gap_s && !(cfg.minDip > 0),
   };
 }
 
@@ -354,6 +373,11 @@ function probAtFrame(state, f) {
   if (!doc) return NaN;
   const i = Math.round((frameToSec(state, f) - doc.t0) / doc.dt);
   return i >= 0 && i < doc.n ? doc.probs[i] : NaN;
+}
+function dipAtFrame(state, f) {
+  if (!doc || !doc.dip) return NaN;
+  const i = Math.round((frameToSec(state, f) - doc.t0) / doc.dt);
+  return i >= 0 && i < doc.n ? doc.dip[i] : NaN;
 }
 function sideProbsAtFrame(state, f) {        // { lead, rear } for the side head, else null
   if (!doc || !doc.probs_lead) return null;
@@ -448,6 +472,11 @@ function template() {
       <input type="range" id="rg-gap" min="0" max="0.5" step="0.033" value="0.17">
       <span class="muted small" id="rg-decode-note"></span>
     </label>
+    <label class="slider">
+      <span>min dip = <output id="rg-dip-out">0.00</output> torso</span>
+      <input type="range" id="rg-dip" min="0" max="0.4" step="0.01" value="0">
+      <span class="muted small">0 = off · the head drop below its own 2-s baseline · gates GT and predictions alike (grey bars, out of the stats)</span>
+    </label>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 8px">
       <button type="button" id="rg-reset" style="background:var(--bg-elev);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:2px 9px;cursor:pointer;font:inherit;font-size:12px">reset to the fold's decode</button>
       <label class="muted small" style="cursor:pointer"><input type="checkbox" id="rg-other"> other defense labels</label>
@@ -473,7 +502,9 @@ function template() {
       false alarm can be read against them), predicted rolls (orange = true · hatched =
       false alarm, no checked source has a roll there · yellow = center-hit only), and the
       p(roll) graph with the threshold line. Click to seek · drag to select a range (then Export /
-      Zoom to in the timeline header) · shift-drag to pan · wheel to zoom · double-click to fit.</p>
+      Zoom to in the timeline header) · shift-drag to pan · wheel to zoom · double-click to fit.
+      The teal curve is the head dip (torso units, 0–0.5 on the same graph); with a min dip set,
+      rolls and predictions under it turn grey and leave the stats.</p>
   `;
 }
 
@@ -491,9 +522,10 @@ function wireControls() {
   bind("rg-thr", "rg-thr-out", "threshold", v => v.toFixed(2));
   bind("rg-min", "rg-min-out", "minEventS", v => v.toFixed(2));
   bind("rg-gap", "rg-gap-out", "gapS", v => v.toFixed(2));
+  bind("rg-dip", "rg-dip-out", "minDip", v => v.toFixed(2));
   host.querySelector("#rg-reset").addEventListener("click", () => {
     if (!doc) return;
-    cfg = { threshold: doc.decode.threshold, minEventS: doc.decode.min_event_s, gapS: doc.decode.gap_s };
+    cfg = { threshold: doc.decode.threshold, minEventS: doc.decode.min_event_s, gapS: doc.decode.gap_s, minDip: 0 };
     syncSliders(); derive(); renderAll();
     if (window.__viewerRedraw) window.__viewerRedraw();
   });
@@ -590,6 +622,7 @@ function syncSliders() {
   set("rg-thr", "rg-thr-out", cfg.threshold, 2);
   set("rg-min", "rg-min-out", cfg.minEventS, 2);
   set("rg-gap", "rg-gap-out", cfg.gapS, 2);
+  set("rg-dip", "rg-dip-out", cfg.minDip, 2);
 }
 
 function renderRun() {
@@ -680,7 +713,8 @@ function renderStats() {
   set("rg-center", val(s => pct(s.centerRecall))); set("rg-counts", val(s => `${s.nGt} / ${s.nPred}`));
   set("rg-mae", val(s => s.startMae == null ? "—" : `${s.startMae.toFixed(1)} / ${s.endMae.toFixed(1)}`));
   set("rg-stat-line", L.map(ln => `<span class="muted small">${many ? ln.initial + ": " : ""}` +
-    (ln.pending ? "loading…" : `true ${ln.stats.tp} · missed ${ln.stats.fn} · false+ ${ln.stats.fp}`) + `</span>`).join(" · "));
+    (ln.pending ? "loading…" : `true ${ln.stats.tp} · missed ${ln.stats.fn} · false+ ${ln.stats.fp}` +
+      (cfg.minDip > 0 ? ` · gated ${ln.stats.gatedGt} GT / ${ln.stats.gatedPred} pred` : "")) + `</span>`).join(" · "));
 }
 
 function firstGt(f) {
@@ -703,7 +737,8 @@ function renderFrameLine(state) {
   }).join(" · ");
   const sp = sideProbsAtFrame(state, f);
   el.innerHTML = `f${f} · t ${fmtTime(frameToSec(state, f), true)} · p(roll) <b>${fmt(p, 2)}</b>` +
-    (sp ? ` <span class="muted">(lead ${fmt(sp.lead, 2)} · rear ${fmt(sp.rear, 2)})</span>` : "") + ` · GT ${gt} · ` +
+    (sp ? ` <span class="muted">(lead ${fmt(sp.lead, 2)} · rear ${fmt(sp.rear, 2)})</span>` : "") +
+    (doc.dip ? ` · dip <b style="color:${COLORS.dip}">${fmt(dipAtFrame(state, f), 2)}</b>` : "") + ` · GT ${gt} · ` +
     `pred ${pr ? `<span style="color:${predColor(pr, g0)}">${sideWord(pr)} · ${pr.status} · ${fmt(pr.score, 2)}</span>` : "<span class=\"muted\">idle</span>"}`;
 }
 
@@ -890,7 +925,7 @@ function drawTimeline(canvas, frame) {
       if (g.vf1 < v0 - 1 || g.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(g);
       drawEventBar(ctx, x1, r.y, x2 - x1, r.h, gtColor(g), g.status === "miss", COLORS.gtMissStripe,
-                   g.label.replace(/_roll$/, ""));
+                   (g.status === "gated" ? "gated " : "") + g.label.replace(/_roll$/, ""));
     }
   });
   // other defense labels (duck / slip / step_back / pull_back): one thin row, named
@@ -913,7 +948,7 @@ function drawTimeline(canvas, frame) {
       if (p.vf1 < v0 - 1 || p.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(p);
       drawEventBar(ctx, x1, predRow.y, x2 - x1, predRow.h, predColor(p, null), p.status === "fa", COLORS.predFAStripe,
-                   p.status === "fa" ? `false+ ${sideTag(p)}${p.score.toFixed(2)}` : `${sideTag(p)}${p.score.toFixed(2)}`);
+                   p.status === "fa" ? `false+ ${sideTag(p)}${p.score.toFixed(2)}` : p.status === "gated" ? `gated ${sideTag(p)}${p.score.toFixed(2)}` : `${sideTag(p)}${p.score.toFixed(2)}`);
     }
     if (showBase) for (const b of signals.base) {
       if (b.vf1 < v0 - 1 || b.vf0 > v1 + 1) continue;
@@ -962,6 +997,24 @@ function drawTimeline(canvas, frame) {
       ctx.font = "9px ui-monospace, monospace";
       ctx.fillStyle = COLORS.probLead; ctx.fillText("lead", LABEL_W + 4, graphRow.y + 10);
       ctx.fillStyle = COLORS.probRear; ctx.fillText("rear", LABEL_W + 32, graphRow.y + 10);
+    }
+    if (doc.dip) {                               // the head dip, torso units, 0..DIP_MAX over the same height
+      const gd = (v) => gy(Math.max(0, Math.min(DIP_MAX, v)) / DIP_MAX);
+      ctx.beginPath(); let fd = true;
+      for (let i = f0; i <= f1; i += perPx) {
+        let v = doc.dip[i];
+        for (let k = 1; k < perPx && i + k <= f1; k++) v = Math.max(v, doc.dip[i + k]);
+        const x = frameToX(secToFrameF(latestState, doc.t0 + i * doc.dt), W);
+        if (fd) { ctx.moveTo(x, gd(v)); fd = false; } else ctx.lineTo(x, gd(v));
+      }
+      ctx.strokeStyle = COLORS.dip; ctx.lineWidth = 1; ctx.stroke();
+      ctx.font = "9px ui-monospace, monospace"; ctx.fillStyle = COLORS.dip;
+      ctx.fillText(`dip 0–${DIP_MAX}`, W - PAD_R - 52, graphRow.y + 20);
+      if (cfg.minDip > 0) {
+        ctx.save(); ctx.setLineDash([2, 3]); ctx.strokeStyle = COLORS.dip; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(LABEL_W, gd(cfg.minDip)); ctx.lineTo(W - PAD_R, gd(cfg.minDip)); ctx.stroke(); ctx.restore();
+        ctx.fillText(`min dip ${cfg.minDip.toFixed(2)}`, LABEL_W + 4, gd(cfg.minDip) - 3);
+      }
     }
     ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = COLORS.thr; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(LABEL_W, gy(cfg.threshold)); ctx.lineTo(W - PAD_R, gy(cfg.threshold)); ctx.stroke(); ctx.restore();
@@ -1016,10 +1069,10 @@ function drawEventBar(ctx, x, y, w, h, color, hatched, stripe, name) {
   }
 }
 
-function gtColor(g) { return g.status === "miss" ? COLORS.gtMiss : g.status === "center" ? COLORS.gtCenter : COLORS.gtHit; }
+function gtColor(g) { return g.status === "gated" ? COLORS.gated : g.status === "miss" ? COLORS.gtMiss : g.status === "center" ? COLORS.gtCenter : COLORS.gtHit; }
 function predColor(p, g) {
   if (!p) return g ? COLORS.gtMiss : "#888888";
-  return p.status === "center" ? COLORS.predCenter : COLORS.pred;
+  return p.status === "gated" ? COLORS.gated : p.status === "center" ? COLORS.predCenter : COLORS.pred;
 }
 
 // ── on-video HUD (the punch lens's box, one hand → one roll) ────────────────
@@ -1033,17 +1086,19 @@ function drawCanvasHud(ctx, state) {
   const predText = !p ? (g ? "MISS" : "idle")
     : p.status === "correct" ? `${sideWord(p)} ${p.score.toFixed(2)} ✓`
     : p.status === "center" ? `${sideWord(p)} ${p.score.toFixed(2)} (center-hit)`
+    : p.status === "gated" ? `${sideWord(p)} ${p.score.toFixed(2)} (gated)`
     : `${sideWord(p)} ${p.score.toFixed(2)} (false+)`;
   const many = signals.lanes.length > 1;
   const gtLines = signals.lanes.map((ln, i) => {       // one line per GT lane
     const lg = findEvent(ln.gt, f), o = findEvent(ln.other, f);
-    const what = lg ? `${lg.label}${lg.status === "miss" ? " (missed)" : ""}`
+    const what = lg ? `${lg.label}${lg.status === "miss" ? " (missed)" : lg.status === "gated" ? " (gated)" : ""}`
       : o ? `${o.label} (not a roll)` : ln.pending ? "loading…" : "idle";
     return { text: `${i ? "     " : "GT:  "} ${many ? ln.initial + " " : ""}${what}`,
              color: lg ? gtColor(lg) : o ? "#7ec8ff" : "#888888" };
   });
   const lines = [
     { text: `Roll  p=${fmt(prob, 2)}  thr ${cfg.threshold.toFixed(2)}`, color: prob >= cfg.threshold ? COLORS.pred : "#dddddd" },
+    ...(doc.dip ? [{ text: `Dip   ${fmt(dipAtFrame(state, f), 2)} torso${cfg.minDip > 0 ? `  (min ${cfg.minDip.toFixed(2)})` : ""}`, color: COLORS.dip }] : []),
     ...gtLines,
     { text: `Pred: ${predText}`, color: predColor(p, g) },
   ];

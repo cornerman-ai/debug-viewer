@@ -1,69 +1,69 @@
 {
- "generated": "2026-09-15T16:30:35",
- "run": "v4_side_colab",
- "labels_sha1": "b343e4dc5e",
- "git_commit": "b72d0f1",
- "n_rounds": 531,
+ "generated": "2026-09-20T20:54:16",
+ "run": "v4_side_on_relabel_0920",
+ "labels_sha1": "e4a0e82f8a",
+ "git_commit": "ee7cfec",
+ "n_rounds": 529,
  "metrics": {
   "pooled": {
-   "n_gt": 2152,
-   "n_pred": 2095,
-   "tp": 1277,
-   "fp": 818,
-   "fn": 875,
-   "precision": 0.6095465393794749,
-   "recall": 0.5934014869888475,
-   "f1": 0.6013656698846245,
-   "center_precision": 0.6248210023866348,
-   "center_recall": 0.608271375464684,
-   "center_f1": 0.6164351306804804,
-   "start_mae_frames": 2.7079091620986686,
-   "end_mae_frames": 3.8496476115896634,
-   "start_bias_frames": -1.4784651527016446,
-   "end_bias_frames": 2.183241973375098,
-   "frame_roc_auc": 0.9076481956765127,
-   "frame_pr_auc": 0.5449691191676401
+   "n_gt": 2160,
+   "n_pred": 2093,
+   "tp": 1312,
+   "fp": 781,
+   "fn": 848,
+   "precision": 0.6268514094601051,
+   "recall": 0.6074074074074074,
+   "f1": 0.6169762520573714,
+   "center_precision": 0.6402293358815098,
+   "center_recall": 0.6203703703703703,
+   "center_f1": 0.6301434281683518,
+   "start_mae_frames": 2.596036585365854,
+   "end_mae_frames": 3.8064024390243905,
+   "start_bias_frames": -1.3460365853658536,
+   "end_bias_frames": 2.3048780487804876,
+   "frame_roc_auc": 0.9116127637914807,
+   "frame_pr_auc": 0.563197906905832
   },
   "fold_mean_std": {
    "f1": [
-    0.6035109317279144,
-    0.021669179234262287
+    0.6203265803764244,
+    0.018637702963387865
    ],
    "recall": [
-    0.622773792751626,
-    0.0870590930218899
+    0.6291676139574066,
+    0.06881160791827128
    ],
    "precision": [
-    0.6053262799437243,
-    0.07344063761874231
+    0.6232301917931178,
+    0.05342776417985549
    ],
    "center_f1": [
-    0.6188652915510936,
-    0.02413348778405495
+    0.6337970069627702,
+    0.0203428195948955
    ],
    "center_recall": [
-    0.638863357587251,
-    0.09123215180372143
+    0.6431469801752436,
+    0.07343023281396142
    ],
    "center_precision": [
-    0.6204164878349727,
-    0.07306553822914501
+    0.6364321079960342,
+    0.05102315006764525
    ],
    "start_mae_frames": [
-    2.7423851853478562,
-    0.28633816076029966
+    2.639110600597472,
+    0.3059255584660149
    ],
    "end_mae_frames": [
-    3.867986138670703,
-    0.24223446834967355
+    3.8450781935321023,
+    0.2642912050344536
    ],
    "frame_roc_auc": [
-    0.9167827465197353,
-    0.01972563933317454
+    0.9186659930261278,
+    0.01796249285288497
    ],
    "frame_pr_auc": [
-    0.5597307229980146,
-    0.015353143837263937
+    0.5753096863033549,
+    0.016283583614482334
    ]
   }
  },
@@ -160,16 +160,16 @@
    "3": {
     "file": "f0093f0fe815.json",
     "gt": 12,
-    "tp": 7,
-    "fp": 4,
-    "fn": 5,
+    "tp": 10,
+    "fp": 1,
+    "fn": 2,
     "fold": 3
    },
    "4": {
     "file": "2c3d092227ab.json",
     "gt": 1,
     "tp": 1,
-    "fp": 0,
+    "fp": 1,
     "fn": 0,
     "fold": 3
    }
@@ -249,10 +249,10 @@
    },
    "9": {
     "file": "8cfb052ea259.json",
-    "gt": 1,
+    "gt": 2,
     "tp": 1,
     "fp": 0,
-    "fn": 0,
+    "fn": 1,
     "fold": 1
    }
   },
@@ -325,9 +325,9 @@
    },
    "3": {
     "file": "fd72bd0f5689.json",
-    "gt": 1,
-    "tp": 1,
-    "fp": 1,
+    "gt": 2,
+    "tp": 2,
+    "fp": 0,
     "fn": 0,
     "fold": 3
    },
@@ -401,7 +401,7 @@
     "file": "36087c43b3dd.json",
     "gt": 17,
     "tp": 8,
-    "fp": 3,
+    "fp": 6,
     "fn": 9,
     "fold": 3
    }
@@ -451,18 +451,18 @@
   "11 minute Aqua Bag 3 rounds Fundamentals Workout [z6B7OIK6LO4]": {
    "0": {
     "file": "aff2ae3c6497.json",
-    "gt": 30,
-    "tp": 9,
-    "fp": 0,
-    "fn": 21,
+    "gt": 29,
+    "tp": 10,
+    "fp": 2,
+    "fn": 19,
     "fold": 3
    },
    "1": {
     "file": "01ca2ca88dc1.json",
     "gt": 22,
-    "tp": 4,
+    "tp": 5,
     "fp": 2,
-    "fn": 18,
+    "fn": 17,
     "fold": 3
    }
   },
@@ -487,10 +487,10 @@
   "13 Shadowboxing Body Shots": {
    "0": {
     "file": "c78f58c904c8.json",
-    "gt": 22,
-    "tp": 12,
-    "fp": 4,
-    "fn": 10,
+    "gt": 25,
+    "tp": 14,
+    "fp": 2,
+    "fn": 11,
     "fold": 1
    }
   },
@@ -531,10 +531,10 @@
    },
    "2": {
     "file": "02be8941f199.json",
-    "gt": 15,
+    "gt": 0,
     "tp": 0,
     "fp": 0,
-    "fn": 15,
+    "fn": 0,
     "fold": 3
    },
    "3": {
@@ -609,7 +609,7 @@
     "file": "0a92d3892c84.json",
     "gt": 0,
     "tp": 0,
-    "fp": 1,
+    "fp": 0,
     "fn": 0,
     "fold": 1
    },
@@ -703,18 +703,18 @@
   "20 Minute Boxing Footwork Heavy bag Workout - Follow along": {
    "0": {
     "file": "a5eb08cbbc14.json",
-    "gt": 2,
-    "tp": 2,
-    "fp": 2,
-    "fn": 0,
+    "gt": 6,
+    "tp": 4,
+    "fp": 0,
+    "fn": 2,
     "fold": 0
    },
    "1": {
     "file": "7d2a25c91cd8.json",
-    "gt": 4,
-    "tp": 3,
-    "fp": 1,
-    "fn": 1,
+    "gt": 8,
+    "tp": 4,
+    "fp": 0,
+    "fn": 4,
     "fold": 0
    },
    "2": {
@@ -771,10 +771,10 @@
   "20 Minute Shadowboxing for Beginners \uff5c Trainer of the Month Club \uff5c Well+Good": {
    "0": {
     "file": "e26232f9d8ed.json",
-    "gt": 12,
+    "gt": 13,
     "tp": 1,
     "fp": 0,
-    "fn": 11,
+    "fn": 12,
     "fold": 1
    },
    "1": {
@@ -787,10 +787,10 @@
    },
    "2": {
     "file": "f0ed12ffb9b6.json",
-    "gt": 4,
+    "gt": 6,
     "tp": 0,
     "fp": 0,
-    "fn": 4,
+    "fn": 6,
     "fold": 1
    }
   },
@@ -954,9 +954,9 @@
    "0": {
     "file": "ce66d2fe401b.json",
     "gt": 10,
-    "tp": 9,
-    "fp": 1,
-    "fn": 1,
+    "tp": 10,
+    "fp": 0,
+    "fn": 0,
     "fold": 4
    },
    "1": {
@@ -1059,10 +1059,10 @@
    },
    "1": {
     "file": "5d5f8edd7ecf.json",
-    "gt": 2,
+    "gt": 0,
     "tp": 0,
     "fp": 0,
-    "fn": 2,
+    "fn": 0,
     "fold": 3
    }
   },
@@ -1098,9 +1098,9 @@
    "0": {
     "file": "a986bf4d99fb.json",
     "gt": 15,
-    "tp": 13,
+    "tp": 14,
     "fp": 0,
-    "fn": 2,
+    "fn": 1,
     "fold": 3
    },
    "1": {
@@ -1134,9 +1134,9 @@
    "1": {
     "file": "9d9d1f8ed186.json",
     "gt": 26,
-    "tp": 24,
-    "fp": 1,
-    "fn": 2,
+    "tp": 25,
+    "fp": 0,
+    "fn": 1,
     "fold": 1
    }
   },
@@ -1161,7 +1161,7 @@
     "file": "7e286807b932.json",
     "gt": 0,
     "tp": 0,
-    "fp": 4,
+    "fp": 3,
     "fn": 0,
     "fold": 2
    },
@@ -1290,27 +1290,27 @@
    "0": {
     "file": "d458c2c8dcb9.json",
     "gt": 29,
-    "tp": 19,
+    "tp": 20,
     "fp": 9,
-    "fn": 10,
+    "fn": 9,
     "fold": 3
    }
   },
   "5 Min Shadow Boxing Workout (Follow Along)": {
    "0": {
     "file": "c0af00af825c.json",
-    "gt": 2,
-    "tp": 2,
-    "fp": 6,
-    "fn": 0,
+    "gt": 4,
+    "tp": 3,
+    "fp": 5,
+    "fn": 1,
     "fold": 0
    },
    "1": {
     "file": "2c8de632e2cc.json",
     "gt": 6,
-    "tp": 6,
-    "fp": 3,
-    "fn": 0,
+    "tp": 5,
+    "fp": 4,
+    "fn": 1,
     "fold": 0
    },
    "2": {
@@ -1331,10 +1331,10 @@
    },
    "4": {
     "file": "0248a6579d92.json",
-    "gt": 2,
+    "gt": 3,
     "tp": 2,
     "fp": 4,
-    "fn": 0,
+    "fn": 1,
     "fold": 0
    }
   },
@@ -1361,10 +1361,10 @@
   "A little help with form and flow [zATbn5Ry40M]": {
    "0": {
     "file": "3e07ec1db3c2.json",
-    "gt": 30,
-    "tp": 25,
-    "fp": 18,
-    "fn": 5,
+    "gt": 31,
+    "tp": 29,
+    "fp": 13,
+    "fn": 2,
     "fold": 1
    }
   },
@@ -1381,27 +1381,27 @@
   "Advice on my Shadow Boxing [KLX3xfCo9Cw]": {
    "0": {
     "file": "0c53058207b2.json",
-    "gt": 9,
-    "tp": 6,
+    "gt": 10,
+    "tp": 5,
     "fp": 0,
-    "fn": 3,
+    "fn": 5,
     "fold": 2
    },
    "1": {
     "file": "1e9b6e1fbb96.json",
-    "gt": 14,
+    "gt": 15,
     "tp": 7,
     "fp": 0,
-    "fn": 7,
+    "fn": 8,
     "fold": 2
    }
   },
   "Advice request on my bag work. [EglbwnGsod8]": {
    "0": {
     "file": "0547587f61a1.json",
-    "gt": 1,
-    "tp": 1,
-    "fp": 0,
+    "gt": 0,
+    "tp": 0,
+    "fp": 1,
     "fn": 0,
     "fold": 4
    }
@@ -1427,10 +1427,10 @@
   "All around technique advice \ud83d\ude4f\ud83c\udffd [vXa5BicbiUQ]": {
    "0": {
     "file": "92b99fe5a7c6.json",
-    "gt": 17,
+    "gt": 16,
     "tp": 13,
-    "fp": 3,
-    "fn": 4,
+    "fp": 4,
+    "fn": 3,
     "fold": 3
    }
   },
@@ -1469,7 +1469,7 @@
     "file": "3f5ac7dc429f.json",
     "gt": 0,
     "tp": 0,
-    "fp": 0,
+    "fp": 1,
     "fn": 0,
     "fold": 3
    }
@@ -1579,10 +1579,10 @@
   "Bag work [4tcg5x]": {
    "0": {
     "file": "3e7a4b546d31.json",
-    "gt": 5,
-    "tp": 1,
-    "fp": 2,
-    "fn": 4,
+    "gt": 3,
+    "tp": 0,
+    "fp": 3,
+    "fn": 3,
     "fold": 0
    }
   },
@@ -1591,7 +1591,7 @@
     "file": "703b5cce65cf.json",
     "gt": 11,
     "tp": 1,
-    "fp": 6,
+    "fp": 5,
     "fn": 10,
     "fold": 1
    }
@@ -1599,10 +1599,10 @@
   "Bag work video [vB6MEMMlkGo]": {
    "0": {
     "file": "c9f7cd172a1f.json",
-    "gt": 22,
-    "tp": 20,
-    "fp": 4,
-    "fn": 2,
+    "gt": 20,
+    "tp": 19,
+    "fp": 5,
+    "fn": 1,
     "fold": 0
    }
   },
@@ -1611,7 +1611,7 @@
     "file": "962582636242.json",
     "gt": 2,
     "tp": 1,
-    "fp": 5,
+    "fp": 7,
     "fn": 1,
     "fold": 3
    },
@@ -1619,7 +1619,7 @@
     "file": "0eb10b0960a2.json",
     "gt": 1,
     "tp": 0,
-    "fp": 1,
+    "fp": 2,
     "fn": 1,
     "fold": 3
    }
@@ -1627,10 +1627,10 @@
   "Bag-work Critique Submission [pg2FHkwvvso]": {
    "0": {
     "file": "9c89812e3545.json",
-    "gt": 15,
-    "tp": 4,
-    "fp": 2,
-    "fn": 11,
+    "gt": 9,
+    "tp": 3,
+    "fp": 4,
+    "fn": 6,
     "fold": 3
    }
   },
@@ -1647,10 +1647,10 @@
   "Bagwork Critique [UyZ77aEugUA]": {
    "0": {
     "file": "60e830eb2161.json",
-    "gt": 4,
+    "gt": 2,
     "tp": 0,
     "fp": 1,
-    "fn": 4,
+    "fn": 2,
     "fold": 4
    }
   },
@@ -1694,9 +1694,9 @@
    "0": {
     "file": "e9aa7b4d4ad2.json",
     "gt": 51,
-    "tp": 22,
-    "fp": 10,
-    "fn": 29,
+    "tp": 23,
+    "fp": 11,
+    "fn": 28,
     "fold": 3
    }
   },
@@ -1731,7 +1731,7 @@
     "file": "ced665d9a954.json",
     "gt": 8,
     "tp": 3,
-    "fp": 4,
+    "fp": 5,
     "fn": 5,
     "fold": 3
    }
@@ -1769,20 +1769,20 @@
   "Bagwork critique [aA1G_V-Gj64]": {
    "0": {
     "file": "3836e57ad570.json",
-    "gt": 6,
-    "tp": 4,
-    "fp": 2,
-    "fn": 2,
+    "gt": 9,
+    "tp": 6,
+    "fp": 0,
+    "fn": 3,
     "fold": 0
    }
   },
   "Bagwork critique [amZPoRM3s78]": {
    "0": {
     "file": "4237ee35d74d.json",
-    "gt": 60,
-    "tp": 35,
+    "gt": 58,
+    "tp": 38,
     "fp": 13,
-    "fn": 25,
+    "fn": 20,
     "fold": 1
    }
   },
@@ -1847,10 +1847,10 @@
   "Bagwork opinions appreciated [1u86mz]": {
    "0": {
     "file": "fc003c6307ce.json",
-    "gt": 1,
+    "gt": 2,
     "tp": 1,
     "fp": 2,
-    "fn": 0,
+    "fn": 1,
     "fold": 1
    },
    "1": {
@@ -1899,9 +1899,9 @@
   "Bagwork, little improvement but more of an update [Ps-arwZbCx0]": {
    "0": {
     "file": "76fcaa4805f0.json",
-    "gt": 24,
-    "tp": 22,
-    "fp": 7,
+    "gt": 23,
+    "tp": 21,
+    "fp": 8,
     "fn": 2,
     "fold": 0
    }
@@ -1929,10 +1929,10 @@
   "Been Working on previous advice. Grateful for any pointers to improve form. thanks! [zafts3]": {
    "0": {
     "file": "5af2b46b841f.json",
-    "gt": 8,
+    "gt": 12,
     "tp": 4,
-    "fp": 6,
-    "fn": 4,
+    "fp": 4,
+    "fn": 8,
     "fold": 1
    }
   },
@@ -2117,10 +2117,10 @@
    },
    "7": {
     "file": "b5a47dd2654d.json",
-    "gt": 1,
+    "gt": 0,
     "tp": 0,
     "fp": 0,
-    "fn": 1,
+    "fn": 0,
     "fold": 1
    }
   },
@@ -2137,18 +2137,18 @@
   "Beginner shadowboxing - looking for honest critique [PMQpEkaf9h4]": {
    "0": {
     "file": "2b782d4411c9.json",
-    "gt": 40,
-    "tp": 27,
-    "fp": 4,
-    "fn": 13,
+    "gt": 38,
+    "tp": 29,
+    "fp": 5,
+    "fn": 9,
     "fold": 3
    },
    "1": {
     "file": "f646b6f41d76.json",
-    "gt": 56,
-    "tp": 31,
-    "fp": 4,
-    "fn": 25,
+    "gt": 52,
+    "tp": 36,
+    "fp": 6,
+    "fn": 16,
     "fold": 3
    }
   },
@@ -2177,7 +2177,7 @@
     "file": "8c0dfe4e196f.json",
     "gt": 2,
     "tp": 0,
-    "fp": 2,
+    "fp": 1,
     "fn": 2,
     "fold": 1
    }
@@ -2215,10 +2215,10 @@
   "Boxing app workout": {
    "0": {
     "file": "6ee5855498bd.json",
-    "gt": 4,
+    "gt": 3,
     "tp": 2,
     "fp": 1,
-    "fn": 2,
+    "fn": 1,
     "fold": 2
    },
    "1": {
@@ -2231,9 +2231,9 @@
    },
    "2": {
     "file": "3f068cc51357.json",
-    "gt": 4,
-    "tp": 3,
-    "fp": 2,
+    "gt": 3,
+    "tp": 2,
+    "fp": 3,
     "fn": 1,
     "fold": 2
    }
@@ -2252,9 +2252,9 @@
    "0": {
     "file": "6d730cbce6c4.json",
     "gt": 11,
-    "tp": 3,
-    "fp": 0,
-    "fn": 8,
+    "tp": 5,
+    "fp": 1,
+    "fn": 6,
     "fold": 3
    }
   },
@@ -2381,9 +2381,9 @@
   "Can I please get some critique-advice on my shadowboxing [nzaxd9]": {
    "0": {
     "file": "b616a409171a.json",
-    "gt": 2,
-    "tp": 2,
-    "fp": 0,
+    "gt": 1,
+    "tp": 1,
+    "fp": 1,
     "fn": 0,
     "fold": 3
    },
@@ -2467,10 +2467,10 @@
   "Critique on shadowboxing [xbj8rs]": {
    "0": {
     "file": "10367bb18997.json",
-    "gt": 18,
-    "tp": 11,
-    "fp": 6,
-    "fn": 7,
+    "gt": 19,
+    "tp": 9,
+    "fp": 8,
+    "fn": 10,
     "fold": 4
    }
   },
@@ -2513,7 +2513,7 @@
     "file": "aeb7ca1bf9b3.json",
     "gt": 0,
     "tp": 0,
-    "fp": 2,
+    "fp": 3,
     "fn": 0,
     "fold": 3
    },
@@ -2527,10 +2527,10 @@
    },
    "5": {
     "file": "03eecc9f60a2.json",
-    "gt": 5,
+    "gt": 6,
     "tp": 4,
     "fp": 0,
-    "fn": 1,
+    "fn": 2,
     "fold": 3
    },
    "6": {
@@ -2563,9 +2563,9 @@
   "Easy shadow boxing session in the garage": {
    "0": {
     "file": "08aac9538a88.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 2,
+    "gt": 2,
+    "tp": 2,
+    "fp": 0,
     "fn": 0,
     "fold": 2
    },
@@ -2580,9 +2580,9 @@
    "2": {
     "file": "9a0ab534357a.json",
     "gt": 2,
-    "tp": 1,
-    "fp": 6,
-    "fn": 1,
+    "tp": 2,
+    "fp": 5,
+    "fn": 0,
     "fold": 2
    },
    "3": {
@@ -2603,10 +2603,10 @@
    },
    "5": {
     "file": "a86bcba731b4.json",
-    "gt": 1,
-    "tp": 0,
-    "fp": 3,
-    "fn": 1,
+    "gt": 4,
+    "tp": 1,
+    "fp": 2,
+    "fn": 3,
     "fold": 2
    }
   },
@@ -2677,18 +2677,18 @@
   "Follow Along Heavy Bag Workout \uff5c 10 minutes": {
    "0": {
     "file": "3762d3e7ed1f.json",
-    "gt": 3,
+    "gt": 2,
     "tp": 1,
     "fp": 0,
-    "fn": 2,
+    "fn": 1,
     "fold": 3
    },
    "1": {
     "file": "6f3279a466d6.json",
-    "gt": 12,
-    "tp": 1,
+    "gt": 9,
+    "tp": 2,
     "fp": 0,
-    "fn": 11,
+    "fn": 7,
     "fold": 3
    },
    "2": {
@@ -2701,10 +2701,10 @@
    },
    "3": {
     "file": "7c416ba1e320.json",
-    "gt": 7,
+    "gt": 6,
     "tp": 1,
     "fp": 0,
-    "fn": 6,
+    "fn": 5,
     "fold": 3
    }
   },
@@ -2755,10 +2755,10 @@
   "Footwork freestyle on the bag. [Ybfd_FFfZyY]": {
    "0": {
     "file": "38ae7e860f16.json",
-    "gt": 5,
+    "gt": 8,
     "tp": 3,
     "fp": 2,
-    "fn": 2,
+    "fn": 5,
     "fold": 3
    }
   },
@@ -2766,9 +2766,9 @@
    "0": {
     "file": "46e343b42eee.json",
     "gt": 5,
-    "tp": 0,
-    "fp": 3,
-    "fn": 5,
+    "tp": 1,
+    "fp": 4,
+    "fn": 4,
     "fold": 3
    }
   },
@@ -2797,7 +2797,7 @@
     "file": "632065dd6627.json",
     "gt": 13,
     "tp": 6,
-    "fp": 2,
+    "fp": 1,
     "fn": 7,
     "fold": 1
    }
@@ -2823,18 +2823,18 @@
    },
    "1": {
     "file": "58aa7373fcd3.json",
-    "gt": 11,
+    "gt": 10,
     "tp": 2,
     "fp": 8,
-    "fn": 9,
+    "fn": 8,
     "fold": 4
    },
    "2": {
     "file": "763b023c175b.json",
-    "gt": 6,
+    "gt": 10,
     "tp": 2,
     "fp": 7,
-    "fn": 4,
+    "fn": 8,
     "fold": 4
    },
    "3": {
@@ -2847,9 +2847,9 @@
    },
    "4": {
     "file": "0de6f0fc4f3f.json",
-    "gt": 7,
-    "tp": 5,
-    "fp": 3,
+    "gt": 6,
+    "tp": 4,
+    "fp": 4,
     "fn": 2,
     "fold": 4
    },
@@ -3169,29 +3169,29 @@
    },
    "4": {
     "file": "28c89901f901.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 1,
-    "fn": 0,
+    "gt": 2,
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
     "fold": 0
    }
   },
   "Heavy Bag Workout \uff5c Follow along Boxing Workout": {
    "0": {
     "file": "b60dad23ff17.json",
-    "gt": 10,
+    "gt": 6,
     "tp": 5,
-    "fp": 6,
-    "fn": 5,
+    "fp": 4,
+    "fn": 1,
     "fold": 0
    }
   },
   "Heavy bag boxing workout, pro training with an app [W9LPEvLxtO8]": {
    "0": {
     "file": "4de8f8cd495f.json",
-    "gt": 2,
-    "tp": 2,
-    "fp": 2,
+    "gt": 1,
+    "tp": 1,
+    "fp": 3,
     "fn": 0,
     "fold": 1
    }
@@ -3349,10 +3349,10 @@
    },
    "1": {
     "file": "3295e293ab4a.json",
-    "gt": 1,
+    "gt": 0,
     "tp": 0,
     "fp": 0,
-    "fn": 1,
+    "fn": 0,
     "fold": 4
    }
   },
@@ -3369,10 +3369,10 @@
   "I got a lot of great feedback here. Time for another critique of my shadow boxing -- after 3 years [BSmTYUs5vdQ]": {
    "0": {
     "file": "bdc4cd454718.json",
-    "gt": 11,
+    "gt": 14,
     "tp": 4,
     "fp": 1,
-    "fn": 7,
+    "fn": 10,
     "fold": 3
    }
   },
@@ -3441,17 +3441,17 @@
    },
    "1": {
     "file": "45df5dfc095a.json",
-    "gt": 9,
-    "tp": 3,
-    "fp": 4,
-    "fn": 6,
+    "gt": 11,
+    "tp": 4,
+    "fp": 3,
+    "fn": 7,
     "fold": 0
    },
    "2": {
     "file": "e01b1532def1.json",
-    "gt": 7,
-    "tp": 4,
-    "fp": 2,
+    "gt": 9,
+    "tp": 6,
+    "fp": 0,
     "fn": 3,
     "fold": 0
    }
@@ -3602,9 +3602,9 @@
    "0": {
     "file": "2b6180125843.json",
     "gt": 19,
-    "tp": 12,
-    "fp": 2,
-    "fn": 7,
+    "tp": 13,
+    "fp": 3,
+    "fn": 6,
     "fold": 3
    }
   },
@@ -3631,10 +3631,10 @@
   "March 21, 2026 [l2TPCicxhk8]": {
    "0": {
     "file": "384043ee7369.json",
-    "gt": 2,
+    "gt": 1,
     "tp": 1,
     "fp": 0,
-    "fn": 1,
+    "fn": 0,
     "fold": 4
    },
    "1": {
@@ -3667,19 +3667,19 @@
   "Need honest feedback and advice. Started 3 months ago. I want to do better. Please be kind [cm6PEb-79Zc]": {
    "0": {
     "file": "f0b77370de71.json",
-    "gt": 2,
-    "tp": 0,
-    "fp": 3,
-    "fn": 2,
+    "gt": 4,
+    "tp": 1,
+    "fp": 2,
+    "fn": 3,
     "fold": 0
    }
   },
   "Need tips and advice for my bagwork [TPalCFHyrd8]": {
    "0": {
     "file": "627d8bbe6eef.json",
-    "gt": 10,
-    "tp": 5,
-    "fp": 5,
+    "gt": 11,
+    "tp": 6,
+    "fp": 4,
     "fn": 5,
     "fold": 3
    }
@@ -3697,25 +3697,25 @@
   "November 15, 2020": {
    "0": {
     "file": "d3b32b759ccc.json",
-    "gt": 12,
-    "tp": 10,
-    "fp": 2,
-    "fn": 2,
+    "gt": 14,
+    "tp": 11,
+    "fp": 1,
+    "fn": 3,
     "fold": 4
    },
    "1": {
     "file": "c18e5ce32bb0.json",
-    "gt": 19,
-    "tp": 15,
-    "fp": 2,
-    "fn": 4,
+    "gt": 17,
+    "tp": 14,
+    "fp": 3,
+    "fn": 3,
     "fold": 4
    },
    "2": {
     "file": "6c59652fc79e.json",
-    "gt": 3,
-    "tp": 3,
-    "fp": 0,
+    "gt": 2,
+    "tp": 2,
+    "fp": 1,
     "fn": 0,
     "fold": 4
    }
@@ -3757,44 +3757,44 @@
   "One round of shadowboxing (I promise I go to the body more in sparrin... [ktbuo8]": {
    "0": {
     "file": "86525e5b7e18.json",
-    "gt": 11,
-    "tp": 8,
-    "fp": 2,
-    "fn": 3,
+    "gt": 14,
+    "tp": 9,
+    "fp": 1,
+    "fn": 5,
     "fold": 4
    }
   },
   "PUNCHING Bag Workout \uff5c Combination Audio \uff5c punching bag for boxing [KatBVp2YqtA]": {
    "0": {
     "file": "5ba79e999cd2.json",
-    "gt": 6,
+    "gt": 5,
     "tp": 5,
     "fp": 11,
-    "fn": 1,
+    "fn": 0,
     "fold": 4
    },
    "1": {
     "file": "41a196b8fddb.json",
-    "gt": 11,
+    "gt": 9,
     "tp": 7,
-    "fp": 11,
-    "fn": 4,
+    "fp": 10,
+    "fn": 2,
     "fold": 4
    },
    "2": {
     "file": "d8dcdf49a093.json",
-    "gt": 8,
-    "tp": 6,
-    "fp": 10,
+    "gt": 7,
+    "tp": 5,
+    "fp": 11,
     "fn": 2,
     "fold": 4
    },
    "3": {
     "file": "38861bd3223c.json",
-    "gt": 6,
+    "gt": 5,
     "tp": 4,
     "fp": 2,
-    "fn": 2,
+    "fn": 1,
     "fold": 4
    },
    "4": {
@@ -3837,7 +3837,7 @@
     "file": "9806698fa30d.json",
     "gt": 0,
     "tp": 0,
-    "fp": 5,
+    "fp": 8,
     "fn": 0,
     "fold": 3
    }
@@ -3875,10 +3875,10 @@
   "Pointers for a beginner on my bag work [T7Yw7FRqnp0]": {
    "0": {
     "file": "2e3b2c0a98ee.json",
-    "gt": 2,
+    "gt": 1,
     "tp": 0,
     "fp": 2,
-    "fn": 2,
+    "fn": 1,
     "fold": 3
    }
   },
@@ -3935,7 +3935,7 @@
     "file": "cf1ac8fae9bf.json",
     "gt": 3,
     "tp": 2,
-    "fp": 3,
+    "fp": 2,
     "fn": 1,
     "fold": 1
    }
@@ -3970,22 +3970,12 @@
     "fold": 2
    }
   },
-  "Seeking for bagwork critique [b4DWLhyKrsw]": {
-   "0": {
-    "file": "775d45b7ccd5.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 26,
-    "fn": 0,
-    "fold": 1
-   }
-  },
   "Shadow Box Workout \uff5c Let me Coach You for 11 Minutes": {
    "0": {
     "file": "544331c99c61.json",
-    "gt": 5,
-    "tp": 4,
-    "fp": 16,
+    "gt": 6,
+    "tp": 5,
+    "fp": 15,
     "fn": 1,
     "fold": 1
    }
@@ -4031,44 +4021,44 @@
   "Shadow Boxing Drill for Home \uff5c Tom Yankello's Drill #1": {
    "0": {
     "file": "83b8832555ab.json",
-    "gt": 10,
-    "tp": 6,
-    "fp": 1,
-    "fn": 4,
+    "gt": 6,
+    "tp": 5,
+    "fp": 2,
+    "fn": 1,
     "fold": 4
    },
    "1": {
     "file": "31b5372196dc.json",
-    "gt": 7,
-    "tp": 6,
-    "fp": 1,
+    "gt": 8,
+    "tp": 7,
+    "fp": 0,
     "fn": 1,
     "fold": 4
    },
    "2": {
     "file": "a7b420b99bed.json",
-    "gt": 9,
-    "tp": 5,
-    "fp": 1,
-    "fn": 4,
+    "gt": 3,
+    "tp": 2,
+    "fp": 4,
+    "fn": 1,
     "fold": 4
    }
   },
   "Shadow Boxing Work Out for Better Boxing": {
    "0": {
     "file": "40e3a214d972.json",
-    "gt": 25,
-    "tp": 25,
-    "fp": 0,
+    "gt": 23,
+    "tp": 23,
+    "fp": 2,
     "fn": 0,
     "fold": 1
    },
    "1": {
     "file": "5f7f98402331.json",
-    "gt": 0,
+    "gt": 1,
     "tp": 0,
-    "fp": 2,
-    "fn": 0,
+    "fp": 1,
+    "fn": 1,
     "fold": 1
    },
    "2": {
@@ -4135,18 +4125,18 @@
   "Shadow Boxing Workout \uff5c Let me coach you for 12 minutes": {
    "0": {
     "file": "80ff16f2e4b5.json",
-    "gt": 2,
-    "tp": 2,
-    "fp": 5,
+    "gt": 1,
+    "tp": 1,
+    "fp": 6,
     "fn": 0,
     "fold": 4
    },
    "1": {
     "file": "b15e153b6b59.json",
-    "gt": 13,
-    "tp": 9,
-    "fp": 12,
-    "fn": 4,
+    "gt": 18,
+    "tp": 13,
+    "fp": 8,
+    "fn": 5,
     "fold": 4
    }
   },
@@ -4175,7 +4165,7 @@
     "file": "a211d8d5ff57.json",
     "gt": 3,
     "tp": 2,
-    "fp": 8,
+    "fp": 7,
     "fn": 1,
     "fold": 1
    }
@@ -4211,18 +4201,18 @@
   "Shadow boxing critique [Ry5z_nGOD0Y]": {
    "0": {
     "file": "bf2bc8500ca6.json",
-    "gt": 10,
-    "tp": 8,
-    "fp": 2,
+    "gt": 11,
+    "tp": 9,
+    "fp": 1,
     "fn": 2,
     "fold": 2
    },
    "1": {
     "file": "f9b39b48012f.json",
-    "gt": 10,
+    "gt": 11,
     "tp": 8,
     "fp": 0,
-    "fn": 2,
+    "fn": 3,
     "fold": 2
    },
    "2": {
@@ -4246,9 +4236,9 @@
    "1": {
     "file": "c736b109a5e5.json",
     "gt": 14,
-    "tp": 10,
+    "tp": 9,
     "fp": 6,
-    "fn": 4,
+    "fn": 5,
     "fold": 2
    }
   },
@@ -4263,10 +4253,10 @@
    },
    "1": {
     "file": "2c25fc15db00.json",
-    "gt": 0,
+    "gt": 1,
     "tp": 0,
     "fp": 0,
-    "fn": 0,
+    "fn": 1,
     "fold": 4
    }
   },
@@ -4303,44 +4293,44 @@
   "Shadow boxing session indoor": {
    "0": {
     "file": "fa0eddf37ad6.json",
-    "gt": 13,
-    "tp": 5,
-    "fp": 1,
-    "fn": 8,
+    "gt": 6,
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
     "fold": 4
    },
    "1": {
     "file": "edc93a82faf7.json",
-    "gt": 4,
-    "tp": 4,
-    "fp": 2,
+    "gt": 5,
+    "tp": 5,
+    "fp": 1,
     "fn": 0,
     "fold": 4
    },
    "2": {
     "file": "950d2584c39a.json",
-    "gt": 2,
-    "tp": 2,
-    "fp": 1,
+    "gt": 3,
+    "tp": 3,
+    "fp": 0,
     "fn": 0,
     "fold": 4
    },
    "3": {
     "file": "0fd61c4ae6f7.json",
     "gt": 2,
-    "tp": 1,
-    "fp": 2,
-    "fn": 1,
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
     "fold": 4
    }
   },
   "Shadow boxing session with a virtual coach app [3n4uYSFrHTw]": {
    "0": {
     "file": "ed6783e933c6.json",
-    "gt": 17,
+    "gt": 18,
     "tp": 14,
     "fp": 8,
-    "fn": 3,
+    "fn": 4,
     "fold": 2
    }
   },
@@ -4377,34 +4367,34 @@
   "Shadow boxing with an app": {
    "0": {
     "file": "ef4c14b851b0.json",
-    "gt": 6,
-    "tp": 2,
-    "fp": 3,
-    "fn": 4,
+    "gt": 8,
+    "tp": 3,
+    "fp": 2,
+    "fn": 5,
     "fold": 3
    },
    "1": {
     "file": "866ffba47b04.json",
-    "gt": 6,
+    "gt": 5,
     "tp": 3,
-    "fp": 0,
-    "fn": 3,
+    "fp": 1,
+    "fn": 2,
     "fold": 3
    },
    "2": {
     "file": "6019e18a2b33.json",
-    "gt": 7,
+    "gt": 15,
     "tp": 2,
     "fp": 0,
-    "fn": 5,
+    "fn": 13,
     "fold": 3
    },
    "3": {
     "file": "2bd514ad2c42.json",
-    "gt": 4,
-    "tp": 0,
-    "fp": 1,
-    "fn": 4,
+    "gt": 8,
+    "tp": 1,
+    "fp": 0,
+    "fn": 7,
     "fold": 3
    }
   },
@@ -4439,7 +4429,7 @@
     "file": "a3f1f93a674d.json",
     "gt": 1,
     "tp": 1,
-    "fp": 1,
+    "fp": 0,
     "fn": 0,
     "fold": 2
    },
@@ -4513,18 +4503,18 @@
   "Shadowboxing critique [KQuR88CSgls]": {
    "0": {
     "file": "288214e706c7.json",
-    "gt": 26,
-    "tp": 7,
+    "gt": 27,
+    "tp": 8,
     "fp": 2,
     "fn": 19,
     "fold": 3
    },
    "1": {
     "file": "95800b11d825.json",
-    "gt": 20,
+    "gt": 21,
     "tp": 2,
-    "fp": 0,
-    "fn": 18,
+    "fp": 1,
+    "fn": 19,
     "fold": 3
    }
   },
@@ -4583,7 +4573,7 @@
     "file": "089cfdf0e641.json",
     "gt": 24,
     "tp": 15,
-    "fp": 7,
+    "fp": 9,
     "fn": 9,
     "fold": 3
    }
@@ -4668,16 +4658,6 @@
     "fold": 0
    }
   },
-  "This is my sand bag training, I started learning boxing from May 2025. [A2Xd55D6yTs]": {
-   "0": {
-    "file": "4f70e4e2ddfb.json",
-    "gt": 0,
-    "tp": 0,
-    "fp": 9,
-    "fn": 0,
-    "fold": 1
-   }
-  },
   "Up to 90kg now, Southpaw - Shadowboxing critique welcome :) [9vkp8o]": {
    "0": {
     "file": "a406a60f0e61.json",
@@ -4731,17 +4711,17 @@
   "WOW!  These Boxing Combos Are Amazing \uff5c Follow Along Training": {
    "0": {
     "file": "01d2b2f0f1f9.json",
-    "gt": 7,
-    "tp": 7,
-    "fp": 0,
+    "gt": 1,
+    "tp": 1,
+    "fp": 6,
     "fn": 0,
     "fold": 4
    },
    "1": {
     "file": "f6601e0356e9.json",
-    "gt": 25,
-    "tp": 24,
-    "fp": 2,
+    "gt": 26,
+    "tp": 25,
+    "fp": 1,
     "fn": 1,
     "fold": 4
    }
@@ -4797,20 +4777,20 @@
   "bagwork give critiques (months boxing) [Yn01ebDSzms]": {
    "0": {
     "file": "4f1604db7446.json",
-    "gt": 4,
+    "gt": 17,
     "tp": 0,
     "fp": 0,
-    "fn": 4,
+    "fn": 17,
     "fold": 4
    }
   },
   "first week boxing shadow boxing need as much constructive criticism as possible ! [e84o1g0z6i8h1]": {
    "0": {
     "file": "3aa2346af3df.json",
-    "gt": 2,
+    "gt": 1,
     "tp": 1,
     "fp": 2,
-    "fn": 1,
+    "fn": 0,
     "fold": 2
    }
   },
@@ -4825,10 +4805,10 @@
    },
    "1": {
     "file": "fd6cdcab027c.json",
-    "gt": 1,
+    "gt": 0,
     "tp": 0,
     "fp": 0,
-    "fn": 1,
+    "fn": 0,
     "fold": 3
    }
   },
@@ -4847,7 +4827,7 @@
     "file": "6f4d027d2474.json",
     "gt": 4,
     "tp": 0,
-    "fp": 0,
+    "fp": 1,
     "fn": 4,
     "fold": 3
    }
