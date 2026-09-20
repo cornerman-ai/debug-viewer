@@ -306,11 +306,16 @@ function sourceEvents(src) {
   return { gt: liveRows(src, l => ROLL_LABELS.has(l)), other: liveRows(src, l => OTHER_DEFENSE.has(l)), pending: false };
 }
 
-function dipOf(sf, ef) {                  // the max head dip inside a grid span; null without the series
-  if (!doc || !doc.dip) return null;
-  let m = -Infinity;
-  for (let i = Math.max(0, sf); i < Math.min(doc.n, Math.max(sf + 1, ef)); i++) if (doc.dip[i] > m) m = doc.dip[i];
-  return Number.isFinite(m) ? m : null;
+function dipPeak(sf, ef) {                // { dip, at }: the deepest grid frame inside a span
+  if (!doc || !doc.dip) return { dip: null, at: null };
+  let m = -Infinity, at = null;
+  for (let i = Math.max(0, sf); i < Math.min(doc.n, Math.max(sf + 1, ef)); i++) if (doc.dip[i] > m) { m = doc.dip[i]; at = i; }
+  return Number.isFinite(m) ? { dip: m, at } : { dip: null, at: null };
+}
+function withPeak(ev) {                      // dip depth, the second it is deepest, and that as a viewer frame
+  const pk = dipPeak(ev.sf, ev.ef);
+  const dipS = pk.at == null ? null : doc.t0 + pk.at * doc.dt;
+  return { ...ev, dip: pk.dip, dipS, vfDip: dipS == null || !latestState ? null : secToFrame(latestState, dipS) };
 }
 function gated(ev) { return cfg.minDip > 0 && ev.dip != null && ev.dip < cfg.minDip; }
 
@@ -319,8 +324,7 @@ function derive() {
   const st = latestState;
   const toGrid = (sec) => Math.round((sec - doc.t0) / doc.dt);
   const vf = (ev) => ({ vf0: secToFrame(st, ev.s), vf1: Math.max(secToFrame(st, ev.s), secToFrame(st, ev.e) - 1) });
-  const pred = decodePred(doc, cfg).map(p => ({
-    ...p, s: doc.t0 + p.sf * doc.dt, e: doc.t0 + p.ef * doc.dt, dip: dipOf(p.sf, p.ef) }));
+  const pred = decodePred(doc, cfg).map(p => withPeak({ ...p, s: doc.t0 + p.sf * doc.dt, e: doc.t0 + p.ef * doc.dt }));
   // the min-dip gate: an event under it is neither a roll nor an alarm — drawn grey, out of the matching
   const predKeep = pred.map((_, i) => i).filter(i => !gated(pred[i]));
   const predKept = predKeep.map(i => pred[i]);
@@ -329,7 +333,7 @@ function derive() {
   const predIou = new Set(), predCenter = new Set();
   const lanes = gtSources.map(src => {
     const ev = sourceEvents(src);
-    const gt = ev.gt.map(g => { const sf = toGrid(g.s), ef = Math.max(toGrid(g.s) + 1, toGrid(g.e)); return { ...g, sf, ef, dip: dipOf(sf, ef) }; });
+    const gt = ev.gt.map(g => { const sf = toGrid(g.s), ef = Math.max(toGrid(g.s) + 1, toGrid(g.e)); return withPeak({ ...g, sf, ef }); });
     const gtKeep = gt.map((_, i) => i).filter(i => !gated(gt[i]));
     const gtKept = gtKeep.map(i => gt[i]);
     const iou = matchEvents(gtKept, predKept, "iou");
@@ -495,6 +499,12 @@ function template() {
     <p class="hint" id="rg-stat-line"></p>
     <p class="hint" id="rg-frame-line"></p>
 
+    <h3>Rolls in this round</h3>
+    <p class="hint">One row per labeled roll: where the label starts, where the head is deepest and how
+      deep (torso units below its own 2-s baseline; the teal tick on the bars). Click a row to seek to
+      the deepest frame.</p>
+    <div id="rg-rolls" style="max-height:280px;overflow:auto"></div>
+
     <h3>Timeline</h3>
     <p class="hint">Below the video: GT rolls, one lane per checked source (green = found ·
       yellow-green = center-hit only · red striped = missed), a thin row of the sources'
@@ -539,6 +549,10 @@ function wireControls() {
   });
   host.querySelector("#rg-src").addEventListener("click", (e) => {
     if (e.target.id === "rg-live-refresh") { ensureLive(true); renderSourcePicker(); renderAll(); }
+  });
+  host.querySelector("#rg-rolls").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-f]");
+    if (tr) seekHack(Number(tr.dataset.f));
   });
   host.querySelector("#rg-round").addEventListener("change", (e) => {
     const file = e.target.value;
@@ -669,9 +683,41 @@ function populateRoundPicker() {
   sel.disabled = false;
 }
 
+function renderRollList() {
+  const el = host.querySelector("#rg-rolls");
+  if (!el) return;
+  if (!signals || !latestState) { el.innerHTML = ""; return; }
+  const many = signals.lanes.length > 1;
+  const rows = [];
+  for (const ln of signals.lanes) for (const g of ln.gt) rows.push({ ln, g });
+  rows.sort((a, b) => a.g.s - b.g.s);
+  const c = "padding:1px 7px;text-align:right;white-space:nowrap", cl = c + ";text-align:left";
+  el.innerHTML = `<table style="border-collapse:collapse;font:11px ui-monospace,monospace"><tr style="color:#8a93a3">` +
+    `<th style="${c}">#</th>${many ? `<th style="${c}">GT</th>` : ""}<th style="${cl}">roll</th><th style="${c}">start</th>` +
+    `<th style="${c}">deepest at</th><th style="${c}">after start</th><th style="${c}">depth</th><th style="${cl}">status</th></tr>` +
+    rows.map(({ ln, g }, i) =>
+      `<tr data-f="${g.vfDip ?? g.vf0}" data-vf0="${g.vf0}" data-vf1="${g.vf1}" style="cursor:pointer${gated(g) ? ";opacity:0.55" : ""}">` +
+      `<td style="${c}">${i + 1}</td>${many ? `<td style="${c}">${ln.initial}</td>` : ""}` +
+      `<td style="${cl};color:${gtColor(g)}">${g.label.replace(/_roll$/, "")}</td>` +
+      `<td style="${c}">${fmtTime(g.s, true)}</td><td style="${c}">${g.dipS == null ? "—" : fmtTime(g.dipS, true)}</td>` +
+      `<td style="${c}">${g.dipS == null ? "—" : "+" + (g.dipS - g.s).toFixed(2) + " s"}</td>` +
+      `<td style="${c};color:${COLORS.dip}"><b>${g.dip == null ? "—" : g.dip.toFixed(2)}</b></td>` +
+      `<td style="${cl}">${g.status}</td></tr>`).join("") + `</table>`;
+  highlightRollRow(latestState.frame);
+}
+function highlightRollRow(f) {              // the row of the roll under the playhead
+  const el = host?.querySelector("#rg-rolls");
+  if (!el) return;
+  for (const tr of el.querySelectorAll("tr[data-vf0]")) {
+    const on = f >= Number(tr.dataset.vf0) && f <= Number(tr.dataset.vf1);
+    tr.style.background = on ? "rgba(255,255,255,0.09)" : "";
+  }
+}
+
 function renderAll() {
   if (!host) return;
   renderStats();
+  renderRollList();
   renderRoundHint();
   renderSourceHint();
   const st = latestState;
@@ -726,12 +772,14 @@ function renderFrameLine(state) {
   const el = host.querySelector("#rg-frame-line");
   if (!el || !signals) return;
   const f = state.frame;
+  highlightRollRow(f);
   const p = probAtFrame(state, f);
   const pr = findEvent(signals.pred, f), g0 = firstGt(f);
   const many = signals.lanes.length > 1;
   const gt = signals.lanes.map(ln => {
     const g = findEvent(ln.gt, f), o = findEvent(ln.other, f);
-    return (many ? `${ln.initial} ` : "") + (g ? `<span style="color:${gtColor(g)}">${g.label} (${g.status})</span>`
+    return (many ? `${ln.initial} ` : "") + (g ? `<span style="color:${gtColor(g)}">${g.label} (${g.status})</span>` +
+        (g.dip != null ? ` <span class="muted">start ${fmtTime(g.s, true)} · deepest <b style="color:${COLORS.dip}">${fmt(g.dip, 2)}</b> at ${fmtTime(g.dipS, true)} (+${(g.dipS - g.s).toFixed(2)} s)</span>` : "")
       : o ? `<span style="color:#7ec8ff">${o.label}</span> <span class="muted">(not a roll)</span>`
       : `<span class="muted">${ln.pending ? "loading…" : "idle"}</span>`);
   }).join(" · ");
@@ -925,7 +973,8 @@ function drawTimeline(canvas, frame) {
       if (g.vf1 < v0 - 1 || g.vf0 > v1 + 1) continue;
       const [x1, x2] = barX(g);
       drawEventBar(ctx, x1, r.y, x2 - x1, r.h, gtColor(g), g.status === "miss", COLORS.gtMissStripe,
-                   (g.status === "gated" ? "gated " : "") + g.label.replace(/_roll$/, ""));
+                   (g.status === "gated" ? "gated " : "") + g.label.replace(/_roll$/, "") + (g.dip != null ? ` ${g.dip.toFixed(2)}` : ""));
+      drawDipTick(ctx, g, r);
     }
   });
   // other defense labels (duck / slip / step_back / pull_back): one thin row, named
@@ -949,6 +998,7 @@ function drawTimeline(canvas, frame) {
       const [x1, x2] = barX(p);
       drawEventBar(ctx, x1, predRow.y, x2 - x1, predRow.h, predColor(p, null), p.status === "fa", COLORS.predFAStripe,
                    p.status === "fa" ? `false+ ${sideTag(p)}${p.score.toFixed(2)}` : p.status === "gated" ? `gated ${sideTag(p)}${p.score.toFixed(2)}` : `${sideTag(p)}${p.score.toFixed(2)}`);
+      drawDipTick(ctx, p, predRow);
     }
     if (showBase) for (const b of signals.base) {
       if (b.vf1 < v0 - 1 || b.vf0 > v1 + 1) continue;
@@ -1051,6 +1101,11 @@ function drawTimeAxis(ctx, W, gridTop, top) {
   ctx.restore();
 }
 
+function drawDipTick(ctx, ev, row) {       // a mark on the bar where the head is deepest
+  if (ev.vfDip == null) return;
+  const xd = frameToX(ev.vfDip + 0.5, ctx.canvas.getBoundingClientRect().width);
+  ctx.fillStyle = COLORS.dip; ctx.fillRect(xd - 1, row.y + 1, 2, row.h - 2);
+}
 function drawEventBar(ctx, x, y, w, h, color, hatched, stripe, name) {
   ctx.fillStyle = color;
   ctx.fillRect(x, y + 1, w, h - 2);
@@ -1091,7 +1146,7 @@ function drawCanvasHud(ctx, state) {
   const many = signals.lanes.length > 1;
   const gtLines = signals.lanes.map((ln, i) => {       // one line per GT lane
     const lg = findEvent(ln.gt, f), o = findEvent(ln.other, f);
-    const what = lg ? `${lg.label}${lg.status === "miss" ? " (missed)" : lg.status === "gated" ? " (gated)" : ""}`
+    const what = lg ? `${lg.label}${lg.dip != null ? ` ↓${lg.dip.toFixed(2)} at +${(lg.dipS - lg.s).toFixed(2)}s` : ""}${lg.status === "miss" ? " (missed)" : lg.status === "gated" ? " (gated)" : ""}`
       : o ? `${o.label} (not a roll)` : ln.pending ? "loading…" : "idle";
     return { text: `${i ? "     " : "GT:  "} ${many ? ln.initial + " " : ""}${what}`,
              color: lg ? gtColor(lg) : o ? "#7ec8ff" : "#888888" };
