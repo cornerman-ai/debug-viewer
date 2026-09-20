@@ -440,6 +440,7 @@ export const RollsGtVsPredMatheRule = {
 
   draw(ctx, state) {
     if (!signals) return;
+    drawDipOverlay(ctx, state);
     drawCanvasHud(ctx, state);
   },
 };
@@ -514,7 +515,9 @@ function template() {
       p(roll) graph with the threshold line. Click to seek · drag to select a range (then Export /
       Zoom to in the timeline header) · shift-drag to pan · wheel to zoom · double-click to fit.
       The teal curve is the head dip (torso units, 0–0.5 on the same graph); with a min dip set,
-      rolls and predictions under it turn grey and leave the stats.</p>
+      rolls and predictions under it turn grey and leave the stats. On the video: the nose's usual
+      height (dashed teal, its 2-s median), the drop from it now, the min-dip line when set, and for
+      the roll under the playhead the nose's path with its start (hollow) and deepest point (filled).</p>
   `;
 }
 
@@ -1128,6 +1131,63 @@ function gtColor(g) { return g.status === "gated" ? COLORS.gated : g.status === 
 function predColor(p, g) {
   if (!p) return g ? COLORS.gtMiss : "#888888";
   return p.status === "gated" ? COLORS.gated : p.status === "center" ? COLORS.predCenter : COLORS.pred;
+}
+
+// ── on-video dip overlay: the head's usual height, the drop from it, and the roll's path ──
+const J = { NOSE: 0, L_SH: 5, R_SH: 6, L_HIP: 11, R_HIP: 12 };   // COCO-17, the viewer's pose layout
+function jointPx(pose, f, j) {
+  if (!pose || f < 0 || f >= pose.n_frames || !(pose.conf[f * 17 + j] >= 0.05)) return null;
+  return [pose.skeleton[(f * 17 + j) * 2], pose.skeleton[(f * 17 + j) * 2 + 1]];
+}
+function torsoPx(pose, f) {                 // shoulder-mid ↔ hip-mid, canvas pixels (the dip's unit, per frame)
+  const pts = [J.L_SH, J.R_SH, J.L_HIP, J.R_HIP].map(j => jointPx(pose, f, j));
+  if (pts.some(p => !p)) return null;
+  const [ls, rs, lh, rh] = pts;
+  return Math.hypot((ls[0] + rs[0]) / 2 - (lh[0] + rh[0]) / 2, (ls[1] + rs[1]) / 2 - (lh[1] + rh[1]) / 2);
+}
+function drawDipOverlay(ctx, state) {
+  const pose = state.pose;
+  if (!pose || !doc || !doc.dip) return;
+  const f = state.frame, s = state.renderScale || 1;
+  const nose = jointPx(pose, f, J.NOSE), T = torsoPx(pose, f), dip = dipAtFrame(state, f);
+  if (!nose || !T || !Number.isFinite(dip)) return;
+  const baseY = nose[1] - dip * T;             // where the nose sits at its 2-s median: dip is measured down from it
+  ctx.save();
+  ctx.strokeStyle = COLORS.dip; ctx.fillStyle = COLORS.dip; ctx.lineWidth = 2 * s;
+  ctx.font = `bold ${Math.round(12 * s)}px ui-monospace, "SF Mono", monospace`;
+  ctx.setLineDash([6 * s, 4 * s]);
+  ctx.beginPath(); ctx.moveTo(nose[0] - 0.5 * T, baseY); ctx.lineTo(nose[0] + 0.5 * T, baseY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(nose[0], baseY); ctx.lineTo(nose[0], nose[1]); ctx.stroke();
+  ctx.fillText(`dip ${dip.toFixed(2)}`, nose[0] + 0.5 * T + 4 * s, nose[1] + 4 * s);
+  if (cfg.minDip > 0) {                        // the gate, as a line the nose has to cross
+    const gy = baseY + cfg.minDip * T;
+    ctx.setLineDash([2 * s, 3 * s]);
+    ctx.beginPath(); ctx.moveTo(nose[0] - 0.5 * T, gy); ctx.lineTo(nose[0] + 0.5 * T, gy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.textAlign = "right";                   // left of the head, so it never collides with the dip label
+    ctx.fillText(`min ${cfg.minDip.toFixed(2)}`, nose[0] - 0.5 * T - 4 * s, gy + 4 * s);
+    ctx.textAlign = "left";
+  }
+  // the roll under the playhead: the nose's path over the label, start hollow, deepest filled
+  const ev = firstGt(f) || findEvent(signals.pred, f);
+  if (ev && ev.vfDip != null) {
+    ctx.lineWidth = 1.5 * s; ctx.globalAlpha = 0.9;
+    ctx.beginPath(); let first = true;
+    for (let k = ev.vf0; k <= ev.vf1; k++) {
+      const q = jointPx(pose, k, J.NOSE);
+      if (!q) continue;
+      if (first) { ctx.moveTo(q[0], q[1]); first = false; } else ctx.lineTo(q[0], q[1]);
+    }
+    ctx.stroke();
+    const p0 = jointPx(pose, ev.vf0, J.NOSE), pd = jointPx(pose, ev.vfDip, J.NOSE);
+    if (p0) { ctx.beginPath(); ctx.arc(p0[0], p0[1], 5 * s, 0, Math.PI * 2); ctx.stroke(); }
+    if (pd) {
+      ctx.beginPath(); ctx.arc(pd[0], pd[1], 5 * s, 0, Math.PI * 2); ctx.fill();
+      ctx.fillText(`deepest ${ev.dip.toFixed(2)}`, pd[0] + 8 * s, pd[1] + 18 * s);
+    }
+  }
+  ctx.restore();
 }
 
 // ── on-video HUD (the punch lens's box, one hand → one roll) ────────────────
