@@ -15,7 +15,7 @@
 //                 decode: { threshold, min_event_s, gap_s, delta },  the fold's LOFO decode
 //                 probs: [n],                                  p(roll) at t0 + i·dt (30 fps)
 //                 probs_lead: [n] | null,                      the side head's p(lead roll); rear = probs − lead
-//                 dip: [n] | null,                             head drop below its own 2-s baseline, torso units (roll_data_mathe.head_dip)
+//                 dip: [n] | null,                             the gate's depth: the head's drop from its highest position in the trailing 3 s, torso units, ≥ 0 (roll_data_mathe.gate_dip)
 //                 gt:   [{ s, e, label, verdict, peak }],      the evaluator's verdicts
 //                 pred: [{ s, e, score, verdict, side }],
 //                 other: [{ s, e, label }],                    John's ducks / slips / pull_backs
@@ -480,7 +480,7 @@ function template() {
     <label class="slider">
       <span>min dip = <output id="rg-dip-out">0.00</output> torso</span>
       <input type="range" id="rg-dip" min="0" max="0.4" step="0.01" value="0">
-      <span class="muted small">0 = off · the head drop below its own 2-s baseline · gates GT and predictions alike (grey bars, out of the stats)</span>
+      <span class="muted small">0 = off · the head's drop from its highest position in the last 3 s (the trainer's / evaluator's --min-dip) · gates GT and predictions alike (grey bars, out of the stats)</span>
     </label>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 8px">
       <button type="button" id="rg-reset" style="background:var(--bg-elev);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:2px 9px;cursor:pointer;font:inherit;font-size:12px">reset to the fold's decode</button>
@@ -502,8 +502,8 @@ function template() {
 
     <h3>Rolls in this round</h3>
     <p class="hint">One row per labeled roll: where the label starts, where the head is deepest and how
-      deep (torso units below its own 2-s baseline; the teal tick on the bars). Click a row to seek to
-      the deepest frame.</p>
+      deep (torso units down from its highest position in the last 3 s; the teal tick on the bars).
+      Click a row to seek to the deepest frame.</p>
     <div id="rg-rolls" style="max-height:280px;overflow:auto"></div>
 
     <h3>Timeline</h3>
@@ -515,8 +515,8 @@ function template() {
       p(roll) graph with the threshold line. Click to seek · drag to select a range (then Export /
       Zoom to in the timeline header) · shift-drag to pan · wheel to zoom · double-click to fit.
       The teal curve is the head dip (torso units, 0–0.5 on the same graph); with a min dip set,
-      rolls and predictions under it turn grey and leave the stats. On the video: the nose's usual
-      height (dashed teal, its 2-s median), the drop from it now, the min-dip line when set, and for
+      rolls and predictions under it turn grey and leave the stats. On the video: the nose's highest
+      position of the last 3 s (dashed teal), the drop from it now, the min-dip line when set, and for
       the roll under the playhead the nose's path with its start (hollow) and deepest point (filled).</p>
   `;
 }
@@ -1151,7 +1151,7 @@ function drawDipOverlay(ctx, state) {
   const f = state.frame, s = state.renderScale || 1;
   const nose = jointPx(pose, f, J.NOSE), T = torsoPx(pose, f), dip = dipAtFrame(state, f);
   if (!nose || !T || !Number.isFinite(dip)) return;
-  const baseY = nose[1] - dip * T;             // where the nose sits at its 2-s median: dip is measured down from it
+  const baseY = nose[1] - dip * T;             // the nose's highest position of the last 3 s: dip is measured down from it
   ctx.save();
   ctx.strokeStyle = COLORS.dip; ctx.fillStyle = COLORS.dip; ctx.lineWidth = 2 * s;
   ctx.font = `bold ${Math.round(12 * s)}px ui-monospace, "SF Mono", monospace`;
