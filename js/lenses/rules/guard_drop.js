@@ -11,10 +11,9 @@
 //     lowest = max d inside the punch span (+pad)      (its lowest point)
 //     drop   = lowest − base                            (how far it went down)
 //
-// Verdict per punch: LOWERED when drop > drop_threshold and the hand started
-// above the guard line; ALWAYS LOW when it already started below the line
-// (base > guard_low) — a different fault, kept apart the way the guard-drop
-// labeler's dropped / always_low verdicts are; HELD otherwise. Punches whose
+// Verdict per punch is the drop alone (Mathe, 2026-09-21 — where the hand
+// started does not enter it): NOT LOWERED at drop <= drop_threshold, LOWERED A
+// BIT up to big_drop_threshold, LOWERED A LOT above it. Punches whose
 // other hand is itself punching (overlap within overlap_tol) are marked not
 // isolated and, by default, excluded — a punching hand is low by design.
 // The shipped rule's own two numbers (shoulder-anchored delta over the punch,
@@ -23,7 +22,9 @@
 // Below the video: one timeline per hand. On a hand's strip its own punches
 // are the blue spans; the spans where it is the RESTING hand are coloured by
 // the verdict, with a tick at the lowest-drop frame. Click to seek. Rows in
-// the punch table seek to the punch and loop it (N / P step, M mutes).
+// the punch table seek to the punch and loop it (N / P step, M mutes). The
+// loop only holds once a punch is picked, and lets go as soon as the paused
+// video leaves it (← / → frame steps, the scrubber, a click off the punch).
 import { J, torsoHeight } from "../../skeleton.js";
 import { activeDetections } from "../shared/punch_detections.js";
 import { isPunchLabel } from "../shared/slip_labels.js";
@@ -31,10 +32,12 @@ import { isPunchLabel } from "../shared/slip_labels.js";
 // Defaults match rules_config.json → rules.guard_drop.params (2026-09-21):
 // delta_threshold 0.10, guard_low_threshold 0.25, start_pct 0.2,
 // overlap_tolerance_seconds 0.1, min_wrist_confidence 0.4 (0.30 here, the
-// viewer's house gate). drop_threshold reuses delta_threshold's value.
+// viewer's house gate). drop_threshold reuses delta_threshold's value;
+// big_drop_threshold is this lens's own (no rule counterpart, unscored).
 const DEFAULTS = {
-  dropThreshold: 0.10,       // torso units the resting hand must go down
-  guardLowThreshold: 0.25,   // base above this = the hand was never up
+  dropThreshold: 0.10,       // torso units down before it counts as lowered (a bit)
+  bigDropThreshold: 0.25,    // torso units down for "lowered a lot"
+  guardLowThreshold: 0.25,   // the shipped rule's end-below-nose line (reference numbers only)
   startPct: 0.20,            // fraction of the span that defines "where it was"
   padFrames: 0,              // frames added after the punch end
   overlapTolSec: 0.10,       // other-hand punch within this = not isolated
@@ -47,15 +50,15 @@ const DEFAULTS = {
 const COLORS = {
   nose: "#7ec8ff", l_wrist: "#ff8a5c", r_wrist: "#ffd95c",
   punch: "rgba(126,200,255,0.55)", punchEdge: "#7ec8ff",
-  lowered: "#ff5d6c", alwaysLow: "#f5b945", held: "#7adf7a",
+  lot: "#ff5d6c", bit: "#f5b945", none: "#7adf7a",
   gated: "#666", excluded: "#444", marker: "#3ad9e0", base: "rgba(255,255,255,0.8)",
 };
 const VERDICT_COLOR = {
-  lowered: COLORS.lowered, always_low: COLORS.alwaysLow, held: COLORS.held,
+  lowered_lot: COLORS.lot, lowered_bit: COLORS.bit, not_lowered: COLORS.none,
   gated: COLORS.gated, not_isolated: COLORS.excluded,
 };
 const VERDICT_LABEL = {
-  lowered: "lowered", always_low: "always low", held: "held",
+  lowered_lot: "lowered a lot", lowered_bit: "lowered a bit", not_lowered: "not lowered",
   gated: "gated", not_isolated: "not isolated",
 };
 
@@ -70,6 +73,7 @@ let cfg = { ...DEFAULTS };
 let cache = null;            // { N, fps, d: {L, R}, dSh: {L, R}, punches, sig }
 let latestState = null;
 let activeIdx = -1;
+let loopArmed = false;       // set by picking a punch; a paused step out of it clears it
 let videoEl = null;
 let timeupdateHandler = null;
 let keydownHandler = null;
@@ -94,15 +98,15 @@ export const GuardDropRule = {
       <h3>Guard drop — the resting hand, per punch</h3>
       <p class="hint">drop = lowest point of the <b>other</b> hand inside the punch minus where it
         was at the start, in torso heights along the nose line (+ = went down).
-        <span style="color:${COLORS.lowered}">lowered</span> · <span style="color:${COLORS.alwaysLow}">always low</span>
-        (started below the guard line) · <span style="color:${COLORS.held}">held</span> ·
+        <span style="color:${COLORS.none}">not lowered</span> · <span style="color:${COLORS.bit}">lowered a bit</span> ·
+        <span style="color:${COLORS.lot}">lowered a lot</span> ·
         <span style="color:${COLORS.gated}">gated</span> (wrist not tracked) ·
         <span style="color:${COLORS.excluded}">not isolated</span> (both hands punching).</p>
       <div class="metric-grid">
         <div><div class="metric-label">punches</div><div class="metric-val" id="gd-n"></div><div class="metric-sub" id="gd-n-sub"></div></div>
-        <div><div class="metric-label">lowered</div><div class="metric-val" id="gd-n-low" style="color:${COLORS.lowered}"></div><div class="metric-sub" id="gd-n-low-sub"></div></div>
-        <div><div class="metric-label">always low</div><div class="metric-val" id="gd-n-al" style="color:${COLORS.alwaysLow}"></div></div>
-        <div><div class="metric-label">held</div><div class="metric-val" id="gd-n-held" style="color:${COLORS.held}"></div></div>
+        <div><div class="metric-label">lowered a lot</div><div class="metric-val" id="gd-n-lot" style="color:${COLORS.lot}"></div><div class="metric-sub" id="gd-n-lot-sub"></div></div>
+        <div><div class="metric-label">lowered a bit</div><div class="metric-val" id="gd-n-bit" style="color:${COLORS.bit}"></div><div class="metric-sub" id="gd-n-bit-sub"></div></div>
+        <div><div class="metric-label">not lowered</div><div class="metric-val" id="gd-n-none" style="color:${COLORS.none}"></div><div class="metric-sub" id="gd-n-none-sub"></div></div>
       </div>
       <h3>This frame</h3>
       <div class="metric-grid">
@@ -117,9 +121,11 @@ export const GuardDropRule = {
         <label class="hint" style="margin-left:auto"><input type="checkbox" id="gd-loop" ${cfg.loop ? "checked" : ""}> loop punch</label>
       </div>
       <h3>Thresholds</h3>
-      <div class="slider-row"><span>drop_threshold = <output id="gd-drop-out">${cfg.dropThreshold.toFixed(2)}</output> torso</span>
+      <div class="slider-row"><span>lowered a bit above <output id="gd-drop-out">${cfg.dropThreshold.toFixed(2)}</output> torso</span>
         <input type="range" id="gd-drop" min="0" max="0.5" step="0.01" value="${cfg.dropThreshold}"></div>
-      <div class="slider-row"><span>guard_low (always-low line) = <output id="gd-glt-out">${cfg.guardLowThreshold.toFixed(2)}</output></span>
+      <div class="slider-row"><span>lowered a lot above <output id="gd-big-out">${cfg.bigDropThreshold.toFixed(2)}</output> torso</span>
+        <input type="range" id="gd-big" min="0" max="0.8" step="0.01" value="${cfg.bigDropThreshold}"></div>
+      <div class="slider-row"><span>guard_low (shipped rule's end-vs-nose line) = <output id="gd-glt-out">${cfg.guardLowThreshold.toFixed(2)}</output></span>
         <input type="range" id="gd-glt" min="-0.3" max="0.8" step="0.01" value="${cfg.guardLowThreshold}"></div>
       <div class="slider-row"><span>start_pct = <output id="gd-sp-out">${cfg.startPct.toFixed(2)}</output> of the span</span>
         <input type="range" id="gd-sp" min="0.05" max="0.5" step="0.05" value="${cfg.startPct}"></div>
@@ -144,6 +150,7 @@ export const GuardDropRule = {
       });
     };
     wire("gd-drop", "gd-drop-out", "dropThreshold");
+    wire("gd-big", "gd-big-out", "bigDropThreshold");
     wire("gd-glt", "gd-glt-out", "guardLowThreshold");
     wire("gd-sp", "gd-sp-out", "startPct");
     wire("gd-pad", "gd-pad-out", "padFrames", v => String(Math.round(v)));
@@ -213,6 +220,7 @@ export const GuardDropRule = {
     if (keydownHandler) document.removeEventListener("keydown", keydownHandler, true);
     timeupdateHandler = keydownHandler = null;
     activeIdx = -1;
+    loopArmed = false;
   },
 };
 
@@ -227,7 +235,7 @@ function getData(state) {
   const p = pickPose(state);
   if (!p) return null;
   const dets = activeDetections(state);
-  const sig = [p, dets, cfg.dropThreshold, cfg.guardLowThreshold, cfg.startPct, cfg.padFrames,
+  const sig = [p, dets, cfg.dropThreshold, cfg.bigDropThreshold, cfg.guardLowThreshold, cfg.startPct, cfg.padFrames,
                cfg.minWristConfidence, cfg.isolatedOnly, cfg.overlapTolSec, cfg.minCoverage];
   if (cache && cache.sig.length === sig.length && cache.sig.every((v, i) => v === sig[i])) return cache;
   cache = compute(p, dets, state.fps || p.fps || 30);
@@ -288,9 +296,9 @@ export function compute(p, dets, fps) {
     let verdict;
     if (coverage < cfg.minCoverage || !Number.isFinite(base) || !Number.isFinite(lowest)) verdict = "gated";
     else if (!isolated && cfg.isolatedOnly) verdict = "not_isolated";
-    else if (base > cfg.guardLowThreshold) verdict = "always_low";
-    else if (drop > cfg.dropThreshold) verdict = "lowered";
-    else verdict = "held";
+    else if (drop > cfg.bigDropThreshold) verdict = "lowered_lot";
+    else if (drop > cfg.dropThreshold) verdict = "lowered_bit";
+    else verdict = "not_lowered";
     return { idx, sf: x.sf, ef: x.ef, side: x.side, other: x.other, hand: x.det.hand,
              type: x.det.punch_type || "punch", uuid: x.det.punch_uuid || null,
              t: x.det.start_time, isolated, base, lowest, lowestFrame, drop, coverage,
@@ -319,10 +327,10 @@ function refresh(state) {
   const scored = pun.filter(p => p.verdict !== "gated" && p.verdict !== "not_isolated").length;
   setText("gd-n", String(pun.length));
   setText("gd-n-sub", `${scored} scored · ${count("gated")} gated · ${count("not_isolated")} not isolated`);
-  setText("gd-n-low", String(count("lowered")));
-  setText("gd-n-low-sub", scored ? `${Math.round(100 * count("lowered") / scored)}% of scored` : "");
-  setText("gd-n-al", String(count("always_low")));
-  setText("gd-n-held", String(count("held")));
+  for (const [id, v] of [["lot", "lowered_lot"], ["bit", "lowered_bit"], ["none", "not_lowered"]]) {
+    setText(`gd-n-${id}`, String(count(v)));
+    setText(`gd-n-${id}-sub`, scored ? `${Math.round(100 * count(v) / scored)}% of scored` : "");
+  }
   for (const side of ["L", "R"]) {
     const v = data.d[side][f];
     setText(`gd-${side.toLowerCase()}-now`, fmt(v), Number.isFinite(v) ? null : "#888");
@@ -370,7 +378,8 @@ function drawSpark(canvas, data, act, frame) {
   let lo = Infinity, hi = -Infinity;
   for (let f = a; f <= b; f++) { const v = arr[f]; if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
   if (!Number.isFinite(lo)) return;
-  lo = Math.min(lo, cfg.guardLowThreshold) - 0.05; hi = Math.max(hi, cfg.guardLowThreshold) + 0.05;
+  const bitLine = act.base + cfg.dropThreshold, lotLine = act.base + cfg.bigDropThreshold;
+  lo = Math.min(lo, act.base) - 0.05; hi = Math.max(hi, Number.isFinite(lotLine) ? lotLine : hi) + 0.05;
   const xOf = f => ((f - a) / Math.max(1, b - a)) * (W - 2) + 1;
   const yOf = v => H - ((v - lo) / (hi - lo)) * (H - 4) - 2;   // bigger d = lower hand = lower on the chart
   ctx.fillStyle = "rgba(126,200,255,0.15)";
@@ -380,7 +389,8 @@ function drawSpark(canvas, data, act, frame) {
     ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash(dash);
     ctx.beginPath(); ctx.moveTo(0, yOf(v)); ctx.lineTo(W, yOf(v)); ctx.stroke(); ctx.restore();
   };
-  line(cfg.guardLowThreshold, COLORS.alwaysLow, [3, 3]);
+  line(bitLine, COLORS.bit, [3, 3]);
+  line(lotLine, COLORS.lot, [3, 3]);
   line(act.base, COLORS.base, [2, 2]);
   line(act.lowest, VERDICT_COLOR[act.verdict], []);
   ctx.strokeStyle = act.other === "L" ? COLORS.l_wrist : COLORS.r_wrist; ctx.lineWidth = 1.5;
@@ -408,8 +418,8 @@ function ensureStageTimeline() {
   const label = document.createElement("div");
   label.className = "hint";
   label.innerHTML = `per hand: <span style="color:${COLORS.punchEdge}">its own punches</span> · as the resting hand: ` +
-    `<span style="color:${COLORS.lowered}">lowered</span> / <span style="color:${COLORS.alwaysLow}">always low</span> / ` +
-    `<span style="color:${COLORS.held}">held</span> / <span style="color:${COLORS.gated}">gated</span>, tick = lowest point (click to seek)`;
+    `<span style="color:${COLORS.none}">not lowered</span> / <span style="color:${COLORS.bit}">lowered a bit</span> / ` +
+    `<span style="color:${COLORS.lot}">lowered a lot</span> / <span style="color:${COLORS.gated}">gated</span>, tick = lowest point (click to seek)`;
   wrap.appendChild(label);
   const canvas = document.createElement("canvas");
   canvas.id = "gd-stage-timeline";
@@ -425,6 +435,7 @@ function ensureStageTimeline() {
     const f = Math.max(0, Math.min(N - 1, Math.round(ratio * (N - 1))));
     const hit = cache.punches.find(p => f >= p.sf && f <= p.ef);
     if (hit) { activeIdx = hit.idx; }
+    loopArmed = !!hit;
     seek(f);
   });
 }
@@ -487,6 +498,7 @@ function seekToPunch(i) {
   const data = latestState ? getData(latestState) : null;
   if (!data || !data.punches.length) return;
   activeIdx = Math.max(0, Math.min(data.punches.length - 1, i));
+  loopArmed = true;
   const p = data.punches[activeIdx];
   seek(p.sf);
   if (videoEl && cfg.loop) videoEl.play?.().catch?.(() => {});
@@ -498,14 +510,16 @@ function installLoop() {
   if (!videoEl) return;
   if (timeupdateHandler) videoEl.removeEventListener("timeupdate", timeupdateHandler);
   timeupdateHandler = () => {
-    if (latestState?.rule?.id !== "guard_drop" || !cfg.loop || activeIdx < 0 || !latestState.fps) return;
+    if (latestState?.rule?.id !== "guard_drop" || !cfg.loop || !loopArmed || activeIdx < 0 || !latestState.fps) return;
     const p = cache?.punches?.[activeIdx];
     if (!p) return;
     const start = latestState.start_sec || 0;
     const pad = Math.round(0.3 * latestState.fps);          // a little context each side
     const endTime = start + (p.ef + pad + 0.5) / latestState.fps;
     const startTime = start + Math.max(0, p.sf - pad) / latestState.fps;
-    if (videoEl.currentTime > endTime || videoEl.currentTime < startTime - 1) videoEl.currentTime = startTime;
+    if (videoEl.currentTime <= endTime && videoEl.currentTime >= startTime - 1) return;
+    if (videoEl.paused) { loopArmed = false; return; }   // stepped out by hand — let go
+    videoEl.currentTime = startTime;
   };
   videoEl.addEventListener("timeupdate", timeupdateHandler);
 }
