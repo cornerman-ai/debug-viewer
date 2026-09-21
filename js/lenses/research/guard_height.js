@@ -42,6 +42,7 @@
 
 import { J } from "../../skeleton.js";
 import { activeDetections } from "../shared/punch_detections.js";
+import { isPunchLabel } from "../shared/slip_labels.js";
 
 const DEFAULTS = {
   targetOffset: 0.30,          // fraction of torso height below the nose
@@ -290,6 +291,7 @@ function compute(p, dets) {
   const inPunch = { L: new Uint8Array(N), R: new Uint8Array(N) };
   let detCount = 0;
   for (const d of (dets || [])) {
+    if (!isPunchLabel(d.punch_type)) continue;   // the Sheet labels carry defense rows too
     const side = sideFor(d);
     if (!side) continue;
     let sf = d.start_frame, ef = d.end_frame;

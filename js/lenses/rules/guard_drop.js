@@ -26,6 +26,7 @@
 // the punch table seek to the punch and loop it (N / P step, M mutes).
 import { J, torsoHeight } from "../../skeleton.js";
 import { activeDetections } from "../shared/punch_detections.js";
+import { isPunchLabel } from "../shared/slip_labels.js";
 
 // Defaults match rules_config.json → rules.guard_drop.params (2026-09-21):
 // delta_threshold 0.10, guard_low_threshold 0.25, start_pct 0.2,
@@ -256,7 +257,8 @@ export function compute(p, dets, fps) {
     }
   }
   const tol = Math.round(cfg.overlapTolSec * fps);
-  const raw = (dets || []).map((det, i) => {
+  // The Sheet labels carry defense rows too (lead_roll parses as a lead hand).
+  const raw = (dets || []).filter(det => isPunchLabel(det.punch_type)).map((det, i) => {
     const stance = (det.stance === "southpaw" || det.stance === "orthodox") ? det.stance : "orthodox";
     const side = SIDE_FOR[det.hand]?.[stance] || "L";
     return { det, i, side, other: OTHER[side], sf: Math.max(0, det.start_frame),

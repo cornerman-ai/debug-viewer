@@ -28,38 +28,21 @@
 // browser is the labeler's own Apps Script web app (the deployment
 // cornerman-labeler/shared/player.js posts labels to): it runs as the script
 // owner and needs no sharing. fetchCombinedRowsForStem() at the bottom reads
-// one video's Combined Data rows through it; fetchRows()/fetchLiveLabels()
-// have not been moved over yet.
+// one video's Combined Data rows through it, and fetchLiveLabels() (the
+// viewer's state.labels) goes through it since 2026-09-21 — one ~6-9 s Apps
+// Script call per video instead of one CSV per session. The form verdicts
+// (Combined Form Labels, rule_* on each detection) came with the dead CSV
+// read and have no web-app path, so detections carry none.
 const PUBLIC_SHEET_ID = "1CewEaweCBw9F-qSvNapiQMNj4wnidHqLA-I19whrly0";
-const COMBINED_SHEET = "Combined Data";
-const FORM_LABELS_SHEET = "Combined Form Labels";
 const ORIENTATION_SHEET = "Orientation Labels";
 const PUNCH_DIR_SHEET = "Punch Directions";
-// Form-rule fields we surface on each detection so per-rule lenses can
-// score their predictions against the coach's verdict.
-const FORM_LABEL_KEYS = [
-  "rule_hand_extended", "rule_hand_low", "rule_hand_ushape",
-  "rule_hip_rotation", "rule_rear_heel_lift", "rule_resting_hand",
-  "rule_extension", "rule_punch_height",
-];
-
 const NON_PUNCH = new Set([
   "round_start", "round_end", "rest_start", "rest_end",
 ]);
 
-// In-session cache of the parsed CSV. The Sheet's ~10k rows are ~1.5 MB
-// over the wire — fetching once per session and reusing across cache
-// picks keeps the viewer snappy. `force=true` bypasses for the Refresh
-// button.
-let cachedRows = null;
-let cachedFetchedAt = 0;
-let cachedFormByUuid = null;     // { punch_uuid -> {rule_*: 'pass'|'fail'|'unclear'|''} }
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export function clearCache() {
-  cachedRows = null;
-  cachedFetchedAt = 0;
-  cachedFormByUuid = null;
   cachedTrackingVideos = null;
   cachedLabelerRowsByLink.clear();
 }
@@ -116,51 +99,6 @@ export function parseCsv(text) {
     .map(r => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""])));
 }
 
-// Pull rows from both label sheets, cached. We fetch them in parallel
-// because every cache load wants both anyway: Combined Data gives us the
-// per-punch timing + video, Combined Form Labels gives us the per-rule
-// pass/fail verdicts that lenses score themselves against.
-export async function fetchRows({ force = false } = {}) {
-  if (!force && cachedRows && Date.now() - cachedFetchedAt < CACHE_TTL_MS) {
-    return {
-      rows: cachedRows, formByUuid: cachedFormByUuid,
-      fetchedAt: cachedFetchedAt, fromCache: true,
-    };
-  }
-  const sheetUrl = (name) =>
-    `https://docs.google.com/spreadsheets/d/${PUBLIC_SHEET_ID}` +
-    `/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
-
-  const [combinedResp, formResp] = await Promise.all([
-    fetch(sheetUrl(COMBINED_SHEET),    { cache: "no-store" }),
-    fetch(sheetUrl(FORM_LABELS_SHEET), { cache: "no-store" }),
-  ]);
-  if (!combinedResp.ok) throw new Error(`HTTP ${combinedResp.status} on ${COMBINED_SHEET}`);
-  if (!formResp.ok)     throw new Error(`HTTP ${formResp.status} on ${FORM_LABELS_SHEET}`);
-
-  cachedRows = parseCsv(await combinedResp.text());
-
-  // Build the punch_uuid → form-verdicts map for fast join.
-  const formRows = parseCsv(await formResp.text());
-  cachedFormByUuid = new Map();
-  for (const r of formRows) {
-    const uuid = (r.punch_uuid || "").trim();
-    if (!uuid) continue;
-    const verdicts = {};
-    for (const k of FORM_LABEL_KEYS) {
-      const v = (r[k] || "").trim().toLowerCase();
-      if (v) verdicts[k] = v;
-    }
-    if (Object.keys(verdicts).length) cachedFormByUuid.set(uuid, verdicts);
-  }
-
-  cachedFetchedAt = Date.now();
-  return {
-    rows: cachedRows, formByUuid: cachedFormByUuid,
-    fetchedAt: cachedFetchedAt, fromCache: false,
-  };
-}
-
 // Normalize a filename / basename for fuzzy matching: drop extension,
 // lowercase, collapse non-alphanum to single spaces, trim.
 function normalize(s) {
@@ -171,8 +109,9 @@ function normalize(s) {
     .trim();
 }
 
-// Find the source video in the Sheet that best matches a cache basename.
-// Returns { name, confidence: 'exact' | 'substr' | 'tokens', n_rows } or null.
+// Find the source video that best matches a cache basename, over a
+// `video_name → row count` map. Returns
+// { name, confidence: 'exact' | 'substr' | 'tokens', n_rows } or null.
 // Strategy:
 //   1. Exact (normalized) match — strongest.
 //   2. One direction substring (cache normalized contains video normalized,
@@ -182,20 +121,6 @@ function normalize(s) {
 //      `name`, etc.
 // If multiple candidates tie, pick the one with the most label rows (i.e.
 // the most specific source video).
-export function findSourceByBasename(rows, cacheBasename) {
-  // Tally counts per video for picking among ties.
-  const counts = new Map();
-  for (const r of rows) {
-    const v = r.video_name;
-    if (!v) continue;
-    counts.set(v, (counts.get(v) || 0) + 1);
-  }
-  return pickSourceByCounts(counts, cacheBasename);
-}
-
-// The matcher proper, over a `video_name → row count` map — shared by the
-// CSV path above and the web-app path at the bottom (which is handed counts,
-// not rows).
 export function pickSourceByCounts(counts, cacheBasename) {
   if (!cacheBasename) return null;
   // Strip the cache-shape suffix `_<engine>_r<N>` so the basename we match
@@ -245,9 +170,7 @@ export function pickSourceByCounts(counts, cacheBasename) {
 }
 
 // Reshape filtered Sheet rows into the detection schema rule lenses expect.
-// `formByUuid` (optional) is the map from fetchRows() — if present, every
-// detection gets its rule_* verdict columns attached.
-export function rowsToDetections(rows, { cacheStartSec = 0, fps, nFrames, formByUuid = null }) {
+export function rowsToDetections(rows, { cacheStartSec = 0, fps, nFrames }) {
   const detections = [];
   for (const r of rows) {
     const label = String(r.label || "").trim().toLowerCase();
@@ -279,10 +202,6 @@ export function rowsToDetections(rows, { cacheStartSec = 0, fps, nFrames, formBy
       labeler: r.labeler || null,
       reviewed: r.reviewed || null,
     };
-    if (formByUuid && punch_uuid && formByUuid.has(punch_uuid)) {
-      const verdicts = formByUuid.get(punch_uuid);
-      for (const [k, v] of Object.entries(verdicts)) det[k] = v;
-    }
     detections.push(det);
   }
   detections.sort((a, b) => a.start_frame - b.start_frame);
@@ -376,40 +295,26 @@ export async function fetchPunchDirectionsAll({ force = false } = {}) {
 }
 
 // Top-level convenience: given a cache basename + cache offset + fps + frame
-// count, fetch (cached) the Sheet, auto-match a source, and return a
-// detections array. The lens code is one call away from live labels.
+// count, pull that video's Combined Data rows through the labeler web app
+// (fetchCombinedRowsForStem: exact stem, else the fuzzy match with its
+// short-name guard) and return a detections array — punches AND defense rows,
+// round markers excluded. The lens code is one call away from live labels.
 export async function fetchLiveLabels({
   cacheBasename, cacheStartSec = 0, fps, nFrames, force = false,
 }) {
-  let fetched;
-  try {
-    fetched = await fetchRows({ force });
-  } catch (err) {
-    return { error: err.message };
-  }
-  const match = findSourceByBasename(fetched.rows, cacheBasename);
-  if (!match) {
-    return {
-      error: "no source-video auto-match in the Sheet for this cache",
-      cacheBasename,
-      fetched_at: fetched.fetchedAt,
-      from_cache: fetched.fromCache,
-    };
-  }
-  const videoRows = fetched.rows.filter(r => r.video_name === match.name);
-  const detections = rowsToDetections(videoRows, {
-    cacheStartSec, fps, nFrames, formByUuid: fetched.formByUuid,
-  });
+  const got = await fetchCombinedRowsForStem(cacheBasename, { force });
+  const fetchedAt = Date.now();
+  if (got.error) return { error: got.error, cacheBasename, fetched_at: fetchedAt };
+  const detections = rowsToDetections(got.rows, { cacheStartSec, fps, nFrames });
   return {
     source: "labels_sheet_live",
     schema_version: 1,
-    source_video: match.name,
-    match_confidence: match.confidence,
-    n_rows_for_video: match.n_rows,
+    source_video: got.source_video,
+    match_confidence: got.match_confidence,
+    n_rows_for_video: got.n_rows,
     cache_start_sec: cacheStartSec,
     fps,
-    fetched_at: fetched.fetchedAt,
-    from_cache: fetched.fromCache,
+    fetched_at: fetchedAt,
     total_punches: detections.length,
     detections,
   };

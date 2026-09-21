@@ -128,6 +128,9 @@ the skeleton one frame off at hard cuts. Caches are 24 / 30 / 60 fps, so never a
   caches "no labels" on first mount shows nothing forever.
 - `state.labels.detections` being an empty ARRAY is not "no rolls": check
   `state.labels.error` first.
+- `state.labels` is one labeler web-app call per video (~6–9 s, Combined Data as of
+  the last merge), and its defense rows get a hand (`lead_roll` → lead): a punch
+  lens filters with `isPunchLabel` (`shared/slip_labels.js`) or counts rolls as punches.
 - Filenames carry Unicode (`｜`, `⧸`) and YouTube ids in `[...]`; match on
   `state.cacheBasename` exactly, then fall back to substring both ways, never on a prefix.
 - `getBoundingClientRect()` is 0×0 while the viewer section is hidden (no round loaded);
