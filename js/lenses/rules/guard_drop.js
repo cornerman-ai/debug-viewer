@@ -24,10 +24,7 @@
 // are the blue spans; the spans where it is the RESTING hand are coloured by
 // the verdict, with a tick at the lowest-drop frame. Click to seek. Rows in
 // the punch table seek to the punch and loop it (N / P step, M mutes).
-//
-// Bare-handed videos only — a glove hides the wrist joint the metric reads.
 import { J, torsoHeight } from "../../skeleton.js";
-import { isGlovelessVideo, gloveNote } from "../shared/glove_filter.js";
 import { activeDetections } from "../shared/punch_detections.js";
 
 // Defaults match rules_config.json → rules.guard_drop.params (2026-09-21):
@@ -80,10 +77,6 @@ export const GuardDropRule = {
   id: "guard_drop",
   label: "Guard drop",
 
-  // Bare-handed videos only — a glove hides the wrist joint the metric reads
-  // (the viewer filters the video list through this, as before).
-  requiresVideo: isGlovelessVideo,
-
   skeletonStyle() {
     return {
       boneColor: "rgba(255,255,255,0.25)",
@@ -98,7 +91,6 @@ export const GuardDropRule = {
     latestState = state;
     host.innerHTML = `
       <h3>Guard drop — the resting hand, per punch</h3>
-      <p class="hint" id="gd-glove-note"></p>
       <p class="hint">drop = lowest point of the <b>other</b> hand inside the punch minus where it
         was at the start, in torso heights along the nose line (+ = went down).
         <span style="color:${COLORS.lowered}">lowered</span> · <span style="color:${COLORS.alwaysLow}">always low</span>
@@ -138,7 +130,6 @@ export const GuardDropRule = {
       <h3>Punches <span class="hint">(click to seek + loop)</span></h3>
       <div id="gd-table" style="max-height:340px;overflow:auto"></div>
     `;
-    setText("gd-glove-note", gloveNote(state));
     ensureStageTimeline();
 
     const wire = (id, outId, key, fmt = v => v.toFixed(2)) => {

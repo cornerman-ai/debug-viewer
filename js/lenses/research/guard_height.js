@@ -42,7 +42,6 @@
 
 import { J } from "../../skeleton.js";
 import { activeDetections } from "../shared/punch_detections.js";
-import { isGlovelessVideo, gloveNote } from "../shared/glove_filter.js";
 
 const DEFAULTS = {
   targetOffset: 0.30,          // fraction of torso height below the nose
@@ -84,9 +83,6 @@ export const GuardHeightRule = {
   id: "guard_height",
   label: "Guard height",
 
-  // Bare-handed videos only — see _glove_filter.js.
-  requiresVideo: isGlovelessVideo,
-
   skeletonStyle() {
     return {
       boneColor: "rgba(255,255,255,0.25)",
@@ -107,7 +103,6 @@ export const GuardHeightRule = {
         Target = nose_y + offset × torso height (shoulder→hip), so it scales
         with the boxer instead of being a pixel constant. A wrist below the
         target while it isn't punching is flagged <span style="color:${COLORS.low}">low</span>.</p>
-      <p class="hint" id="gh-glove-note"></p>
 
       <h3>Guard low % (punches excluded)</h3>
       <div class="metric-grid">
@@ -265,8 +260,6 @@ export const GuardHeightRule = {
     setText("gh-note", data.detCount
       ? `${data.detCount} punches excluded per-hand (±${Math.round(cfg.punchPad)}f pad).`
       : `No punches loaded — nothing excluded, so this is raw per-frame flagging.`);
-
-    setText("gh-glove-note", gloveNote(state));
 
     drawTimeline(host.querySelector("#gh-timeline"), data, f);
     drawStageTimeline(document.getElementById("gh-stage-timeline"), data, f);
