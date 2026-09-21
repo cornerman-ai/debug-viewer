@@ -98,7 +98,10 @@ export const GuardDropRule = {
         was at the start, in torso heights along the nose line (+ = went down).
         <span style="color:${COLORS.none}">not lowered</span> · <span style="color:${COLORS.bit}">lowered a bit</span> ·
         <span style="color:${COLORS.lot}">lowered a lot</span> ·
-        <span style="color:${COLORS.gated}">gated</span> (wrist not tracked).</p>
+        <span style="color:${COLORS.gated}">gated</span> (wrist not tracked).
+        On the video: <span style="color:${COLORS.nose}">nose</span> ·
+        <span style="color:${COLORS.base}">baseline</span> (dashed — where the resting hand was at the start
+        of the punch) · the resting wrist; the gap between the last two is the drop.</p>
       <div class="metric-grid">
         <div><div class="metric-label">punches</div><div class="metric-val" id="gd-n"></div><div class="metric-sub" id="gd-n-sub"></div></div>
         <div><div class="metric-label">lowered a lot</div><div class="metric-val" id="gd-n-lot" style="color:${COLORS.lot}"></div><div class="metric-sub" id="gd-n-lot-sub"></div></div>
@@ -177,34 +180,46 @@ export const GuardDropRule = {
     const f = state.frame;
     const s = state.renderScale || 1;
     const W = ctx.canvas.width;
+    // Three lines, each named at the right edge: the nose, the baseline (where
+    // the resting hand was at the start of the punch — the drop is measured from
+    // it) and the resting wrist. Baseline + wrist only inside a punch: the picked
+    // one when it covers this frame, else the first punch that does.
+    const labels = [];
     const nose = jt(p, f, J.NOSE);
-    if (nose.c > 0) hline(ctx, nose.y, W, COLORS.nose, 2 * s, 3 * s);
+    if (nose.c > 0) {
+      hline(ctx, nose.y, W, COLORS.nose, 2 * s, 0);
+      labels.push({ y: nose.y, text: "nose", color: COLORS.nose });
+    }
     const torso = Math.max(1e-6, torsoHeight(p, f));
     const act = data && activeIdx >= 0 ? data.punches[activeIdx] : null;
-    const inAct = act && f >= act.sf && f <= act.ef;
-    for (const side of ["L", "R"]) {
-      const w = jt(p, f, JOINTS[side].wrist);
-      if (w.c <= 0) continue;
-      const isResting = inAct && act.other === side;
-      hline(ctx, w.y, W, side === "L" ? COLORS.l_wrist : COLORS.r_wrist, (isResting ? 3 : 1.5) * s, 3 * s);
-    }
-    if (inAct && nose.c > 0 && Number.isFinite(act.base)) {
-      // where the resting hand was at the start, and its lowest point, drawn
-      // on this frame's nose line and torso so the ruler is the current one
-      hline(ctx, nose.y + act.base * torso, W, COLORS.base, 1.5 * s, 0);
-      if (Number.isFinite(act.lowest)) hline(ctx, nose.y + act.lowest * torso, W, VERDICT_COLOR[act.verdict], 1.5 * s, 0);
-      const w = jt(p, f, JOINTS[act.other].wrist);
+    const here = act && f >= act.sf && f <= act.ef ? act
+      : (data?.punches.find(q => f >= q.sf && f <= q.ef) || null);
+    if (here) {
+      if (nose.c > 0 && Number.isFinite(here.base)) {
+        // on this frame's nose line and torso ruler, so the gap to the wrist line IS the drop
+        const yb = nose.y + here.base * torso;
+        hline(ctx, yb, W, COLORS.base, 2 * s, 4 * s);
+        labels.push({ y: yb, text: "baseline (start of punch)", color: COLORS.base });
+      }
+      const w = jt(p, f, JOINTS[here.other].wrist);
       if (w.c > 0) {
+        const col = here.other === "L" ? COLORS.l_wrist : COLORS.r_wrist;
+        hline(ctx, w.y, W, col, 3 * s, 0);
         ctx.save();
-        ctx.strokeStyle = VERDICT_COLOR[act.verdict]; ctx.lineWidth = 2 * s;
+        ctx.strokeStyle = col; ctx.lineWidth = 2 * s;
         ctx.beginPath(); ctx.arc(w.x, w.y, 9 * s, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
+        const dropNow = data.d[here.other][f] - here.base;
+        labels.push({ y: w.y, color: col,
+                      text: `${here.other} wrist (resting)${Number.isFinite(dropNow) ? ` · drop ${fmt(dropNow)}` : ""}` });
       }
     }
+    lineLabels(ctx, labels, W, s);
     // corner HUD
     const lines = [];
-    if (act) lines.push(`punch ${activeIdx + 1}/${data.punches.length}: ${act.type} ${act.hand} → resting ${act.other} · drop ${fmt(act.drop)} (${VERDICT_LABEL[act.verdict]})`);
-    if (inAct) lines.push(`${act.other} wrist now ${fmt(data.d[act.other][f])} · base ${fmt(act.base)} · lowest ${fmt(act.lowest)} @f${act.lowestFrame}`);
+    const shown = here || act;
+    if (shown) lines.push(`punch ${shown.idx + 1}/${data.punches.length}: ${shown.type} ${shown.hand} → resting ${shown.other} · drop ${fmt(shown.drop)} (${VERDICT_LABEL[shown.verdict]})`);
+    if (here) lines.push(`${here.other} wrist now ${fmt(data.d[here.other][f])} · base ${fmt(here.base)} · lowest ${fmt(here.lowest)} @f${here.lowestFrame}`);
     if (lines.length) hud(ctx, lines, s);
   },
 
@@ -546,6 +561,26 @@ function hline(ctx, y, w, color, lineWidth, dash) {
   ctx.strokeStyle = color; ctx.lineWidth = lineWidth;
   if (dash) ctx.setLineDash([dash * 2, dash * 2]);
   ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  ctx.restore();
+}
+// Name each overlay line at the right edge, in its colour; labels are pushed
+// apart (downwards) so two close lines never print on top of each other.
+function lineLabels(ctx, labels, W, s) {
+  if (!labels.length) return;
+  ctx.save();
+  const fs = Math.round(12 * s), pad = 4 * s, h = fs + pad * 2;
+  ctx.font = `${fs}px ui-monospace, monospace`;
+  ctx.textBaseline = "middle";
+  const placed = labels.map(l => ({ ...l, cy: l.y })).sort((a, b) => a.cy - b.cy);
+  for (let i = 1; i < placed.length; i++) placed[i].cy = Math.max(placed[i].cy, placed[i - 1].cy + h + 2 * s);
+  for (const l of placed) {
+    const tw = ctx.measureText(l.text).width + pad * 2;
+    const x = W - tw - 8 * s;
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(x, l.cy - h / 2, tw, h);
+    ctx.fillStyle = l.color;
+    ctx.fillText(l.text, x + pad, l.cy);
+  }
   ctx.restore();
 }
 function hud(ctx, lines, s) {
