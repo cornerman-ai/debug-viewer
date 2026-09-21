@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cornerman Pipeline Viewer</title>
+<style>
+  :root {
+    --bg: #f5f5f7; --panel: rgba(255,255,255,0.78); --panel-solid: #ffffff; --elev: #ffffff;
+    --text: #1d1d1f; --text2: #6e6e73; --text3: #aeaeb2; --sep: rgba(60,60,67,0.14); --fill: rgba(120,120,128,0.12);
+    --fill2: rgba(120,120,128,0.2); --accent: #007aff; --track: #fbfbfd; --grid: rgba(60,60,67,0.08);
+    --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+    --angle: #007aff; --playhead: #ff3b30;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000; --panel: rgba(28,28,30,0.78); --panel-solid: #1c1c1e; --elev: #2c2c2e;
+      --text: #f5f5f7; --text2: #98989d; --text3: #636366; --sep: rgba(84,84,88,0.5); --fill: rgba(118,118,128,0.24);
+      --fill2: rgba(118,118,128,0.36); --accent: #0a84ff; --track: #111113; --grid: rgba(255,255,255,0.07);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+      --angle: #0a84ff; --playhead: #ff453a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.38 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; overflow: hidden;
+  }
+  button { font: inherit; color: inherit; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ── toolbar ── */
+  .toolbar {
+    position: sticky; top: 0; z-index: 20; height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+    background: var(--panel); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--sep);
+  }
+  .btn, .seg button { white-space: nowrap; }
+  .toolbar .title { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .toolbar .sub { color: var(--text2); font-size: 12px; white-space: nowrap; }
+  .spacer { flex: 1; }
+  .btn {
+    border: 0; background: var(--fill); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: 500;
+    transition: background .15s;
+  }
+  .btn:hover { background: var(--fill2); }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  select.btn { appearance: none; -webkit-appearance: none; padding-right: 26px; max-width: 360px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text2) 50%), linear-gradient(135deg, var(--text2) 50%, transparent 50%);
+    background-position: calc(100% - 13px) 50%, calc(100% - 9px) 50%; background-size: 4px 4px; background-repeat: no-repeat; }
+  .seg { display: inline-flex; background: var(--fill); border-radius: 9px; padding: 2px; }
+  .seg button { border: 0; background: transparent; padding: 4px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text); }
+  .seg button.on { background: var(--elev); box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.04); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text2); font-size: 12px; user-select: none; }
+  .toggle .sw { width: 30px; height: 18px; border-radius: 9px; background: var(--fill2); position: relative; transition: background .2s; }
+  .toggle .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .2s; }
+  .toggle.on .sw { background: #34c759; }
+  .toggle.on .sw::after { transform: translateX(12px); }
+
+  /* ── layout ── */
+  .app { display: none; height: calc(100vh - 52px); grid-template-rows: minmax(0, 1fr) auto; gap: 12px; padding: 12px 16px 16px; }
+  .app.ready { display: grid; }
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 26vw, 440px); gap: 12px; min-height: 0; }
+  .card { background: var(--panel-solid); border-radius: 14px; box-shadow: var(--shadow); }
+  .stage { position: relative; background: #000; border-radius: 14px; overflow: hidden; min-height: 0; display: flex; }
+  .stage video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .stage .hud { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-weight: 600; font-size: 13px;
+    background: rgba(0,0,0,0.55); color: #fff; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); width: max-content; }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .pill.impact { background: #fff; color: #000; letter-spacing: 0.04em; font-size: 11px; }
+  .stage .media-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: #ddd; text-align: center; padding: 24px; }
+  .stage .media-msg.show { display: flex; }
+  .stage .clock { position: absolute; bottom: 12px; right: 12px; pointer-events: none; }
+
+  .inspector { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; }
+  .inspector .card { padding: 14px 16px; }
+  .label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .facing { display: flex; align-items: center; gap: 14px; }
+  .facing .deg { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
+  .facing .hint { color: var(--text2); font-size: 12px; }
+  .event .name { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .event .name .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .event .rows { margin-top: 8px; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; color: var(--text2); font-size: 12px; }
+  .event .rows b { color: var(--text); font-weight: 500; text-align: right; }
+  .event .empty { color: var(--text3); font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; background: var(--fill); cursor: pointer; font-size: 12px; user-select: none; border: 0; }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .chip .n { color: var(--text2); }
+  .chip.off { opacity: 0.38; }
+  .keys { color: var(--text2); font-size: 11.5px; line-height: 1.7; }
+  kbd { font: 500 11px/1 -apple-system, system-ui, sans-serif; background: var(--fill); border-radius: 4px; padding: 2px 5px; color: var(--text); }
+
+  /* ── timeline ── */
+  .timeline { padding: 10px 0 8px; }
+  .tl-head { display: flex; align-items: center; gap: 10px; padding: 0 14px 8px; }
+  .tl-head .label { margin: 0; }
+  #tl { display: block; width: 100%; height: 318px; cursor: default; touch-action: none; }
+  .tooltip { position: fixed; z-index: 50; pointer-events: none; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45;
+    background: var(--panel); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--shadow); border: 0.5px solid var(--sep);
+    display: none; max-width: 260px; }
+  .tooltip b { font-weight: 600; }
+  .tooltip .m { color: var(--text2); }
+
+  /* ── empty state ── */
+  .welcome { height: calc(100vh - 52px); display: flex; align-items: center; justify-content: center; }
+  .welcome .box { text-align: center; max-width: 520px; padding: 40px; }
+  .welcome h1 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 8px; font-weight: 700; }
+  .welcome p { color: var(--text2); font-size: 14px; margin: 0 0 22px; }
+  .welcome .actions { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .welcome .fine { color: var(--text3); font-size: 12px; margin-top: 18px; }
+  .welcome .err { color: #ff3b30; font-size: 13px; margin-top: 14px; white-space: pre-line; }
+  .banner { display: none; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 10px; background: var(--fill); font-size: 12.5px; }
+  .banner.show { display: flex; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <div style="min-width:0">
+    <div class="title" id="title">Pipeline Viewer</div>
+  </div>
+  <div class="sub num" id="subtitle"></div>
+  <div class="spacer"></div>
+  <a class="btn" href="../" style="text-decoration:none" title="the frame-by-frame rule debug viewer">Rule debug viewer</a>
+  <select class="btn" id="videoSelect" style="display:none" title="video folders in pipeline_tests"></select>
+  <button class="btn" id="openBtn">Open Folder…</button>
+</div>
+
+<div class="welcome" id="welcome">
+  <div class="box">
+    <h1>Pipeline Viewer</h1>
+    <p>Punches, impact, defense and facing angle on one timeline, synced with the video.</p>
+    <div class="actions">
+      <button class="btn primary" id="welcomeOpen" style="padding:9px 18px;font-size:14px">Open Folder…</button>
+      <button class="btn" id="reopenBtn" style="display:none"></button>
+    </div>
+    <div class="fine">Pick the Ambo <b>data</b> folder to choose among all test videos,<br>or a single video folder inside <b>pipeline_tests</b>.</div>
+    <div class="err" id="welcomeErr"></div>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <div class="top">
+    <div class="stage" id="stage">
+      <video id="video" preload="auto" muted playsinline></video>
+      <canvas id="overlay"></canvas>
+      <div class="hud" id="hud"></div>
+      <div class="clock pill num" id="clock">0:00.000 · f 0</div>
+      <div class="media-msg" id="mediaMsg">
+        <div style="font-size:15px;font-weight:600">Video and skeleton are outside this folder</div>
+        <div style="color:#aaa;max-width:420px">Link the Ambo <b>data</b> folder once (it is remembered), or pick the video file directly.</div>
+        <div style="display:flex;gap:8px"><button class="btn primary" id="linkData">Link data folder…</button><button class="btn" id="pickVideo" style="background:rgba(255,255,255,.14);color:#fff">Pick video…</button></div>
+      </div>
+    </div>
+    <div class="inspector">
+      <div class="card">
+        <div class="label">Facing</div>
+        <div class="facing">
+          <svg id="compass" width="84" height="84" viewBox="-42 -42 84 84"></svg>
+          <div><div class="deg num" id="deg">–</div><div class="hint">0° to camera · 180° back</div></div>
+        </div>
+      </div>
+      <div class="card event" id="punchCard"><div class="label">Punch</div><div class="empty">No punch</div></div>
+      <div class="card event" id="defCard"><div class="label">Defense</div><div class="empty">No defensive move</div></div>
+      <div class="card">
+        <div class="label">Punches</div><div class="chips" id="punchChips"></div>
+        <div class="label" style="margin-top:12px">Defense</div><div class="chips" id="defChips"></div>
+      </div>
+      <div class="card keys">
+        <kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame · <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd> 1 s<br>
+        <kbd>↑</kbd><kbd>↓</kbd> previous / next event · <kbd>I</kbd> jump to impact<br>
+        Timeline: scroll to zoom · drag to pan · click to seek
+      </div>
+    </div>
+  </div>
+  <div class="card timeline">
+    <div class="tl-head">
+      <div class="label">Timeline</div>
+      <div class="seg" id="zoomSeg">
+        <button data-s="5">5 s</button><button data-s="10" class="on">10 s</button><button data-s="30">30 s</button><button data-s="60">1 min</button><button data-s="0">All</button>
+      </div>
+      <div class="spacer"></div>
+      <div class="banner" id="banner"></div>
+      <label class="toggle on" id="skelToggle"><span class="sw"></span>Skeleton</label>
+      <label class="toggle on" id="followToggle"><span class="sw"></span>Follow playhead</label>
+      <div class="seg" id="rateSeg"><button data-r="0.25">¼×</button><button data-r="0.5">½×</button><button data-r="1" class="on">1×</button><button data-r="2">2×</button></div>
+    </div>
+    <canvas id="tl"></canvas>
+  </div>
+</div>
+<div class="tooltip" id="tip"></div>
+
+<script>
+'use strict';
+// ════════════════════════════ constants ════════════════════════════
+const PUNCH = {                       // punches.csv punch_type → Apple system colors
+  jab:              {c: '#34c759', l: 'J', name: 'Jab'},
+  cross:            {c: '#ff9500', l: 'C', name: 'Cross'},
+  hook:             {c: '#ff2d55', l: 'H', name: 'Hook'},
+  uppercut:         {c: '#ffcc00', l: 'U', name: 'Uppercut'},
+  hook_or_uppercut: {c: '#af52de', l: 'B', name: 'Hook / uppercut'},
+};
+const DEF = {                         // defenses.csv defense_type
+  roll:      {c: '#5ac8fa', l: 'R', name: 'Roll'},
+  slip:      {c: '#5856d6', l: 'S', name: 'Slip'},
+  duck:      {c: '#a2845e', l: 'D', name: 'Duck'},
+  pull_back: {c: '#8e8e93', l: 'P', name: 'Pull-back'},
+};
+const styleP = t => PUNCH[t] || {c: '#8e8e93', l: '?', name: t};
+const styleD = t => DEF[t] || {c: '#8e8e93', l: '?', name: t};
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+// COCO-17 subset of BlazePose-33 for the stick figure, and its bones
+const J = {nose: 0, lsh: 11, rsh: 12, lel: 13, rel: 14, lwr: 15, rwr: 16, lhip: 23, rhip: 24, lkn: 25, rkn: 26, lan: 27, ran: 28};
+const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12]];
+const STAGES = {
+  punches: ['punch_impact', 'impacts.csv'], punchesFallback: ['punch_classification', 'punches.csv'],
+  punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
+  angle: ['facing_angle', 'facing_angle.csv'],
+};
+
+// ════════════════════════════ tiny helpers ════════════════════════════
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const head = lines.shift().split(',');
+  return lines.map(l => { const v = l.split(','); const o = {}; head.forEach((h, i) => o[h] = v[i]); return o; });
+}
+function parseNpy(buf) {
+  const dv = new DataView(buf), major = dv.getUint8(6);
+  const hlen = major === 1 ? dv.getUint16(8, true) : dv.getUint32(8, true), off = major === 1 ? 10 : 12;
+  const header = new TextDecoder().decode(new Uint8Array(buf, off, hlen));
+  if (!/'descr':\s*'<f4'/.test(header) || /'fortran_order':\s*True/.test(header)) throw new Error('unsupported .npy: ' + header);
+  const shape = header.match(/'shape':\s*\(([^)]*)\)/)[1].split(',').filter(s => s.trim()).map(Number);
+  return {data: new Float32Array(buf, off + hlen), shape};
+}
+const fmtT = s => { const m = Math.floor(s / 60), r = s - m * 60; return `${m}:${r.toFixed(3).padStart(6, '0')}`; };
+
+// ── IndexedDB: remember the folder handles between visits ──
+const idb = {
+  db: null,
+  open() { return this.db || (this.db = new Promise((res, rej) => {
+    const r = indexedDB.open('cornerman-pipeline-viewer', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  })); },
+  async get(k) { try { const db = await this.open(); return await new Promise(r => { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => r(q.result); q.onerror = () => r(undefined); }); } catch { return undefined; } },
+  async set(k, v) { try { const db = await this.open(); db.transaction('kv', 'readwrite').objectStore('kv').put(v, k); } catch {} },
+};
+
+// ════════════════════════════ sources ════════════════════════════
+// A source reads a video folder's stage files, plus (optionally) the data root for the video + skeleton.
+async function fileIn(dir, parts) {
+  let d = dir;
+  for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p);
+  return (await d.getFileHandle(parts[parts.length - 1])).getFile();
+}
+async function hasEntry(dir, name) { try { await dir.getDirectoryHandle(name); return true; } catch { return false; } }
+async function ensurePerm(h) {
+  if (!h) return false;
+  if ((await h.queryPermission({mode: 'read'})) === 'granted') return true;
+  return (await h.requestPermission({mode: 'read'})) === 'granted';
+}
+const fsSource = (videoDir, dataDir) => ({
+  name: videoDir.name,
+  text: async parts => (await fileIn(videoDir, parts)).text(),
+  mediaFile: async parts => dataDir ? fileIn(dataDir, parts) : null,
+  hasData: !!dataDir,
+});
+// ?data=<url of Ambo/data>&video=<folder name>: the same over HTTP (a local server; used for testing)
+const httpSource = (base, name) => {
+  const u = parts => base + parts.map(encodeURIComponent).join('/');
+  const get = async parts => { const r = await fetch(u(parts)); if (!r.ok) throw new Error(`${r.status} ${parts.join('/')}`); return r; };
+  return {
+    name, http: true, hasData: true,
+    text: async parts => (await get(['pipeline_tests', name, ...parts])).text(),
+    mediaFile: async parts => ({url: u(parts), arrayBuffer: async () => (await get(parts)).arrayBuffer()}),
+  };
+};
+async function httpList(base) {
+  const html = await (await fetch(base + 'pipeline_tests/')).text();
+  return [...html.matchAll(/href="([^"]+)\/"/g)].map(m => decodeURIComponent(m[1])).filter(n => !n.startsWith('.'));
+}
+
+// ════════════════════════════ state ════════════════════════════
+const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], skel: null,
+           stance: 'orthodox', videoName: '', objectUrl: null, hiddenP: new Set(), hiddenD: new Set()};
+const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover: null, lastFrame: -1};
+const video = $('video');
+
+// ════════════════════════════ loading ════════════════════════════
+async function loadFolder(src) {
+  S.src = src;
+  const [pjs, angleCsv, defCsv] = await Promise.all([
+    src.text(STAGES.punchJson).then(JSON.parse).catch(() => null),
+    src.text(STAGES.angle).catch(() => null),
+    src.text(STAGES.defenses).catch(() => null)]);
+  let pcsv = await src.text(STAGES.punches).catch(() => null), hasImpact = !!pcsv;
+  if (!pcsv) pcsv = await src.text(STAGES.punchesFallback).catch(() => null);
+  if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
+
+  S.fps = pjs?.run?.fps || 30; S.stance = pjs?.run?.stance || 'orthodox';
+  S.videoName = pjs?.run?.video || `${src.name}.mp4`;
+  const A = angleCsv ? parseCSV(angleCsv) : [];
+  S.n = A.length || pjs?.run?.n_frames || 0;
+  S.angle = new Float32Array(S.n); S.pose = new Uint8Array(S.n);
+  A.forEach((r, i) => { S.angle[i] = +r.angle_deg; S.pose[i] = +r.has_pose; });
+  S.hasAngle = A.length > 0;
+  S.punches = (pcsv ? parseCSV(pcsv) : []).map(r => ({
+    kind: 'p', sf: +r.start_frame, ef: +r.end_frame, type: r.punch_type, hand: r.hand, target: r.target,
+    impact: hasImpact && r.impact_status === 'ok' ? +r.impact_frame : null, impConf: r.impact_conf ? +r.impact_conf : null,
+    impStatus: hasImpact ? r.impact_status : 'not run'})).sort((a, b) => a.sf - b.sf);
+  S.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
+    kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share,
+    prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
+  if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
+  S.dur = S.n / S.fps;
+  S.hiddenP.clear(); S.hiddenD.clear();
+
+  $('title').textContent = src.name;
+  $('title').style.display = $('videoSelect').style.display === 'none' ? '' : 'none';   // the dropdown already names it
+  $('subtitle').textContent = `${S.n.toLocaleString()} frames · ${S.fps} fps · ${fmtT(S.dur).replace(/\.\d+$/, '')} · ` +
+    `${S.punches.length} punches · ${S.defenses.length} defensive moves`;
+  $('welcome').style.display = 'none'; $('app').classList.add('ready');
+  const missing = [!hasImpact && 'punch impact', !angleCsv && 'facing angle', !defCsv && 'defense'].filter(Boolean);
+  $('banner').textContent = missing.length ? `Not in this folder: ${missing.join(', ')}` : '';
+  $('banner').classList.toggle('show', missing.length > 0);
+  buildChips(); setSpan(10); V.lastFrame = -1;
+  await loadMedia();
+  resize(); draw(true);
+}
+
+async function loadMedia() {
+  const src = S.src;
+  S.skel = null;
+  if (S.objectUrl) { URL.revokeObjectURL(S.objectUrl); S.objectUrl = null; }
+  if (!src.hasData) { video.removeAttribute('src'); video.load(); $('mediaMsg').classList.add('show'); return; }
+  $('mediaMsg').classList.remove('show');
+  const stem = S.videoName.replace(/\.[^.]+$/, '');
+  try {
+    const f = await src.mediaFile(['raw_videos', 'full_pipeline_test_videos', S.videoName]);
+    if (f.url) video.src = f.url; else { S.objectUrl = URL.createObjectURL(f); video.src = S.objectUrl; }
+  } catch (e) { $('mediaMsg').classList.add('show'); console.warn('video not found', e); }
+  // the skeleton only draws the stick figure: load it after the video so playback is never waiting on it
+  src.mediaFile(['skeleton_data', 'full_pipeline_test_videos', `${stem}_blazepose_full.npy`])
+    .then(f => f.arrayBuffer()).then(buf => { const a = parseNpy(buf); if (a.shape[1] === 33) { S.skel = a.data; S.skelC = a.shape[2]; draw(true); } })
+    .catch(e => console.warn('skeleton not loaded', e));
+}
+
+// ── opening: a data root (lists pipeline_tests/*) or one video folder ──
+async function pickDir() {
+  if (!window.showDirectoryPicker) throw new Error('This browser cannot open folders — use Chrome or Edge.');
+  return window.showDirectoryPicker({id: 'cornerman-pipeline', mode: 'read'});
+}
+async function openHandle(h) {
+  if (await hasEntry(h, 'pipeline_tests')) {                 // the data root
+    S.dataDir = h; await idb.set('dataDir', h);
+    await showVideoList();
+  } else {                                                    // a single video folder
+    await idb.set('lastVideo', h.name);
+    if (!S.dataDir) { const d = await idb.get('dataDir'); if (d && (await d.queryPermission({mode: 'read'})) === 'granted') S.dataDir = d; }
+    await loadFolder(fsSource(h, S.dataDir));
+    S.loneVideoDir = h;
+  }
+}
+async function showVideoList() {
+  const pt = await S.dataDir.getDirectoryHandle('pipeline_tests');
+  const names = [];
+  for await (const [name, e] of pt.entries()) if (e.kind === 'directory' && !name.startsWith('.')) names.push(name);
+  names.sort();
+  if (!names.length) throw new Error('pipeline_tests has no video folders yet.');
+  fillSelect(names, async name => { await idb.set('lastVideo', name); await loadFolder(fsSource(await pt.getDirectoryHandle(name), S.dataDir)); });
+  const last = await idb.get('lastVideo');
+  await $('videoSelect').onchange({target: {value: names.includes(last) ? last : names[0]}});
+}
+function fillSelect(names, onPick) {
+  const sel = $('videoSelect');
+  sel.innerHTML = names.map(n => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
+  sel.style.display = '';
+  sel.onchange = async e => { sel.value = e.target.value; await guard(() => onPick(e.target.value)); };
+}
+async function guard(fn) {
+  try { await fn(); } catch (e) {
+    if (e.name === 'AbortError') return;
+    console.error(e); $('welcomeErr').textContent = e.message;
+    if (!$('app').classList.contains('ready')) $('welcome').style.display = ''; else alert(e.message);
+  }
+}
+const openFlow = () => guard(async () => openHandle(await pickDir()));
+$('openBtn').onclick = openFlow; $('welcomeOpen').onclick = openFlow;
+$('linkData').onclick = () => guard(async () => {
+  const h = await pickDir();
+  if (!(await hasEntry(h, 'raw_videos'))) throw new Error(`“${h.name}” is not the Ambo data folder (no raw_videos inside).`);
+  S.dataDir = h; await idb.set('dataDir', h);
+  if (S.loneVideoDir) await loadFolder(fsSource(S.loneVideoDir, h));
+});
+$('pickVideo').onclick = () => {
+  const inp = Object.assign(document.createElement('input'), {type: 'file', accept: 'video/*'});
+  inp.onchange = () => { const f = inp.files[0]; if (!f) return;
+    if (S.objectUrl) URL.revokeObjectURL(S.objectUrl); S.objectUrl = URL.createObjectURL(f); video.src = S.objectUrl; $('mediaMsg').classList.remove('show'); };
+  inp.click();
+};
+
+// ════════════════════════════ inspector ════════════════════════════
+function buildChips() {
+  const count = (arr, t) => arr.filter(x => x.type === t).length;
+  const mk = (box, table, arr, hidden) => {
+    box.innerHTML = '';
+    Object.entries(table).forEach(([t, s]) => {
+      const n = count(arr, t); if (!n) return;
+      const b = document.createElement('button');
+      b.className = 'chip' + (hidden.has(t) ? ' off' : '');
+      b.innerHTML = `<span class="dot" style="background:${s.c}"></span>${s.name}<span class="n num">${n}</span>`;
+      b.onclick = () => { hidden.has(t) ? hidden.delete(t) : hidden.add(t); b.classList.toggle('off'); draw(true); };
+      box.appendChild(b);
+    });
+    if (!box.children.length) box.innerHTML = '<span style="color:var(--text3)">none</span>';
+  };
+  mk($('punchChips'), PUNCH, S.punches, S.hiddenP);
+  mk($('defChips'), DEF, S.defenses, S.hiddenD);
+}
+function compass(a) {
+  const g = $('compass'), sep = css('--sep'), acc = css('--accent'), t2 = css('--text2');
+  let s = `<circle r="36" fill="none" stroke="${sep}" stroke-width="1.5"/>`;
+  for (let k = 0; k < 8; k++) { const th = k * Math.PI / 4; s += `<line x1="${Math.sin(th) * 32}" y1="${Math.cos(th) * 32}" x2="${Math.sin(th) * 36}" y2="${Math.cos(th) * 36}" stroke="${sep}" stroke-width="1.5"/>`; }
+  s += `<rect x="-7" y="37" width="14" height="5" rx="1.5" fill="${t2}"/>`;               // the camera, at the bottom
+  if (a !== null) {
+    const th = a * Math.PI / 180, x = Math.sin(th) * 28, y = Math.cos(th) * 28;
+    s += `<line x1="0" y1="0" x2="${x}" y2="${y}" stroke="${acc}" stroke-width="3.5" stroke-linecap="round"/>` +
+         `<circle cx="${x}" cy="${y}" r="4.5" fill="${acc}"/><circle r="3" fill="${acc}"/>`;
+  }
+  g.innerHTML = s;
+}
+function eventCard(el, label, e, f) {
+  if (!e) { el.innerHTML = `<div class="label">${label}</div><div class="empty">${label === 'Punch' ? 'No punch' : 'No defensive move'}</div>`; return; }
+  const fps = S.fps, n = e.ef - e.sf + 1;
+  if (e.kind === 'p') {
+    const s = styleP(e.type), imp = e.impact;
+    const impTxt = imp === null ? `<span style="color:var(--text3)">none (${e.impStatus})</span>`
+      : f === imp ? '<span style="color:#ff3b30">▶ now</span>' : f < imp ? `in ${imp - f} f` : `${f - imp} f ago`;
+    el.innerHTML = `<div class="label">Punch</div><div class="name"><span class="dot" style="background:${s.c}"></span>${cap(e.hand)} ${s.name}</div>
+      <div class="rows num"><span>Target</span><b>${e.target || '–'}</b><span>Frames</span><b>${e.sf}–${e.ef} · ${n}</b>
+      <span>Time</span><b>${fmtT(e.sf / fps)}</b><span>Impact</span><b>${imp === null ? '–' : 'f ' + imp}</b>
+      <span></span><b>${impTxt}</b>${imp === null ? '' : `<span>Impact conf.</span><b>${e.impConf.toFixed(2)}</b>`}</div>`;
+  } else {
+    const s = styleD(e.type);
+    el.innerHTML = `<div class="label">Defense</div><div class="name"><span class="dot" style="background:${s.c}"></span>${e.side ? cap(e.side) + ' ' : ''}${s.name}</div>
+      <div class="rows num"><span>Frames</span><b>${e.sf}–${e.ef} · ${n}</b><span>Time</span><b>${fmtT(e.sf / fps)}</b>
+      <span>Which-move share</span><b>${e.share.toFixed(2)}</b><span>Move prob.</span><b>${e.prob.toFixed(2)}</b></div>`;
+  }
+}
+const at = (arr, f, hidden) => arr.filter(e => e.sf <= f && f <= e.ef && !hidden.has(e.type));
+
+// ════════════════════════════ video overlay ════════════════════════════
+const ov = $('overlay'), octx = ov.getContext('2d');
+function videoRect() {
+  const W = ov.clientWidth, H = ov.clientHeight, vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+  const sc = Math.min(W / vw, H / vh);
+  return {x: (W - vw * sc) / 2, y: (H - vh * sc) / 2, w: vw * sc, h: vh * sc, W, H};
+}
+function drawOverlay(f, punchesNow) {
+  const dpr = devicePixelRatio || 1, R = videoRect();
+  if (ov.width !== Math.round(R.W * dpr) || ov.height !== Math.round(R.H * dpr)) { ov.width = Math.round(R.W * dpr); ov.height = Math.round(R.H * dpr); }
+  octx.setTransform(dpr, 0, 0, dpr, 0, 0); octx.clearRect(0, 0, R.W, R.H);
+  if (!S.skel || f >= S.skel.length / (33 * S.skelC)) return;
+  const C = S.skelC, base = f * 33 * C;
+  const P = j => { const x = S.skel[base + j * C], y = S.skel[base + j * C + 1];
+    return Number.isFinite(x) && Number.isFinite(y) ? [R.x + x * R.w, R.y + y * R.h] : null; };
+  if (V.skel) {
+    octx.lineCap = 'round'; octx.lineWidth = 3; octx.strokeStyle = 'rgba(255,255,255,0.85)';
+    for (const [a, b] of BONES) { const p = P(a), q = P(b); if (p && q) { octx.beginPath(); octx.moveTo(...p); octx.lineTo(...q); octx.stroke(); } }
+    octx.fillStyle = '#0a84ff';
+    for (const j of Object.values(J)) { const p = P(j); if (p) { octx.beginPath(); octx.arc(p[0], p[1], 3.2, 0, 7); octx.fill(); } }
+  }
+  // impact: a ring on the punching wrist, strongest on the impact frame, fading over ±3 frames
+  for (const e of punchesNow.concat(S.punches.filter(p => p.impact !== null && Math.abs(p.impact - f) <= 3 && !S.hiddenP.has(p.type)))) {
+    if (e.impact === null) continue;
+    const d = Math.abs(e.impact - f); if (d > 3) continue;
+    const leadLeft = S.stance !== 'southpaw', wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr, p = P(wr); if (!p) continue;
+    const a = 1 - d / 4;
+    octx.strokeStyle = styleP(e.type).c; octx.globalAlpha = a; octx.lineWidth = 4;
+    octx.beginPath(); octx.arc(p[0], p[1], 16 + (3 - d) * 5, 0, 7); octx.stroke();
+    octx.globalAlpha = a * 0.35; octx.fillStyle = styleP(e.type).c; octx.beginPath(); octx.arc(p[0], p[1], 12, 0, 7); octx.fill();
+    octx.globalAlpha = 1;
+  }
+}
+
+// ════════════════════════════ timeline ════════════════════════════
+const tl = $('tl'), tctx = tl.getContext('2d');
+const L = 78, RPAD = 14;                                        // left gutter for track names
+const TR = {ruler: [0, 24], angle: [30, 128], lead: [166, 30], rear: [200, 30], def: [240, 30], over: [284, 30]};
+let TW = 0, TH = 0;
+const tx = t => L + (t - V.t0) / (V.t1 - V.t0) * (TW - L - RPAD);
+const xt = x => V.t0 + (x - L) / (TW - L - RPAD) * (V.t1 - V.t0);
+const ox = t => L + t / S.dur * (TW - L - RPAD);
+function resize() {
+  const dpr = devicePixelRatio || 1; TW = tl.clientWidth; TH = tl.clientHeight;
+  tl.width = Math.round(TW * dpr); tl.height = Math.round(TH * dpr); tctx.setTransform(dpr, 0, 0, dpr, 0, 0); V.dirty = true;
+}
+function setSpan(s) {
+  V.span = s;
+  document.querySelectorAll('#zoomSeg button').forEach(b => b.classList.toggle('on', +b.dataset.s === s));
+  const t = video.currentTime || 0;
+  if (!s || s >= S.dur) { V.t0 = 0; V.t1 = S.dur; } else { V.t0 = t - s / 2; V.t1 = t + s / 2; clampView(); }
+  V.dirty = true;
+}
+function clampView() {
+  let w = Math.min(Math.max(V.t1 - V.t0, 0.5), S.dur);
+  if (V.t0 < 0) V.t0 = 0; V.t1 = V.t0 + w;
+  if (V.t1 > S.dur) { V.t1 = S.dur; V.t0 = S.dur - w; }
+}
+function rr(x, y, w, h, r) {
+  w = Math.max(0, w); h = Math.max(0, h); r = Math.max(0, Math.min(r, w / 2, h / 2));
+  tctx.beginPath(); tctx.roundRect ? tctx.roundRect(x, y, w, h, r) : tctx.rect(x, y, w, h);
+}
+function niceStep(span, px) {
+  const target = span / (px / 90), steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+  return steps.find(s => s >= target) || 600;
+}
+function drawTimeline(f) {
+  if (TW - L - RPAD < 20) { resize(); if (TW - L - RPAD < 20) return; }
+  const c = tctx, text = css('--text'), text2 = css('--text2'), text3 = css('--text3'), grid = css('--grid'), track = css('--track'),
+        sep = css('--sep'), acc = css('--angle'), ph = css('--playhead'), fps = S.fps;
+  c.clearRect(0, 0, TW, TH);
+  c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
+  const W = TW - L - RPAD;
+  // track backgrounds + names
+  const names = {angle: 'Facing', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview'};
+  for (const [k, [y, h]] of Object.entries(TR)) {
+    if (k === 'ruler') continue;
+    c.fillStyle = track; rr(L, y, W, h, 7); c.fill();
+    c.fillStyle = text2; c.textAlign = 'right'; c.fillText(names[k], k === 'angle' ? L - 36 : L - 12, y + h / 2);
+  }
+  // ruler + vertical grid
+  const step = niceStep(V.t1 - V.t0, W);
+  c.textAlign = 'center';
+  for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) {
+    const x = tx(t);
+    c.strokeStyle = grid; c.lineWidth = 1; c.beginPath(); c.moveTo(x, TR.angle[0]); c.lineTo(x, TR.def[0] + TR.def[1]); c.stroke();
+    c.fillStyle = text3; c.fillText(step < 1 ? t.toFixed(1) + ' s' : fmtT(t).replace(/\.\d+$/, ''), x, 12);
+  }
+  c.save(); c.beginPath(); c.rect(L, 0, W, TR.over[0] - 4); c.clip();
+  // angle track
+  const [ay, ah] = TR.angle, ymap = a => ay + ah / 2 - a / 180 * (ah / 2 - 6);
+  c.textAlign = 'left';
+  for (const g of [-180, -90, 0, 90, 180]) {
+    c.strokeStyle = g === 0 ? sep : grid; c.lineWidth = 1; c.beginPath(); c.moveTo(L, ymap(g)); c.lineTo(L + W, ymap(g)); c.stroke();
+  }
+  c.restore(); c.fillStyle = text3; c.textAlign = 'right'; c.font = '500 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  for (const g of [-180, -90, 0, 90, 180]) c.fillText(`${g}°`, L - 6, ymap(g));
+  c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  c.save(); c.beginPath(); c.rect(L, 0, W, TR.over[0] - 4); c.clip();
+  if (S.hasAngle) {
+    const f0 = Math.max(0, Math.floor(V.t0 * fps) - 1), f1 = Math.min(S.n - 1, Math.ceil(V.t1 * fps) + 1);
+    const every = Math.max(1, Math.floor((f1 - f0) / (W * 1.5)));   // never more dots than ~1.5 per pixel
+    const r = (f1 - f0) / W > 1 ? 1.2 : 1.8;
+    c.fillStyle = acc;
+    for (let i = f0; i <= f1; i += every) { if (!S.pose[i]) continue; const x = tx(i / fps); c.fillRect(x - r, ymap(S.angle[i]) - r, 2 * r, 2 * r); }
+  }
+  // punch + defense blocks
+  const block = (e, y, h, s, active) => {
+    const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps), w = Math.max(2, x1 - x0 - 1);
+    if (x1 < L || x0 > L + W) return;
+    c.globalAlpha = V.hover === e ? 1 : 0.92; c.fillStyle = s.c; rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
+    if (active) { c.strokeStyle = text; c.lineWidth = 2; rr(x0 - 1, y + 2, w + 2, h - 4, 6); c.stroke(); }
+    if (w > 13) {                                               // label at the left edge, clear of the impact line
+      const big = w > 70; c.fillStyle = 'rgba(0,0,0,0.72)'; c.textAlign = big ? 'left' : 'center';
+      c.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+      c.fillText(big ? s.name : s.l, big ? x0 + 7 : x0 + Math.min(8, w / 2), y + h / 2 + 0.5);
+    }
+    if (e.impact != null) {                                     // the impact frame, drawn on the block itself
+      const xi = tx((e.impact + 0.5) / fps);
+      c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(xi, y + 3); c.lineTo(xi, y + h - 3); c.stroke();
+      c.fillStyle = '#fff'; c.beginPath(); c.moveTo(xi, y - 1); c.lineTo(xi + 4.5, y + 3.5); c.lineTo(xi - 4.5, y + 3.5); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 1; c.stroke();
+    }
+  };
+  for (const e of S.punches) if (!S.hiddenP.has(e.type))
+    block(e, e.hand === 'lead' ? TR.lead[0] : TR.rear[0], TR.lead[1], styleP(e.type), e.sf <= f && f <= e.ef);
+  for (const e of S.defenses) if (!S.hiddenD.has(e.type)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
+  // playhead
+  const xp = tx((f + 0.5) / fps);
+  c.strokeStyle = ph; c.lineWidth = 1.5; c.beginPath(); c.moveTo(xp, 20); c.lineTo(xp, TR.def[0] + TR.def[1]); c.stroke();
+  c.fillStyle = ph; rr(xp - 5, 16, 10, 8, 2.5); c.fill();
+  c.restore();
+  // overview: the whole video, events as ticks, the visible window as a lens
+  const [oy, oh] = TR.over;
+  for (const e of S.punches) if (!S.hiddenP.has(e.type)) { c.fillStyle = styleP(e.type).c; c.fillRect(ox(e.sf / fps), oy + 5, Math.max(1, ox((e.ef + 1) / fps) - ox(e.sf / fps)), 9); }
+  for (const e of S.defenses) if (!S.hiddenD.has(e.type)) { c.fillStyle = styleD(e.type).c; c.fillRect(ox(e.sf / fps), oy + 17, Math.max(1, ox((e.ef + 1) / fps) - ox(e.sf / fps)), 8); }
+  const vx0 = ox(V.t0), vx1 = ox(V.t1);
+  c.fillStyle = 'rgba(128,128,128,0.16)'; rr(vx0, oy, Math.max(4, vx1 - vx0), oh, 6); c.fill();
+  c.strokeStyle = acc; c.lineWidth = 1.5; rr(vx0, oy + 0.75, Math.max(4, vx1 - vx0), oh - 1.5, 6); c.stroke();
+  c.strokeStyle = ph; c.lineWidth = 1.5; const xo = ox(f / fps); c.beginPath(); c.moveTo(xo, oy); c.lineTo(xo, oy + oh); c.stroke();
+}
+
+// ════════════════════════════ frame loop ════════════════════════════
+const frameNow = () => Math.max(0, Math.min(S.n - 1, Math.round(video.currentTime * S.fps)));
+function draw(force) {
+  if (!S.src) return;
+  const f = frameNow();
+  if (f !== V.lastFrame || force) {
+    V.lastFrame = f;
+    const pNow = at(S.punches, f, S.hiddenP), dNow = at(S.defenses, f, S.hiddenD);
+    const a = S.hasAngle && S.pose[f] ? S.angle[f] : null;
+    $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
+    eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f);
+    $('clock').textContent = `${fmtT(video.currentTime)} · f ${f}`;
+    const hud = [];
+    for (const e of pNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}</span>`);
+    if (S.punches.some(e => e.impact === f && !S.hiddenP.has(e.type))) hud.push('<span class="pill impact">IMPACT</span>');
+    for (const e of dNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleD(e.type).c}"></span>${e.side ? cap(e.side) + ' ' : ''}${styleD(e.type).name}</span>`);
+    $('hud').innerHTML = hud.join('');
+    drawOverlay(f, pNow);
+    // follow: keep the playhead inside the window, scrolling continuously while playing
+    if (V.follow && V.span && V.t1 - V.t0 < S.dur) {
+      const t = f / S.fps, w = V.t1 - V.t0;
+      if (!video.paused) { V.t0 = t - w / 2; V.t1 = t + w / 2; clampView(); }
+      else if (t < V.t0 || t > V.t1) { V.t0 = t - w / 2; V.t1 = t + w / 2; clampView(); }
+    }
+    V.dirty = true;
+  }
+  if (V.dirty) { drawTimeline(f); V.dirty = false; }
+}
+(function loop() {
+  requestAnimationFrame(loop);                                // scheduled first: one bad frame must not stop the loop
+  try { draw(false); } catch (e) { console.error(e); }
+})();
+
+// ════════════════════════════ interaction ════════════════════════════
+function seekFrame(f) { f = Math.max(0, Math.min(S.n - 1, f)); video.currentTime = (f + 0.5) / S.fps; V.lastFrame = -1; draw(true); }
+function setFollow(on) { V.follow = on; $('followToggle').classList.toggle('on', on); }
+function hit(x, y) {
+  if (x < L) return null;
+  const t = xt(x), f = Math.floor(t * S.fps);
+  const inRow = ([ry, rh]) => y >= ry && y <= ry + rh;
+  const find = (arr, hidden, pred) => arr.find(e => !hidden.has(e.type) && pred(e) && f >= e.sf - 1 && f <= e.ef + 1);
+  if (inRow(TR.lead)) return find(S.punches, S.hiddenP, e => e.hand === 'lead');
+  if (inRow(TR.rear)) return find(S.punches, S.hiddenP, e => e.hand === 'rear');
+  if (inRow(TR.def)) return find(S.defenses, S.hiddenD, () => true);
+  return null;
+}
+let drag = null;
+tl.addEventListener('pointerdown', e => {
+  const r = tl.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  tl.setPointerCapture(e.pointerId);
+  if (y >= TR.over[0]) {                                    // overview: jump the lens there and drag it
+    drag = {mode: 'over'}; const w = V.t1 - V.t0, t = (x - L) / (TW - L - RPAD) * S.dur;
+    V.t0 = t - w / 2; V.t1 = t + w / 2; clampView(); setFollow(false); V.dirty = true; return;
+  }
+  drag = {mode: 'main', x0: x, y0: y, t0: V.t0, t1: V.t1, moved: false};
+});
+tl.addEventListener('pointermove', e => {
+  const r = tl.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (drag?.mode === 'over') {
+    const w = V.t1 - V.t0, t = (x - L) / (TW - L - RPAD) * S.dur; V.t0 = t - w / 2; V.t1 = t + w / 2; clampView(); V.dirty = true; return;
+  }
+  if (drag?.mode === 'main') {
+    const dx = x - drag.x0;
+    if (Math.abs(dx) > 3 || drag.moved) {
+      drag.moved = true; const dt = dx / (TW - L - RPAD) * (drag.t1 - drag.t0);
+      V.t0 = drag.t0 - dt; V.t1 = drag.t1 - dt; clampView(); setFollow(false); tl.style.cursor = 'grabbing'; V.dirty = true;
+    }
+    return;
+  }
+  const h = hit(x, y);
+  if (h !== V.hover) { V.hover = h; V.dirty = true; }
+  tl.style.cursor = h ? 'pointer' : 'default';
+  tip(h, e.clientX, e.clientY);
+});
+tl.addEventListener('pointerup', e => {
+  const r = tl.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (drag?.mode === 'main' && !drag.moved && x >= L) {
+    const h = hit(x, y);
+    seekFrame(h ? h.sf : Math.floor(xt(x) * S.fps));        // a block: its first frame; anywhere else: that frame
+  }
+  drag = null; tl.style.cursor = 'default';
+});
+tl.addEventListener('pointerleave', () => { if (!drag) { V.hover = null; V.dirty = true; tip(null); } });
+tl.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = tl.getBoundingClientRect(), x = e.clientX - r.left, w = V.t1 - V.t0;
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) {     // pan: trackpad sideways swipe, or shift + wheel
+    const d = (e.shiftKey ? e.deltaY : e.deltaX) / (TW - L - RPAD) * w; V.t0 += d; V.t1 += d;
+  } else {                                                           // zoom around the cursor
+    const t = xt(Math.max(L, x)), k = Math.exp(e.deltaY * (e.ctrlKey ? 0.01 : 0.0022));
+    const nw = Math.min(S.dur, Math.max(0.5, w * k)); V.t0 = t - (t - V.t0) * nw / w; V.t1 = V.t0 + nw;
+    document.querySelectorAll('#zoomSeg button').forEach(b => b.classList.remove('on'));
+  }
+  clampView(); setFollow(false); V.dirty = true;
+}, {passive: false});
+function tip(e, cx, cy) {
+  const el = $('tip');
+  if (!e) { el.style.display = 'none'; return; }
+  const fps = S.fps, n = e.ef - e.sf + 1;
+  if (e.kind === 'p') {
+    const s = styleP(e.type);
+    el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.hand)} ${s.name}</b> <span class="m">target ${e.target}</span><br>
+      <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>` +
+      (e.impact === null ? `<span class="m">no impact (${e.impStatus})</span>` : `<span class="num">impact f ${e.impact} · conf ${e.impConf.toFixed(2)}</span>`);
+  } else {
+    const s = styleD(e.type);
+    el.innerHTML = `<b style="color:${s.c}">●</b> <b>${e.side ? cap(e.side) + ' ' : ''}${s.name}</b><br>
+      <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>
+      <span class="num">which-move share ${e.share.toFixed(2)} · move prob ${e.prob.toFixed(2)}</span>`;
+  }
+  el.style.display = 'block';
+  const bw = el.offsetWidth, bh = el.offsetHeight;
+  el.style.left = Math.min(innerWidth - bw - 8, cx + 14) + 'px'; el.style.top = Math.max(8, cy - bh - 12) + 'px';
+}
+$('zoomSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; setSpan(+b.dataset.s); setFollow(true); };
+$('rateSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return;
+  video.playbackRate = +b.dataset.r; document.querySelectorAll('#rateSeg button').forEach(x => x.classList.toggle('on', x === b)); };
+$('followToggle').onclick = e => { e.preventDefault(); setFollow(!V.follow); if (V.follow) { const t = video.currentTime, w = V.t1 - V.t0; V.t0 = t - w / 2; V.t1 = t + w / 2; clampView(); V.dirty = true; } };
+$('skelToggle').onclick = e => { e.preventDefault(); V.skel = !V.skel; $('skelToggle').classList.toggle('on', V.skel); draw(true); };
+$('stage').addEventListener('click', e => { if (e.target === video || e.target.id === 'overlay' || e.target.id === 'stage') video.paused ? video.play() : video.pause(); });
+document.addEventListener('keydown', e => {
+  if (!S.src || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  const f = frameNow(), events = S.punches.filter(p => !S.hiddenP.has(p.type)).concat(S.defenses.filter(d => !S.hiddenD.has(d.type))).sort((a, b) => a.sf - b.sf);
+  if (e.code === 'Space') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
+  else if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
+    e.preventDefault(); video.pause(); seekFrame(f + (e.code === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? Math.round(S.fps) : 1));
+  } else if (e.code === 'ArrowDown') { e.preventDefault(); video.pause(); const n = events.find(x => x.sf > f); if (n) seekFrame(n.sf); }
+  else if (e.code === 'ArrowUp') { e.preventDefault(); video.pause(); const p = events.filter(x => x.sf < f).pop(); if (p) seekFrame(p.sf); }
+  else if (e.code === 'KeyI') {
+    const p = at(S.punches, f, S.hiddenP).find(x => x.impact !== null) || S.punches.find(x => x.impact !== null && x.impact > f && !S.hiddenP.has(x.type));
+    if (p) { video.pause(); seekFrame(p.impact); }
+  }
+});
+video.addEventListener('loadedmetadata', () => draw(true));
+video.addEventListener('seeked', () => draw(true));
+addEventListener('resize', () => { resize(); draw(true); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => draw(true));
+
+// ════════════════════════════ start ════════════════════════════
+(async () => {
+  const q = new URLSearchParams(location.search);
+  if (q.get('data')) {                                       // HTTP mode (a local server), for testing
+    const base = q.get('data').replace(/\/?$/, '/');
+    await guard(async () => {
+      const names = await httpList(base);
+      fillSelect(names, async name => loadFolder(httpSource(base, name)));
+      const want = q.get('video'); await $('videoSelect').onchange({target: {value: names.includes(want) ? want : names[0]}});
+    });
+    return;
+  }
+  const d = await idb.get('dataDir');
+  if (d) {
+    const rb = $('reopenBtn'); rb.style.display = ''; rb.textContent = `Continue with “${d.name}”`;
+    rb.onclick = () => guard(async () => { if (!(await ensurePerm(d))) throw new Error('Permission to read the folder was not granted.'); await openHandle(d); });
+  }
+})();
+</script>
+</body>
+</html>

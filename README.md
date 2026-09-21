@@ -10,6 +10,10 @@ Vision, glove-wrist, YOLO, RTMPose, MoveNet and YOLO11 caches (Drive
 
 **Live**: https://cornerman-ai.github.io/debug-viewer/
 
+**Also here**: the [pipeline viewer](pipeline/) (https://cornerman-ai.github.io/debug-viewer/pipeline/) — one
+full-pipeline test video with its punches, impact frames, defensive moves and facing angle on one timeline, read
+from Drive `Ambo/data/pipeline_tests/`. A separate page with its own README ([pipeline/README.md](pipeline/README.md)).
+
 ## What it does
 
 Pick the cache folder once per session, then for each round pick just
