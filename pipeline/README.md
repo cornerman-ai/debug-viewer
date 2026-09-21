@@ -23,6 +23,8 @@ Chrome or Edge (it reads folders with the File System Access API) and Google Dri
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
 (fps, stance, video name), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
 `*_blazepose_full.npy` skeleton for the stick figure. A missing stage is named in the timeline header; the rest still works.
+The rule layers read `punch_axiality/axiality.csv`, `hip_rotation/hip_rotation.csv` and `arm_extension/arm_extension.{csv,json}`
+when present, joined to the punches by start frame and hand.
 
 Over HTTP (a static server with Range support rooted at the data folder, serving this page from the same origin):
 `index.html?data=<url of data/>&video=<folder name>` — used for testing.
@@ -33,5 +35,17 @@ Timeline rows: facing angle (0° = to the camera, ±180° = back), lead and rear
 defense, and an overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
 hover for details; the chips in the side panel hide or show a punch / defense type. On the video: the skeleton, a ring
 on the punching wrist around impact, and pills naming the current punch / move.
+
+**Rule layers** (side panel, all off by default, the choice is remembered): each adds a timeline row, a section in
+the punch card and a video overlay for the punch under the playhead. Colors: green = fine, orange = too little,
+red = wrong / too much, gray = not judged.
+
+- **Arm extension** (`arm_extension/`): per jab / cross the production rule's verdict (pass / fail; skipped = dashed),
+  its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
+  with this frame's elbow bend.
+- **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against the study's IQR (block color), the
+  impact → end verdict as the bottom stripe; on the video the hip line in the verdict color.
+- **Axiality** (`punch_axiality/`): per straight a bar as tall as its axiality, the dashed line at 0.71 where the rules
+  stop judging (gray = too head-on).
 
 Keys: Space play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact.

@@ -94,13 +94,23 @@
   .chip .n { color: var(--text2); }
   .chip.off { opacity: 0.38; }
   .keys { color: var(--text2); font-size: 11.5px; line-height: 1.7; }
+  .layer { display: flex; flex-direction: column; gap: 3px; padding: 7px 0; border-top: 0.5px solid var(--sep); }
+  .layer:first-of-type { border-top: 0; padding-top: 0; }
+  .layer .toggle { color: var(--text); font-size: 13px; font-weight: 500; justify-content: space-between; width: 100%; }
+  .layer .toggle.disabled { opacity: 0.4; pointer-events: none; }
+  .layer .lsum { color: var(--text2); font-size: 11.5px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .layer .lsum i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
+  .event .sub { margin-top: 10px; padding-top: 8px; border-top: 0.5px solid var(--sep); }
+  .event .sub .h { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 6px; }
+  .verdict { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #fff; text-transform: none; letter-spacing: 0; }
   kbd { font: 500 11px/1 -apple-system, system-ui, sans-serif; background: var(--fill); border-radius: 4px; padding: 2px 5px; color: var(--text); }
 
   /* ── timeline ── */
   .timeline { padding: 10px 0 8px; }
   .tl-head { display: flex; align-items: center; gap: 10px; padding: 0 14px 8px; }
   .tl-head .label { margin: 0; }
-  #tl { display: block; width: 100%; height: 318px; cursor: default; touch-action: none; }
+  #tl { display: block; width: 100%; height: 318px; cursor: default; touch-action: none; transition: height .2s; }
   .tooltip { position: fixed; z-index: 50; pointer-events: none; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45;
     background: var(--panel); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--shadow); border: 0.5px solid var(--sep);
     display: none; max-width: 260px; }
@@ -167,6 +177,12 @@
       </div>
       <div class="card event" id="punchCard"><div class="label">Punch</div><div class="empty">No punch</div></div>
       <div class="card event" id="defCard"><div class="label">Defense</div><div class="empty">No defensive move</div></div>
+      <div class="card" id="layersCard">
+        <div class="label">Rule layers</div>
+        <div class="layer"><label class="toggle" data-layer="arm">Arm extension<span class="sw"></span></label><div class="lsum" id="sum-arm"></div></div>
+        <div class="layer"><label class="toggle" data-layer="hip">Hip rotation<span class="sw"></span></label><div class="lsum" id="sum-hip"></div></div>
+        <div class="layer"><label class="toggle" data-layer="axi">Axiality<span class="sw"></span></label><div class="lsum" id="sum-axi"></div></div>
+      </div>
       <div class="card">
         <div class="label">Punches</div><div class="chips" id="punchChips"></div>
         <div class="label" style="margin-top:12px">Defense</div><div class="chips" id="defChips"></div>
@@ -221,7 +237,17 @@ const STAGES = {
   punches: ['punch_impact', 'impacts.csv'], punchesFallback: ['punch_classification', 'punches.csv'],
   punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
   angle: ['facing_angle', 'facing_angle.csv'],
+  axi: ['punch_axiality', 'axiality.csv'], hip: ['hip_rotation', 'hip_rotation.csv'],
+  arm: ['arm_extension', 'arm_extension.csv'], armJson: ['arm_extension', 'arm_extension.json'],
 };
+// rule verdicts → semantic Apple colors (green = fine, orange = too little, red = wrong / too much, gray = not judged)
+const VERD = {good: '#34c759', pass: '#34c759', bad_low: '#ff9500', bad_high: '#ff3b30', fail: '#ff3b30',
+              skip: '#8e8e93', unclear: '#8e8e93', judgeable: '#30b0c7', too_head_on: '#8e8e93'};
+const VNAME = {good: 'good', pass: 'pass', bad_low: 'too little', bad_high: 'too much', fail: 'fail', skip: 'skipped',
+               unclear: 'unclear', judgeable: 'judgeable', too_head_on: 'too head-on'};
+const LAYERS = ['arm', 'hip', 'axi'];
+const LNAME = {arm: 'Arm ext.', hip: 'Hip rot.', axi: 'Axiality'};
+const ARM3 = {lead: [11, 13, 15], rear: [12, 14, 16]};         // BlazePose-33 shoulder / elbow / wrist of the orthodox lead / rear arm
 
 // ════════════════════════════ tiny helpers ════════════════════════════
 const $ = id => document.getElementById(id);
@@ -289,7 +315,9 @@ async function httpList(base) {
 // ════════════════════════════ state ════════════════════════════
 const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], skel: null,
            stance: 'orthodox', videoName: '', objectUrl: null, hiddenP: new Set(), hiddenD: new Set()};
-const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover: null, lastFrame: -1};
+const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover: null, hoverLayer: null, lastFrame: -1,
+           layers: {arm: false, hip: false, axi: false}};
+try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 const video = $('video');
 
 // ════════════════════════════ loading ════════════════════════════
@@ -317,6 +345,22 @@ async function loadFolder(src) {
   S.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
     kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share,
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
+  const [axiCsv, hipCsv, armCsv, armJs] = await Promise.all([STAGES.axi, STAGES.hip, STAGES.arm].map(
+    k => src.text(k).catch(() => null)).concat(src.text(STAGES.armJson).then(JSON.parse).catch(() => null)));
+  const byKey = new Map(S.punches.map(p => [`${p.sf}|${p.hand}`, p]));
+  const join = (csvText, fn) => { if (!csvText) return false;
+    for (const r of parseCSV(csvText)) { const p = byKey.get(`${r.start_frame}|${r.hand}`); if (p) fn(p, r); } return true; };
+  const num = v => v === '' || v === undefined ? null : +v;
+  S.has = {
+    axi: join(axiCsv, (p, r) => { p.axi = {v: num(r.axiality), level: r.axial_level, gate: r.gate, status: r.status}; }),
+    hip: join(hipCsv, (p, r) => { p.hip = {status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
+      vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
+      qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact)}; }),
+    arm: join(armCsv, (p, r) => { if (!r.verdict) return; p.arm = {verdict: r.verdict, skip: r.skip_reason, peakF: num(r.peak_frame),
+      peak: num(r.peak_bend), deg: num(r.bend_deg), score: num(r.punch_score), impDeg: num(r.impact_bend_deg),
+      impVerdict: r.impact_verdict}; }),
+  };
+  S.armSum = armJs;
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
   S.dur = S.n / S.fps;
   S.hiddenP.clear(); S.hiddenD.clear();
@@ -329,7 +373,7 @@ async function loadFolder(src) {
   const missing = [!hasImpact && 'punch impact', !angleCsv && 'facing angle', !defCsv && 'defense'].filter(Boolean);
   $('banner').textContent = missing.length ? `Not in this folder: ${missing.join(', ')}` : '';
   $('banner').classList.toggle('show', missing.length > 0);
-  buildChips(); setSpan(10); V.lastFrame = -1;
+  buildChips(); buildLayers(); setSpan(10); V.lastFrame = -1;
   await loadMedia();
   resize(); draw(true);
 }
@@ -423,6 +467,35 @@ function buildChips() {
   mk($('punchChips'), PUNCH, S.punches, S.hiddenP);
   mk($('defChips'), DEF, S.defenses, S.hiddenD);
 }
+function buildLayers() {
+  const dot = (c, t) => `<span><i style="background:${c}"></i>${t}</span>`;
+  const count = (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
+  const P = S.punches;
+  const a = count(P, p => p.axi?.status === 'ok' ? p.axi.gate : null);
+  const h = count(P, p => p.hip?.status === 'ok' ? p.hip.vsi : null);
+  const m = count(P, p => p.arm?.verdict);
+  const sum = {
+    axi: dot(VERD.judgeable, `${a.judgeable || 0} judgeable`) + dot(VERD.too_head_on, `${a.too_head_on || 0} too head-on`),
+    hip: dot(VERD.good, `${h.good || 0} good`) + dot(VERD.bad_low, `${h.bad_low || 0} too little`) +
+      dot(VERD.bad_high, `${h.bad_high || 0} too much`) + '<span>start → impact, vs the study IQR</span>',
+    arm: dot(VERD.pass, `${m.pass || 0} pass`) + dot(VERD.fail, `${m.fail || 0} fail`) + dot(VERD.skip, `${(m.skip || 0) + (m.unclear || 0)} skipped`) +
+      (S.armSum?.score != null ? `<span>round score ${S.armSum.score} · ${S.armSum.band} · severity ${S.armSum.severity}</span>` : ''),
+  };
+  for (const k of LAYERS) {
+    const t = document.querySelector(`.toggle[data-layer="${k}"]`);
+    t.classList.toggle('disabled', !S.has[k]); t.classList.toggle('on', !!(S.has[k] && V.layers[k]));
+    $(`sum-${k}`).innerHTML = S.has[k] ? sum[k] : '<span>not in this folder</span>';
+  }
+  layout();
+}
+document.querySelectorAll('.toggle[data-layer]').forEach(t => t.onclick = e => {
+  e.preventDefault(); const k = t.dataset.layer; if (!S.has?.[k]) return;
+  V.layers[k] = !V.layers[k]; t.classList.toggle('on', V.layers[k]);
+  try { localStorage.setItem('pipelineViewerLayers', JSON.stringify(V.layers)); } catch {}
+  layout(); resize(); draw(true);
+});
+const layerOn = k => !!(S.has?.[k] && V.layers[k]);
+
 function compass(a) {
   const g = $('compass'), sep = css('--sep'), acc = css('--accent'), t2 = css('--text2');
   let s = `<circle r="36" fill="none" stroke="${sep}" stroke-width="1.5"/>`;
@@ -445,13 +518,39 @@ function eventCard(el, label, e, f) {
     el.innerHTML = `<div class="label">Punch</div><div class="name"><span class="dot" style="background:${s.c}"></span>${cap(e.hand)} ${s.name}</div>
       <div class="rows num"><span>Target</span><b>${e.target || '–'}</b><span>Frames</span><b>${e.sf}–${e.ef} · ${n}</b>
       <span>Time</span><b>${fmtT(e.sf / fps)}</b><span>Impact</span><b>${imp === null ? '–' : 'f ' + imp}</b>
-      <span></span><b>${impTxt}</b>${imp === null ? '' : `<span>Impact conf.</span><b>${e.impConf.toFixed(2)}</b>`}</div>`;
+      <span></span><b>${impTxt}</b>${imp === null ? '' : `<span>Impact conf.</span><b>${e.impConf.toFixed(2)}</b>`}</div>` + layerSections(e);
   } else {
     const s = styleD(e.type);
     el.innerHTML = `<div class="label">Defense</div><div class="name"><span class="dot" style="background:${s.c}"></span>${e.side ? cap(e.side) + ' ' : ''}${s.name}</div>
       <div class="rows num"><span>Frames</span><b>${e.sf}–${e.ef} · ${n}</b><span>Time</span><b>${fmtT(e.sf / fps)}</b>
       <span>Which-move share</span><b>${e.share.toFixed(2)}</b><span>Move prob.</span><b>${e.prob.toFixed(2)}</b></div>`;
   }
+}
+const iqr = q => q.map(x => x == null ? '–' : x.toFixed(1)).join('–') + '°';
+const pillV = v => `<span class="verdict" style="background:${VERD[v] || '#8e8e93'}">${VNAME[v] || v}</span>`;
+function layerSections(e) {
+  let h = '';
+  if (layerOn('arm')) {
+    const a = e.arm;
+    h += `<div class="sub"><div class="h">Arm extension ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
+      `<div class="rows num" style="margin-top:0"><span>Elbow bend, rule frame</span><b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
+       <span>Passes at bend ≤</span><b>36.4° (r ≥ 0.95)</b>${a.skip ? `<span>Skipped</span><b>${a.skip}</b>` : ''}
+       ${a.score != null ? `<span>Punch score</span><b>${a.score.toFixed(1)}</b>` : ''}
+       <span>Bend at impact</span><b>${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>';
+  }
+  if (layerOn('hip')) {
+    const r = e.hip;
+    h += `<div class="sub"><div class="h">Hip rotation ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
+      `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}° <span style="color:var(--text3)">IQR ${iqr(r.qsi)}</span></b>
+       <span>Impact → end</span><b>${r.ie.toFixed(1)}° ${pillV(r.vie)} <span style="color:var(--text3)">IQR ${iqr(r.qie)}</span></b></div>`) + '</div>';
+  }
+  if (layerOn('axi')) {
+    const x = e.axi;
+    h += `<div class="sub"><div class="h">Axiality ${x?.status === 'ok' ? pillV(x.gate) : ''}</div>` + (!x || x.status !== 'ok' ? `<div class="empty">no value (${x?.status || 'not run'})</div>` :
+      `<div class="rows num" style="margin-top:0"><span>Along the camera axis</span><b>${x.v.toFixed(2)} · ${x.level.replace('_', ' ')}</b>
+       <span>Rules skip above</span><b>0.71 (45°)</b></div>`) + '</div>';
+  }
+  return h;
 }
 const at = (arr, f, hidden) => arr.filter(e => e.sf <= f && f <= e.ef && !hidden.has(e.type));
 
@@ -476,6 +575,7 @@ function drawOverlay(f, punchesNow) {
     octx.fillStyle = '#0a84ff';
     for (const j of Object.values(J)) { const p = P(j); if (p) { octx.beginPath(); octx.arc(p[0], p[1], 3.2, 0, 7); octx.fill(); } }
   }
+  for (const e of punchesNow) drawRuleOverlay(e, f, P);
   // impact: a ring on the punching wrist, strongest on the impact frame, fading over ±3 frames
   for (const e of punchesNow.concat(S.punches.filter(p => p.impact !== null && Math.abs(p.impact - f) <= 3 && !S.hiddenP.has(p.type)))) {
     if (e.impact === null) continue;
@@ -489,10 +589,53 @@ function drawOverlay(f, punchesNow) {
   }
 }
 
+function overlayLabel(x, y, text, color) {
+  octx.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  const w = octx.measureText(text).width + 14;
+  octx.fillStyle = 'rgba(0,0,0,0.62)'; octx.beginPath();
+  octx.roundRect ? octx.roundRect(x, y - 11, w, 22, 11) : octx.rect(x, y - 11, w, 22); octx.fill();
+  octx.fillStyle = color; octx.fillText(text, x + 7, y + 4.5);
+}
+function drawRuleOverlay(e, f, P) {
+  const leadLeft = S.stance !== 'southpaw';
+  if (layerOn('arm') && e.arm) {                              // the punching arm, colored by the rule's verdict
+    const [s, el, w] = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'], a = P(s), b = P(el), c = P(w);
+    if (a && b && c) {
+      const col = VERD[e.arm.verdict] || '#8e8e93', peak = f === e.arm.peakF;
+      octx.strokeStyle = col; octx.lineWidth = peak ? 7 : 5; octx.lineCap = 'round'; octx.lineJoin = 'round';
+      octx.beginPath(); octx.moveTo(...a); octx.lineTo(...b); octx.lineTo(...c); octx.stroke();
+      // this frame's elbow bend in image space: the rule's own 2D reading (canvas pixels are isotropic)
+      const u = [a[0] - b[0], a[1] - b[1]], v = [c[0] - b[0], c[1] - b[1]];
+      const ang = Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v)))));
+      const bend = 180 - ang * 180 / Math.PI, a0 = Math.atan2(u[1], u[0]), a1 = Math.atan2(v[1], v[0]);
+      const ccw = ((a1 - a0 + 2 * Math.PI) % (2 * Math.PI)) > Math.PI;
+      octx.lineWidth = 2.5; octx.beginPath(); octx.arc(b[0], b[1], 18, a0, a1, ccw); octx.stroke();
+      overlayLabel(b[0] + 14, b[1] + 28, `elbow ${bend.toFixed(0)}°${peak ? ' · rule frame · ' + VNAME[e.arm.verdict] : ''}`, col);
+    }
+  }
+  if (layerOn('hip') && e.hip?.status === 'ok') {             // the hip line, colored by the start → impact verdict
+    const l = P(23), r = P(24);
+    if (l && r) {
+      const col = VERD[e.hip.vsi]; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
+      octx.beginPath(); octx.moveTo(...l); octx.lineTo(...r); octx.stroke();
+      overlayLabel(Math.max(l[0], r[0]) + 12, (l[1] + r[1]) / 2, `hips ${e.hip.si.toFixed(0)}° · ${VNAME[e.hip.vsi]}`, col);
+    }
+  }
+}
+
 // ════════════════════════════ timeline ════════════════════════════
 const tl = $('tl'), tctx = tl.getContext('2d');
 const L = 78, RPAD = 14;                                        // left gutter for track names
-const TR = {ruler: [0, 24], angle: [30, 128], lead: [166, 30], rear: [200, 30], def: [240, 30], over: [284, 30]};
+let TR = {};
+function layout() {
+  TR = {ruler: [0, 24], angle: [30, 128], lead: [166, 30], rear: [200, 30], def: [240, 30]};
+  let y = 280;
+  for (const k of LAYERS) if (layerOn(k)) { TR[k] = [y, 26]; y += 30; }
+  TR.bottom = y - (y === 280 ? 10 : 4);                        // lowest edge of the scrolling rows
+  TR.over = [TR.bottom + 14, 30];
+  tl.style.height = `${TR.over[0] + TR.over[1] + 4}px`;
+}
+layout();
 let TW = 0, TH = 0;
 const tx = t => L + (t - V.t0) / (V.t1 - V.t0) * (TW - L - RPAD);
 const xt = x => V.t0 + (x - L) / (TW - L - RPAD) * (V.t1 - V.t0);
@@ -529,9 +672,10 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // track backgrounds + names
-  const names = {angle: 'Facing', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview'};
-  for (const [k, [y, h]] of Object.entries(TR)) {
-    if (k === 'ruler') continue;
+  const names = {angle: 'Facing', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
+  for (const [k, v] of Object.entries(TR)) {
+    if (k === 'ruler' || k === 'bottom') continue;
+    const [y, h] = v;
     c.fillStyle = track; rr(L, y, W, h, 7); c.fill();
     c.fillStyle = text2; c.textAlign = 'right'; c.fillText(names[k], k === 'angle' ? L - 36 : L - 12, y + h / 2);
   }
@@ -540,7 +684,7 @@ function drawTimeline(f) {
   c.textAlign = 'center';
   for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) {
     const x = tx(t);
-    c.strokeStyle = grid; c.lineWidth = 1; c.beginPath(); c.moveTo(x, TR.angle[0]); c.lineTo(x, TR.def[0] + TR.def[1]); c.stroke();
+    c.strokeStyle = grid; c.lineWidth = 1; c.beginPath(); c.moveTo(x, TR.angle[0]); c.lineTo(x, TR.bottom); c.stroke();
     c.fillStyle = text3; c.fillText(step < 1 ? t.toFixed(1) + ' s' : fmtT(t).replace(/\.\d+$/, ''), x, 12);
   }
   c.save(); c.beginPath(); c.rect(L, 0, W, TR.over[0] - 4); c.clip();
@@ -582,9 +726,10 @@ function drawTimeline(f) {
   for (const e of S.punches) if (!S.hiddenP.has(e.type))
     block(e, e.hand === 'lead' ? TR.lead[0] : TR.rear[0], TR.lead[1], styleP(e.type), e.sf <= f && f <= e.ef);
   for (const e of S.defenses) if (!S.hiddenD.has(e.type)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
+  drawLayerRows(c, f, W, text, grid);
   // playhead
   const xp = tx((f + 0.5) / fps);
-  c.strokeStyle = ph; c.lineWidth = 1.5; c.beginPath(); c.moveTo(xp, 20); c.lineTo(xp, TR.def[0] + TR.def[1]); c.stroke();
+  c.strokeStyle = ph; c.lineWidth = 1.5; c.beginPath(); c.moveTo(xp, 20); c.lineTo(xp, TR.bottom); c.stroke();
   c.fillStyle = ph; rr(xp - 5, 16, 10, 8, 2.5); c.fill();
   c.restore();
   // overview: the whole video, events as ticks, the visible window as a lens
@@ -595,6 +740,49 @@ function drawTimeline(f) {
   c.fillStyle = 'rgba(128,128,128,0.16)'; rr(vx0, oy, Math.max(4, vx1 - vx0), oh, 6); c.fill();
   c.strokeStyle = acc; c.lineWidth = 1.5; rr(vx0, oy + 0.75, Math.max(4, vx1 - vx0), oh - 1.5, 6); c.stroke();
   c.strokeStyle = ph; c.lineWidth = 1.5; const xo = ox(f / fps); c.beginPath(); c.moveTo(xo, oy); c.lineTo(xo, oy + oh); c.stroke();
+}
+
+function drawLayerRows(c, f, W, text, grid) {
+  const fps = S.fps, font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  const span = e => { const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps); return [x0, Math.max(2, x1 - x0 - 1)]; };
+  const vis = e => !S.hiddenP.has(e.type) && tx((e.ef + 1) / fps) >= L && tx(e.sf / fps) <= L + W;
+  const tag = (x, w, y, h, t) => { if (w < 30) return; c.font = font; c.fillStyle = 'rgba(0,0,0,0.75)'; c.textAlign = 'left'; c.fillText(t, x + 6, y + h / 2 + 0.5); };
+  const ring = (e, k, x, y, w, h) => { if ((e.sf <= f && f <= e.ef) || (V.hover === e && V.hoverLayer === k)) {
+    c.strokeStyle = text; c.lineWidth = 1.5; rr(x - 1, y + 1, w + 2, h - 2, 6); c.stroke(); } };
+  if (TR.arm) {                                   // arm extension: verdict block, the rule's frame as a white tick
+    const [y, h] = TR.arm;
+    for (const e of S.punches) { if (!e.arm || !vis(e)) continue;
+      const [x, w] = span(e), a = e.arm, judged = a.verdict === 'pass' || a.verdict === 'fail', col = VERD[a.verdict] || '#8e8e93';
+      if (judged) { c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill(); }
+      else { c.globalAlpha = 0.25; c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
+             c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([3, 2]); rr(x + 0.5, y + 3.5, w - 1, h - 7, 5); c.stroke(); c.setLineDash([]); }
+      if (a.peakF != null) { const xi = tx((a.peakF + 0.5) / fps); c.strokeStyle = judged ? '#fff' : col; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      if (judged && a.deg != null) tag(x, w, y, h, `${a.deg.toFixed(0)}°`);
+      ring(e, 'arm', x, y, w, h);
+    }
+  }
+  if (TR.hip) {                                   // hip rotation: start → impact verdict, impact → end as the bottom stripe
+    const [y, h] = TR.hip;
+    for (const e of S.punches) { if (!e.hip || e.hip.status !== 'ok' || !vis(e)) continue;
+      const [x, w] = span(e);
+      c.fillStyle = VERD[e.hip.vsi]; rr(x, y + 3, w, h - 6, 5); c.fill();
+      c.save(); rr(x, y + 3, w, h - 6, 5); c.clip(); c.fillStyle = VERD[e.hip.vie]; c.fillRect(x, y + h - 8, w, 5);
+      c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x, y + h - 9, w, 1); c.restore();
+      tag(x, w, y - 2, h, `${e.hip.si.toFixed(0)}°`);
+      ring(e, 'hip', x, y, w, h);
+    }
+  }
+  if (TR.axi) {                                   // axiality: bar height = value, dashed line at the rules' 0.71 gate
+    const [y, h] = TR.axi, base = y + h - 3, hh = h - 6, yg = base - 0.7071 * hh;
+    for (const e of S.punches) { if (!e.axi || e.axi.status !== 'ok' || !vis(e)) continue;
+      const [x, w] = span(e), bh = Math.max(2, e.axi.v * hh);
+      c.fillStyle = VERD[e.axi.gate]; rr(x, base - bh, w, bh, 3); c.fill();
+      if (w >= 30) { c.font = font; c.fillStyle = text; c.textAlign = 'left'; c.fillText(e.axi.v.toFixed(2), x + 5, Math.min(base - bh - 7, y + h / 2)); }
+      ring(e, 'axi', x, y, w, h);
+    }
+    c.strokeStyle = VERD.too_head_on; c.lineWidth = 1; c.setLineDash([4, 3]);
+    c.beginPath(); c.moveTo(L, yg); c.lineTo(L + W, yg); c.stroke(); c.setLineDash([]);
+  }
 }
 
 // ════════════════════════════ frame loop ════════════════════════════
@@ -641,6 +829,7 @@ function hit(x, y) {
   if (inRow(TR.lead)) return find(S.punches, S.hiddenP, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, S.hiddenP, e => e.hand === 'rear');
   if (inRow(TR.def)) return find(S.defenses, S.hiddenD, () => true);
+  for (const k of LAYERS) if (TR[k] && inRow(TR[k])) { const e = find(S.punches, S.hiddenP, p => !!p[k]); V.hoverLayer = e ? k : null; return e || null; }
   return null;
 }
 let drag = null;
@@ -666,8 +855,9 @@ tl.addEventListener('pointermove', e => {
     }
     return;
   }
+  const prevLayer = V.hoverLayer; V.hoverLayer = null;
   const h = hit(x, y);
-  if (h !== V.hover) { V.hover = h; V.dirty = true; }
+  if (h !== V.hover || V.hoverLayer !== prevLayer) { V.hover = h; V.dirty = true; }
   tl.style.cursor = h ? 'pointer' : 'default';
   tip(h, e.clientX, e.clientY);
 });
@@ -696,7 +886,20 @@ function tip(e, cx, cy) {
   const el = $('tip');
   if (!e) { el.style.display = 'none'; return; }
   const fps = S.fps, n = e.ef - e.sf + 1;
-  if (e.kind === 'p') {
+  if (e.kind === 'p' && V.hoverLayer) {
+    const s = styleP(e.type), k = V.hoverLayer, head = `<b style="color:${s.c}">●</b> <b>${cap(e.hand)} ${s.name}</b> <span class="m num">${fmtT(e.sf / fps)}</span><br>`;
+    const v = x => `<b style="color:${VERD[x]}">${VNAME[x] || x}</b>`;
+    if (k === 'arm') { const a = e.arm;
+      el.innerHTML = head + `arm extension ${v(a.verdict)}${a.skip ? ` <span class="m">(${a.skip})</span>` : ''}<br>` +
+        `<span class="num">elbow bend ${a.deg == null ? '–' : a.deg.toFixed(1) + '°'} at the rule frame f ${a.peakF ?? '–'}</span><br>` +
+        `<span class="m num">at impact ${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} · passes at ≤ 36.4°${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span>`;
+    } else if (k === 'hip') { const r = e.hip;
+      el.innerHTML = head + `<span class="num">start → impact ${r.si.toFixed(1)}° ${v(r.vsi)} <span class="m">IQR ${iqr(r.qsi)}</span></span><br>` +
+        `<span class="num">impact → end ${r.ie.toFixed(1)}° ${v(r.vie)} <span class="m">IQR ${iqr(r.qie)}</span></span>`;
+    } else { const x = e.axi;
+      el.innerHTML = head + `<span class="num">axiality ${x.v.toFixed(2)} · ${x.level.replace('_', ' ')}</span><br>${v(x.gate)} <span class="m">rules skip above 0.71</span>`;
+    }
+  } else if (e.kind === 'p') {
     const s = styleP(e.type);
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.hand)} ${s.name}</b> <span class="m">target ${e.target}</span><br>
       <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>` +
