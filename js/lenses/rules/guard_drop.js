@@ -14,8 +14,11 @@
 // Verdict per punch is the drop alone (Mathe, 2026-09-21 — where the hand
 // started does not enter it): NOT LOWERED at drop <= drop_threshold, LOWERED A
 // BIT up to big_drop_threshold, LOWERED A LOT above it. Every punch is scored,
-// combos included (Mathe, 2026-09-21: no isolated-only filter) — so in a combo
-// the resting hand's drop can be its own punch leaving or coming back.
+// combos included (Mathe, 2026-09-21: no isolated-only filter). Once the
+// resting hand starts its own next punch the hand is punching, not resting, so
+// the punch is measured only up to the frame before that punch's labelled start
+// (base, lowest and coverage all over that window); the resting hand's drop can
+// still include the return of its previous punch.
 // The shipped rule's own two numbers (shoulder-anchored delta over the punch,
 // end position vs the nose; guard_drop.py) are shown beside it for reference.
 //
@@ -182,7 +185,8 @@ export const GuardDropRule = {
     const W = ctx.canvas.width;
     // Three lines, each named at the right edge: the nose, the baseline (where
     // the resting hand was at the start of the punch — the drop is measured from
-    // it) and the resting wrist. Baseline + wrist only inside a punch: the picked
+    // it) and the resting wrist. Baseline + wrist only inside a punch's measured
+    // window (it ends where the resting hand starts its next punch): the picked
     // one when it covers this frame, else the first punch that does.
     const labels = [];
     const nose = jt(p, f, J.NOSE);
@@ -192,8 +196,8 @@ export const GuardDropRule = {
     }
     const torso = Math.max(1e-6, torsoHeight(p, f));
     const act = data && activeIdx >= 0 ? data.punches[activeIdx] : null;
-    const here = act && f >= act.sf && f <= act.ef ? act
-      : (data?.punches.find(q => f >= q.sf && f <= q.ef) || null);
+    const here = act && f >= act.sf && f <= act.mEnd ? act
+      : (data?.punches.find(q => f >= q.sf && f <= q.mEnd) || null);
     if (here) {
       if (nose.c > 0 && Number.isFinite(here.base)) {
         // on this frame's nose line and torso ruler, so the gap to the wrist line IS the drop
@@ -281,19 +285,23 @@ export function compute(p, dets, fps) {
              ef: Math.min(N - 1, det.end_frame + cfg.padFrames) };
   }).filter(x => x.ef >= x.sf).sort((a, b) => a.sf - b.sf);
   const punches = raw.map((x, idx) => {
+    // measure up to the resting hand's own next punch (raw is sorted by start)
+    const next = raw.find(y => y.side === x.other && y.sf >= x.sf && y.sf <= x.ef);
+    const mEnd = next ? next.sf - 1 : x.ef;
+    const win = Math.max(0, mEnd - x.sf + 1);
     const span = x.ef - x.sf + 1;
-    const nStart = Math.max(1, Math.round(span * cfg.startPct));
+    const nStart = Math.max(1, Math.round(win * cfg.startPct));
     const arr = d[x.other];
-    const base = meanFinite(arr, x.sf, x.sf + nStart - 1);
+    const base = win ? meanFinite(arr, x.sf, x.sf + nStart - 1) : NaN;
     let lowest = -Infinity, lowestFrame = -1, n = 0;
-    for (let f = x.sf; f <= x.ef; f++) {
+    for (let f = x.sf; f <= mEnd; f++) {
       const v = arr[f];
       if (!Number.isFinite(v)) continue;
       n++;
       if (v > lowest) { lowest = v; lowestFrame = f; }
     }
     if (!n) lowest = NaN;
-    const coverage = n / span;
+    const coverage = win ? n / win : 0;
     const drop = lowest - base;
     // the shipped rule's two numbers, for reference (guard_drop.py)
     const nEnd = Math.max(1, Math.round(span * 0.2));
@@ -305,7 +313,7 @@ export function compute(p, dets, fps) {
     else if (drop > cfg.bigDropThreshold) verdict = "lowered_lot";
     else if (drop > cfg.dropThreshold) verdict = "lowered_bit";
     else verdict = "not_lowered";
-    return { idx, sf: x.sf, ef: x.ef, side: x.side, other: x.other, hand: x.det.hand,
+    return { idx, sf: x.sf, ef: x.ef, mEnd, cut: !!next, side: x.side, other: x.other, hand: x.det.hand,
              type: x.det.punch_type || "punch", uuid: x.det.punch_uuid || null,
              t: x.det.start_time, base, lowest, lowestFrame, drop, coverage,
              shDelta, endNose, ruleDrop, verdict };
@@ -349,7 +357,8 @@ function refresh(state) {
   if (act) {
     const c = VERDICT_COLOR[act.verdict];
     setText("gd-active",
-      `<b>${act.type}</b> · ${act.hand} hand (${act.side}) · frames ${act.sf}–${act.ef} · resting hand <b>${act.other}</b><br>` +
+      `<b>${act.type}</b> · ${act.hand} hand (${act.side}) · frames ${act.sf}–${act.ef} · resting hand <b>${act.other}</b>` +
+      (act.cut ? ` · measured to f${act.mEnd} (its next punch starts)` : "") + `<br>` +
       `base ${fmt(act.base)} → lowest ${fmt(act.lowest)} @f${act.lowestFrame} · <b style="color:${c}">drop ${fmt(act.drop)} · ${VERDICT_LABEL[act.verdict]}</b><br>` +
       `<span class="hint">rule: shoulder delta ${fmt(act.shDelta)}, end vs nose ${fmt(act.endNose)} → ${act.ruleDrop ? "drop" : "no drop"} · ` +
       `coverage ${Math.round(100 * act.coverage)}%</span>`);
@@ -389,7 +398,7 @@ function drawSpark(canvas, data, act, frame) {
   const xOf = f => ((f - a) / Math.max(1, b - a)) * (W - 2) + 1;
   const yOf = v => H - ((v - lo) / (hi - lo)) * (H - 4) - 2;   // bigger d = lower hand = lower on the chart
   ctx.fillStyle = "rgba(126,200,255,0.15)";
-  ctx.fillRect(xOf(act.sf), 0, xOf(act.ef) - xOf(act.sf), H);
+  ctx.fillRect(xOf(act.sf), 0, Math.max(0, xOf(act.mEnd) - xOf(act.sf)), H);   // the measured window
   const line = (v, color, dash) => {
     if (!Number.isFinite(v)) return;
     ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash(dash);
@@ -468,7 +477,7 @@ function drawStageTimeline(canvas, data, frame) {
     ctx.fillStyle = "rgba(255,255,255,0.06)";
     ctx.fillRect(xOf(0), y, xOf(N - 1) - xOf(0), trackH);
     for (const p of data.punches) {
-      const x0 = xOf(p.sf), x1 = Math.max(xOf(p.ef), x0 + 2);
+      const x0 = xOf(p.sf), x1 = Math.max(xOf(p.side === side ? p.ef : p.mEnd), x0 + 2);
       if (p.side === side) {
         ctx.fillStyle = COLORS.punch;
         ctx.fillRect(x0, y + 1, x1 - x0, trackH - 2);
