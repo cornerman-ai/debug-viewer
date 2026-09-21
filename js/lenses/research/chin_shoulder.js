@@ -90,7 +90,7 @@ function save() {
 
 // ---------------------------------------------------------------- helpers
 const stripStem = (s) => String(s || "").replace(/_h264$/, "");
-const poseOf = (st) => st.poseV6 || st.pose || null;
+const poseOf = (st) => st.pose || null;
 const startSec = (st) => poseOf(st)?.start_sec || 0;
 const fmt = (v, d = 3) => (Number.isFinite(v) ? v.toFixed(d) : "—");
 

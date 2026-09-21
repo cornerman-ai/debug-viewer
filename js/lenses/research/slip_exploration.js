@@ -18,7 +18,7 @@
 //
 // THE SCREEN IS THE SPAN. While this lens is active the page hides everything
 // that is about choosing footage — the picker card's Drive / cache / video /
-// round / Firebase / on-device sections (the lens dropdown stays, and the
+// round sections (the lens dropdown stays, and the
 // Drive connect section comes back when the folder is not connected), the
 // stage's own video + round mirrors, the side panel — and shows the current
 // clip on the footage with the skeleton overlay, the viewer's play / speed /
@@ -269,7 +269,7 @@ function clipLabels(c, d) {
 function centerLineFor(d, state) {
   if (mode === "video") {
     const x = clipInLoaded(state, curClip());
-    const m = computeCenterLine(state?.poseV6 || state?.pose);
+    const m = computeCenterLine(state?.pose);
     return m && !m.bad && x ? { m, base: x.s, w: state.pose?.width || null } : null;
   }
   if (!d) return null;
@@ -371,7 +371,7 @@ function driveOption(c) {
 // is not the loaded one. Same frame count as the export ⇒ frames directly,
 // otherwise the seconds via the viewer's convention.
 function clipInLoaded(state, c) {
-  const pose = state && (state.poseV6 || state.pose);
+  const pose = state && state.pose;
   if (!pose || !c || !state.cacheBasename) return null;
   if (normStem(state.cacheBasename) !== normStem(c.stem) || state.cacheRound !== c.round) return null;
   const n = pose.n_frames, fps = pose.fps || state.fps || 30;
@@ -1321,7 +1321,7 @@ export const SlipExplorationRule = {
     });
     // Frame steps: the viewer's frames in video mode, our clock's otherwise.
     const stepFrame = dir => {
-      if (mode === "video") { if (activeState?.pose || activeState?.poseV6) seekTo((activeState.frame || 0) + dir); }
+      if (mode === "video") { if (activeState?.pose) seekTo((activeState.frame || 0) + dir); }
       else seekFrame(frame + dir, { pause: true });
     };
     root.querySelector("#fa-mute").addEventListener("click", () => {
@@ -1388,7 +1388,7 @@ export const SlipExplorationRule = {
       const c = curClip();
       if (!c) return;
       const st = activeState;
-      const loaded = !!(st?.poseV6 || st?.pose);
+      const loaded = !!st?.pose;
       const here = loaded ? visible.findIndex(k => clipInLoaded(st, k)) : -1;
       if (pending) { setMode("video"); renderAll(); pendingCheck?.(); }
       else if (here >= 0 && !clipInLoaded(st, c)) showClip(here);

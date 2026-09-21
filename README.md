@@ -3,9 +3,10 @@
 A static, dependency-free web app for inspecting BlazePose Drive caches
 against the
 [Cornerman](https://github.com/cornerman-ai/backend) rules
-engine, frame by frame. Legacy YOLO-Pose / Apple Vision caches (from
-`Cornerman/archive/`) still open with the generic lenses; the
-engine-era comparison lenses live in `cornerman-archive/legacy-pose/`.
+engine, frame by frame. BlazePose is the only engine it reads: Apple
+Vision, glove-wrist, YOLO, RTMPose, MoveNet and YOLO11 caches (Drive
+`archive/`) are skipped, and the engine-era comparison lenses live in
+`cornerman-archive/legacy-pose/`.
 
 **Live**: https://cornerman-ai.github.io/debug-viewer/
 
@@ -26,12 +27,11 @@ nothing is uploaded.
 
 ## Workflow
 
-1. **Cache folder** — pick `Cornerman/data/skeleton_data/blazepose/`
-   (legacy yolo/vision caches live under `Cornerman/archive/boxing_ai/`).
-   The viewer indexes every `<base>_<engine>_r<N>.npy +
-   <base>_<engine>_r<N>_meta.json` pair (`.bak.npy` backups skipped)
-   and **merges picks** so both engines end up in one index. Status
-   line reports counts per engine. Use *Clear index* to start over.
+1. **Cache folder** — pick `Ambo/data/skeleton_data/blazepose/`.
+   The viewer indexes every `<base>_blazepose_r<N>.npy +
+   <base>_blazepose_r<N>_meta.json` pair (`.bak.npy` backups skipped)
+   and **merges picks** into one index. The status line reports the
+   round count. Use *Clear index* to start over.
    Same workflow on Mac and Windows — no symlinks, no parent-folder
    pick.
 2. **Video** — pick an `.mp4`. If its basename matches an indexed video,
@@ -41,16 +41,22 @@ nothing is uploaded.
 
 ## Input format
 
-Drive cache (same shape for every engine — BlazePose today; legacy
-YOLO-Pose / Apple Vision caches identical):
+BlazePose Drive cache, one set per round:
 
-- `<round>.npy` — float32, shape `(N, 17, 3)`, one row per joint per
-  frame holding `(x, y, conf)`. Layout is COCO-17. Coords are normalised
-  to `[0, 1]` and de-normalised to pixels at load time using the video's
-  natural dimensions.
-- `<round>_meta.json` — at minimum `{ fps, layout: "coco17" }`.
+- `<stem>_blazepose_r<N>.npy` — float32, shape `(N, 33, 8)`: per joint
+  per frame `x, y, z, x_world_m, y_world_m, z_world_m, visibility,
+  presence`. x, y are normalised to `[0, 1]` and de-normalised to pixels
+  at load time using the video's natural dimensions. Lenses read it
+  remapped to COCO-17 (`state.pose`, conf = visibility); the full 33
+  joints ride along as `state.blaze33`.
+- `<stem>_blazepose_r<N>_meta.json` — at minimum
+  `{ fps, layout: "blazepose33" }`. Any other layout is refused.
+- `<stem>_blazepose_r<N>_pts.npy` (optional) — each frame's source-video
+  time; `<stem>_blazepose_r<N>_punches.json` (optional) — ST-GCN
+  detections.
 
-Pick both files together via multi-select in the pose picker.
+Pick the `.npy` and `_meta.json` together via multi-select in the pose
+picker.
 
 ## Lenses
 

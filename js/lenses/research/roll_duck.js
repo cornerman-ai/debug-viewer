@@ -50,7 +50,7 @@ const COLOR_TRAIL = "#b48cff";  // nose trail
 // ── metric core (mirrors roll_duck_experiment.py head_signals) ──────────────
 
 function pickPose(state) {
-  return state.poseV6 || state.pose;
+  return state.pose;
 }
 
 let metricCache = { pose: null };

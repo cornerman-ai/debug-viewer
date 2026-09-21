@@ -145,7 +145,7 @@ function persist() {
 const denomCfg = () => DENOMS[cfg.denom];
 const threshold = () => cfg.thresholds[cfg.denom];
 
-const pickPose = state => state.poseV6 || state.pose;
+const pickPose = state => state.pose;
 
 let host;
 let mc = { pose: null };
@@ -286,9 +286,9 @@ export const StanceDepthSideRule = {
   id: "stance_depth_side",
   label: "Stance depth",
 
-  // Only the curated side videos are selectable. The manual picker and the
-  // Firebase path bypass the dropdown, so update() refuses those too: the whole
-  // claim of this lens is that the camera is side-on.
+  // Only the curated side videos are selectable. The manual picker bypasses
+  // the dropdown, so update() refuses those too: the whole claim of this lens
+  // is that the camera is side-on.
   requiresVideo: isCuratedVideo,
 
   skeletonStyle() {

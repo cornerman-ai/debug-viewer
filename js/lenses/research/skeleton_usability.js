@@ -83,7 +83,7 @@ let lastFrame = 0, lastDrawnFrame = -1, lastZoomLabel = "";
 
 // ── clock (the impact spotter lens's convention) ─────────────────────────────
 function stripStem(s) { return String(s || "").replace(/_h264$/, ""); }
-function poseOf(state) { return state.poseV6 || state.pose || null; }
+function poseOf(state) { return state.pose || null; }
 function startSec(state) { const p = poseOf(state); return (p && (p.start_sec || 0)) || 0; }
 function nFrames(state) { const p = poseOf(state); return p ? p.n_frames : 0; }
 function secToFrame(state, t) {

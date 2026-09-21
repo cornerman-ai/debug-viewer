@@ -170,8 +170,7 @@ header .sub { margin: 4px 0 0; color: var(--fg-muted); font-size: 13px; }
 
 /* A set of sections that are direct alternatives — same outcome, different
    path (Drive folder vs. Cache folder both build the same video/cache
-   index; Firebase vs. On-device round vs. Manual file pick all load one
-   round directly, just from a different place) — gets bundled into one
+   index) — gets bundled into one
    visible capsule instead of just a divider between otherwise-identical
    top-level cards. That's the actual point: at a glance, "these belong
    together as one choice" vs. "Video & lens is the next, unrelated step". */
@@ -287,8 +286,8 @@ select:focus-visible {
   outline-offset: 1px;
 }
 
-/* Live status text (drive/cache/firebase/on-device status lines, sign-in
-   state, …) carries a `data-state` set from JS alongside its existing
+/* Live status text (drive/cache status lines, …) carries a `data-state`
+   set from JS alongside its existing
    text, so the same line also reads as busy/success/error/warn at a
    glance — a spinner while a fetch is in flight, green once something is
    confirmed working, red on failure — instead of only ever sitting there

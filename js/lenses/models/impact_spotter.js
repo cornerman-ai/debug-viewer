@@ -57,7 +57,7 @@ let keysBound = false;
 // ---------------------------------------------------------------- helpers
 function stripStem(s) { return String(s || "").replace(/_h264$/, ""); }
 
-function poseOf(state) { return state.poseV6 || state.pose || null; }
+function poseOf(state) { return state.pose || null; }
 
 function startSec(state) {
   const p = poseOf(state);

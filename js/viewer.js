@@ -6,22 +6,20 @@
 // Bump this on every push so the user can tell whether the new code is
 // actually live or whether GitHub Pages / their browser is still serving
 // a cached copy. Format: YYYY-MM-DD.N where N restarts at 1 each day.
-const BUILD = "2026-08-03.2";
+const BUILD = "2026-09-21.1";
 {
   const el = document.getElementById("build-tag");
   if (el) el.textContent = `build ${BUILD}`;
 }
 
 import "./theme.js";
-import { loadPose, loadGloveWrists, loadPtsArray, loadBlaze33 } from "./pose-loader.js";
+import { loadPose, loadPtsArray, loadBlaze33 } from "./pose-loader.js";
 import { loadPunches } from "./punches-loader.js";
 import { fetchLiveLabels } from "./sheet-labels.js";
 import { drawSkeleton } from "./skeleton.js";
 import { RULES } from "./lenses/registry.js";
 import * as drive from "./drive-folder.js";
 import { Muxer, ArrayBufferTarget } from "./vendor/mp4-muxer.mjs";
-import * as firebaseSource from "./firebase-source.js";
-import { loadOnDeviceSkeleton, loadOnDeviceAnalysis } from "./ondevice-loader.js";
 
 const els = {
   videoFile:    document.getElementById("video-file"),
@@ -66,61 +64,18 @@ const els = {
   thumbCanvas: document.getElementById("thumb-canvas"),
   thumbLabel:  document.getElementById("thumb-label"),
   stageExtras: document.getElementById("stage-extras"),
-  // Firebase picker (on-device sessions).
-  fbSection:     document.getElementById("firebase-section"),
-  fbSessionId:   document.getElementById("fb-session-id"),
-  fbRound:       document.getElementById("fb-round"),
-  fbLoad:        document.getElementById("fb-load"),
-  fbListRecent:  document.getElementById("fb-list-recent"),
-  fbRecent:      document.getElementById("fb-recent-sessions"),
-  fbStatus:      document.getElementById("fb-status"),
-  fbSignin:      document.getElementById("fb-signin"),
-  fbSignout:     document.getElementById("fb-signout"),
-  fbUser:        document.getElementById("fb-user"),
-  odVideo:       document.getElementById("od-video"),
-  odSkeleton:    document.getElementById("od-skeleton"),
-  odAnalysis:    document.getElementById("od-analysis"),
-  odRound:       document.getElementById("od-round"),
-  odLoad:        document.getElementById("od-load"),
-  odStatus:      document.getElementById("od-status"),
 };
 
-// Sets a status line's text and, via `data-state`, how it reads at a
-// glance — css/style.css colors "busy" (with a spinner), "success",
-// "warn", and "error" differently from plain muted text. `state` is
-// falsy/omitted for the neutral default. Purely presentational: every
-// call site already had the text, this just stops throwing away the
-// "is this thing working, loading, or broken" signal that text implies.
-function setStatus(el, text, state) {
-  if (!el) return;
-  el.textContent = text;
-  el.dataset.state = state || "";
-}
-
 // Cache index built from the folder picker (or the Drive folder walker):
-//   Map<videoBasename, Map<roundN, { yolo?: {npy,meta,punches?}, vision?: ... }>>
+//   Map<videoBasename, Map<roundN, { blazepose: {npy, meta, pts?, punches?} }>>
 // Slot values are EITHER File objects (manual picker) OR
 // FileSystemFileHandle objects (Drive folder). loadFromIndex calls
 // drive.toFile() on values when it's actually time to load.
 // Survives across video picks within one page session.
 //
-// Engine slots: `yolo`, `vision`, `vision3d`, `glove`, `vision_glove` are
-// recognized by filename. `vision_combined` is a synthetic tag we apply when
-// a `_vision_` file lives inside a folder whose name starts with `pose_cache_v`
-// (the older "Apple Vision skeleton with glove-model wrists baked in" cache
-// built by glove_wrist_cache_build.ipynb §8). `vision_glove` is the v6 cache
-// (pose_cache_v6/, files named `<stem>_vision_glove_r<N>`) — same shape but
-// the filename advertises the combination, and the meta carries per-round
-// glove-presence info consumed by the round_v6 lens.
-const ENGINE_TAGS = ["yolo", "vision", "vision3d", "rtmpose", "movenet", "yolo11", "blazepose", "glove", "vision_combined", "vision_glove"];
-const SKELETON_ENGINES = ["yolo", "vision", "vision3d", "rtmpose", "movenet", "yolo11", "blazepose", "vision_combined", "vision_glove"];
-const COMBINED_DIR_RE = /^pose_cache_v/i;
-function classifyEngine(engine, parentDir) {
-  if (engine === "vision" && parentDir && COMBINED_DIR_RE.test(parentDir)) {
-    return "vision_combined";
-  }
-  return engine;
-}
+// BlazePose is the only engine (`<stem>_blazepose_r<N>.npy`); caches of any
+// other engine (Apple Vision, the glove-wrist caches, YOLO, RTMPose, MoveNet,
+// YOLO11) are not indexed.
 let cacheIndex = null;
 
 // Drive-folder state: a separate index of video filename -> FileSystemFileHandle
@@ -151,7 +106,6 @@ const state = {
   frame: 0,
   rule: null,    // active rule module
   raf: null,
-  analysis: null, // populated by the Firebase load path; consumed by ondevice_lens
 };
 
 // ── File loading ────────────────────────────────────────────────────────────
@@ -192,45 +146,6 @@ async function onCopyVideoName() {
   clearTimeout(btn._resetTimer);
   btn._resetTimer = setTimeout(() => { btn.textContent = original; }, 1200);
 }
-if (els.fbLoad)          els.fbLoad.addEventListener("click", onFirebaseLoad);
-if (els.fbListRecent)    els.fbListRecent.addEventListener("click", onFirebaseListRecent);
-if (els.fbRecent)        els.fbRecent.addEventListener("change", onFirebaseRecentPick);
-if (els.odLoad)          els.odLoad.addEventListener("click", onLocalOnDeviceLoad);
-if (els.fbSignin)        els.fbSignin.addEventListener("click", onFirebaseSignIn);
-if (els.fbSignout)       els.fbSignout.addEventListener("click", () => firebaseSource.signOutViewer());
-
-// Reflect Google auth state in the Firebase panel (button visibility + uid).
-firebaseSource.onAuthChange((user) => {
-  if (!els.fbUser) return;
-  if (user) {
-    setStatus(els.fbUser, `— signed in as ${user.email}`, "success");
-    if (els.fbSignin) els.fbSignin.hidden = true;
-    if (els.fbSignout) els.fbSignout.hidden = false;
-  } else {
-    setStatus(els.fbUser, "— use the phone's account, or the debug admin", "");
-    if (els.fbSignin) els.fbSignin.hidden = false;
-    if (els.fbSignout) els.fbSignout.hidden = true;
-  }
-});
-
-// If we just came back from a redirect sign-in (popup fallback), finish it —
-// onAuthChange above then updates the panel.
-firebaseSource.completeRedirectSignIn();
-
-async function onFirebaseSignIn() {
-  if (els.fbSignin) els.fbSignin.disabled = true;
-  try {
-    await firebaseSource.signIn();
-    // onAuthChange fires from the SDK once the sign-in resolves and takes
-    // over els.fbUser; nothing else to set here on success.
-  } catch (err) {
-    console.error("[firebase sign-in]", err);
-    setStatus(els.fbStatus, `— sign-in failed: ${err.message}`, "error");
-  } finally {
-    if (els.fbSignin) els.fbSignin.disabled = false;
-  }
-}
-
 // On boot, hide the Drive section entirely if the API isn't there (Safari /
 // Firefox today). Otherwise try to silently restore the last folder handle.
 initDriveSection();
@@ -449,15 +364,13 @@ function syncStagePickers() {
 }
 
 // True if a round-slot satisfies the active lens's requirements.
-// Default predicate (when a rule doesn't declare `requires`): at least one
-// 2D engine present. This keeps every existing 2D rule working without a
-// per-rule code change. A lens's `requires(slot, { base, round })` also gets
+// Default predicate (when a rule doesn't declare `requires`): the round has
+// a BlazePose cache. A lens's `requires(slot, { base, round })` also gets
 // WHICH round of WHICH video it is judging, for lenses whose scope is a
 // curated span inside a video (slips: one frontal round out of eight).
 function slotMatchesActiveLens(slot, base, round) {
   const req = state.rule?.requires;
-  if (!req) return !!(slot?.yolo || slot?.vision || slot?.vision_glove || slot?.rtmpose
-                      || slot?.movenet || slot?.yolo11 || slot?.blazepose);
+  if (!req) return !!slot?.blazepose;
   try { return !!req(slot, { base, round }); }
   catch { return false; }
 }
@@ -553,14 +466,11 @@ async function onDriveVideoPick() {
   onVideoPick();
 }
 
-// Folder picker: index every `<base>_<engine>_r<N>.npy` and matching
-// `<base>_<engine>_r<N>_meta.json`. `engine` is `yolo` or `vision`. Each
-// round entry tracks both engines independently so the viewer can offer a
-// YOLO-vs-Vision compare lens whenever both are present.
+// Folder picker: index every `<base>_blazepose_r<N>.npy` and matching
+// `<base>_blazepose_r<N>_meta.json` (same pattern as drive-folder.js's walk).
 //
-// Picks MERGE into the existing index (so the cross-platform workflow is
-// "pick yolo_pose_cache, then pick apple_vision_pose_cache"); use the
-// Clear button to start over. Re-picking a folder that already contributed
+// Picks MERGE into the existing index (pick one folder, then another); use
+// the Clear button to start over. Re-picking a folder that already contributed
 // files just upserts those files — same files in same slot, no growth.
 function onCacheFolder(e) {
   const files = Array.from(e.target.files || []);
@@ -573,32 +483,19 @@ function onCacheFolder(e) {
       continue;
     }
     if (f.name.endsWith(".bak.npy")) continue;
-    // Three sibling patterns we recognize per round + engine:
-    //   <base>_<engine>_r<N>.npy           — pose data
-    //   <base>_<engine>_r<N>_meta.json     — pose metadata
-    //   <base>_<engine>_r<N>_punches.json  — ST-GCN detections (optional;
-    //                                        produced by dump_punches.py)
+    // Sibling patterns we recognize per round:
+    //   <base>_blazepose_r<N>.npy           — pose data
+    //   <base>_blazepose_r<N>_meta.json     — pose metadata
+    //   <base>_blazepose_r<N>_pts.npy       — per-frame timestamps (optional)
+    //   <base>_blazepose_r<N>_punches.json  — ST-GCN detections (optional)
     // GT labels are pulled live from the Sheet at load time — no sidecar.
-    // `vision3d` is the experimental Apple 3D engine; pairs an `.npy`
-    // with optional `_cam.npy` (per-frame cameraOriginMatrix) and `_proj.npy`
-    // (image-space projection via pointInImage) sidecars alongside the usual
-    // `_meta.json`. `_punches` only applies to 2D engines.
-    // Longer tokens first — `vision_glove` would otherwise be eaten as
-    // `vision` with a base ending in `_vision`.
     const m = f.name.match(
-      /^(.+?)_(vision_glove|vision3d|vision|yolo11|yolo|rtmpose|movenet|blazepose|glove)_r(\d+)(_meta|_punches|_cam|_proj|_pts)?\.(npy|json)$/
+      /^(.+?)_(blazepose)_r(\d+)(_meta|_punches|_pts)?\.(npy|json)$/
     );
     if (!m) continue;
-    const [, base, rawEngine, roundStr, suffix, ext] = m;
+    const [, base, engine, roundStr, suffix, ext] = m;
     const round = parseInt(roundStr);
     if (ext === "json" && !suffix) continue;
-    // webkitRelativePath is "pickedFolder/.../file.npy" — the immediate parent
-    // directory is what disambiguates `pose_cache_v5/foo_vision_r0.npy` (the
-    // combined cache) from `apple_vision_pose_cache/foo_vision_r0.npy` (raw).
-    const relPath = f.webkitRelativePath || "";
-    const segs = relPath.split("/");
-    const parentDir = segs.length >= 2 ? segs[segs.length - 2] : "";
-    const engine = classifyEngine(rawEngine, parentDir);
 
     if (!cacheIndex.has(base)) cacheIndex.set(base, new Map());
     const rounds = cacheIndex.get(base);
@@ -606,22 +503,17 @@ function onCacheFolder(e) {
     const roundSlot = rounds.get(round);
     if (!roundSlot[engine]) roundSlot[engine] = {};
     const engineSlot = roundSlot[engine];
-    if (ext === "npy" && suffix === "_cam")        engineSlot.cam = f;
-    else if (ext === "npy" && suffix === "_proj")  engineSlot.proj = f;
-    else if (ext === "npy" && suffix === "_pts")   engineSlot.pts = f;
+    if (ext === "npy" && suffix === "_pts")        engineSlot.pts = f;
     else if (ext === "npy")                        engineSlot.npy = f;
     else if (suffix === "_meta")                   engineSlot.meta = f;
     else if (suffix === "_punches")                engineSlot.punches = f;
   }
 
-  // Drop incomplete pose pairs (need .npy + _meta.json per engine). Punches
-  // and cam-matrix sidecars are optional — their absence is fine.
+  // Drop incomplete pose pairs (need .npy + _meta.json). The pts and punches
+  // sidecars are optional — their absence is fine.
   for (const [base, rounds] of cacheIndex) {
     for (const [round, slot] of rounds) {
-      for (const eng of ENGINE_TAGS) {
-        if (slot[eng] && (!slot[eng].npy || !slot[eng].meta)) delete slot[eng];
-      }
-      if (!SKELETON_ENGINES.some(eng => slot[eng])) rounds.delete(round);
+      if (!slot.blazepose?.npy || !slot.blazepose?.meta) rounds.delete(round);
     }
     if (rounds.size === 0) cacheIndex.delete(base);
   }
@@ -658,32 +550,16 @@ function onCacheClear() {
 
 function refreshCacheStatus() {
   const nVideos = cacheIndex?.size || 0;
-  let nRounds = 0, nYolo = 0, nVision = 0, nVision3D = 0, nCombined = 0, nV6 = 0;
-  for (const rounds of cacheIndex?.values() || []) {
-    for (const slot of rounds.values()) {
-      nRounds++;
-      if (slot.yolo)             nYolo++;
-      if (slot.vision)           nVision++;
-      if (slot.vision3d)         nVision3D++;
-      if (slot.vision_combined)  nCombined++;
-      if (slot.vision_glove)     nV6++;
-    }
-  }
+  const nRounds = countRounds(cacheIndex);
   if (nRounds) {
-    const parts = [];
-    if (nYolo)      parts.push(`${nYolo} YOLO`);
-    if (nVision)    parts.push(`${nVision} Apple Vision`);
-    if (nVision3D)  parts.push(`${nVision3D} Vision 3D`);
-    if (nCombined)  parts.push(`${nCombined} Vision+glove`);
-    if (nV6)        parts.push(`${nV6} v6`);
     els.cacheStatus.textContent =
-      `— ${nRounds} rounds across ${nVideos} videos (${parts.join(" + ")})`;
+      `— ${nRounds} BlazePose rounds across ${nVideos} videos`;
     els.cacheStatus.dataset.state = "success";
     if (els.cacheSection) els.cacheSection.open = false;
     els.cacheClear.hidden = false;
   } else {
     els.cacheStatus.textContent = cacheIndex
-      ? "— no `_<engine>_r{N}.npy + _meta.json` pairs found in that folder"
+      ? "— no `_blazepose_r{N}.npy + _meta.json` pairs found in that folder"
       : "— pick once per session";
     els.cacheStatus.dataset.state = cacheIndex ? "error" : "";
     els.cacheClear.hidden = true;
@@ -731,11 +607,7 @@ function loadVideoOnly(videoFile, errMessage) {
     .then(() => {
       if (token !== currentLoadToken) return;
       state.pose = null;
-      state.poseSecondary = null;
-      state.poseCombined = null;
-      state.poseV6 = null;
-      state.pose3d = null;
-      state.engines = [];
+      state.blaze33 = null;
       state.n_frames = 0;
       state.frame = 0;
       els.scrubber.max = 0;
@@ -782,192 +654,20 @@ function onManualPose() {
   loadFromFiles(v, ps);
 }
 
-// ── Firebase (on-device sessions) ───────────────────────────────────────────
-//
-// Parallel data source to Drive/cache folder. Fetches video + skeleton +
-// on-device analysis sidecar from Firebase Storage for a (sessionId,
-// roundNumber) and feeds them into start() like any other load path.
-// State.analysis is set so the on-device lens can render.
-
-async function onFirebaseLoad() {
-  const sessionId = els.fbSessionId.value.trim();
-  const roundN = parseInt(els.fbRound.value, 10);
-  if (!sessionId || Number.isNaN(roundN)) {
-    setStatus(els.fbStatus, "— enter a session id and round number", "warn");
-    return;
-  }
-
-  setStatus(els.fbStatus, `— fetching ${sessionId} r${roundN}…`, "busy");
-  els.loadStatus.textContent = `Loading ${sessionId} / round ${roundN} from Firebase…`;
-  const token = ++currentLoadToken;
-  if (els.fbLoad) els.fbLoad.disabled = true;
-
-  try {
-    const blobs = await firebaseSource.fetchRoundBlobs(sessionId, roundN);
-    if (token !== currentLoadToken) return;
-    await startOnDeviceRound(blobs, sessionId, roundN, els.fbStatus, token);
-  } catch (err) {
-    if (token !== currentLoadToken) return;
-    console.error("[firebase load]", err);
-    setStatus(els.fbStatus, `— error: ${err.message}`, "error");
-    els.loadStatus.textContent = `Firebase load failed: ${err.message}`;
-  } finally {
-    if (els.fbLoad && token === currentLoadToken) els.fbLoad.disabled = false;
-  }
-}
-
-// Shared by the Firebase loader and the local on-device picker: take the
-// three blobs (video required, analysis optional) and feed them into start()
-// the same way. `idLabel`/`roundN` are identity hints for lenses + status.
-async function startOnDeviceRound(blobs, idLabel, roundN, statusEl, token) {
-  if (!blobs.videoBlob) {
-    throw new Error(
-      "round has no uploaded video yet (skeleton/analysis only) — retry once the video finishes uploading",
-    );
-  }
-  // Wrap the video blob in a File so loadVideo's pattern matches existing
-  // call sites (it only uses the Blob interface, but giving it a name keeps
-  // state.videoFileName meaningful).
-  const videoFile = new File([blobs.videoBlob], `${idLabel}_r${roundN}.mp4`, { type: "video/mp4" });
-  await loadVideo(videoFile);
-  if (token !== currentLoadToken) return;
-
-  const pose = await loadOnDeviceSkeleton(blobs.skeletonBlob);
-  if (token !== currentLoadToken) return;
-  pose.engine = pose.engine || "apple_vision_2d";
-
-  let analysis = null;
-  if (blobs.analysisBlob) {
-    try {
-      analysis = await loadOnDeviceAnalysis(blobs.analysisBlob);
-    } catch (err) {
-      console.error("[on-device load] analysis parse failed:", err);
-    }
-  }
-  if (token !== currentLoadToken) return;
-
-  // Identity hints used by some lenses (orientation_lens reads cacheBasename
-  // to pull Sheet labels; on-device lens doesn't need them but we set them
-  // anyway for consistency).
-  state.cacheBasename = idLabel;
-  state.cacheRound = roundN;
-
-  // Pull punches out of the analysis sidecar so the existing punch rendering
-  // pipeline (3rd start() arg) lights up just like it does for training-cache
-  // loads.
-  const punches = analysis?.punches ?? null;
-  start(pose, null, punches, null, null, null, analysis);
-
-  const punchNote = punches ? `· ${punches.detections.length} punches` : "";
-  const sidecarNote = analysis
-    ? `with on-device analysis (${Object.keys(analysis.rules).length} rules${punchNote})`
-    : `no analysis sidecar`;
-  if (statusEl) setStatus(statusEl, `— loaded ${idLabel} r${roundN}, ${sidecarNote}`, "success");
-  els.loadStatus.textContent = "";
-}
-
-// Local-file twin of onFirebaseLoad: read the on-device round straight from
-// disk (video + skeleton + optional analysis sidecar). Sidesteps Storage
-// owner-scope auth entirely — used for rounds pulled off the phone.
-async function onLocalOnDeviceLoad() {
-  const videoFile = els.odVideo.files?.[0];
-  const skeletonFile = els.odSkeleton.files?.[0];
-  const analysisFile = els.odAnalysis.files?.[0] ?? null;
-  if (!videoFile || !skeletonFile) {
-    setStatus(els.odStatus, "— pick at least a video + skeleton JSON", "warn");
-    return;
-  }
-  const roundN = parseInt(els.odRound.value, 10) || 0;
-  const idLabel = videoFile.name.replace(/\.mp4$/i, "");
-  setStatus(els.odStatus, `— loading ${videoFile.name}…`, "busy");
-  els.loadStatus.textContent = "Loading on-device round from local files…";
-  const token = ++currentLoadToken;
-  if (els.odLoad) els.odLoad.disabled = true;
-  try {
-    await startOnDeviceRound(
-      { videoBlob: videoFile, skeletonBlob: skeletonFile, analysisBlob: analysisFile },
-      idLabel, roundN, els.odStatus, token,
-    );
-  } catch (err) {
-    if (token !== currentLoadToken) return;
-    console.error("[local on-device load]", err);
-    setStatus(els.odStatus, `— error: ${err.message}`, "error");
-    els.loadStatus.textContent = `Local load failed: ${err.message}`;
-  } finally {
-    if (els.odLoad && token === currentLoadToken) els.odLoad.disabled = false;
-  }
-}
-
-async function onFirebaseListRecent() {
-  setStatus(els.fbStatus, "— fetching session list…", "busy");
-  if (els.fbListRecent) els.fbListRecent.disabled = true;
-  try {
-    const sessions = await firebaseSource.listRecentSessions(20);
-    els.fbRecent.innerHTML = '<option value="">— pick a recent session —</option>';
-    for (const s of sessions) {
-      const opt = document.createElement("option");
-      opt.value = s.sessionId;
-      // Stash the available rounds so onFirebaseRecentPick can default the
-      // round input to a value that actually exists for this session.
-      opt.dataset.rounds = JSON.stringify(s.rounds);
-      const rounds = s.rounds.length ? `r${s.rounds.join(",")}` : "(no rounds)";
-      opt.textContent = `${s.sessionId} (${rounds})`;
-      els.fbRecent.appendChild(opt);
-    }
-    els.fbRecent.hidden = sessions.length === 0;
-    setStatus(
-      els.fbStatus,
-      sessions.length ? `— ${sessions.length} recent sessions` : `— no sessions found`,
-      sessions.length ? "success" : "warn",
-    );
-  } catch (err) {
-    console.error("[firebase list]", err);
-    setStatus(els.fbStatus, `— list error: ${err.message}`, "error");
-  } finally {
-    if (els.fbListRecent) els.fbListRecent.disabled = false;
-  }
-}
-
-function onFirebaseRecentPick() {
-  const sel = els.fbRecent;
-  const sessionId = sel.value;
-  if (!sessionId) return;
-  els.fbSessionId.value = sessionId;
-  // Default the round to the first one this session actually has — sessions
-  // that started at round 1 (or higher) would 404 if we left the input at 0.
-  const opt = sel.options[sel.selectedIndex];
-  const rounds = opt?.dataset?.rounds ? JSON.parse(opt.dataset.rounds) : [];
-  if (rounds.length > 0) {
-    els.fbRound.value = String(rounds[0]);
-  }
-  onFirebaseLoad();
-}
-
 function loadFromIndex(videoFile, slot) {
-  // BlazePose is REQUIRED for every lens (user request 2026-06-24). If this
-  // round has no BlazePose cache, show the video with a clear "missing
-  // BlazePose" message and NO skeleton — never silently fall back to Apple
-  // Vision. loadVideoOnly clears any leftover skeleton so the screen is honest
-  // about the gap.
-  if (!slot.blazepose) {
+  // Every lens runs on BlazePose (the only engine the index holds). A round
+  // without a complete BlazePose cache never reaches the index, but guard
+  // anyway: show the video with a clear message and NO skeleton.
+  // loadVideoOnly clears any leftover skeleton so the screen is honest about
+  // the gap.
+  const blaze = slot?.blazepose;
+  if (!blaze) {
     loadVideoOnly(videoFile,
-      `⚠ No BlazePose cache for this round — the viewer requires BlazePose for ` +
-      `every lens (Apple Vision fallback is disabled). Extract a _blazepose_ ` +
-      `cache for this video/round.`);
+      `⚠ No BlazePose cache for this round — extract a _blazepose_ cache ` +
+      `for this video/round.`);
     return;
   }
-  // `slot` may also have `yolo`, `vision`, and/or `vision_glove`. The `primary`
-  // variable below is the SIDECAR ANCHOR (glove wrists, punches, 3D, v6) and
-  // keeps the Vision-first priority — but it is NOT the skeleton the rule
-  // lenses run on. The rule-facing primary is forced to BlazePose just before
-  // start() (see below); Vision is demoted to the secondary slot there so the
-  // compare lenses and wrist_swap can still reach it.
-  const primary = slot.vision || slot.yolo || slot.vision_glove || slot.rtmpose
-                || slot.movenet || slot.yolo11 || slot.blazepose;
-  const secondary = (slot.vision && slot.yolo) ? slot.yolo : null;
-  const status =
-    `Loading ${videoFile.name}${secondary ? " (vision + yolo)" : ""}…`;
-  els.loadStatus.textContent = status;
+  els.loadStatus.textContent = `Loading ${videoFile.name}…`;
 
   const token = ++currentLoadToken;
   loadVideo(videoFile)
@@ -976,188 +676,41 @@ function loadFromIndex(videoFile, slot) {
       const size = { width: els.video.videoWidth, height: els.video.videoHeight };
       // Each slot value may be a File OR a FileSystemFileHandle (Drive folder).
       // drive.toFile() returns a File from either.
-      const primaryNpy  = await drive.toFile(primary.npy);
-      const primaryMeta = await drive.toFile(primary.meta);
-      const posePrimary = await loadPose([primaryNpy, primaryMeta], size);
+      const npyFile  = await drive.toFile(blaze.npy);
+      const metaFile = await drive.toFile(blaze.meta);
+      // The 33→COCO-17 remap every lens reads as state.pose.
+      const pose = await loadPose([npyFile, metaFile], size);
       if (token !== currentLoadToken) return;
-      // Engine tags reflect which slot each pose came from. Primary is
-      // Vision when both engines are present (see the slot-pick above),
-      // so when there's both we know primary = vision and secondary = yolo;
-      // otherwise primary is whichever single engine exists for this round.
-      // If the v6 cache was the only thing in the slot, the meta records
-      // the actual engine (`apple_vision_2d` for ungloved or
-      // `apple_vision_2d+glove_v6` for gloved) — use it verbatim.
-      let primaryEngine;
-      if (slot.vision && primary === slot.vision)            primaryEngine = "apple_vision_2d";
-      else if (slot.yolo && primary === slot.yolo)           primaryEngine = "yolo_pose";
-      else if (slot.vision_glove && primary === slot.vision_glove)
-        primaryEngine = posePrimary.meta?.engine || "apple_vision_2d+glove_v6";
-      else if (slot.rtmpose && primary === slot.rtmpose)     primaryEngine = "rtmpose_body17";
-      else if (slot.movenet && primary === slot.movenet)     primaryEngine = "movenet";
-      else if (slot.yolo11 && primary === slot.yolo11)       primaryEngine = "yolo11_pose";
-      else if (slot.blazepose && primary === slot.blazepose) primaryEngine = "blazepose";
-      else                                                    primaryEngine = "unknown";
-      posePrimary.engine = primaryEngine;
-      // Per-frame PTS sidecar → exact cross-engine time alignment (engine_compare).
-      if (primary.pts) posePrimary.pts = await loadPtsArray(await drive.toFile(primary.pts));
-      let poseSecondary = null;
-      if (secondary) {
-        const secNpy  = await drive.toFile(secondary.npy);
-        const secMeta = await drive.toFile(secondary.meta);
-        poseSecondary = await loadPose([secNpy, secMeta], size);
-        if (token !== currentLoadToken) return;
-        poseSecondary.engine =
-          primaryEngine === "apple_vision_2d" ? "yolo_pose" : "apple_vision_2d";
-        if (secondary.pts) poseSecondary.pts = await loadPtsArray(await drive.toFile(secondary.pts));
-      }
-      // Optional sibling: ST-GCN punch detections for the primary engine.
+      // Per-frame PTS sidecar → exact source-video time of each cache frame.
+      if (blaze.pts) pose.pts = await loadPtsArray(await drive.toFile(blaze.pts));
+      // Optional sibling: ST-GCN punch detections for this round.
       let punches = null;
-      if (primary.punches) {
+      if (blaze.punches) {
         try {
-          const punchFile = await drive.toFile(primary.punches);
+          const punchFile = await drive.toFile(blaze.punches);
           punches = await loadPunches(punchFile);
         } catch (err) {
           console.warn("punches load failed:", err.message);
         }
       }
-      // Apple Vision 3D support was archived 2026-08-06
-      // (cornerman-archive/legacy-pose/debug-viewer-lenses/);
-      // state.pose3d stays null so lens contracts are unchanged.
-      let pose3d = null;
-      // Optional: glove-wrist sidecar — attached to the vision pose object
-      // (or primary, if no vision). Frame timing matches the matching
-      // vision cache 1:1, so the wrist-swap lens can index it directly.
-      if (slot.glove) {
-        try {
-          const gNpy  = await drive.toFile(slot.glove.npy);
-          const gMeta = await drive.toFile(slot.glove.meta);
-          const glove = await loadGloveWrists(gNpy, gMeta, size);
-          // Attach to whichever pose is the Vision pose; fall back to primary.
-          if (poseSecondary && poseSecondary.engine === "apple_vision_2d") {
-            poseSecondary.gloveWrists = glove;
-          } else {
-            posePrimary.gloveWrists = glove;
-          }
-        } catch (err) {
-          console.warn("glove wrists load failed:", err.message);
-        }
-      }
-      // Optional: combined vision+glove cache (pose_cache_v*/). Same shape as
-      // a raw vision cache but with wrists 9/10 replaced where the glove
-      // model was confident. Carried separately so combined_compare can
-      // overlay it against the raw vision pose.
-      let poseCombined = null;
-      if (slot.vision_combined) {
-        try {
-          const cNpy  = await drive.toFile(slot.vision_combined.npy);
-          const cMeta = await drive.toFile(slot.vision_combined.meta);
-          poseCombined = await loadPose([cNpy, cMeta], size);
-          poseCombined.engine = "apple_vision_2d_combined";
-        } catch (err) {
-          console.warn("combined pose load failed:", err.message);
-        }
-      }
-      // Optional: v6 cache (pose_cache_v6/). Production-shape Apple Vision
-      // skeleton with glove wrists baked in for gloved rounds. The round_v6
-      // lens reads this directly so it doesn't redo the substitution; engine
-      // / presence / wrist_replaced flags live in the meta JSON.
-      let poseV6 = null;
-      if (slot.vision_glove) {
-        try {
-          const vgNpy  = await drive.toFile(slot.vision_glove.npy);
-          const vgMeta = await drive.toFile(slot.vision_glove.meta);
-          poseV6 = await loadPose([vgNpy, vgMeta], size);
-          // Reflect whichever engine the meta records — pure Vision for
-          // ungloved rounds, vision+glove for gloved rounds.
-          poseV6.engine = poseV6.meta?.engine || "apple_vision_2d+glove_v6";
-        } catch (err) {
-          console.warn("v6 pose load failed:", err.message);
-        }
-      }
-      // Optional: RTMPose Body-17 cache (rtmpose_pose_cache/). Same COCO-17
-      // (N,17,3) normalized layout as YOLO/Vision, aligned to the same rounds —
-      // loaded as a separate engine so engine_compare can pick it vs Vision.
-      let poseRtm = null;
-      if (slot.rtmpose) {
-        try {
-          const rNpy  = await drive.toFile(slot.rtmpose.npy);
-          const rMeta = await drive.toFile(slot.rtmpose.meta);
-          poseRtm = await loadPose([rNpy, rMeta], size);
-          poseRtm.engine = "rtmpose_body17";
-          if (slot.rtmpose.pts) poseRtm.pts = await loadPtsArray(await drive.toFile(slot.rtmpose.pts));
-        } catch (err) {
-          console.warn("rtmpose pose load failed:", err.message);
-        }
-      }
-      // Bake-off engines (COCO-17): MoveNet / YOLO11 / BlazePose (coco17 remap).
-      // Loaded as independent engines so the multi-skeleton compare lens can
-      // overlay any of them. blazepose33 (feet) is NOT loaded here — non-coco17.
-      const loadEngine = async (s, tag) => {
-        if (!s) return null;
-        try {
-          const p = await loadPose([await drive.toFile(s.npy), await drive.toFile(s.meta)], size);
-          p.engine = tag;
-          if (s.pts) p.pts = await loadPtsArray(await drive.toFile(s.pts));
-          return p;
-        } catch (err) { console.warn(`${tag} load failed:`, err.message); return null; }
-      };
-      const poseMovenet = await loadEngine(slot.movenet, "movenet");
-      const poseYolo11  = await loadEngine(slot.yolo11, "yolo11_pose");
-      const poseBlaze   = await loadEngine(slot.blazepose, "blazepose");
-
       // Full BlazePose-33 (all joints + z + visibility + presence) for the
-      // dedicated inspector lens. The COCO-17 remap above (poseBlaze) feeds
-      // engine_compare; this keeps everything the engine_compare path drops.
+      // lenses that need what the COCO-17 remap drops (feet, world-3D).
       let blaze33 = null;
-      if (slot.blazepose) {
-        try {
-          blaze33 = await loadBlaze33(await drive.toFile(slot.blazepose.npy),
-                                      await drive.toFile(slot.blazepose.meta), size);
-          if (slot.blazepose.pts) blaze33.pts = await loadPtsArray(await drive.toFile(slot.blazepose.pts));
-        } catch (err) { console.warn("blaze33 load failed:", err.message); }
-      }
+      try {
+        blaze33 = await loadBlaze33(npyFile, metaFile, size);
+        if (pose.pts) blaze33.pts = pose.pts;
+      } catch (err) { console.warn("blaze33 load failed:", err.message); }
 
       if (token !== currentLoadToken) return;
-
-      // ── BlazePose is the REQUIRED working skeleton for every rule lens ─────
-      // (user request 2026-06-24): the primary handed to start() must be
-      // BlazePose so every lens that reads state.pose runs on it. poseBlaze is
-      // already the 33→COCO-17 remap (pose-loader), so each lens keeps the EXACT
-      // joint indices it used for Vision — a 17-joint lens still sees 17, an
-      // ankles-only lens still sees ankles. The rounds-without-BlazePose case is
-      // handled loudly at the top of loadFromIndex; reaching here with no blaze
-      // pose means the cache file was present but failed to load — fail loudly
-      // rather than silently rendering Apple Vision.
-      const rulePrimary = posePrimary.engine === "blazepose" ? posePrimary : poseBlaze;
-      if (!rulePrimary) {
-        throw new Error(
-          `BlazePose cache for this round failed to load (${primary.npy.name}). ` +
-          `The viewer requires BlazePose for every lens — Apple Vision fallback is disabled.`
-        );
-      }
-      // Keep the original non-BlazePose primary (Vision/YOLO/…, with its glove /
-      // punch sidecars) reachable for the compare lenses and the Vision-anchored
-      // wrist_swap lens: demote it to the secondary slot when free, else to an
-      // extra engine.
-      let ruleSecondary = poseSecondary;
-      let extraEngines = [poseMovenet, poseYolo11, poseBlaze].filter(Boolean);
-      if (rulePrimary !== posePrimary) {
-        if (!ruleSecondary) ruleSecondary = posePrimary;
-        else extraEngines.push(posePrimary);
-      }
-      extraEngines = extraEngines.filter(p => p !== rulePrimary);
-      start(rulePrimary, ruleSecondary, punches, pose3d, poseCombined, poseV6, null, poseRtm,
-            extraEngines, blaze33);
+      start(pose, punches, blaze33);
 
       // Expose cache identity on state so lenses that key by (stem, round, frame)
       // — e.g. orientation_lens looking up orientation GT labels — can find it
       // without re-parsing filenames themselves. Round comes from the `_rN`
       // suffix; cacheBasename is the source-video stem (suffix stripped).
-      // Longer engine tokens first so `_vision_glove_` doesn't get truncated
-      // at `_vision_`.
-      const npyName = primary.npy.name;
+      const npyName = npyFile.name;
       state.cacheBasename = stripCacheSuffix(npyName);
-      const rndMatch = /_(?:vision_glove|vision|yolo11|yolo|rtmpose|movenet|blazepose)_r(\d+)\.npy$/i.exec(npyName);
+      const rndMatch = /_blazepose_r(\d+)\.npy$/i.exec(npyName);
       state.cacheRound = rndMatch ? parseInt(rndMatch[1], 10) : null;
 
       // Live GT labels: derive a basename from the cache filename, then hit
@@ -1165,9 +718,9 @@ function loadFromIndex(videoFile, slot) {
       // the lens falls back to ST-GCN / heuristic.
       tryLiveLabels({
         cacheBasename: state.cacheBasename,
-        cacheStartSec: rulePrimary.start_sec || 0,
-        fps: rulePrimary.fps,
-        nFrames: rulePrimary.n_frames,
+        cacheStartSec: pose.start_sec || 0,
+        fps: pose.fps,
+        nFrames: pose.n_frames,
         token,
       });
     })
@@ -1179,7 +732,7 @@ function loadFromIndex(videoFile, slot) {
 }
 
 function loadFromFiles(videoFile, poseFiles) {
-  // Manual file picker — single engine only. Pose loader takes the .npy and
+  // Manual file picker — one BlazePose round. Pose loader takes the .npy and
   // the _meta.json; a third file ending in _punches.json is consumed as the
   // ST-GCN-detection source. GT labels are pulled live from the Sheet using
   // the cache basename as the source-video hint.
@@ -1211,7 +764,7 @@ function loadFromFiles(videoFile, poseFiles) {
       // need (stem, round, frame) work in the manual-picker path too.
       if (npyFile) {
         state.cacheBasename = stripCacheSuffix(npyFile.name);
-        const rndMatch = /_(?:vision_glove|vision|yolo11|yolo|rtmpose|movenet|blazepose)_r(\d+)\.npy$/i.exec(npyFile.name);
+        const rndMatch = /_blazepose_r(\d+)\.npy$/i.exec(npyFile.name);
         state.cacheRound = rndMatch ? parseInt(rndMatch[1], 10) : null;
       }
       // Live GT labels.
@@ -1264,26 +817,20 @@ function populateRoundSelect(rounds, base = null) {
 }
 
 // Strip extension; the cache files were named after the source video so
-// `<videoBasename>` should be the prefix of `<videoBasename>_yolo_r0.npy`.
+// `<videoBasename>` should be the prefix of `<videoBasename>_blazepose_r0.npy`.
 function videoBasename(name) {
   return name.replace(/\.[^.]+$/, "");
 }
 
 // Strip the cache-shape tail from a .npy filename so what's left is the
-// basename that points at the source video. `30 MIN…_h264_vision_r0.npy`
+// basename that points at the source video. `30 MIN…_h264_blazepose_r0.npy`
 // → `30 MIN…_h264`. Anything that doesn't match the convention is returned
 // extension-stripped so we can still try a fuzzy match.
 function stripCacheSuffix(fileName) {
   if (!fileName) return null;
   return fileName
     .replace(/\.npy$/i, "")
-    // Strip any recognised cache-shape tail. Engines are
-    // yolo/vision/vision3d/glove/vision_combined/vision_glove per ENGINE_TAGS;
-    // anything else falls through and we hand the raw stem to the
-    // auto-matcher's fuzzy logic. Longer tokens listed first so
-    // `_vision_glove_` matches as a unit instead of being truncated to
-    // `_vision_`.
-    .replace(/_(vision_glove|vision_combined|vision3d|vision|yolo11|yolo|rtmpose|movenet|blazepose|glove)_r\d+$/i, "");
+    .replace(/_blazepose_r\d+$/i, "");
 }
 
 // Fire a best-effort live-label fetch. Doesn't block UI. On success, sets
@@ -1340,41 +887,10 @@ function updateVideoInfo() {
   els.videoInfo.hidden = false;
 }
 
-// Short human label for an engine tag — used by the multi-skeleton compare lens.
-function engineDisplayLabel(tag) {
-  const t = tag || "";
-  if (t === "apple_vision_2d") return "Vision";
-  if (t === "apple_vision_2d_combined") return "Vision-comb";
-  if (t.startsWith("apple_vision_2d+glove")) return "v6";
-  if (t === "yolo_pose") return "YOLO";
-  if (t === "yolo11_pose") return "YOLO11";
-  if (t === "rtmpose_body17") return "RTMPose";
-  if (t === "movenet") return "MoveNet";
-  if (t === "blazepose") return "BlazePose";
-  return t || "pose";
-}
-
-function start(pose, poseSecondary = null, punches = null, pose3d = null, poseCombined = null, poseV6 = null, analysis = null, poseRtm = null, extraEngines = [], blaze33 = null) {
-  state.pose = pose;
-  state.blaze33 = blaze33;               // optional full BlazePose-33 (inspector lens)
-  state.poseSecondary = poseSecondary;   // optional second engine for compare
-  state.poseCombined = poseCombined;     // optional vision+glove combined cache
-  state.poseV6 = poseV6;                 // optional pose_cache_v6 (vision+glove_v6)
-  state.poseRtm = poseRtm;               // optional RTMPose Body-17 (rtmpose_pose_cache)
-  // Every COCO-17 skeleton engine loaded for this round, deduped by engine tag —
-  // what the multi-skeleton compare lens overlays. Primary first, then the rest.
-  state.engines = [];
-  {
-    const seenEng = new Set();
-    for (const p of [pose, poseSecondary, poseCombined, poseV6, poseRtm, ...extraEngines]) {
-      if (!p || !p.skeleton || seenEng.has(p.engine)) continue;
-      seenEng.add(p.engine);
-      state.engines.push({ key: p.engine, label: engineDisplayLabel(p.engine), pose: p });
-    }
-  }
+function start(pose, punches = null, blaze33 = null) {
+  state.pose = pose;                     // BlazePose, remapped to COCO-17
+  state.blaze33 = blaze33;               // optional full BlazePose-33 (feet, z, world-3D)
   state.punches = punches;               // optional ST-GCN detections
-  state.pose3d = pose3d;                 // optional Apple Vision 3D (separate layout)
-  state.analysis = analysis;             // optional on-device analysis sidecar (Firebase load path)
   state.labels = null;                   // populated asynchronously by tryLiveLabels()
   state.orientationLabels = null;        // populated by orientation lens on demand
   state.predictionFiles = predictionFiles; // punch-classifier dumps from Drive / cache folder
@@ -1639,8 +1155,8 @@ if (els.lensPick) {
 }
 
 // Expose the viewer's redraw to lenses that need to repaint the main canvas
-// in response to their own controls (e.g. the Vision 3D lens's "Overlay on
-// video" toggle). The lens calls window.__viewerRedraw() — small hack vs.
+// in response to their own controls (e.g. the Overview lens's "Show skeleton
+// overlay" toggle). The lens calls window.__viewerRedraw() — small hack vs.
 // inventing a richer rule API.
 window.__viewerRedraw = () => redraw();
 // Lens timelines export a drag-selected frame range through the same path as

@@ -2,11 +2,11 @@
 // hand_return_path).
 //
 // These lenses were written for the labelled-data eval workflow, so they read
-// punches from the hand-labelled GT (`state.labels.detections`). On an app-
-// recorded on-device round there are no labels yet — the punches live in
-// `state.punches.detections` (the ST-GCN classifier's predictions, the same
-// ones the on-device rules actually run on). Fall back to those so the lens
-// renders on unlabelled rounds too. Mirrors angle_change.js's source pick.
+// punches from the hand-labelled GT (`state.labels.detections`). On an
+// unlabelled round the punches can come from its `_punches.json` sidecar
+// (`state.punches.detections`, the ST-GCN classifier's predictions). Fall back
+// to those so the lens renders on unlabelled rounds too. Mirrors
+// angle_change.js's source pick.
 //
 // Returns a stable array reference (or null) so callers can use identity
 // (`dets !== lastDetections`) for change detection without re-rendering every

@@ -39,19 +39,17 @@
 // bearing than for the old 2D-arc metric since a vertical drop reads even
 // on a head-on punch; left in so head-on punches can be excluded if wanted.
 //
-// COVERAGE GATE — the low over a gappy track can miss the dip (glove
-// occlusion → NaN wrist, no Vision fallback). Windows with less than
+// COVERAGE GATE — the low over a gappy track can miss the dip (an occluded
+// wrist fails the conf gate → NaN). Windows with less than
 // minCoverage valid frames score "unclear" instead of guessing.
 //
-// Wrist source: identical contract to arm_extension — v6 cache preferred
-// (glove wrists baked in at joints 9/10, conf gated by minGloveConf),
-// legacy raw-glove sidecar honored, pose wrist otherwise.
+// Wrist source: identical contract to arm_extension — the BlazePose wrist,
+// gated by minPoseConf.
 //
 // Compares predicted vs the labeler's rule_hand_ushape verdict when
 // available — same agree/disagree pattern as arm_extension.
 
 import { J } from "../../skeleton.js";
-import { gloveXY, gloveConf } from "../../pose-loader.js";
 import { ensureAxialityModel, axialityForPunch } from "../shared/axiality_predictions.js";
 import { activeDetections, isStraightType } from "../shared/punch_detections.js";
 import { toQuality, qualityOf } from "../shared/rules_score.js";
@@ -69,7 +67,6 @@ const DEFAULTS = {
   minCoverage:  0.60,   // min fraction of valid wrist frames inside the return window
   axialityGate: true,
   axialityMax:  Math.SQRT1_2,   // ≈0.7071 = cos 45° — same cut as arm_extension
-  minGloveConf: 0.20,
   minPoseConf:  0.20,
   // Straights only (hooks/uppercuts arc by design). Body shots are back
   // in: the drop metric measures the fist sinking BELOW its extension
@@ -105,8 +102,8 @@ const SIDE_FOR = {
 };
 
 const JOINTS_FOR_SIDE = {
-  L: { shoulder: J.L_SHOULDER, wrist: J.L_WRIST, gloveSide: 0 },
-  R: { shoulder: J.R_SHOULDER, wrist: J.R_WRIST, gloveSide: 1 },
+  L: { shoulder: J.L_SHOULDER, wrist: J.L_WRIST },
+  R: { shoulder: J.R_SHOULDER, wrist: J.R_WRIST },
 };
 
 let host;
@@ -124,19 +121,14 @@ let activeIdx = -1;          // index into signals.punches currently looped
 let timeupdateHandler = null;
 let keydownHandler = null;
 
-// v6 cache is the canonical wrist source — same pick as arm_extension.
+// The BlazePose skeleton every lens reads — same pick as arm_extension.
 function pickPose(state) {
-  return state.poseV6 || state.pose;
+  return state.pose;
 }
 
 export const HandReturnPathRule = {
   id: "hand_return_path",
   label: "Hand return path (straights)",
-
-  requires(slot) {
-    return !!slot?.vision_glove
-      || (!!(slot?.vision || slot?.yolo) && !!slot?.glove);
-  },
 
   skeletonStyle() {
     return {
@@ -189,7 +181,6 @@ export const HandReturnPathRule = {
     wireSlider("hrp-maxret",  "hrp-maxret-out",  "maxReturnSec", recomputeAndRefresh, 1);
     wireSlider("hrp-cov",     "hrp-cov-out",     "minCoverage", rescoreAndRefresh);
     wireSlider("hrp-pose-gate",  "hrp-pose-gate-out",  "minPoseConf", recomputeAndRefresh);
-    wireSlider("hrp-glove-gate", "hrp-glove-gate-out", "minGloveConf", recomputeAndRefresh);
     wireSlider("hrp-spike",      "hrp-spike-out",      "spikeVel", recomputeAndRefresh);
 
     // Axiality gate toggle + cut — verdict-only, like arm_extension.
@@ -475,7 +466,7 @@ function buildPunch(d, stance, side, idx, ctx) {
   // same span the offset-trace graph draws, so the recovery is always seen.
 
   // Smoothed shoulder-relative offset (wrist_y − shoulder_y; bigger = fist
-  // lower). Smoothing stops one jittery glove frame faking a dip / recovery.
+  // lower). Smoothing stops one jittery wrist frame faking a dip / recovery.
   const half = Math.max(0, Math.round((cfg.smoothSec * fps - 1) / 2));
   const offS = smoothOffset(arm, peakFrame, cap, half);
   const offPeak = offS[peakFrame];
@@ -495,8 +486,8 @@ function buildPunch(d, stance, side, idx, ctx) {
 
   // Low = lowest fist (max offset). SPIKE GUARD: a "low" reached by a wrist
   // teleport — a huge single-frame raw-wrist jump near it — isn't a real dip.
-  // The glove detector reports these confidently (conf 0.4–0.8), so a conf
-  // gate can't catch them; geometry can. Excise the excursion and re-find,
+  // A tracker can report these confidently, so a conf gate can't catch them;
+  // geometry can. Excise the excursion and re-find,
   // a few passes (combos can have more than one).
   const findLow = () => {
     let lf = peakFrame, ol = Number.isFinite(offPeak) ? offPeak : -Infinity;
@@ -666,7 +657,6 @@ function perFrameArm(pose, side, cfg, torso) {
   const shy = new Float32Array(N).fill(NaN);
   const reach = new Float32Array(N).fill(NaN);
   const noseDist = new Float32Array(N).fill(NaN);
-  const source = new Array(N).fill(null);
   for (let f = 0; f < N; f++) {
     // Same-side shoulder (drop reference) — gated on shoulder conf alone so
     // the overlay lines survive even when torso is briefly missing.
@@ -679,7 +669,7 @@ function perFrameArm(pose, side, cfg, torso) {
     }
     const w = wristXY(pose, f, joints, cfg);
     if (!w) continue;
-    wx[f] = w.x; wy[f] = w.y; source[f] = w.source;
+    wx[f] = w.x; wy[f] = w.y;
     const t = torso[f];
     const tOk = Number.isFinite(t) && t > 0;
     if (Number.isFinite(shx[f]) && tOk) {
@@ -692,27 +682,17 @@ function perFrameArm(pose, side, cfg, torso) {
       if (Number.isFinite(nx)) noseDist[f] = Math.hypot(w.x - nx, w.y - ny) / t;
     }
   }
-  return { wx, wy, shx, shy, reach, noseDist, source };
+  return { wx, wy, shx, shy, reach, noseDist };
 }
 
-// Same wrist contract as arm_extension: legacy glove sidecar first, then
-// v6 (glove baked in, minGloveConf, no Vision fallback) / pose wrist.
+// Same wrist contract as arm_extension: the pose wrist, or null when it fails
+// the pose-conf gate.
 function wristXY(pose, frame, joints, cfg) {
-  const g = pose.gloveWrists;
-  if (g) {
-    const [gx, gy] = gloveXY(g, frame, joints.gloveSide);
-    const gc       = gloveConf(g, frame, joints.gloveSide);
-    if (gc >= cfg.minGloveConf && Number.isFinite(gx) && Number.isFinite(gy)) {
-      return { x: gx, y: gy, source: "glove" };
-    }
-  }
   const px = pose.skeleton[(frame * 17 + joints.wrist) * 2];
   const py = pose.skeleton[(frame * 17 + joints.wrist) * 2 + 1];
   const pc = pose.conf[frame * 17 + joints.wrist];
-  const isGloveBaked = pose.meta?.wrist_replaced_with_glove === true;
-  const gate = isGloveBaked ? cfg.minGloveConf : cfg.minPoseConf;
-  if (pc < gate || !Number.isFinite(px)) return null;
-  return { x: px, y: py, source: isGloveBaked ? "glove" : "pose" };
+  if (pc < cfg.minPoseConf || !Number.isFinite(px)) return null;
+  return { x: px, y: py };
 }
 
 // Per-frame euclidean torso |shoulder_mid → hip_mid| — same normalizer
@@ -1223,8 +1203,7 @@ function renderTemplate(sig, cfg) {
     <p class="hint">
       A gappy wrist track can hide the dip — windows with too few valid
       return frames score <b>unclear</b> instead of pretending the path
-      was clean. Conf gates match the other lenses (v6: glove conf below
-      the gate = no wrist, no Vision fallback).
+      was clean. The conf gate matches the other lenses.
     </p>
     <div class="slider-row">
       <input type="range" id="hrp-cov" min="0.20" max="1.00" step="0.05" value="${cfg.minCoverage}" />
@@ -1234,17 +1213,12 @@ function renderTemplate(sig, cfg) {
     <div class="slider-row">
       <input type="range" id="hrp-pose-gate" min="0.05" max="0.95" step="0.05" value="${cfg.minPoseConf}" />
       <output id="hrp-pose-gate-out">${cfg.minPoseConf.toFixed(2)}</output>
-      <span class="muted small">pose conf — nose, shoulder, wrist-fallback, hip</span>
-    </div>
-    <div class="slider-row">
-      <input type="range" id="hrp-glove-gate" min="0.05" max="0.95" step="0.05" value="${cfg.minGloveConf}" />
-      <output id="hrp-glove-gate-out">${cfg.minGloveConf.toFixed(2)}</output>
-      <span class="muted small">glove conf — below = no wrist detection on v6 rounds</span>
+      <span class="muted small">pose conf — nose, shoulder, wrist, hip</span>
     </div>
 
     <h3>Spike guard</h3>
     <p class="hint">
-      The glove detector sometimes teleports the wrist for a few frames with
+      A wrist track can teleport for a few frames with
       <em>high</em> confidence (so a conf gate can't catch it), faking a
       dip-and-recover. A "low" reached by a wrist jump ≥ this (torsos/frame,
       physically impossible for a hand) is excised and the low re-found.

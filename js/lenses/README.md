@@ -62,15 +62,15 @@ joints the loader interpolated). Line widths are scaled by `renderScale` for you
 
 | field | meaning |
 |---|---|
-| `state.pose` | the loaded pose cache. `pose.skeleton` is a FLAT array of `n_frames × 17 × 2` pixels: joint `j` at frame `f` is `x = skeleton[(f*17+j)*2]`, `y = skeleton[(f*17+j)*2+1]`. `pose.conf[f*17+j]` is the confidence (BlazePose visibility). `pose.n_frames`, `pose.fps`, `pose.width`, `pose.height`, `pose.start_sec` (video time of cache frame 0, pre-buffer included), `pose.round_start_sec`, `pose.meta` (the parsed `_meta.json`), `pose.imputed`. Prefer `state.poseV6 || state.pose` if you want the glove-augmented cache when present. |
+| `state.pose` | the loaded pose cache. `pose.skeleton` is a FLAT array of `n_frames × 17 × 2` pixels: joint `j` at frame `f` is `x = skeleton[(f*17+j)*2]`, `y = skeleton[(f*17+j)*2+1]`. `pose.conf[f*17+j]` is the confidence (BlazePose visibility). `pose.n_frames`, `pose.fps`, `pose.width`, `pose.height`, `pose.start_sec` (video time of cache frame 0, pre-buffer included), `pose.round_start_sec`, `pose.meta` (the parsed `_meta.json`), `pose.imputed`. Always BlazePose, remapped to COCO-17. |
+| `state.blaze33` | the same round's full BlazePose-33 cache (feet, z, world-3D, visibility, presence), or null — see `loadBlaze33` in `js/pose-loader.js` for the layout |
 | `state.frame`, `state.fps`, `state.n_frames` | the current cache frame and the cache's fps |
 | `state.start_sec`, `state.start_frame` | where cache frame 0 sits in the source video (`start_frame = floor(start_sec * fps)`) |
 | `state.cacheBasename`, `state.cacheRound` | the video stem (cache suffix stripped) and round index — the identity to match your own data on |
 | `state.renderScale` | canvas px ÷ CSS px; multiply your line widths and font sizes by it in `draw` |
 | `state.labels` | the Sheet's rows for this round, loaded asynchronously (null until then; `{error, detections: []}` when the lookup failed). `labels.detections[]` = `{punch_type, start_frame, end_frame, start_time, end_time, timestamp, hand, stance, punch_uuid, labeler, reviewed}` in cache frames / cache-relative seconds — punches AND defense labels (`lead_roll`, `duck`, …); round markers excluded |
-| `state.punches` | the on-device / backend punch detections when a Firebase round was loaded, else null |
+| `state.punches` | the round's ST-GCN detections when the cache has a `_punches.json` sidecar, else null |
 | `state.predictionFiles` | `Map<filename, File>` of `predictions_*.json` files found next to the caches — how the punch lens gets its dumps |
-| `state.analysis` | the on-device analysis sidecar (Firebase path) |
 
 Joints are COCO-17: `import { J, EDGES, torsoHeight, drawSkeleton, confColor } from "../../skeleton.js"`
 (`J.NOSE`, `J.L_SHOULDER`, … `J.R_ANKLE`). The house unit for any metric is torso

@@ -29,20 +29,14 @@
 //                   per-punch prediction, joined by punch_uuid
 //   predicted     = skip (axial) / fail (bent) / pass — see rescorePunch
 //
-// Wrist source: prefer the v6 cache (pose_cache_v6/, Apple Vision skeleton
-// with glove wrists baked in at joints 9/10 for gloved rounds — same model
-// the iOS app runs live). When the v6 meta says wrist_replaced_with_glove,
-// the wrist conf at joints 9/10 IS the glove conf, gated by minGloveConf;
-// otherwise it's the Vision wrist gated by minPoseConf. Legacy raw-glove
-// sidecar (pose.gloveWrists) is still honored as a fallback for rounds
-// that pre-date v6. Anatomical side maps from (hand, stance) the same way
+// Wrist source: the BlazePose wrist, gated by minPoseConf like every other
+// joint. Anatomical side maps from (hand, stance) the same way
 // guard_drop / step_punch_sync do.
 //
 // Compares predicted vs the labeler's rule_extension verdict when
 // available — same agree/disagree pattern as the hip_rotation lens.
 
 import { J } from "../../skeleton.js";
-import { gloveXY, gloveConf } from "../../pose-loader.js";
 // Axiality is the sideways gate: the trained temporal model's held-out
 // per-punch prediction (predictions_axiality_*.json, loaded by axiality_model.js
 // and joined by punch_uuid). 0 = flat across the image (side-on), 1 = down the
@@ -69,7 +63,6 @@ const DEFAULTS = {
   // to a single upper cut. Lower = stricter (demand more side-on).
   axialityGate:     true,
   axialityMax:      Math.SQRT1_2,   // ≈0.7071 = cos 45° = sin 45°
-  minGloveConf:     0.20,
   minPoseConf:      0.20,
   // Anatomical shoulder correction. COCO labels the shoulder kp at the
   // acromion (top of the shoulder); the glenohumeral joint center is a
@@ -93,7 +86,6 @@ const COLORS = {
   unclear:     "#f5b945",
   ratioGuide:  "rgba(255,255,255,0.45)",
   poseArm:     "rgba(255,200,80,0.85)",
-  gloveArm:    "#d68bff",
   agree:       "#5fd97a",
   disagree:    "#e85a5a",
 };
@@ -105,8 +97,8 @@ const SIDE_FOR = {
 };
 
 const JOINTS_FOR_SIDE = {
-  L: { shoulder: J.L_SHOULDER, elbow: J.L_ELBOW, wrist: J.L_WRIST, gloveSide: 0 },
-  R: { shoulder: J.R_SHOULDER, elbow: J.R_ELBOW, wrist: J.R_WRIST, gloveSide: 1 },
+  L: { shoulder: J.L_SHOULDER, elbow: J.L_ELBOW, wrist: J.L_WRIST },
+  R: { shoulder: J.R_SHOULDER, elbow: J.R_ELBOW, wrist: J.R_WRIST },
 };
 
 let host;
@@ -115,23 +107,14 @@ let signals = null;
 let lastPose = null;
 let latestState = null;   // live state, for the async model-ready recompute
 
-// v6 cache is the canonical wrist source — it bakes in the glove substitution
-// the iOS app does live. Fall back to state.pose for rounds that pre-date v6.
+// The BlazePose skeleton every lens reads.
 function pickPose(state) {
-  return state.poseV6 || state.pose;
+  return state.pose;
 }
 
 export const ArmExtensionRule = {
   id: "arm_extension",
   label: "Arm extension (straights)",
-
-  requires(slot) {
-    // v6 cache alone is sufficient — it has Vision + glove substitution baked
-    // in. For legacy rounds without v6, we still accept raw Vision/YOLO +
-    // a glove sidecar so the lens can do the substitution itself.
-    return !!slot?.vision_glove
-      || (!!(slot?.vision || slot?.yolo) && !!slot?.glove);
-  },
 
   skeletonStyle() {
     return {
@@ -139,9 +122,9 @@ export const ArmExtensionRule = {
       boneWidth: 1.5,
       jointRadius: 3,
       // Highlight the joints we use for the ratio, EXCEPT wrists — this lens
-      // draws its own wrist markers (square = glove, ring = pose) so letting
-      // the base renderer also paint an amber confidence dot at the same
-      // spot creates visual noise. Same approach as the wrist_swap lens.
+      // draws its own wrist marker (a ring) so letting the base renderer
+      // also paint an amber confidence dot at the same spot creates visual
+      // noise.
       hideJoints: new Set([J.L_WRIST, J.R_WRIST]),
       highlightJoints: new Set([
         J.L_SHOULDER, J.R_SHOULDER, J.L_ELBOW, J.R_ELBOW,
@@ -230,7 +213,7 @@ export const ArmExtensionRule = {
       el.textContent = `Valid frames: L ${pct(lOk)} (${lOk}/${N}) · R ${pct(rOk)} (${rOk}/${N})`;
     };
 
-    // Pose / glove confidence-gate sliders
+    // Pose confidence-gate slider
     const wireGate = (sliderId, outId, cfgKey) => {
       const s = host.querySelector("#" + sliderId);
       const o = host.querySelector("#" + outId);
@@ -242,7 +225,6 @@ export const ArmExtensionRule = {
       });
     };
     wireGate("ae-pose-gate",  "ae-pose-gate-out",  "minPoseConf");
-    wireGate("ae-glove-gate", "ae-glove-gate-out", "minGloveConf");
 
     // Axiality gate — the only gate. Both the toggle and the slider only move
     // the verdict (peak_axiality is already computed per punch in computeAll),
@@ -364,8 +346,6 @@ export const ArmExtensionRule = {
     const ap = activePunchAt(signals.punches, f);
     setAxial("ae-l-axial", ap && ap.side === "L" ? ap.peak_axiality : NaN, cfg);
     setAxial("ae-r-axial", ap && ap.side === "R" ? ap.peak_axiality : NaN, cfg);
-    setText("ae-l-source", signals.sourceL[f] || "—");
-    setText("ae-r-source", signals.sourceR[f] || "—");
   },
 };
 
@@ -392,10 +372,10 @@ function computeAll(state, cfg) {
   // Same normalizer the stance_width rule uses, just per-frame.
   const torsoEuclid = torsoEuclidPerFrame(pose, cfg);
 
-  const { ratio: ratioL, reach: reachL, bendDeg: bendL, source: sourceL } = perFrameRatio(pose, "L", cfg, bodyAxis, torsoEuclid);
-  const { ratio: ratioR, reach: reachR, bendDeg: bendR, source: sourceR } = perFrameRatio(pose, "R", cfg, bodyAxis, torsoEuclid);
+  const { ratio: ratioL, reach: reachL, bendDeg: bendL } = perFrameRatio(pose, "L", cfg, bodyAxis, torsoEuclid);
+  const { ratio: ratioR, reach: reachR, bendDeg: bendR } = perFrameRatio(pose, "R", cfg, bodyAxis, torsoEuclid);
 
-  // Punches filtered to straights (labelled GT, or on-device predictions when
+  // Punches filtered to straights (labelled GT, or ST-GCN predictions when
   // unlabelled), with optional rule_extension verdict for agreement scoring.
   const detections = (activeDetections(state) || []).filter(d =>
     isStraightType(d.punch_type)
@@ -410,20 +390,17 @@ function computeAll(state, cfg) {
     const ratioArr = side === "L" ? ratioL : ratioR;
     const reachArr = side === "L" ? reachL : reachR;
     const bendArr  = side === "L" ? bendL : bendR;
-    const srcArr   = side === "L" ? sourceL : sourceR;
 
     // Pick the peak frame as the most-extended one in the window — that's
     // the moment of "full extension" that drives the verdict. Prefer max
     // reach (|sh→wr|/arm_length); fall back to max r (straightness) when
     // arm_length is unknown so reach is NaN.
     let peakReachWin = -Infinity;
-    let peakRWin = -Infinity, peakFrame = sf, gloveFrames = 0, validFrames = 0;
+    let peakRWin = -Infinity, peakFrame = sf;
     let peakFrameByR = sf, peakFrameByReach = sf;
     for (let f = sf; f <= ef; f++) {
       const r = ratioArr[f];
       if (!Number.isFinite(r)) continue;
-      validFrames++;
-      if (srcArr[f] === "glove") gloveFrames++;
       if (r > peakRWin) { peakRWin = r; peakFrameByR = f; }
       const rea = reachArr[f];
       if (Number.isFinite(rea) && rea > peakReachWin) { peakReachWin = rea; peakFrameByReach = f; }
@@ -445,19 +422,12 @@ function computeAll(state, cfg) {
       ? d.rule_extension : null;
 
     // Per-joint confidence at the peak frame — what fed the verdict.
-    // Wrist conf reflects whichever source was actually used: if the
-    // glove won the source pick that frame, use the glove conf; else
-    // the pose wrist conf.
     const joints = JOINTS_FOR_SIDE[side];
     let shConf = NaN, elConf = NaN, wrConf = NaN;
     if (peakValid) {
       shConf = pose.conf[peakFrame * 17 + joints.shoulder];
       elConf = pose.conf[peakFrame * 17 + joints.elbow];
-      if (srcArr[peakFrame] === "glove" && pose.gloveWrists) {
-        wrConf = gloveConf(pose.gloveWrists, peakFrame, joints.gloveSide);
-      } else {
-        wrConf = pose.conf[peakFrame * 17 + joints.wrist];
-      }
+      wrConf = pose.conf[peakFrame * 17 + joints.wrist];
     }
 
     const p = {
@@ -475,11 +445,9 @@ function computeAll(state, cfg) {
       peak_bend_deg: peakValid ? bendArr[peakFrame] : NaN,
       peak_reach: peakValid ? peakReach : NaN,
       peak_axiality,
-      glove_coverage: validFrames ? gloveFrames / validFrames : 0,
       peak_sh_conf: shConf,
       peak_el_conf: elConf,
       peak_wr_conf: wrConf,
-      peak_wr_source: peakValid ? (srcArr[peakFrame] || "—") : "—",
       label,
     };
     // Single source of truth for predicted/reason — keeps re-score handlers
@@ -490,7 +458,7 @@ function computeAll(state, cfg) {
 
   return {
     ratioL, ratioR, bendL, bendR,
-    sourceL, sourceR, punches, fps, bodyAxis,
+    punches, fps, bodyAxis,
   };
 }
 
@@ -579,16 +547,15 @@ function perFrameRatio(pose, side, cfg, bodyAxis, torsoEuclid) {
   const ratio  = new Float32Array(N);
   const reach  = new Float32Array(N);
   const bendDeg = new Float32Array(N);
-  const source = new Array(N);
   const RAD_TO_DEG = 180 / Math.PI;
   for (let f = 0; f < N; f++) {
     const w = wristXY(pose, f, joints, cfg);
-    if (!w) { ratio[f] = NaN; reach[f] = NaN; bendDeg[f] = NaN; source[f] = null; continue; }
+    if (!w) { ratio[f] = NaN; reach[f] = NaN; bendDeg[f] = NaN; continue; }
 
     const sc = pose.conf[f * 17 + joints.shoulder];
     const ec = pose.conf[f * 17 + joints.elbow];
     if (sc < cfg.minPoseConf || ec < cfg.minPoseConf) {
-      ratio[f] = NaN; reach[f] = NaN; bendDeg[f] = NaN; source[f] = null; continue;
+      ratio[f] = NaN; reach[f] = NaN; bendDeg[f] = NaN; continue;
     }
     const sh = shoulderXY(pose, f, joints, cfg, bodyAxis);
     const sx = sh.x, sy = sh.y;
@@ -600,7 +567,7 @@ function perFrameRatio(pose, side, cfg, bodyAxis, torsoEuclid) {
     const sw = Math.hypot(sx - w.x, sy - w.y);        // shoulder→wrist
     const path = ue + fa;
     if (path < 1e-3 || ue < 1e-3 || fa < 1e-3) {
-      ratio[f] = NaN; reach[f] = NaN; bendDeg[f] = NaN; source[f] = null; continue;
+      ratio[f] = NaN; reach[f] = NaN; bendDeg[f] = NaN; continue;
     }
     // Bounded [0,1]. Clamp tiny float overshoots that can happen when the
     // wrist is collinear with shoulder–elbow.
@@ -619,9 +586,8 @@ function perFrameRatio(pose, side, cfg, bodyAxis, torsoEuclid) {
     // assumes equal segments). Bend = 180° − elbow_angle.
     const cosElbow = Math.max(-1, Math.min(1, (ue*ue + fa*fa - sw*sw) / (2*ue*fa)));
     bendDeg[f] = 180 - Math.acos(cosElbow) * RAD_TO_DEG;
-    source[f] = w.source;
   }
-  return { ratio, reach, bendDeg, source };
+  return { ratio, reach, bendDeg };
 }
 
 // Per-frame Euclidean torso length, |shoulder_mid → hip_mid|. Returns a
@@ -659,30 +625,13 @@ function torsoEuclidPerFrame(pose, cfg) {
   return out;
 }
 
+// The pose wrist, or null when it fails the pose-conf gate.
 function wristXY(pose, frame, joints, cfg) {
-  // Legacy raw-glove sidecar path — only set on pre-v6 rounds. When present
-  // we honor it for backwards compatibility, but new rounds use v6 below.
-  const g = pose.gloveWrists;
-  if (g) {
-    const [gx, gy] = gloveXY(g, frame, joints.gloveSide);
-    const gc       = gloveConf(g, frame, joints.gloveSide);
-    if (gc >= cfg.minGloveConf && Number.isFinite(gx) && Number.isFinite(gy)) {
-      return { x: gx, y: gy, source: "glove" };
-    }
-  }
-  // v6 path (also the legacy pose-only fallback). When the meta says
-  // wrist_replaced_with_glove, joints 9/10 are the glove wrist already and
-  // conf at those indices is the glove conf — gate with minGloveConf and
-  // treat below-threshold as no detection (matches the production contract:
-  // NO Vision fallback when the glove model was running). When the meta
-  // says wrists are pure Vision, use minPoseConf like any other joint.
   const px = pose.skeleton[(frame * 17 + joints.wrist) * 2];
   const py = pose.skeleton[(frame * 17 + joints.wrist) * 2 + 1];
   const pc = pose.conf[frame * 17 + joints.wrist];
-  const isGloveBaked = pose.meta?.wrist_replaced_with_glove === true;
-  const gate = isGloveBaked ? cfg.minGloveConf : cfg.minPoseConf;
-  if (pc < gate || !Number.isFinite(px)) return null;
-  return { x: px, y: py, source: isGloveBaked ? "glove" : "pose" };
+  if (pc < cfg.minPoseConf || !Number.isFinite(px)) return null;
+  return { x: px, y: py };
 }
 
 // ─── render ────────────────────────────────────────────────────────────────
@@ -711,10 +660,8 @@ function renderTemplate(sig, cfg) {
         &nbsp;arc at the elbow shows the <b>interior angle</b>; the number next to it is the <b>bend</b> in °</li>
       <li><span style="display:inline-block;width:24px;height:1px;background:${COLORS.ratioGuide};border-top:1px dashed ${COLORS.ratioGuide};vertical-align:middle"></span>
         &nbsp;dashed shoulder→wrist guide (the "if fully extended" line)</li>
-      <li><span style="display:inline-block;width:12px;height:12px;background:rgba(0,0,0,0.55);border:2px solid ${COLORS.gloveArm};vertical-align:middle"></span>
-        &nbsp;wrist from the <b>glove detector</b> (conf ≥ ${cfg.minGloveConf})</li>
       <li><span style="display:inline-block;width:14px;height:14px;border:2px solid ${COLORS.poseArm};border-radius:50%;vertical-align:middle"></span>
-        &nbsp;wrist from the <b>pose model</b> (fallback when glove missing/low-conf)</li>
+        &nbsp;<b>wrist</b> (pose conf ≥ ${cfg.minPoseConf})</li>
       <li><span style="color:${COLORS.pass};font-family:monospace">0.97</span>
         / <span style="color:${COLORS.fail};font-family:monospace">0.82</span>
         &nbsp;ratio readout next to each wrist, colored by pass/fail vs threshold</li>
@@ -727,8 +674,7 @@ function renderTemplate(sig, cfg) {
         <div class="metric-val" id="ae-l-ratio">—</div>
         <div class="metric-sub">
           <span id="ae-l-bend">—</span> ·
-          axial <span id="ae-l-axial">—</span> ·
-          <span id="ae-l-source">—</span>
+          axial <span id="ae-l-axial">—</span>
         </div>
       </div>
       <div class="metric">
@@ -736,8 +682,7 @@ function renderTemplate(sig, cfg) {
         <div class="metric-val" id="ae-r-ratio">—</div>
         <div class="metric-sub">
           <span id="ae-r-bend">—</span> ·
-          axial <span id="ae-r-axial">—</span> ·
-          <span id="ae-r-source">—</span>
+          axial <span id="ae-r-axial">—</span>
         </div>
       </div>
     </div>
@@ -785,23 +730,16 @@ function renderTemplate(sig, cfg) {
     </div>
     <p class="hint muted small" id="ae-axial-status" style="margin:4px 0 0 0">—</p>
 
-    <h3>Confidence gates</h3>
+    <h3>Confidence gate</h3>
     <p class="hint">
-      Frames where the relevant pose joints (shoulder/elbow/wrist/hip) or the
-      glove detection fall below these confidences are rejected from the
-      ratio computation. Raising the pose gate kills frames with sketchy
-      pose tracking; raising the glove gate makes the lens fall back to
-      the pose wrist more often.
+      Frames where the relevant pose joints (shoulder/elbow/wrist/hip) fall
+      below this confidence are rejected from the ratio computation. Raising
+      the gate kills frames with sketchy pose tracking.
     </p>
     <div class="slider-row">
       <input type="range" id="ae-pose-gate" min="0.05" max="0.95" step="0.05" value="${cfg.minPoseConf}" />
       <output id="ae-pose-gate-out">${cfg.minPoseConf.toFixed(2)}</output>
-      <span class="muted small">pose conf — shoulder, elbow, wrist-fallback, hip</span>
-    </div>
-    <div class="slider-row">
-      <input type="range" id="ae-glove-gate" min="0.05" max="0.95" step="0.05" value="${cfg.minGloveConf}" />
-      <output id="ae-glove-gate-out">${cfg.minGloveConf.toFixed(2)}</output>
-      <span class="muted small">glove conf — v6: below = no wrist detection (no Vision fallback); legacy sidecar: below = fall back to pose wrist</span>
+      <span class="muted small">pose conf — shoulder, elbow, wrist, hip</span>
     </div>
     <p class="hint muted small" id="ae-gate-status" style="margin:4px 0 0 0">—</p>
 
@@ -951,7 +889,7 @@ function renderPunchTable() {
           <th title="peak reach = |sh→wr| / euclidean torso at peak frame — context only, no longer a gate (units: torsos)">reach</th>
           <th title="shoulder confidence at peak frame">sh</th>
           <th title="elbow confidence at peak frame">el</th>
-          <th title="wrist confidence at peak frame — glove if used, pose if fallback">wr</th>
+          <th title="wrist confidence at peak frame">wr</th>
         </tr></thead>
         <tbody>${tbody}</tbody>
       </table>`;
@@ -1038,16 +976,11 @@ function drawArmGhost(ctx, pose, frame, side, cfg, scale) {
   const sc = pose.conf[frame * 17 + joints.shoulder];
   const ec = pose.conf[frame * 17 + joints.elbow];
   const wc = pose.conf[frame * 17 + joints.wrist];
-  const gloveOK = pose.gloveWrists && (() => {
-    const gc = gloveConf(pose.gloveWrists, frame, joints.gloveSide);
-    const [gx] = gloveXY(pose.gloveWrists, frame, joints.gloveSide);
-    return gc >= cfg.minGloveConf && Number.isFinite(gx);
-  })();
 
   const tooLow = [];
   if (sc < cfg.minPoseConf) tooLow.push(`sh ${sc.toFixed(2)}`);
   if (ec < cfg.minPoseConf) tooLow.push(`el ${ec.toFixed(2)}`);
-  if (!gloveOK && wc < cfg.minPoseConf) tooLow.push(`wr ${wc.toFixed(2)}`);
+  if (wc < cfg.minPoseConf) tooLow.push(`wr ${wc.toFixed(2)}`);
   if (!tooLow.length) tooLow.push("no wrist signal");
 
   ctx.save();
@@ -1279,7 +1212,7 @@ function drawArmRatio(ctx, pose, frame, side, ratio, cfg, scale, bodyAxis) {
 
   // Mark the three corners we measure against — shoulder and elbow get
   // solid dots so the user can see exactly which joints feed the ratio /
-  // bend computation. The wrist gets its own glove-or-pose marker below.
+  // bend computation. The wrist gets its own ring marker below.
   ctx.fillStyle = color;
   ctx.strokeStyle = "rgba(0,0,0,0.55)";
   ctx.lineWidth = 1.5 * scale;
@@ -1389,22 +1322,12 @@ function drawArmRatio(ctx, pose, frame, side, ratio, cfg, scale, bodyAxis) {
     ctx.restore();
   }
 
-  // Wrist marker — square if glove, ring if pose. Same shape vocabulary as
-  // the wrist_swap lens.
-  if (w.source === "glove") {
-    const s_ = 8 * scale;
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(w.x - s_, w.y - s_, s_ * 2, s_ * 2);
-    ctx.strokeStyle = COLORS.gloveArm;
-    ctx.lineWidth = 3 * scale;
-    ctx.strokeRect(w.x - s_, w.y - s_, s_ * 2, s_ * 2);
-  } else {
-    ctx.strokeStyle = COLORS.poseArm;
-    ctx.lineWidth = 3 * scale;
-    ctx.beginPath();
-    ctx.arc(w.x, w.y, 9 * scale, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+  // Wrist marker — a ring.
+  ctx.strokeStyle = COLORS.poseArm;
+  ctx.lineWidth = 3 * scale;
+  ctx.beginPath();
+  ctx.arc(w.x, w.y, 9 * scale, 0, Math.PI * 2);
+  ctx.stroke();
 
   // Ratio readout next to the wrist
   if (Number.isFinite(ratio)) {

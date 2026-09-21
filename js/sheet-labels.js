@@ -7,7 +7,7 @@
 // Flow (option A — auto-match):
 //   1. The viewer loads a pose cache. The cache filename gives us a
 //      basename (e.g. `30 MIN SHADOWBOXING…_h264` from
-//      `30 MIN SHADOWBOXING…_h264_vision_r0.npz`).
+//      `30 MIN SHADOWBOXING…_h264_blazepose_r0.npy`).
 //   2. We fetch the Sheet CSV once per session (cached in memory), then
 //      look for a unique `video_name` whose stem matches the cache
 //      basename (case-insensitive, substring either direction).
@@ -123,10 +123,10 @@ function normalize(s) {
 // the most specific source video).
 export function pickSourceByCounts(counts, cacheBasename) {
   if (!cacheBasename) return null;
-  // Strip the cache-shape suffix `_<engine>_r<N>` so the basename we match
+  // Strip the cache-shape suffix `_blazepose_r<N>` so the basename we match
   // against is just the source name, e.g.
-  //   `30 MIN SHADOWBOXING…_h264_vision_r0` → `30 MIN SHADOWBOXING…_h264`
-  const cb = cacheBasename.replace(/_(yolo|vision)_r\d+$/i, "");
+  //   `30 MIN SHADOWBOXING…_h264_blazepose_r0` → `30 MIN SHADOWBOXING…_h264`
+  const cb = cacheBasename.replace(/_blazepose_r\d+$/i, "");
   const cbN = normalize(cb);
   if (!cbN) return null;
   const names = [...counts.keys()];
@@ -375,7 +375,7 @@ export async function fetchCombinedVideoCounts({ force = false } = {}) {
 // with times in source-video SECONDS, or { error }.
 export async function fetchCombinedRowsForStem(cacheBasename, { force = false } = {}) {
   if (!cacheBasename) return { error: "no cache basename to match" };
-  const stem = cacheBasename.replace(/_(yolo|vision)_r\d+$/i, "");
+  const stem = cacheBasename.replace(/_blazepose_r\d+$/i, "");
 
   const pull = async name => {
     const hit = force ? null : cachedRowsByName.get(name);
@@ -407,8 +407,8 @@ export async function fetchCombinedRowsForStem(cacheBasename, { force = false } 
     // fuzzy-match against the video list the way fetchLiveLabels does.
     const counts = await fetchCombinedVideoCounts({ force });
     const match = pickSourceByCounts(counts, cacheBasename);
-    // A fuzzy hit on a short name is a guess, not a match: an on-device
-    // round is called `round_1`, and both of its tokens sit in "Do a full
+    // A fuzzy hit on a short name is a guess, not a match: a round called
+    // `round_1` has both of its tokens in "Do a full
     // round practicing a combo. Today: 1 - 2 - 3 …" — 29 rows of someone
     // else's labels. Fuzzy needs a name with something to go on.
     const nTokens = normalize(stem).split(" ").filter(Boolean).length;
@@ -453,7 +453,7 @@ export async function fetchTrackingVideos({ force = false } = {}) {
 // with times in source-video SECONDS, or { error }.
 export async function fetchLabelerRowsForStem(cacheBasename, { force = false } = {}) {
   if (!cacheBasename) return { error: "no cache basename to match" };
-  const stem = cacheBasename.replace(/_(yolo|vision)_r\d+$/i, "");
+  const stem = cacheBasename.replace(/_blazepose_r\d+$/i, "");
   try {
     const catalog = await fetchTrackingVideos({ force });
     // Exact first (tracker names carry no extension), then the fuzzy match and

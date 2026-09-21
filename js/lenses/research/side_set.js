@@ -34,7 +34,7 @@ const COLOR_ACCENT = "#b48cff";
 
 let cache = { pose: null, basename: null };
 
-const pickPose = state => state.poseV6 || state.pose;
+const pickPose = state => state.pose;
 
 function compute(state) {
   const pose = pickPose(state);
@@ -81,9 +81,9 @@ export const SideSetRule = {
   },
 
   // Per-video filter for the Drive dropdown: only the curated videos are
-  // selectable while this lens is active. The manual file picker and the
-  // Firebase path bypass it, which is why update()/draw() still handle a video
-  // that is not in the set.
+  // selectable while this lens is active. The manual file picker bypasses
+  // it, which is why update()/draw() still handle a video that is not in
+  // the set.
   requiresVideo: isCuratedVideo,
 
   mount(_host) {

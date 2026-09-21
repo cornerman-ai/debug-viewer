@@ -1,8 +1,7 @@
 // Stance-width rule lens.
 //
 // Recomputes the stance_width rule in the browser from the loaded pose
-// cache — unlike the on-device lens, which only displays the sidecar the
-// phone uploaded. This is the workbench for iterating on the rule: today
+// cache. This is the workbench for iterating on the rule: today
 // it is a line-for-line port of the shipped implementation
 // (cornerman-ios StanceWidthRule.swift v4, itself parity-tested against
 // cornerman_rules.rules.stance_width); tweaks/experiments go here first.
@@ -317,9 +316,9 @@ let host;
 // Memoized round computation, keyed on the pose object + fps.
 let cache = { pose: null, fps: 0, out: null };
 
-// v6 cache is the canonical pose source (mirrors guard_drop.js pickPose).
+// The BlazePose skeleton every lens reads (mirrors guard_drop.js pickPose).
 function pickPose(state) {
-  return state.poseV6 || state.pose;
+  return state.pose;
 }
 
 // Lens-side diagnostic, NOT part of the ported rule: split the ankle

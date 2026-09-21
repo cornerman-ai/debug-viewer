@@ -1,66 +1,18 @@
 // Overview panel — no rule lens, just shows the raw per-joint state at the
-// current frame. Useful when you want to eyeball Apple Vision's confidence
+// current frame. Useful when you want to eyeball BlazePose's confidence
 // distribution before picking a specific rule.
 //
 // Also paints a labeler-style punch label in the top-left of the video when
 // the current frame falls inside a labelled (or model-detected) punch window.
 // Source order: state.labels (ground truth) > state.punches (ST-GCN) > none.
 
-import { JOINT_NAMES, confColor, drawSkeleton } from "../../skeleton.js";
+import { JOINT_NAMES, confColor } from "../../skeleton.js";
 
 let host;
 
-// ── Skeleton/engine picker so the per-joint table can show any loaded engine
-//    (Vision / YOLO / RTMPose / v6), not just the primary. ──
-const ENGINE_LABEL = {
-  apple_vision_2d: "Vision", yolo_pose: "YOLO", rtmpose_body17: "RTMPose",
-  apple_vision_2d_combined: "v6 (combined)",
-};
-function engLabel(p) {
-  const e = (p && p.engine) || "";
-  return ENGINE_LABEL[e] || (e.startsWith("apple_vision_2d+glove") ? "v6" : (e || "pose"));
-}
-function ovSources(state) {
-  const seen = new Set(), out = [];
-  const add = (p, suffix) => {
-    if (!p || seen.has(p)) return;
-    seen.add(p); out.push({ pose: p, label: engLabel(p) + (suffix || "") });
-  };
-  add(state.pose); add(state.poseSecondary); add(state.poseRtm);
-  add(state.poseV6, " v6"); add(state.poseCombined, " comb");
-  return out;
-}
-let ovSel = null;   // selected source label (persists across rounds)
 let ovShowSkel = true;  // skeleton overlay on/off (persists across rounds)
 // Style that fully suppresses the base skeleton draw in viewer.js.
 const HIDDEN_SKELETON = { boneColor: "rgba(0,0,0,0)", jointRadius: 0, minConf: Infinity, showImputed: false };
-// Map the viewer's current frame to the selected pose's frame by ABSOLUTE pts
-// (same alignment engine_compare uses); falls back to the start_sec+fps model.
-function ovFrame(p, state) {
-  if (p === state.pose) return state.frame;            // primary: canonical frame
-  // Reference time = what the VIDEO is actually displaying (currentTime), not the
-  // primary's pts — the player seeks on a uniform timeline that can drift a frame
-  // or two from a non-uniform primary cache. Match the on-screen instant.
-  const vid = document.getElementById("video");
-  const t = (vid && isFinite(vid.currentTime))
-    ? vid.currentTime
-    : (state.pose.start_sec || 0) + state.frame / state.pose.fps;
-  const bp = p.pts;
-  if (bp && bp.length) {
-    let lo = 0, hi = bp.length - 1;
-    while (lo < hi) { const m = (lo + hi) >> 1; if (bp[m] < t) lo = m + 1; else hi = m; }
-    let best = lo;
-    if (lo > 0 && Math.abs(bp[lo - 1] - t) <= Math.abs(bp[lo] - t)) best = lo - 1;
-    return best;
-  }
-  const sf = Math.round((t - (p.start_sec || 0)) * p.fps);
-  return (sf >= 0 && sf < p.n_frames) ? sf : 0;
-}
-// The single source the per-joint table AND the on-video overlay both follow.
-function ovSelected(state) {
-  const srcs = ovSources(state);
-  return srcs.find(s => s.label === ovSel) || srcs[0] || null;
-}
 
 export const OverviewRule = {
   id: "overview",
@@ -68,32 +20,18 @@ export const OverviewRule = {
 
   mount(_host, state) {
     host = _host;
-    const srcs = ovSources(state);
-    if (!srcs.find(s => s.label === ovSel)) ovSel = srcs[0]?.label || null;
-    const opts = srcs.map(s =>
-      `<option value="${s.label}"${s.label === ovSel ? " selected" : ""}>${s.label}</option>`).join("");
     host.innerHTML = `
       <h2>Per-joint state</h2>
-      <label class="hint" style="display:block;margin-bottom:6px">Skeleton:
-        <select id="ov-engine" style="background:#1c1c1c;color:#eee;border:1px solid #444;border-radius:4px;padding:1px 5px">${opts || "<option>—</option>"}</select></label>
       <label class="hint" style="display:block;margin-bottom:6px">
         <input type="checkbox" id="ov-skel"${ovShowSkel ? " checked" : ""}> Show skeleton overlay</label>
       <div id="ov-source" class="hint" style="margin-bottom:8px"></div>
-      <p class="hint">Confidence is colour-coded: green ≥ 0.5, amber ≥ 0.2, red below.
-      A zero means the engine didn't detect that joint (Vision emits 0; YOLO/RTMPose
-      usually return a low-conf guess). Non-primary engines are mapped to this frame by PTS.
-      The picked skeleton is also what's drawn on the video.</p>
+      <p class="hint">Confidence is BlazePose's per-joint visibility, colour-coded:
+      green ≥ 0.5, amber ≥ 0.2, red below.</p>
       <table class="joint-table">
         <thead><tr><th>#</th><th>Joint</th><th>x</th><th>y</th><th>conf</th></tr></thead>
         <tbody id="joint-tbody"></tbody>
       </table>
     `;
-    const sel = host.querySelector("#ov-engine");
-    if (sel) sel.addEventListener("change", () => {
-      ovSel = sel.value;
-      this.update(state);
-      window.__viewerRedraw?.();   // repaint the overlay too, not just the table
-    });
     const skel = host.querySelector("#ov-skel");
     if (skel) skel.addEventListener("change", () => {
       ovShowSkel = skel.checked;
@@ -103,10 +41,9 @@ export const OverviewRule = {
   },
 
   update(state) {
-    const src = ovSelected(state);
+    const pose = state.pose, fr = state.frame;
     const tbody = host.querySelector("#joint-tbody");
-    if (!src) { if (tbody) tbody.innerHTML = ""; renderSourceLine(state); return; }
-    const pose = src.pose, fr = ovFrame(pose, state);
+    if (!pose) { if (tbody) tbody.innerHTML = ""; renderSourceLine(state); return; }
     const rows = [];
     for (let j = 0; j < 17; j++) {
       const x = pose.skeleton[(fr * 17 + j) * 2];
@@ -126,33 +63,15 @@ export const OverviewRule = {
     renderSourceLine(state);
   },
 
-  // The base renderer (viewer.js) always draws the primary, state.pose. When a
-  // different engine is picked, suppress it here so we can draw the picked
-  // skeleton ourselves in draw() — the overlay then tracks the dropdown, not
-  // just the per-joint table. "primary" selected → {} → normal overlay.
-  skeletonStyle(state) {
-    if (!ovShowSkel) return HIDDEN_SKELETON;
-    const src = ovSelected(state);
-    if (src && src.pose !== state.pose) {
-      return HIDDEN_SKELETON;
-    }
-    return {};
+  // The base renderer (viewer.js) draws state.pose; the checkbox hides it.
+  skeletonStyle() {
+    return ovShowSkel ? {} : HIDDEN_SKELETON;
   },
 
-  // Draws the picked non-primary skeleton (when one is selected), then the
-  // top-left punch label, mimicking the labeler's HUD. Stacks one block per
-  // active punch when multiple windows overlap (fast combos).
+  // Draws the top-left punch label, mimicking the labeler's HUD. Stacks one
+  // block per active punch when multiple windows overlap (fast combos).
   draw(ctx, state) {
     const s = state.renderScale || 1;
-    // Picked a non-primary engine → draw its skeleton (PTS-mapped to this
-    // frame), confidence-coloured exactly like the primary overlay.
-    const src = ovSelected(state);
-    if (ovShowSkel && src && src.pose !== state.pose) {
-      drawSkeleton(ctx, src.pose, ovFrame(src.pose, state), {
-        boneWidth: 2 * s,
-        jointRadius: 4 * s,
-      });
-    }
     const aps = activePunches(state, state.frame);
     if (aps.length) drawPunchHudStack(ctx, aps, state, s);
   },

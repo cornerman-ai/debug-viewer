@@ -227,7 +227,7 @@ const ok = (conf, f, js, min) => js.every(j => conf[f * 17 + j] > min);
 
 let mc = { pose: null };
 
-const pickPose = s => s.poseV6 || s.pose;
+const pickPose = s => s.pose;
 
 // ── curated frontal set (merged in from the retired frontal_segments lens) ──
 //
@@ -498,7 +498,7 @@ export const BladednessRule = {
   label: "Bladedness (squared vs side-on)",
 
   // Only the curated frontal videos are selectable. The dropdown filter alone
-  // isn't enough — the manual file picker and the Firebase path bypass it — so
+  // isn't enough — the manual file picker bypasses it — so
   // update()/draw() refuse to measure a non-curated video as well.
   requiresVideo: isCuratedVideo,
 

@@ -99,7 +99,7 @@ let selection = null;         // drag-selected frame range (shared/timeline_sele
 
 // ── clock helpers (same convention as the impact spotter lens) ──────────────
 function stripStem(s) { return String(s || "").replace(/_h264$/, ""); }
-function poseOf(state) { return state.poseV6 || state.pose || null; }
+function poseOf(state) { return state.pose || null; }
 function startSec(state) { const p = poseOf(state); return (p && (p.start_sec || 0)) || 0; }
 function secToFrame(state, tSrc) {
   const fps = state.fps || 30;

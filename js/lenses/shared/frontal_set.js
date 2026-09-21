@@ -53,10 +53,9 @@ fetch("./lens_data/frontal_rounds.json", { cache: "no-store" })
   // The dropdowns filter on requires(), which cannot answer until this lands.
   .finally(() => window.dispatchEvent(new Event("lens-filter-changed")));
 
-// Same engine test as the viewer's default `requires` — any 2D skeleton cache.
+// Same engine test as the viewer's default `requires` — a BlazePose cache.
 // Exported for lenses that build their own round filter on top of it.
-export const hasSkeleton = slot => !!(slot?.blazepose || slot?.yolo || slot?.vision
-  || slot?.vision_glove || slot?.rtmpose || slot?.movenet || slot?.yolo11);
+export const hasSkeleton = slot => !!slot?.blazepose;
 
 // Pending ⇒ hide (the fetch re-fires the filter). Failed, or a stem the dump
 // does not know ⇒ do not filter rounds rather than hide footage silently.

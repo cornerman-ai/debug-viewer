@@ -38,7 +38,6 @@ import { SideSetRule } from "./research/side_set.js";
 import { SlipExplorationRule } from "./research/slip_exploration.js";
 import { SlipsGtRule } from "./research/slips_gt.js";
 import { PunchClassifierRule } from "./models/punch_classifier.js";
-import { OnDeviceLensRule } from "./inspect/ondevice.js";
 import { PoseCoverageLensRule } from "./inspect/pose_coverage.js";
 import { SkeletonCompareRule } from "./inspect/skeleton_compare.js";
 import { SkeletonUsabilityRule } from "./research/skeleton_usability.js";
@@ -78,7 +77,6 @@ export const RULES = [
   HipRotationReviewRule,
   HitHeightRule,
   ImpactSpotterLensRule,
-  OnDeviceLensRule,
   PoseCoverageLensRule,
   PunchClassifierRule,
   PunchPredictionsRule,

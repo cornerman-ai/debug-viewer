@@ -1,6 +1,6 @@
 // COCO-17 joint indices and bone topology, mirroring the rules engine
-// (cornerman_rules/utils/skeleton.py). Both YOLO-Pose and the on-device
-// Apple Vision module write joints in this order.
+// (cornerman_rules/utils/skeleton.py). pose-loader remaps BlazePose-33 into
+// this order.
 
 export const J = {
   NOSE: 0,
@@ -50,7 +50,7 @@ export function torsoHeight(pose, frame) {
 }
 
 // Color a joint marker by confidence — green ≥ 0.5, amber ≥ 0.2, red below.
-// Zero confidence (Vision didn't detect this joint) renders transparent so the
+// Zero confidence (the joint wasn't detected) renders transparent so the
 // overlay doesn't lie about a joint that isn't actually there.
 export function confColor(c) {
   if (c <= 0) return "rgba(0,0,0,0)";

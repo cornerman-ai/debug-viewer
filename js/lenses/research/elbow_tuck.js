@@ -66,7 +66,7 @@ function frameValid(conf, f) {
 let metricCache = { pose: null, fps: 0 };
 
 function pickPose(state) {
-  return state.poseV6 || state.pose;
+  return state.pose;
 }
 
 function computeMetrics(state) {
@@ -97,11 +97,9 @@ function computeMetrics(state) {
   // Per-side hook exclusion: frames where THAT hand is throwing a hook.
   const hookL = new Array(n).fill(false), hookR = new Array(n).fill(false);
   if (dets) {
-    const roundStance = state.analysis?.ankleOrientation?.stance;
     for (const d of dets) {
       if (!isHook(d.punch_type)) continue;
       const stance = (d.stance === "southpaw" || d.stance === "orthodox") ? d.stance
-                   : (roundStance === "southpaw" || roundStance === "orthodox") ? roundStance
                    : "orthodox";
       const side = SIDE_FOR[d.hand]?.[stance];
       if (!side) continue;

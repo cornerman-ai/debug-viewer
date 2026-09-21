@@ -26,48 +26,17 @@ const VIDEO_EXTENSIONS = /\.(mp4|mov|m4v|webm)$/i;
 // Drive-folder walk indexes exactly the same files a manual folder pick would.
 // (GT labels are pulled live from the Sheet at load time; no sidecar.)
 //
-// Six engine tags now: `yolo` and `vision` are the COCO-17 2D engines;
-// `vision3d` is the experimental Apple Vision 3D engine producing
-// (N, 17, 4) body-frame metres + an optional `_cam.npy` sidecar with the
-// per-frame cameraOriginMatrix; `glove` is a wrist-only sidecar — shape
-// (N, 2, 3) holding (x, y, conf) for [L_wrist, R_wrist] from the trained
-// glove detector, time-aligned with the matching vision cache, used by the
-// wrist-swap lens to replace Vision's wrists at render time.
-// `vision_combined` is a synthetic tag we apply to `_vision_` files that
-// live inside a `pose_cache_v*/` folder — the production-shaped cache built
-// by glove_wrist_cache_build.ipynb §8 with glove wrists baked into joints 9/10.
-// `vision_glove` is the v6 cache (pose_cache_v6/) — Apple Vision skeleton
-// with glove-detector wrists already baked in for gloved rounds (or pure
-// Vision for ungloved rounds), shape (N, 17, 3). The meta sidecar carries
-// the per-round glove-presence decision and engine versions so the round_v6
-// lens can render exactly what the iOS app sees.
-// The 3D / glove files share the same `_r{N}` and `_meta.json` conventions
-// so the slot machinery below is reused as-is.
-//
-// Engine alternation MUST list longer tokens first — `vision_glove` would
-// otherwise be eaten as `(vision)` with base ending in `_vision`, then
-// `_glove_r…` would fail to match.
-// Bake-off engines (movenet/yolo11/blazepose) are COCO-17 like yolo/rtmpose.
-// `yolo11` MUST precede `yolo` (longer-first) so `_yolo11_` isn't eaten as
-// `_yolo`. `blazepose33` is intentionally absent — that 33-joint cache is for
-// the schema-aware skeleton_compare lens, not the COCO-17 loaders.
+// BlazePose is the only engine: `<stem>_blazepose_r<N>.npy` (N, 33, 8) plus
+// its `_meta.json`, the optional `_pts.npy` per-frame timestamps and an
+// optional `_punches.json` detections sidecar. Caches of any other engine
+// (Apple Vision, the glove-wrist caches, YOLO, RTMPose, MoveNet, YOLO11 —
+// all in Drive's archive/) don't match and are skipped.
 const CACHE_FILE_RE =
-  /^(.+?)_(vision_glove|vision3d|vision|yolo11|yolo|rtmpose|movenet|blazepose|glove)_r(\d+)(_meta|_punches|_cam|_proj|_pts)?\.(npy|json)$/;
+  /^(.+?)_(blazepose)_r(\d+)(_meta|_punches|_pts)?\.(npy|json)$/;
 // Punch-classifier predictions dump (one file per training run, schema in
 // js/rules/punch_classifier.js). Walker captures these and exposes them as
 // `state.predictionFiles` so the lens auto-loads without a file picker.
 const PREDICTIONS_FILE_RE = /^predictions_.*\.json$/i;
-const COMBINED_DIR_RE = /^pose_cache_v/i;
-function classifyEngine(engine, _parentDirName) {
-  // `vision_glove` and `vision_combined` are filename-distinguished now (the
-  // v6 builder writes `_vision_glove_` directly), so the parent-folder hint
-  // for `vision_combined` only matters for the older pose_cache_v*/ files
-  // that still use the bare `_vision_` naming. v6 files match unambiguously.
-  if (engine === "vision" && _parentDirName && COMBINED_DIR_RE.test(_parentDirName)) {
-    return "vision_combined";
-  }
-  return engine;
-}
 
 // ── IndexedDB plumbing (tiny manual wrapper to avoid pulling in idb-keyval) ──
 
@@ -207,17 +176,9 @@ export async function walk(rootHandle) {
       if (name.endsWith(".bak.npy")) continue;
       const m = name.match(CACHE_FILE_RE);
       if (!m) continue;
-      const [, base, rawEngine, roundStr, suffix, ext] = m;
+      const [, base, engine, roundStr, suffix, ext] = m;
       const round = parseInt(roundStr);
       if (ext === "json" && !suffix) continue;
-      // Parent-folder hint disambiguates `pose_cache_v5/foo_vision_r0.npy`
-      // (combined cache with glove wrists baked in) from `apple_vision_pose_cache/`
-      // (raw vision). Same filename pattern; only the folder differs.
-      const engine = classifyEngine(rawEngine, dirHandle.name);
-      // The 3D loader expects `npy` (data) and `_cam.npy` (camera matrices)
-      // to live in the same engine slot. The cam .npy isn't required —
-      // viewer is happy without it — but if present, stash it as `cam`.
-      // `_punches` only applies to 2D engines.
 
       if (!cacheIndex.has(base)) cacheIndex.set(base, new Map());
       const rounds = cacheIndex.get(base);
@@ -225,9 +186,7 @@ export async function walk(rootHandle) {
       const slot = rounds.get(round);
       if (!slot[engine]) slot[engine] = {};
       const engineSlot = slot[engine];
-      if (ext === "npy" && suffix === "_cam")        engineSlot.cam = entry;
-      else if (ext === "npy" && suffix === "_proj")  engineSlot.proj = entry;
-      else if (ext === "npy" && suffix === "_pts")   engineSlot.pts = entry;
+      if (ext === "npy" && suffix === "_pts")        engineSlot.pts = entry;
       else if (ext === "npy")                        engineSlot.npy = entry;
       else if (suffix === "_meta")                   engineSlot.meta = entry;
       else if (suffix === "_punches")                engineSlot.punches = entry;
@@ -236,26 +195,11 @@ export async function walk(rootHandle) {
 
   await visit(rootHandle);
 
-  // Same completeness filter the manual picker applies: drop engines that
-  // don't have both .npy + _meta.json; drop rounds that lost ALL skeleton
-  // engines. The 3D engine is treated the same way — it needs its own
-  // .npy + meta. The `glove` sidecar follows the same npy+meta requirement,
-  // but does NOT count as a skeleton engine — it's only useful when paired
-  // with vision (it replaces Vision's wrists at render time).
-  // `vision_combined` and `vision_glove` ARE skeleton engines — both are
-  // full COCO-17 poses, just with wrists 9/10 replaced by glove predictions
-  // on confident frames (vision_combined = legacy pose_cache_v5/, vision_glove
-  // = pose_cache_v6/).
+  // Same completeness filter the manual picker applies: a round needs its
+  // BlazePose .npy + _meta.json, else it is dropped.
   for (const [base, rounds] of cacheIndex) {
     for (const [round, slot] of rounds) {
-      for (const eng of ["yolo", "vision", "vision3d", "rtmpose", "movenet", "yolo11", "blazepose", "glove", "vision_combined", "vision_glove"]) {
-        if (slot[eng] && (!slot[eng].npy || !slot[eng].meta)) delete slot[eng];
-      }
-      // glove alone is useless — needs a skeleton engine to overlay on
-      if (!slot.yolo && !slot.vision && !slot.vision3d && !slot.rtmpose && !slot.movenet
-          && !slot.yolo11 && !slot.blazepose && !slot.vision_combined && !slot.vision_glove) {
-        rounds.delete(round);
-      }
+      if (!slot.blazepose?.npy || !slot.blazepose?.meta) rounds.delete(round);
     }
     if (rounds.size === 0) cacheIndex.delete(base);
   }

@@ -47,7 +47,7 @@ const cfg = {
   levelUnder: -0.08,     // height_norm above this ⇒ "under" (chin tucked)
   ruler: "shoulder",     // "shoulder" | "torso"
   aspect: false,         // multiply normalized coords back to pixels first
-  stance: "auto",        // "auto" | "orthodox" | "southpaw"
+  stance: "orthodox",    // "orthodox" | "southpaw"
   minVis: 0.5,
 };
 
@@ -86,9 +86,7 @@ function frameOf(b, state) {
 }
 
 function stanceOf(state) {
-  if (cfg.stance !== "auto") return cfg.stance;
-  const s = state.analysis?.ankleOrientation?.stance;
-  return (s === "southpaw" || s === "orthodox") ? s : "orthodox";   // house default
+  return cfg.stance;
 }
 
 // Everything the lens needs for one frame, in the CURRENTLY SELECTED coord
@@ -213,8 +211,7 @@ export const ChinHeightRule = {
           </select></label>
         <label>stance
           <select id="ch-stance">
-            <option value="auto" selected>auto</option>
-            <option value="orthodox">orthodox</option>
+            <option value="orthodox" selected>orthodox</option>
             <option value="southpaw">southpaw</option>
           </select></label>
         <label title="Normalized x,y divide by width,height — so dx and dy are different lengths unless the video is square.">

@@ -100,7 +100,7 @@ export const StepPunchSyncRule = {
     if (refreshBtn) {
       refreshBtn.addEventListener("click", async () => {
         const cacheBasename = state.pose?.source
-          ? state.pose.source.replace(/\.npy$/i, "").replace(/_(yolo|vision)_r\d+$/i, "")
+          ? state.pose.source.replace(/\.npy$/i, "").replace(/_blazepose_r\d+$/i, "")
           : null;
         if (!cacheBasename) { refreshBtn.textContent = "no cache"; return; }
         refreshBtn.disabled = true;

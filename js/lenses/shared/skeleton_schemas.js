@@ -1,5 +1,5 @@
 // AUTO-GENERATED from cornerman-backend/pose_bakeoff/_skeletons.py — do not hand-edit.
-// Keypoint schemas for the Skeleton-compare lens: COCO-17 (Vision/YOLO/v6),
+// Keypoint schemas for the Skeleton-compare lens: COCO-17 (the BlazePose remap),
 // BlazePose-33, RTMPose Wholebody-133. Each: {n, names, point_tags, edges:[[i,j,tag]]}.
 // wholebody133 connectivity is derived from rtmlib's coco133 definition.
 

@@ -2,12 +2,12 @@
 // pick which goes in each slot. Like engine_compare, but schema-aware (COCO-17,
 // BlazePose-33, RTMPose Wholebody-133) and source-selectable.
 //
-// Built-in sources come from the loaded round (Vision / YOLO / v6, all COCO-17).
+// The built-in source is the loaded round's BlazePose skeleton (COCO-17 remap).
 // Extra sources (BlazePose-33, RTMPose Wholebody-133) are loaded from .skel.json
 // files via the file picker in the panel — generate them with
 // cornerman-backend/pose_bakeoff/npz_to_skeljson.py for the round you're viewing.
 // IMPORTANT: extract those from the UPRIGHT (display-oriented) video so the
-// pixel coords match the browser's video + the Vision skeleton.
+// pixel coords match the browser's video + the loaded skeleton.
 //
 // Slot A = warm/orange, Slot B = cool/cyan. Wrists enlarged. Region toggles +
 // confidence slider manage clutter on the dense 133-point skeleton.
@@ -24,9 +24,7 @@ function base64ToFloat32(b64) {
 }
 
 function engineName(e) {
-  return e === "yolo_pose" ? "YOLO"
-    : e === "apple_vision_2d" ? "Vision"
-    : e === "vision_combined" ? "Vision (comb)"
+  return e === "blazepose" ? "BlazePose"
     : e === "blazepose_33" ? "BlazePose-33"
     : e === "rtmpose_wholebody_133" ? "RTMPose-133"
     : (e || "pose");
@@ -43,7 +41,7 @@ let THR = 0.2;
 let enabled = new Set(GROUPS.filter(g => g[2]).map(g => g[0]));
 let lastSrcSig = "";
 
-// Built-in sources from the loaded round + any loaded extras.
+// The built-in source from the loaded round + any loaded extras.
 function collectSources(state) {
   const seen = new Set(), out = [];
   const add = (p, suffix) => {
@@ -51,7 +49,7 @@ function collectSources(state) {
     seen.add(p);
     out.push({ name: engineName(p.engine) + (suffix || ""), schema: p.schema || "coco17", pose: p });
   };
-  if (state) { add(state.pose); add(state.poseSecondary); add(state.poseV6, " v6"); }
+  if (state) add(state.pose);
   for (const e of extras) out.push(e);
   return out;
 }

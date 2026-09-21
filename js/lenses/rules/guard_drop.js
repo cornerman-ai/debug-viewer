@@ -218,9 +218,7 @@ export const GuardDropRule = {
 };
 
 // ─── compute ───────────────────────────────────────────────────────────────
-// The drawn BlazePose skeleton — never state.poseV6 (the archived Apple Vision +
-// glove cache): a round that still had one was measured on Vision, not on what
-// the overlay shows.
+// The drawn BlazePose skeleton.
 function pickPose(state) { return state.pose; }
 
 function jt(pose, f, j) {

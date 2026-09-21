@@ -1,8 +1,7 @@
 // Punch classifier (GT vs Pred) — visual replacement for the throwaway
 // `eventacc_video_overlay.html` cell in the legacy training notebooks. The
-// current shipped baseline is `classifier_5class_kfold_eventacc_14joints_vision_exp_C_speedjitter.ipynb`
-// (14-joint Vision + interp + speed jitter augmentation, EA 66.4%; see
-// project_classifier_14j_baseline.md for the full headline numbers).
+// current classifier is bp14jz (BlazePose ST-GCN, 14 joints; trained with
+// cornerman-backend's ml/punch_classification/train.py).
 //
 // The original notebook's HTML overlay fuzzy-matched dropped videos to its
 // embedded prediction set by the first 20 chars of the filename, which
@@ -61,7 +60,8 @@
 //   See cornerman-backend: rescore_event_matching.py, decoder_experiment.py,
 //   upgrade_predictions_schema.py (local v1 -> v3 upgrade, no Colab needed).
 //
-// Notebook export snippet (already wired as cell 29 of the C notebook):
+// Notebook export snippet (the retired Colab training notebooks carried it as
+// an export cell; fill in the model name and output path):
 //
 //   import json, numpy as np
 //   from pathlib import Path
@@ -80,13 +80,13 @@
 //           'rear_truth': np.asarray(e['rear_truth'], dtype=np.int16).tolist(),
 //       })
 //   out = {
-//       'schema_version': 1, 'model': 'classifier_5class_eventacc_14j_vision_exp_C_speedjitter',
+//       'schema_version': 1, 'model': '<checkpoint suffix>',
 //       'exported_at': datetime.now(timezone.utc).isoformat(),
 //       'lead_class_names': LEAD_CLASS_NAMES,
 //       'rear_class_names': REAR_CLASS_NAMES,
 //       'rounds': rounds_out,
 //   }
-//   path = '/content/drive/MyDrive/boxing_ai/models/predictions_eventacc_5class_vision_14j_exp_C_speedjitter_latest.json'
+//   path = '<output dir>/predictions_<checkpoint suffix>.json'
 //   Path(path).write_text(json.dumps(out))
 //   print(f'Wrote {len(rounds_out)} rounds → {path}')
 
@@ -141,8 +141,8 @@ let activeRound = null;   // round entry currently scoped
 let signals = null;       // derived events + per-round stats
 let lastPose = null;
 let lastCacheKey = null;
-// True iff `dump` was synthesized from state.punches (Firebase on-device
-// flow), not loaded from a predictions JSON. We invalidate it whenever
+// True iff `dump` was synthesized from state.punches (a round's
+// `_punches.json` sidecar), not loaded from a predictions JSON. We invalidate it whenever
 // the scope changes so the synth always reflects the active round's
 // detections rather than a stale prior round.
 let dumpFromOnDevice = false;
@@ -159,10 +159,10 @@ export const PunchClassifierRule = {
   label: "Punch classifier (GT vs Pred)",
 
   skeletonStyle() {
-    // The current shipped 5-class classifier (14j Vision + interp, see
-    // project_classifier_14j_baseline.md) drops the original COCO-17 indices
-    // 13 (L_knee), 14 (R_knee), 15 (L_ankle). To mirror what the model
-    // actually sees, hide those three joints + the edges touching them.
+    // The bp14jz classifier sees COCO 0..12 + the rear ankle (16 for an
+    // orthodox boxer) — it drops the COCO-17 indices 13 (L_knee),
+    // 14 (R_knee), 15 (L_ankle). To mirror what the model actually sees,
+    // hide those three joints + the edges touching them.
     // `showImputed` (default true) keeps the magenta ring around any
     // joint that was NaN in the raw cache and got linear-interpolated by
     // pose-loader's `interpolateNanTrajectories` — same imputation the
@@ -296,12 +296,12 @@ for e in all_predictions:
         'rear_truth': np.asarray(e['rear_truth'], dtype=np.int16).tolist(),
     })
 out = {'schema_version': 1,
-       'model': 'classifier_5class_eventacc_14j_vision_exp_C_speedjitter',
+       'model': '&lt;checkpoint suffix&gt;',
        'exported_at': datetime.now(timezone.utc).isoformat(),
        'lead_class_names': LEAD_CLASS_NAMES,
        'rear_class_names': REAR_CLASS_NAMES,
        'rounds': rounds_out}
-path = '/content/drive/MyDrive/boxing_ai/models/predictions_eventacc_5class_vision_14j_exp_C_speedjitter_latest.json'
+path = '&lt;output dir&gt;/predictions_&lt;checkpoint suffix&gt;.json'
 Path(path).write_text(json.dumps(out))
 print(f'Wrote {len(rounds_out)} rounds → {path}')</pre>
     </details>
@@ -507,7 +507,7 @@ function cacheKey(state) {
 
 // Synthesize a one-round predictions dump from state.punches.detections.
 // Maps each detection's (hand, punch_type) to the corresponding class
-// index using the iOS classifier's class_names (5-class Exp C). Frames
+// index using the 5-class classifier's class_names. Frames
 // outside detection windows are class 0 (idle), matching the per-frame
 // argmax interpretation the lens expects.
 function synthesizeOnDeviceDump(state) {
@@ -537,8 +537,8 @@ function synthesizeOnDeviceDump(state) {
 
   return {
     schema_version: 1,
-    source: "ondevice_stgcn",
-    model: "ondevice_stgcn (exp_C 14j 5-class)",
+    source: "punches_sidecar",
+    model: state.punches.source || "punches sidecar",
     exported_at: new Date().toISOString(),
     lead_class_names: ONDEVICE_LEAD,
     rear_class_names: ONDEVICE_REAR,
@@ -566,18 +566,17 @@ function clampInt(v, lo, hi) {
 function refreshScope(state) {
   const prevRound = activeRound;
   // Drop a stale synthesized dump when the punches reference changes
-  // (user picked a different Firebase round) so we re-synth below.
+  // (user picked a different round) so we re-synth below.
   if (dumpFromOnDevice && state.punches !== lastPunchesRef) {
     dump = null;
     dumpFromOnDevice = false;
   }
-  // Firebase / on-device fallback: when no predictions JSON has been
-  // loaded but the analysis sidecar produced punch detections, build a
+  // Punches-sidecar fallback: when no predictions JSON has been
+  // loaded but the round's `_punches.json` sidecar has detections, build a
   // one-round synthetic dump so the existing timeline / canvas HUD light
   // up without requiring a separate predictions_*.json. GT tracks will
   // be empty (no ground truth for real footage), which renders as
-  // pred-only — exactly what we want to inspect on-device classifier
-  // output.
+  // pred-only — exactly what we want to inspect classifier output.
   if (!dump && state.punches?.detections?.length && state.pose?.n_frames) {
     const synth = synthesizeOnDeviceDump(state);
     if (synth) {
@@ -585,8 +584,8 @@ function refreshScope(state) {
       dumpFromOnDevice = true;
       lastPunchesRef = state.punches;
       setStatus(
-        `on-device · ${state.punches.detections.length} detections · ` +
-          `model ondevice_stgcn (no ground truth)`
+        `punches sidecar · ${state.punches.detections.length} detections · ` +
+          `model ${state.punches.source || "unknown"} (no ground truth)`
       );
       populateRoundPicker();
     }
@@ -728,7 +727,7 @@ function eventsFromJson(events, round) {
 
 // Honest GT: prefer row-based events (schema >= 2) — one event per labeled
 // span, so rapid same-class combos stay separate instead of fusing into one
-// long block. Missing key (v1 files, on-device synth) falls back to
+// long block. Missing key (v1 files, the punches-sidecar synth) falls back to
 // run-length encoding the truth array.
 function gtEvents(round, hand) {
   const ev = round[hand + "_gt_events"];

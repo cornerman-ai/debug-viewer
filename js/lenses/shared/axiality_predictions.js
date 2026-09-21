@@ -1,7 +1,7 @@
 // Shared loader for the temporal axiality model's per-punch predictions.
 //
 // train_axiality_temporal.py (cornerman-backend) writes
-// `predictions_axiality_temporal.json` next to the Vision caches:
+// `predictions_axiality_temporal.json` next to the pose caches:
 //
 //   { "kind": "axiality_temporal", "model": "...", "exported_at": "...",
 //     "levels": [0, 0.383, 0.707, 0.924, 1.0],

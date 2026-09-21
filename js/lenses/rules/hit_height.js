@@ -27,11 +27,10 @@
 // solar plexus), below the belt.
 //
 // Landing frame = most-extended frame in the punch window (max |shoulder→wrist|).
-// Side maps from (hand, stance) like guard_drop / arm_extension; wrist source
-// prefers the v6 glove-baked wrist, then a legacy glove sidecar, then pose.
+// Side maps from (hand, stance) like guard_drop / arm_extension; the wrist is
+// the BlazePose wrist.
 
 import { J } from "../../skeleton.js";
-import { gloveXY, gloveConf } from "../../pose-loader.js";
 // Axiality gate (same as arm_extension): a straight down the camera axis
 // foreshortens, so the 2D landing frame + fist height can't be trusted — skip it.
 import { ensureAxialityModel, axialityForPunch } from "../shared/axiality_predictions.js";
@@ -78,8 +77,8 @@ const SIDE_FOR = {
   rear: { orthodox: "R", southpaw: "L" },
 };
 const JOINTS_FOR_SIDE = {
-  L: { shoulder: J.L_SHOULDER, wrist: J.L_WRIST, gloveSide: 0 },
-  R: { shoulder: J.R_SHOULDER, wrist: J.R_WRIST, gloveSide: 1 },
+  L: { shoulder: J.L_SHOULDER, wrist: J.L_WRIST },
+  R: { shoulder: J.R_SHOULDER, wrist: J.R_WRIST },
 };
 
 let host;
@@ -246,7 +245,7 @@ export const HitHeightRule = {
     const z = zoneFor(w.y, B);
     const frac = (S.floorY - w.y) / S.H;
     setText("hh-live-height", `${frac.toFixed(2)} H`);
-    setText("hh-live-zone", `<span class="${z.flag ? "bad" : "good"}">${z.label}</span> · ${w.source}`);
+    setText("hh-live-zone", `<span class="${z.flag ? "bad" : "good"}">${z.label}</span>`);
   },
 };
 
@@ -561,20 +560,11 @@ function computePunches(state) {
 // ─── wrist / side ────────────────────────────────────────────────────────────
 
 function wristXY(pose, frame, joints, cfg) {
-  const g = pose.gloveWrists;
-  if (g) {
-    const [gx, gy] = gloveXY(g, frame, joints.gloveSide);
-    const gc = gloveConf(g, frame, joints.gloveSide);
-    if (gc >= cfg.minWristConfidence && Number.isFinite(gx) && Number.isFinite(gy)) {
-      return { x: gx, y: gy, source: "glove" };
-    }
-  }
   const px = pose.skeleton[(frame * 17 + joints.wrist) * 2];
   const py = pose.skeleton[(frame * 17 + joints.wrist) * 2 + 1];
   const pc = pose.conf[frame * 17 + joints.wrist];
   if (pc < cfg.minWristConfidence || !Number.isFinite(px)) return null;
-  const baked = pose.meta?.wrist_replaced_with_glove === true;
-  return { x: px, y: py, source: baked ? "glove" : "pose" };
+  return { x: px, y: py };
 }
 
 function sideFor(d) {
@@ -731,7 +721,7 @@ function drawTag(ctx, x, y, text, color, scale) {
 // ─── misc ────────────────────────────────────────────────────────────────────
 
 function pickPose(state) {
-  return state.poseV6 || state.pose;
+  return state.pose;
 }
 
 function median(arr) {

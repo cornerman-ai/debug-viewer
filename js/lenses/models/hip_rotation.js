@@ -5,7 +5,7 @@
 // hand-crafted geometric heuristic). Here there is no per-frame signal to
 // recompute: train_hip_rotation_temporal.py already produced an honest
 // cross-validated (out-of-fold) rating per punch and dumped it next to the
-// Vision caches as:
+// pose caches as:
 //
 //   predictions_hip_rotation_temporal.json
 //   { "kind": "hip_rotation_temporal", "model": "...", "exported_at": "...",
@@ -601,11 +601,6 @@ function drawCanvas(ctx, state) {
 export const HipRotationModelRule = {
   id: "hip_rotation_model",
   label: "Hip rotation model (GT vs pred)",
-
-  // Apple Vision is the production pose source the model was trained on.
-  requires(slot) {
-    return !!slot?.vision;
-  },
 
   skeletonStyle() {
     return {

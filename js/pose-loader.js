@@ -1,28 +1,25 @@
-// Loads YOLO-Pose Drive cache: a `<round>.npy` of shape (N, 17, 3) holding
-// (x, y, conf) per joint per frame in COCO-17 order, plus a sibling
-// `<round>_meta.json` with at least { fps, layout: "coco17" }.
+// Loads a BlazePose Drive cache: a `<stem>_blazepose_r<N>.npy` of shape
+// (N, 33, 8) plus a sibling `_meta.json` with at least
+// { fps, layout: "blazepose33" }, remapped to COCO-17 on the way in.
 //
 // Coords in the .npy are normalised to [0, 1]; we de-normalise to pixels using
 // the loaded video's natural dimensions (so the video must be loaded first).
 //
 // **NaN handling (must match the classifier's training-time view):**
-// As of 2026-05-27 the v14j Vision classifier replaced `nan_to_num(nan=0.0)`
-// with linear interpolation of NaN runs (`interpolate_nan_runs` in the
-// training notebook). This pose-loader mirrors that — NaN positions get
+// the punch classifier's input conditioning (`detect_punches` in
+// cornerman-backend) interpolates NaN runs linearly. This pose-loader
+// mirrors that — NaN positions get
 // interpolated between flanking valid frames, with carry-forward /
 // carry-back at clip boundaries. The `imputed` mask flags which joints
 // were originally NaN so lenses can render them with a magenta indicator
 // around their now-interpolated position (skeleton.js handles the
 // rendering).
 //
-// Previous behaviour (nan_to_num→0) is documented in git history for
-// the v6/v17j models that were trained against that policy.
-//
 // Output shape (consumed by the rest of the viewer):
 //   { skeleton: Float32Array(n*17*2),  // (frame, joint, xy) row-major
 //     conf:     Float32Array(n*17),    // (frame, joint)     row-major
 //     imputed:  Uint8Array(n*17),      // 1 = was NaN in cache, now 0,0,0
-//     fps, width, height, n_frames, engine: "yolo_pose", source }
+//     fps, width, height, n_frames, engine: "blazepose", source }
 
 const N_JOINTS = 17;
 
@@ -50,9 +47,12 @@ async function loadNpy(npyFile, metaFile, videoSize) {
   const start_sec = Number(meta.actual_start_sec ?? meta.start_sec ?? 0);
   const round_start_sec = Number(meta.start_sec ?? start_sec);
   const pre_buffer_sec = Math.max(0, round_start_sec - start_sec);
-  const layout = meta.layout || "coco17";
-  if (layout !== "coco17" && layout !== "blazepose33") {
-    throw new Error(`Unsupported layout '${layout}' — only coco17 and blazepose33 are wired up.`);
+  const layout = meta.layout || "(none)";
+  if (layout !== "blazepose33") {
+    throw new Error(
+      `Unsupported layout '${layout}' — the viewer reads BlazePose caches only ` +
+      `(layout blazepose33). Apple Vision / YOLO / RTMPose caches are no longer supported.`
+    );
   }
 
   const { data, shape, dtype } = parseNpy(await npyFile.arrayBuffer());
@@ -60,34 +60,25 @@ async function loadNpy(npyFile, metaFile, videoSize) {
     throw new Error(`Expected float32 LE in .npy, got dtype '${dtype}'.`);
   }
 
-  // BlazePose-33 production cache (blazepose_pose_cache/, shape (N,33,8) =
+  // BlazePose-33 production cache (shape (N,33,8) =
   // [x, y, z, x_world_m, y_world_m, z_world_m, visibility, presence]) is read
-  // THROUGH a 33→COCO-17 remap so the rest of the viewer — and the
-  // engine-compare lens — sees an ordinary COCO-17 engine. x,y are already
-  // image-normalised like coco17; `conf` is BlazePose's per-joint `visibility`
-  // (channel 6), its cleanest occlusion signal. The extra 33-joint data (feet,
-  // world-3D) rides the schema-aware skeleton_compare lens, not this path.
-  const isBlaze = layout === "blazepose33" ||
-                  (shape.length === 3 && shape[1] === 33 && shape[2] === 8);
-  if (isBlaze) {
-    if (shape.length !== 3 || shape[1] !== 33 || shape[2] !== 8) {
-      throw new Error(
-        `Expected .npy shape (N, 33, 8) for blazepose33 cache, got (${shape.join(", ")}).`
-      );
-    }
-  } else if (shape.length !== 3 || shape[1] !== 17 || shape[2] !== 3) {
+  // THROUGH a 33→COCO-17 remap so every lens sees an ordinary COCO-17
+  // skeleton. x,y are image-normalised; `conf` is BlazePose's per-joint
+  // `visibility` (channel 6), its cleanest occlusion signal. The extra
+  // 33-joint data (feet, world-3D) rides state.blaze33 (loadBlaze33 below).
+  if (shape.length !== 3 || shape[1] !== 33 || shape[2] !== 8) {
     throw new Error(
-      `Expected .npy shape (N, 17, 3) for coco17 cache, got (${shape.join(", ")}).`
+      `Expected .npy shape (N, 33, 8) for blazepose33 cache, got (${shape.join(", ")}).`
     );
   }
 
   // COCO-17 joint j ← BlazePose-33 source index (mouth/hands/feet-extra dropped).
   const BLAZE_TO_COCO = [0, 2, 5, 7, 8, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
-  const J_IN    = isBlaze ? 33 : 17;
-  const CH      = isBlaze ? 8  : 3;
-  const CONF_CH = isBlaze ? 6  : 2;   // BlazePose visibility vs coco17 conf
+  const J_IN    = 33;
+  const CH      = 8;
+  const CONF_CH = 6;   // BlazePose visibility
   // Base offset into `data` for the source joint backing COCO joint j at frame f.
-  const srcBase = (f, j) => (f * J_IN + (isBlaze ? BLAZE_TO_COCO[j] : j)) * CH;
+  const srcBase = (f, j) => (f * J_IN + BLAZE_TO_COCO[j]) * CH;
 
   const n_frames = shape[0];
   const w = videoSize?.width || meta.width || 1;
@@ -119,13 +110,12 @@ async function loadNpy(npyFile, metaFile, videoSize) {
   const sx = normalised ? w : 1;
   const sy = normalised ? h : 1;
 
-  // Split (N, 17, 3) → flat skeleton (N*17*2) + flat conf (N*17).
+  // Split the remapped (N, 17) joints → flat skeleton (N*17*2) + flat conf (N*17).
   //
   // **NaN handling (must match the classifier's training-time pipeline):**
-  // As of 2026-05-27, the v14j Vision classifier replaced `nan_to_num(nan=0.0)`
-  // with linear interpolation across NaN runs — see `interpolate_nan_runs`
-  // in the 5-class training notebook. The viewer must mirror that to honor
-  // the "debug must mirror target" principle (memory:
+  // the punch classifier interpolates NaN runs linearly (`detect_punches`'
+  // input conditioning, mirroring the training loaders). The viewer must
+  // mirror that to honor the "debug must mirror target" principle (memory:
   // feedback_debug_must_mirror_target.md). NaN runs are interpolated
   // per-(joint, channel) between flanking valid frames; boundary runs
   // carry-forward / carry-back.
@@ -176,7 +166,7 @@ async function loadNpy(npyFile, metaFile, videoSize) {
     round_start_sec,     // video time the official round begins
     pre_buffer_sec,      // round_start_sec - start_sec, for the meta line
     width: w, height: h, n_frames,
-    engine: "yolo_pose",
+    engine: "blazepose",
     source: npyFile.name,
     normalised,
     meta,                // parsed _meta.json — lenses read extras (e.g. wrist_run)
@@ -187,8 +177,7 @@ async function loadNpy(npyFile, metaFile, videoSize) {
 // array. Operates per (joint, channel) trajectory: walk the time axis,
 // replace each NaN frame with linear interpolation between the nearest
 // valid frames on either side, or carry-forward / carry-back at clip
-// boundaries. If the whole trajectory is NaN, fill with zeros (shouldn't
-// happen on Vision in practice).
+// boundaries. If the whole trajectory is NaN, fill with zeros.
 //
 // Mirrors the training notebook's `interpolate_nan_runs` (which uses
 // np.interp's clamp-to-endpoint behaviour for out-of-range x). The
@@ -341,54 +330,4 @@ export function jointXY(pose, frame, joint) {
 
 export function jointConf(pose, frame, joint) {
   return pose.conf[frame * N_JOINTS + joint];
-}
-
-// Glove-wrist sidecar loader. Cache shape is (N, 2, 3) — [L_wrist, R_wrist]
-// each storing (x_norm, y_norm, conf). NaN x/y means the glove model didn't
-// produce that wrist for this frame. Frame timing exactly matches the matching
-// vision cache (same actual_start_sec, fps, n_frames) so the index lines up
-// 1:1 with the vision pose object the rule attaches it to.
-//
-// Returns:
-//   { wrists: Float32Array(n*2*2),   // [f, side, xy] row-major, pixel coords
-//     conf:   Float32Array(n*2),     // [f, side]
-//     fps, start_sec, n_frames, width, height }
-export async function loadGloveWrists(npyFile, metaFile, videoSize) {
-  const meta = JSON.parse(await metaFile.text());
-  const fps = Number(meta.fps);
-  const start_sec = Number(meta.actual_start_sec ?? meta.start_sec ?? 0);
-
-  const { data, shape, dtype } = parseNpy(await npyFile.arrayBuffer());
-  if (shape.length !== 3 || shape[1] !== 2 || shape[2] !== 3) {
-    throw new Error(
-      `Expected glove cache shape (N, 2, 3), got (${shape.join(", ")}).`
-    );
-  }
-  if (dtype !== "<f4") {
-    throw new Error(`Expected float32 LE in glove .npy, got dtype '${dtype}'.`);
-  }
-  const n_frames = shape[0];
-  const w = videoSize?.width  || meta.width  || 1;
-  const h = videoSize?.height || meta.height || 1;
-
-  const wrists = new Float32Array(n_frames * 2 * 2);
-  const conf   = new Float32Array(n_frames * 2);
-  for (let f = 0; f < n_frames; f++) {
-    for (let s = 0; s < 2; s++) {
-      const base = (f * 2 + s) * 3;
-      wrists[(f * 2 + s) * 2 + 0] = data[base + 0] * w;
-      wrists[(f * 2 + s) * 2 + 1] = data[base + 1] * h;
-      conf[f * 2 + s] = data[base + 2];
-    }
-  }
-  return { wrists, conf, fps, start_sec, n_frames, width: w, height: h };
-}
-
-// Lookup helpers for the glove cache. side: 0=L, 1=R.
-export function gloveXY(g, frame, side) {
-  const i = (frame * 2 + side) * 2;
-  return [g.wrists[i], g.wrists[i + 1]];
-}
-export function gloveConf(g, frame, side) {
-  return g.conf[frame * 2 + side];
 }

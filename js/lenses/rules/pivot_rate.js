@@ -152,37 +152,9 @@ function pivotScore(secPerPivot, cfg) {
   return Math.round(100 * sigmoidAnchored(secPerPivot, cfg.scoreStart, cfg.scoreMid, cfg.scoreSat, cfg.scoreK));
 }
 
-// Per-punch facing samples for the ratchet. Two sources:
-//  - on-device round: reuse the angles the device already computed
-//    (rules.pivot_rate.perPunch[].angle_deg). The skeleton recompute below
-//    needs a per-punch `stance` that on-device detections don't carry, so it
-//    would otherwise blank out — this makes the lens work on Firebase rounds.
-//  - corpus / labeled round: recompute orientation from the skeleton.
+// Per-punch facing samples for the ratchet: orientation recomputed from the
+// skeleton for each labeled (or detected) punch.
 function gatherSamples(state, fps) {
-  const od = state.analysis?.rules?.pivot_rate;
-  if (od && Array.isArray(od.perPunch) && od.perPunch.length) {
-    const stance = state.analysis?.ankleOrientation?.stance ?? null;
-    const samples = od.perPunch.map((p) => {
-      const sf = p.start_frame ?? 0;
-      return {
-        det: {
-          start_frame: sf,
-          end_frame: p.end_frame ?? sf,
-          timestamp: p.timestamp,
-          hand: p.hand,
-          punch_type: p.punch_type,
-          stance,
-        },
-        timestamp: p.timestamp != null ? p.timestamp : sf / fps,
-        angle: p.angle_deg != null ? Number(p.angle_deg) : null,
-        // Device decided usability; mirror it (and require a finite angle).
-        used: !!p.used && p.angle_deg != null,
-        stance,
-      };
-    });
-    samples.sort((a, b) => (a.det.start_frame ?? 0) - (b.det.start_frame ?? 0));
-    return { sourceKind: "ondevice", samples };
-  }
   const source = pickSource(state);
   const detections = (source?.detections || []).slice().sort(
     (a, b) => (a.start_frame ?? 0) - (b.start_frame ?? 0)

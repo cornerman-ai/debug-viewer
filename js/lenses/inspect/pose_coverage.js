@@ -1,19 +1,14 @@
 // Pose coverage lens — quantitative pose-quality summary for the loaded round.
 //
-// For every loaded engine (primary, secondary, v6) it reports, over the WHOLE
-// round, per body region:
+// For the loaded BlazePose skeleton it reports, over the WHOLE round, per body
+// region:
 //   • uptime%  — fraction of frames the region's joints are detected at conf ≥ slider
 //   • mean conf — average confidence of that region's joints WHEN detected (conf > 0)
 //
-// This is the production-skeleton (COCO-17) analog of the BlazePose-vs-RTMPose
-// bake-off stats. The diagnostic move: drag the confidence slider up — uptime
-// that HOLDS = solid tracking; uptime that COLLAPSES = the engine was guessing
-// at low confidence. Wrists (the punch signal) and Ankles (stance) are the rows
-// that matter most.
-//
-// Cross-engine caveat: Apple Vision returns 0 when a joint isn't detected,
-// while YOLO returns a low-confidence guess — so at low thresholds YOLO's
-// uptime looks inflated. Compare engines with the slider raised.
+// The diagnostic move: drag the confidence slider up — uptime that HOLDS =
+// solid tracking; uptime that COLLAPSES = the engine was guessing at low
+// confidence. Wrists (the punch signal) and Ankles (stance) are the rows that
+// matter most.
 
 import { JOINT_NAMES } from "../../skeleton.js";
 
@@ -31,27 +26,12 @@ const ALL17 = Array.from({ length: 17 }, (_, j) => j);
 
 const C_GREEN = "#5fd97a", C_AMBER = "#f5b945", C_RED = "#e85a5a";
 
-function engineName(e) {
-  return e === "yolo_pose" ? "YOLO"
-    : e === "apple_vision_2d" ? "Vision"
-    : e === "vision_combined" ? "Vision (combined)"
-    : (e || "pose");
-}
 
 function upColor(u) { return u >= 0.8 ? C_GREEN : u >= 0.5 ? C_AMBER : C_RED; }
 
-// Collect the distinct loaded pose sources (primary, secondary, v6), labelled.
+// The loaded pose source (BlazePose), labelled — one table column.
 function collect(state) {
-  const seen = new Set(), out = [];
-  const add = (p, tag) => {
-    if (!p || seen.has(p)) return;
-    seen.add(p);
-    out.push({ pose: p, name: engineName(p.engine) + (tag ? ` ${tag}` : "") });
-  };
-  add(state.pose);
-  add(state.poseSecondary);
-  add(state.poseV6, "v6");
-  return out;
+  return state.pose ? [{ pose: state.pose, name: "BlazePose" }] : [];
 }
 
 // Whole-round stats for one pose at threshold thr.
@@ -137,7 +117,7 @@ function renderJoints() {
   el.innerHTML = `<table class="joint-table" style="width:100%"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
-// Per-frame line: how many of 17 joints each engine has at conf ≥ THR right now.
+// Per-frame line: how many of 17 joints are at conf ≥ THR right now.
 function renderFrameLine() {
   const el = host && host.querySelector("#pc-frame");
   if (!el) return;
@@ -165,21 +145,17 @@ export const PoseCoverageLensRule = {
     host.innerHTML = `
       <h2>Pose coverage</h2>
       <p class="hint">
-        Whole-round detection <b>uptime%</b> and <b>mean confidence</b> per region, for each
-        loaded engine. Drag the threshold: uptime that <b>holds</b> = solid tracking; uptime that
+        Whole-round detection <b>uptime%</b> and <b>mean confidence</b> per region.
+        Drag the threshold: uptime that <b>holds</b> = solid tracking; uptime that
         <b>collapses</b> = low-confidence guessing. <b>Wrists</b> (punch signal) and <b>Ankles</b>
         (stance) matter most.
-      </p>
-      <p class="hint" style="color:var(--text-muted,#888)">
-        Caveat: Vision returns 0 for an undetected joint; YOLO returns a low-conf guess — so at low
-        thresholds YOLO's uptime looks inflated. Compare engines with the slider raised.
       </p>
       <label class="slider-row" style="display:block;font-size:13px;margin:6px 0">
         confidence ≥ <output id="pc-thr-out">${THR.toFixed(2)}</output>
         <input type="range" id="pc-thr" min="0" max="1" step="0.05" value="${THR}">
       </label>
       <div class="muted small" style="margin-bottom:8px">
-        ${srcs.length} engine${srcs.length === 1 ? "" : "s"} · ${state.pose ? state.pose.n_frames : 0} frames · ${dur.toFixed(1)}s
+        ${state.pose ? state.pose.n_frames : 0} frames · ${dur.toFixed(1)}s
       </div>
       <div id="pc-table"></div>
       <h3 style="margin-top:12px">Current frame</h3>

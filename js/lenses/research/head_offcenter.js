@@ -37,7 +37,8 @@
 // within ~45° of the camera axis (axiality >= cos45° ≈ 0.707), skipping side-on
 // ones — the OPPOSITE direction to hit_height/arm_extension, which keep side-on
 // punches because they read fist HEIGHT (foreshortens head-on, not lateral).
-// Falls back to on-device per-punch axiality; missing axiality fails closed.
+// Falls back to the detection's inline axiality (a punches sidecar's);
+// missing axiality fails closed.
 //
 // Normalization: a body straight drops the level and FORESHORTENS the torso in
 // the image, so we normalize by a STABLE per-round torso height (median over

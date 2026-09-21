@@ -43,7 +43,7 @@ export const isPunchLabel = l =>
 // ── curated frames of the loaded round ──────────────────────────────────────
 
 let cur = { pose: null, basename: null, entryStem: undefined };
-const pickPose = state => state.poseV6 || state.pose;
+const pickPose = state => state.pose;
 
 // { pose, basename, round, n, fps, startSec, entry, inSpan, ranges, nIn } or
 // null without a pose. Recomputed when the manifest lands (entry changes).

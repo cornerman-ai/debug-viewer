@@ -208,7 +208,7 @@ function renderShell() {
        it visible even collapsed) instead of hiding the wrapper wholesale. */
     #pick-section > *:not(.lens-row) { display:none !important; }
     #pick-section > .lens-row { display:block !important; margin:0 !important; }
-    /* Drive/Cache and Firebase/On-device/Manual now each live inside an
+    /* Drive/Cache and Manual now each live inside an
        .alt-group capsule — hiding the capsule takes its contents (and the
        "or" dividers between them) with it, instead of hiding each section
        individually and leaving an empty bordered box behind. */
