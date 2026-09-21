@@ -541,8 +541,8 @@ function layerSections(e) {
   if (layerOn('hip')) {
     const r = e.hip;
     h += `<div class="sub"><div class="h">Hip rotation ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
-      `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}° <span style="color:var(--text3)">IQR ${iqr(r.qsi)}</span></b>
-       <span>Impact → end</span><b>${r.ie.toFixed(1)}° ${pillV(r.vie)} <span style="color:var(--text3)">IQR ${iqr(r.qie)}</span></b></div>`) + '</div>';
+      `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
+       <span>Typical (IQR)</span><b>${iqr(r.qsi)}</b></div>`) + '</div>';
   }
   if (layerOn('axi')) {
     const x = e.axi;
@@ -761,14 +761,12 @@ function drawLayerRows(c, f, W, text, grid) {
       ring(e, 'arm', x, y, w, h);
     }
   }
-  if (TR.hip) {                                   // hip rotation: start → impact verdict, impact → end as the bottom stripe
+  if (TR.hip) {                                   // hip rotation: the start → impact verdict
     const [y, h] = TR.hip;
     for (const e of S.punches) { if (!e.hip || e.hip.status !== 'ok' || !vis(e)) continue;
       const [x, w] = span(e);
       c.fillStyle = VERD[e.hip.vsi]; rr(x, y + 3, w, h - 6, 5); c.fill();
-      c.save(); rr(x, y + 3, w, h - 6, 5); c.clip(); c.fillStyle = VERD[e.hip.vie]; c.fillRect(x, y + h - 8, w, 5);
-      c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x, y + h - 9, w, 1); c.restore();
-      tag(x, w, y - 2, h, `${e.hip.si.toFixed(0)}°`);
+      tag(x, w, y, h, `${e.hip.si.toFixed(0)}°`);
       ring(e, 'hip', x, y, w, h);
     }
   }
@@ -894,8 +892,8 @@ function tip(e, cx, cy) {
         `<span class="num">elbow bend ${a.deg == null ? '–' : a.deg.toFixed(1) + '°'} at the rule frame f ${a.peakF ?? '–'}</span><br>` +
         `<span class="m num">at impact ${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} · passes at ≤ 36.4°${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span>`;
     } else if (k === 'hip') { const r = e.hip;
-      el.innerHTML = head + `<span class="num">start → impact ${r.si.toFixed(1)}° ${v(r.vsi)} <span class="m">IQR ${iqr(r.qsi)}</span></span><br>` +
-        `<span class="num">impact → end ${r.ie.toFixed(1)}° ${v(r.vie)} <span class="m">IQR ${iqr(r.qie)}</span></span>`;
+      el.innerHTML = head + `<span class="num">hip rotation start → impact ${r.si.toFixed(1)}° ${v(r.vsi)}</span><br>` +
+        `<span class="m num">typical (IQR) ${iqr(r.qsi)}</span>`;
     } else { const x = e.axi;
       el.innerHTML = head + `<span class="num">axiality ${x.v.toFixed(2)} · ${x.level.replace('_', ' ')}</span><br>${v(x.gate)} <span class="m">rules skip above 0.71</span>`;
     }
