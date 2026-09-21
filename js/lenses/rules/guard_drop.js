@@ -13,9 +13,9 @@
 //
 // Verdict per punch is the drop alone (Mathe, 2026-09-21 — where the hand
 // started does not enter it): NOT LOWERED at drop <= drop_threshold, LOWERED A
-// BIT up to big_drop_threshold, LOWERED A LOT above it. Punches whose
-// other hand is itself punching (overlap within overlap_tol) are marked not
-// isolated and, by default, excluded — a punching hand is low by design.
+// BIT up to big_drop_threshold, LOWERED A LOT above it. Every punch is scored,
+// combos included (Mathe, 2026-09-21: no isolated-only filter) — so in a combo
+// the resting hand's drop can be its own punch leaving or coming back.
 // The shipped rule's own two numbers (shoulder-anchored delta over the punch,
 // end position vs the nose; guard_drop.py) are shown beside it for reference.
 //
@@ -31,7 +31,7 @@ import { isPunchLabel } from "../shared/slip_labels.js";
 
 // Defaults match rules_config.json → rules.guard_drop.params (2026-09-21):
 // delta_threshold 0.10, guard_low_threshold 0.25, start_pct 0.2,
-// overlap_tolerance_seconds 0.1, min_wrist_confidence 0.4 (0.30 here, the
+// min_wrist_confidence 0.4 (0.30 here, the
 // viewer's house gate). drop_threshold reuses delta_threshold's value;
 // big_drop_threshold is this lens's own (no rule counterpart, unscored).
 const DEFAULTS = {
@@ -40,10 +40,8 @@ const DEFAULTS = {
   guardLowThreshold: 0.25,   // the shipped rule's end-below-nose line (reference numbers only)
   startPct: 0.20,            // fraction of the span that defines "where it was"
   padFrames: 0,              // frames added after the punch end
-  overlapTolSec: 0.10,       // other-hand punch within this = not isolated
   minWristConfidence: 0.30,
   minCoverage: 0.6,          // fraction of span frames with a usable metric
-  isolatedOnly: true,
   loop: true,
 };
 
@@ -51,15 +49,15 @@ const COLORS = {
   nose: "#7ec8ff", l_wrist: "#ff8a5c", r_wrist: "#ffd95c",
   punch: "rgba(126,200,255,0.55)", punchEdge: "#7ec8ff",
   lot: "#ff5d6c", bit: "#f5b945", none: "#7adf7a",
-  gated: "#666", excluded: "#444", marker: "#3ad9e0", base: "rgba(255,255,255,0.8)",
+  gated: "#666", marker: "#3ad9e0", base: "rgba(255,255,255,0.8)",
 };
 const VERDICT_COLOR = {
   lowered_lot: COLORS.lot, lowered_bit: COLORS.bit, not_lowered: COLORS.none,
-  gated: COLORS.gated, not_isolated: COLORS.excluded,
+  gated: COLORS.gated,
 };
 const VERDICT_LABEL = {
   lowered_lot: "lowered a lot", lowered_bit: "lowered a bit", not_lowered: "not lowered",
-  gated: "gated", not_isolated: "not isolated",
+  gated: "gated",
 };
 
 // (hand, stance) → anatomical side, mirroring guard_drop.py's GUARD_JOINTS.
@@ -100,8 +98,7 @@ export const GuardDropRule = {
         was at the start, in torso heights along the nose line (+ = went down).
         <span style="color:${COLORS.none}">not lowered</span> · <span style="color:${COLORS.bit}">lowered a bit</span> ·
         <span style="color:${COLORS.lot}">lowered a lot</span> ·
-        <span style="color:${COLORS.gated}">gated</span> (wrist not tracked) ·
-        <span style="color:${COLORS.excluded}">not isolated</span> (both hands punching).</p>
+        <span style="color:${COLORS.gated}">gated</span> (wrist not tracked).</p>
       <div class="metric-grid">
         <div><div class="metric-label">punches</div><div class="metric-val" id="gd-n"></div><div class="metric-sub" id="gd-n-sub"></div></div>
         <div><div class="metric-label">lowered a lot</div><div class="metric-val" id="gd-n-lot" style="color:${COLORS.lot}"></div><div class="metric-sub" id="gd-n-lot-sub"></div></div>
@@ -133,7 +130,6 @@ export const GuardDropRule = {
         <input type="range" id="gd-pad" min="0" max="20" step="1" value="${cfg.padFrames}"></div>
       <div class="slider-row"><span>min_wrist_confidence = <output id="gd-mwc-out">${cfg.minWristConfidence.toFixed(2)}</output></span>
         <input type="range" id="gd-mwc" min="0" max="1" step="0.01" value="${cfg.minWristConfidence}"></div>
-      <label class="hint"><input type="checkbox" id="gd-iso" ${cfg.isolatedOnly ? "checked" : ""}> isolated punches only (the rule's scope)</label>
       <h3>Punches <span class="hint">(click to seek + loop)</span></h3>
       <div id="gd-table" style="max-height:340px;overflow:auto"></div>
     `;
@@ -155,9 +151,6 @@ export const GuardDropRule = {
     wire("gd-sp", "gd-sp-out", "startPct");
     wire("gd-pad", "gd-pad-out", "padFrames", v => String(Math.round(v)));
     wire("gd-mwc", "gd-mwc-out", "minWristConfidence");
-    host.querySelector("#gd-iso").addEventListener("change", (e) => {
-      cfg.isolatedOnly = e.target.checked; cache = null; refresh(latestState); window.__viewerRedraw?.();
-    });
     host.querySelector("#gd-loop").addEventListener("change", (e) => { cfg.loop = e.target.checked; });
     host.querySelector("#gd-prev").addEventListener("click", () => seekToPunch(activeIdx - 1));
     host.querySelector("#gd-next").addEventListener("click", () => seekToPunch(activeIdx + 1));
@@ -225,7 +218,10 @@ export const GuardDropRule = {
 };
 
 // ─── compute ───────────────────────────────────────────────────────────────
-function pickPose(state) { return state.poseV6 || state.pose; }
+// The drawn BlazePose skeleton — never state.poseV6 (the archived Apple Vision +
+// glove cache): a round that still had one was measured on Vision, not on what
+// the overlay shows.
+function pickPose(state) { return state.pose; }
 
 function jt(pose, f, j) {
   return { x: pose.skeleton[(f * 17 + j) * 2], y: pose.skeleton[(f * 17 + j) * 2 + 1], c: pose.conf[f * 17 + j] };
@@ -236,7 +232,7 @@ function getData(state) {
   if (!p) return null;
   const dets = activeDetections(state);
   const sig = [p, dets, cfg.dropThreshold, cfg.bigDropThreshold, cfg.guardLowThreshold, cfg.startPct, cfg.padFrames,
-               cfg.minWristConfidence, cfg.isolatedOnly, cfg.overlapTolSec, cfg.minCoverage];
+               cfg.minWristConfidence, cfg.minCoverage];
   if (cache && cache.sig.length === sig.length && cache.sig.every((v, i) => v === sig[i])) return cache;
   cache = compute(p, dets, state.fps || p.fps || 30);
   cache.sig = sig;
@@ -264,7 +260,6 @@ export function compute(p, dets, fps) {
       if (sh.c >= cfg.minWristConfidence) dSh[side][f] = (w.y - sh.y) / torso;
     }
   }
-  const tol = Math.round(cfg.overlapTolSec * fps);
   // The Sheet labels carry defense rows too (lead_roll parses as a lead hand).
   const raw = (dets || []).filter(det => isPunchLabel(det.punch_type)).map((det, i) => {
     const stance = (det.stance === "southpaw" || det.stance === "orthodox") ? det.stance : "orthodox";
@@ -273,7 +268,6 @@ export function compute(p, dets, fps) {
              ef: Math.min(N - 1, det.end_frame + cfg.padFrames) };
   }).filter(x => x.ef >= x.sf).sort((a, b) => a.sf - b.sf);
   const punches = raw.map((x, idx) => {
-    const isolated = !raw.some(y => y !== x && y.side !== x.side && y.sf - tol <= x.ef && y.ef + tol >= x.sf);
     const span = x.ef - x.sf + 1;
     const nStart = Math.max(1, Math.round(span * cfg.startPct));
     const arr = d[x.other];
@@ -295,13 +289,12 @@ export function compute(p, dets, fps) {
     const ruleDrop = shDelta > cfg.dropThreshold && endNose > cfg.guardLowThreshold;
     let verdict;
     if (coverage < cfg.minCoverage || !Number.isFinite(base) || !Number.isFinite(lowest)) verdict = "gated";
-    else if (!isolated && cfg.isolatedOnly) verdict = "not_isolated";
     else if (drop > cfg.bigDropThreshold) verdict = "lowered_lot";
     else if (drop > cfg.dropThreshold) verdict = "lowered_bit";
     else verdict = "not_lowered";
     return { idx, sf: x.sf, ef: x.ef, side: x.side, other: x.other, hand: x.det.hand,
              type: x.det.punch_type || "punch", uuid: x.det.punch_uuid || null,
-             t: x.det.start_time, isolated, base, lowest, lowestFrame, drop, coverage,
+             t: x.det.start_time, base, lowest, lowestFrame, drop, coverage,
              shDelta, endNose, ruleDrop, verdict };
   });
   return { N, fps, d, dSh, punches };
@@ -324,9 +317,9 @@ function refresh(state) {
   const f = state.frame;
   const pun = data.punches;
   const count = v => pun.filter(p => p.verdict === v).length;
-  const scored = pun.filter(p => p.verdict !== "gated" && p.verdict !== "not_isolated").length;
+  const scored = pun.filter(p => p.verdict !== "gated").length;
   setText("gd-n", String(pun.length));
-  setText("gd-n-sub", `${scored} scored · ${count("gated")} gated · ${count("not_isolated")} not isolated`);
+  setText("gd-n-sub", `${scored} scored · ${count("gated")} gated`);
   for (const [id, v] of [["lot", "lowered_lot"], ["bit", "lowered_bit"], ["none", "not_lowered"]]) {
     setText(`gd-n-${id}`, String(count(v)));
     setText(`gd-n-${id}-sub`, scored ? `${Math.round(100 * count(v) / scored)}% of scored` : "");
@@ -346,7 +339,7 @@ function refresh(state) {
       `<b>${act.type}</b> · ${act.hand} hand (${act.side}) · frames ${act.sf}–${act.ef} · resting hand <b>${act.other}</b><br>` +
       `base ${fmt(act.base)} → lowest ${fmt(act.lowest)} @f${act.lowestFrame} · <b style="color:${c}">drop ${fmt(act.drop)} · ${VERDICT_LABEL[act.verdict]}</b><br>` +
       `<span class="hint">rule: shoulder delta ${fmt(act.shDelta)}, end vs nose ${fmt(act.endNose)} → ${act.ruleDrop ? "drop" : "no drop"} · ` +
-      `coverage ${Math.round(100 * act.coverage)}% · ${act.isolated ? "isolated" : "overlaps the other hand"}</span>`);
+      `coverage ${Math.round(100 * act.coverage)}%</span>`);
   } else setText("gd-active", "—");
   drawSpark(host.querySelector("#gd-spark"), data, act, f);
   renderTable(data);
