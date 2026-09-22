@@ -61,9 +61,18 @@
   .toggle.on .sw::after { transform: translateX(12px); }
 
   /* ── layout ── */
-  .app { display: none; height: calc(100vh - 52px); grid-template-rows: minmax(0, 1fr) auto; gap: 12px; padding: 12px 16px 16px; }
+  .app { display: none; height: calc(100vh - 52px); grid-template-columns: minmax(240px, 1fr) 12px var(--panel-w);
+    grid-template-rows: minmax(0, 1fr); padding: 12px 16px 16px; --panel-w: clamp(380px, 30vw, 540px); --tl-h: 46vh; }
+  .leftcol { display: grid; grid-template-rows: minmax(120px, 1fr) 12px auto; min-height: 0; min-width: 0; }
   .app.ready { display: grid; }
-  .top { display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 26vw, 440px); gap: 12px; min-height: 0; }
+  /* dividers: drag to resize, double-click to reset; a thin grip appears on hover */
+  .split { position: relative; display: flex; align-items: center; justify-content: center; touch-action: none; }
+  .split::after { content: ''; border-radius: 2px; background: var(--fill2); opacity: 0; transition: opacity .15s, background .15s; }
+  .split:hover::after, .split.drag::after { opacity: 1; }
+  .split.drag::after { background: var(--accent); }
+  .split.v { cursor: col-resize; } .split.v::after { width: 4px; height: 44px; }
+  .split.h { cursor: row-resize; } .split.h::after { width: 44px; height: 4px; }
+  body.resizing, body.resizing * { user-select: none !important; }
   .card { background: var(--panel-solid); border-radius: 14px; box-shadow: var(--shadow); }
   .stage { position: relative; background: #000; border-radius: 14px; overflow: hidden; min-height: 0; display: flex; }
   .stage video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; transform-origin: 0 0; }
@@ -122,7 +131,7 @@
   .tl-head { display: flex; align-items: center; gap: 10px; padding: 0 14px 8px; }
   .tl-head .label { margin: 0; }
   #tl { display: block; width: 100%; height: 318px; cursor: default; touch-action: none; }
-  .tl-scroll { max-height: 46vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  .tl-scroll { max-height: var(--tl-h); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
   .tooltip { position: fixed; z-index: 50; pointer-events: none; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45;
     background: var(--panel); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--shadow); border: 0.5px solid var(--sep);
     display: none; max-width: 260px; }
@@ -167,7 +176,7 @@
 </div>
 
 <div class="app" id="app">
-  <div class="top">
+  <div class="leftcol">
     <div class="stage" id="stage">
       <video id="video" preload="auto" muted playsinline></video>
       <canvas id="overlay"></canvas>
@@ -180,48 +189,50 @@
         <div style="display:flex;gap:8px"><button class="btn primary" id="linkData">Link data folder…</button><button class="btn" id="pickVideo" style="background:rgba(255,255,255,.14);color:#fff">Pick video…</button></div>
       </div>
     </div>
-    <div class="inspector">
-      <div class="card">
-        <div class="label">Facing</div>
-        <div class="facing">
-          <svg id="compass" width="84" height="84" viewBox="-42 -42 84 84"></svg>
-          <div><div class="deg num" id="deg">–</div><div class="hint">0° to camera · 180° back</div></div>
+    <div class="split h" id="splitH" title="drag to resize · double-click to reset"></div>
+    <div class="card timeline">
+      <div class="tl-head">
+        <div class="label">Timeline</div>
+        <div class="seg" id="zoomSeg">
+          <button data-s="5">5 s</button><button data-s="10" class="on">10 s</button><button data-s="30">30 s</button><button data-s="60">1 min</button><button data-s="0">All</button>
         </div>
+        <div class="spacer"></div>
+        <div class="banner" id="banner"></div>
+        <label class="toggle on" id="skelToggle"><span class="sw"></span>Skeleton</label>
+        <label class="toggle on" id="followToggle"><span class="sw"></span>Follow playhead</label>
+        <div class="seg" id="rateSeg"><button data-r="0.25">¼×</button><button data-r="0.5">½×</button><button data-r="1" class="on">1×</button><button data-r="2">2×</button></div>
       </div>
-      <div class="card event" id="punchCard"><div class="label">Punch</div><div class="empty">No punch</div></div>
-      <div class="card event" id="defCard"><div class="label">Defense</div><div class="empty">No defensive move</div></div>
-      <div class="card" id="layersCard">
-        <div class="label">Rule layers</div>
-        <div id="layerList"></div>
-      </div>
-      <div class="card">
-        <div class="label">Punches</div><div class="chips" id="punchChips"></div>
-        <div class="dist" id="punchDist"></div>
-        <div class="label" style="margin-top:12px">Target</div><div class="dist" id="targetDist"></div>
-        <div class="label" style="margin-top:12px">Defense</div><div class="chips" id="defChips"></div>
-        <div class="dist" id="defDist"></div>
-      </div>
-      <div class="card keys">
-        <kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame · <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd> 1 s<br>
-        <kbd>↑</kbd><kbd>↓</kbd> previous / next event · <kbd>I</kbd> jump to impact<br>
-        Timeline: scroll to zoom · drag to pan · click to seek · scroll over the row names to scroll the rows<br>
-        Video: scroll to zoom · drag to pan · double-click or <kbd>0</kbd> resets · <kbd>+</kbd><kbd>−</kbd> zoom
-      </div>
+      <div class="tl-scroll" id="tlScroll"><canvas id="tl"></canvas></div>
     </div>
   </div>
-  <div class="card timeline">
-    <div class="tl-head">
-      <div class="label">Timeline</div>
-      <div class="seg" id="zoomSeg">
-        <button data-s="5">5 s</button><button data-s="10" class="on">10 s</button><button data-s="30">30 s</button><button data-s="60">1 min</button><button data-s="0">All</button>
+  <div class="split v" id="splitV" title="drag to resize · double-click to reset"></div>
+  <div class="inspector">
+    <div class="card">
+      <div class="label">Facing</div>
+      <div class="facing">
+        <svg id="compass" width="84" height="84" viewBox="-42 -42 84 84"></svg>
+        <div><div class="deg num" id="deg">–</div><div class="hint">0° to camera · 180° back</div></div>
       </div>
-      <div class="spacer"></div>
-      <div class="banner" id="banner"></div>
-      <label class="toggle on" id="skelToggle"><span class="sw"></span>Skeleton</label>
-      <label class="toggle on" id="followToggle"><span class="sw"></span>Follow playhead</label>
-      <div class="seg" id="rateSeg"><button data-r="0.25">¼×</button><button data-r="0.5">½×</button><button data-r="1" class="on">1×</button><button data-r="2">2×</button></div>
     </div>
-    <div class="tl-scroll" id="tlScroll"><canvas id="tl"></canvas></div>
+    <div class="card event" id="punchCard"><div class="label">Punch</div><div class="empty">No punch</div></div>
+    <div class="card event" id="defCard"><div class="label">Defense</div><div class="empty">No defensive move</div></div>
+    <div class="card" id="layersCard">
+      <div class="label">Rule layers</div>
+      <div id="layerList"></div>
+    </div>
+    <div class="card">
+      <div class="label">Punches</div><div class="chips" id="punchChips"></div>
+      <div class="dist" id="punchDist"></div>
+      <div class="label" style="margin-top:12px">Target</div><div class="dist" id="targetDist"></div>
+      <div class="label" style="margin-top:12px">Defense</div><div class="chips" id="defChips"></div>
+      <div class="dist" id="defDist"></div>
+    </div>
+    <div class="card keys">
+      <kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame · <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd> 1 s<br>
+      <kbd>↑</kbd><kbd>↓</kbd> previous / next event · <kbd>I</kbd> jump to impact<br>
+      Timeline: scroll to zoom · drag to pan · click to seek · scroll over the row names to scroll the rows<br>
+      Video: scroll to zoom · drag to pan · double-click or <kbd>0</kbd> resets · <kbd>+</kbd><kbd>−</kbd> zoom
+    </div>
   </div>
 </div>
 <div class="tooltip" id="tip"></div>
@@ -823,6 +834,40 @@ layout();
 let TW = 0, TH = 0;
 const tlScroll = $('tlScroll');
 new ResizeObserver(() => { resize(); V.dirty = true; }).observe(tl);
+
+// ── resizable panels: the side panel's width (video | panel divider) and the timeline's height (top | timeline
+//    divider); both remembered per browser, double-click a divider to reset ──
+const appEl = $('app'), SIZE_KEY = 'pipelineViewerSizes';
+const sizes = (() => { try { return JSON.parse(localStorage.getItem(SIZE_KEY) || '{}'); } catch { return {}; } })();
+function applySizes() {
+  if (sizes.panelW) appEl.style.setProperty('--panel-w', `${sizes.panelW}px`); else appEl.style.removeProperty('--panel-w');
+  if (sizes.tlH) appEl.style.setProperty('--tl-h', `${sizes.tlH}px`); else appEl.style.removeProperty('--tl-h');
+  try { localStorage.setItem(SIZE_KEY, JSON.stringify(sizes)); } catch {}
+  if (S.src) { resize(); applyZoom(); }                     // re-size the timeline + overlay bitmaps now, not on the next frame
+}
+function dragSplit(el, onMove) {
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('drag'); document.body.classList.add('resizing');
+    const move = ev => { onMove(ev); applySizes(); };
+    const up = () => { el.classList.remove('drag'); document.body.classList.remove('resizing');
+      el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); };
+    el.addEventListener('pointermove', move); el.addEventListener('pointerup', up);
+  });
+}
+dragSplit($('splitV'), ev => {                              // side panel: 260 px .. leave the video at least 240 px
+  const r = appEl.getBoundingClientRect();
+  sizes.panelW = Math.round(Math.max(260, Math.min(r.right - 16 - ev.clientX, r.width - 32 - 12 - 240)));
+});
+dragSplit($('splitH'), ev => {                              // timeline rows: 90 px .. leave the top at least 140 px
+  const head = document.querySelector('.tl-head').getBoundingClientRect().height + 18;   // card chrome above/below the rows
+  const r = appEl.getBoundingClientRect();
+  sizes.tlH = Math.round(Math.max(90, Math.min(r.bottom - 16 - ev.clientY - head, r.height - 28 - 12 - 140 - head)));
+});
+$('splitV').addEventListener('dblclick', () => { delete sizes.panelW; applySizes(); });
+$('splitH').addEventListener('dblclick', () => { delete sizes.tlH; applySizes(); });
+applySizes();
+// the video area changes size with the dividers: keep the zoom inside it and redraw the skeleton on the new size
+new ResizeObserver(() => { if (S.src) { typeof applyZoom === 'function' ? applyZoom() : draw(true); } }).observe($('stage'));
 tlScroll.addEventListener('scroll', () => { V.dirty = true; });
 const tx = t => L + (t - V.t0) / (V.t1 - V.t0) * (TW - L - RPAD);
 const xt = x => V.t0 + (x - L) / (TW - L - RPAD) * (V.t1 - V.t0);
