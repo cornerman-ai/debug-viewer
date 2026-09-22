@@ -113,6 +113,16 @@
   .dist .legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
   .dist .legend b { color: var(--text); font-weight: 600; }
   .dist .note { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .viewSeg { position: sticky; top: 0; z-index: 3; align-self: stretch; }
+  .srow { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: baseline; font-size: 12.5px; padding: 3px 0; }
+  .srow .k { color: var(--text2); }
+  .srow .v { font-weight: 600; white-space: nowrap; }
+  .srow .v i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+  .srow .v .m { color: var(--text2); font-weight: 400; }
+  .big { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; }
+  .big .n { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .big .k { color: var(--text2); font-size: 12.5px; }
+  .sep-t { border-top: 0.5px solid var(--sep); margin-top: 10px; padding-top: 8px; }
   .combos .head { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 11.5px; color: var(--text2); }
   .combos .head b { color: var(--text); font-weight: 600; }
   .combos .head i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
@@ -216,32 +226,48 @@
   </div>
   <div class="split v" id="splitV" title="drag to resize · double-click to reset"></div>
   <div class="inspector">
-    <div class="card">
-      <div class="label">Facing</div>
-      <div class="facing">
-        <svg id="compass" width="84" height="84" viewBox="-42 -42 84 84"></svg>
-        <div><div class="deg num" id="deg">–</div><div class="hint">0° to camera · 180° back</div></div>
+    <div class="seg viewSeg" id="viewSeg"><button data-v="now" class="on">Now</button><button data-v="round">Round</button></div>
+
+    <div id="nowView" style="display:contents">
+      <div class="card">
+        <div class="label">Facing</div>
+        <div class="facing">
+          <svg id="compass" width="84" height="84" viewBox="-42 -42 84 84"></svg>
+          <div><div class="deg num" id="deg">–</div><div class="hint">0° to camera · 180° back</div></div>
+        </div>
       </div>
+      <div class="card event" id="punchCard"><div class="label">Punch</div><div class="empty">No punch</div></div>
+      <div class="card event" id="defCard"><div class="label">Defense</div><div class="empty">No defensive move</div></div>
     </div>
-    <div class="card event" id="punchCard"><div class="label">Punch</div><div class="empty">No punch</div></div>
-    <div class="card event" id="defCard"><div class="label">Defense</div><div class="empty">No defensive move</div></div>
+
+    <div id="roundView" style="display:none">
+      <div class="card" id="scoreCard"></div>
+      <div class="card">
+        <div class="label">Punches</div><div class="chips" id="punchChips"></div>
+        <div class="dist" id="punchDist"></div>
+        <div class="dist" id="handDist"></div>
+        <div class="dist" id="targetDist"></div>
+        <div class="sep-t" id="punchRules"></div>
+      </div>
+      <div class="card">
+        <div class="label">Defense</div><div class="chips" id="defChips"></div>
+        <div class="dist" id="defDist"></div>
+        <div class="dist" id="sideDist"></div>
+        <div class="sep-t" id="defRules"></div>
+      </div>
+      <div class="card">
+        <div class="label">Combos</div>
+        <div id="comboStats"></div>
+        <div class="sep-t"><div class="label">Offensive</div><div id="comboDist-offensive"></div></div>
+        <div class="sep-t"><div class="label">Combined</div><div id="comboDist-combined"></div></div>
+      </div>
+      <div class="card" id="ruleCard"></div>
+    </div>
+
     <div class="card" id="layersCard">
-      <div class="label">Rule layers</div>
+      <div class="label">Timeline layers</div>
       <div id="layerList"></div>
     </div>
-    <div class="card">
-      <div class="label">Punches</div><div class="chips" id="punchChips"></div>
-      <div class="dist" id="punchDist"></div>
-      <div class="label" style="margin-top:12px">Hand</div><div class="dist" id="handDist"></div>
-      <div class="label" style="margin-top:12px">Target</div><div class="dist" id="targetDist"></div>
-      <div class="combos" id="samePunch" style="margin-top:10px"></div>
-      <div class="combos" id="bodyShots" style="margin-top:2px"></div>
-      <div class="label" style="margin-top:16px">Defense</div><div class="chips" id="defChips"></div>
-      <div class="dist" id="defDist"></div>
-      <div class="label" style="margin-top:12px">Side</div><div class="dist" id="sideDist"></div>
-      <div class="combos" id="sameDef" style="margin-top:10px"></div>
-      <div class="label" style="margin-top:16px">Offensive combos</div><div id="comboDist-offensive"></div>
-      <div class="label" style="margin-top:16px">Combined combos</div><div id="comboDist-combined"></div>
     </div>
   </div>
 </div>
@@ -303,8 +329,6 @@ const COMBO = {offensive: '#0a84ff', combined: '#bf5af2'};
 // combo diversity (offensive only): top-3 share >= 70 % repetitive, 50-70 % moderate, < 50 % varied, < 10 combos not rated
 const ELBOWCOL = {tucked: '#34c759', 'sometimes flared': '#ff9f0a', flared: '#ff3b30', 'not rated': '#8e8e93'};
 const DIVCOL = {varied: '#34c759', moderate: '#ff9f0a', repetitive: '#ff3b30', 'not rated': '#8e8e93'};
-const divTxt = k => k?.diversity ? `<span><i style="background:${DIVCOL[k.diversity.rating]}"></i>${k.diversity.rating}` +
-  (k.top3_share != null ? ` · top 3 = <b>${Math.round(k.top3_share * 100)}%</b>` : '') + '</span>' : '';
 function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order
   return r.elements.split(' ; ').map(t => { const [kind, hand, type, sf] = t.split('|'); return {kind, hand, type, sf: +sf}; });
 }
@@ -322,7 +346,7 @@ function comboLayer(kind, label, short, what) {
     summary(P, js, {dot}) {
       const k = js?.[kind]; if (!k) return '';
       return dot(COMBO[kind], `${k.n_combinations} combinations`) + `<span>${k.n_different} different</span>` +
-        (kind === 'combined' ? `<span>${k.n_with_defense} with a defensive move</span>` : divTxt(k)) + `<span class="m">${what}</span>`;
+        (kind === 'combined' ? `<span>${k.n_with_defense} with a defensive move</span>` : '');
     },
     card: (e, x) => `<div class="sub"><div class="h">${label}</div>` + (!x ? '<div class="empty">not in a combination</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elements</span><b>${x.nP} punches${x.nD ? ` + ${x.nD} defense` : ''}</b>
@@ -340,7 +364,6 @@ function comboLayer(kind, label, short, what) {
     },
   };
 }
-const roundTxt = (q, b) => q != null ? `<span>round <b>${q}</b> · ${b}</span>` : '';
 const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${v >= 0 ? 'right' : 'left'}`;
 const RULE_LAYERS = [
   {
@@ -351,7 +374,7 @@ const RULE_LAYERS = [
     summary(P, js, {dot, count}) {
       const m = count(P, p => p.arm?.verdict);
       return dot(VERD.pass, `${m.pass || 0} pass`) + dot(VERD.fail, `${m.fail || 0} fail`) +
-        dot(VERD.skip, `${(m.skip || 0) + (m.unclear || 0)} skipped`) + roundTxt(js?.score, js?.band);
+        dot(VERD.skip, `${(m.skip || 0) + (m.unclear || 0)} skipped`);
     },
     card: (e, a) => `<div class="sub"><div class="h">Arm extension ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elbow bend, rule frame</span><b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
@@ -432,7 +455,7 @@ const RULE_LAYERS = [
     summary(P, js, {dot, count}) {
       const hr = count(P, p => p.hit?.verdict || null);
       return dot(VERD.on_target, `${hr.on_target || 0} on target`) + dot(VERD.off_target, `${hr.off_target || 0} off`) +
-        dot(VERD.skip, `${hr.skip || 0} skipped`) + roundTxt(js?.score, js?.band);
+        dot(VERD.skip, `${hr.skip || 0} skipped`);
     },
     card(e, x) {
       const zn = z => z ? (ZONE[z]?.[1] || z) : '–', pct = v => v == null ? '–' : `${(v * 100).toFixed(0)}% of stance height`;
@@ -483,8 +506,7 @@ const RULE_LAYERS = [
     summary(P, js, {dot, count}) {
       const b = count(P, p => p.hoc?.band || null);
       return dot(VERD.perfect, `${b.perfect || 0} perfect`) + dot(VERD.good, `${b.good || 0} good`) +
-        dot(VERD.bad, `${b.bad || 0} bad`) + dot(VERD.critical, `${b.critical || 0} critical`) +
-        roundTxt(js?.round_score, js?.round_band);
+        dot(VERD.bad, `${b.bad || 0} bad`) + dot(VERD.critical, `${b.critical || 0} critical`);
     },
     card: (e, x) => `<div class="sub"><div class="h">Head off center line ${x?.band ? pillV(x.band) : ''}</div>` +
       (!x ? '<div class="empty">no reading</div>' :
@@ -533,9 +555,8 @@ const RULE_LAYERS = [
     parseItem: (r, num) => ({arm: r.arm, sf: num(r.start_frame), ef: num(r.end_frame), peak: num(r.peak_flare), mean: num(r.mean_flare)}),
     summary(P, js, {dot}) {
       if (!js) return '';
-      const a = js.arms, pct = v => v?.flared_share == null ? '–' : `${Math.round(v.flared_share * 100)}%`;
-      return dot(ELBOWCOL[js.rating] || '#8e8e93', js.rating) + `<span>lead <b>${pct(a.lead)}</b></span>` +
-        `<span>rear <b>${pct(a.rear)}</b></span><span class="m">share of judged frames flared</span>`;
+      const a = js.arms, pct = v => v?.flared_share == null ? '–' : `${Math.round(v.flared_share * 100)}%`;   // eslint-disable-line
+      return `<span>lead <b>${pct(a.lead)}</b> flared</span><span>rear <b>${pct(a.rear)}</b></span>`;
     },
     card: (e, x) => '',                                  // per-frame rule: nothing punch-specific to show
     tip: (e, x) => `<b>Elbow flared · ${cap(x.arm)} arm</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s<br>` +
@@ -773,68 +794,60 @@ function buildChips() {
   mk($('defChips'), DEF, S.defenses, S.hiddenD);
   // distributions over ALL detected punches (the chips above only hide / show them on the timeline)
   const n = S.punches.length;
-  const dist = (el, parts, note) => {
+  const dist = (el, parts, cap) => {
     const tot = parts.reduce((a, x) => a + x.n, 0);
     if (!tot) { el.innerHTML = '<span style="color:var(--text3)">none</span>'; return; }
-    el.innerHTML = `<div class="bar">${parts.filter(x => x.n).map(x => `<span style="flex:${x.n};background:${x.c}" title="${x.name} ${x.n}"></span>`).join('')}</div>
-      <div class="legend num">${parts.filter(x => x.n).map(x => `<span><i style="background:${x.c}"></i>${x.name} <b>${Math.round(x.n / tot * 100)}%</b></span>`).join('')}</div>` +
-      (note ? `<div class="note">${note}</div>` : '');
+    el.innerHTML = (cap ? `<div class="k" style="color:var(--text2);font-size:11.5px;margin-bottom:4px">${cap}</div>` : '') +
+      `<div class="bar">${parts.filter(x => x.n).map(x => `<span style="flex:${x.n};background:${x.c}" title="${x.name} ${x.n}"></span>`).join('')}</div>
+      <div class="legend num">${parts.filter(x => x.n).map(x => `<span><i style="background:${x.c}"></i>${x.name} <b>${Math.round(x.n / tot * 100)}%</b></span>`).join('')}</div>`;
   };
   dist($('punchDist'), Object.entries(PUNCH).map(([t, st]) => ({name: st.name, c: st.c, n: count(S.punches, t)})));
   dist($('defDist'), Object.entries(DEF).map(([t, st]) => ({name: st.name, c: st.c, n: count(S.defenses, t)})));
   const by = (arr, f, v) => arr.filter(x => f(x) === v).length, dark = css('--text'), mid = '#8e8e93', light = css('--fill2');
   dist($('handDist'), [{name: 'Lead', c: dark, n: by(S.punches, p => p.hand, 'lead')},
-                       {name: 'Rear', c: mid, n: by(S.punches, p => p.hand, 'rear')}]);
+                       {name: 'Rear', c: mid, n: by(S.punches, p => p.hand, 'rear')}], 'Hand');
   dist($('targetDist'), [{name: 'Head', c: dark, n: by(S.punches, p => p.target, 'head')},
                          {name: 'Body', c: mid, n: by(S.punches, p => p.target, 'body')},
-                         {name: 'Unknown', c: light, n: S.punches.filter(p => p.target !== 'head' && p.target !== 'body').length}]);
+                         {name: 'Unknown', c: light, n: S.punches.filter(p => p.target !== 'head' && p.target !== 'body').length}], 'Target');
   dist($('sideDist'), [{name: 'Lead', c: dark, n: by(S.defenses, d => d.side, 'lead')},
                        {name: 'Rear', c: mid, n: by(S.defenses, d => d.side, 'rear')},
-                       {name: 'No side', c: light, n: S.defenses.filter(d => d.side !== 'lead' && d.side !== 'rear').length}]);
-  comboDist('offensive'); comboDist('combined'); sameDefense(); samePunches(); bodyShots();
+                       {name: 'No side', c: light, n: S.defenses.filter(d => d.side !== 'lead' && d.side !== 'rear').length}], 'Side');
+  comboDist('offensive'); comboDist('combined'); sameDefense(); punchRules(); comboStats();
 }
-// same defense (same_defense/same_defense.json): the most-used move type (>= 80 % same defense, 60-80 % moderate,
-// < 60 % varied) and the most-used side (>= 80 % one-sided); < 10 moves → not rated
+const COMBO_TOP = 3;                       // sequences listed per combo kind before "Show all"
+// the whole-video ratings, one compact row each; the rule itself sits in the row's tooltip
+const BODYCOL = {enough: '#34c759', 'a few': '#ffcc00', 'too few': '#ff9f0a', 'head only': '#ff3b30', 'not rated': '#8e8e93'};
+const SPCOL = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30', 'not rated': '#8e8e93'};
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
-// same punches (same_punches/same_punches.json): the share of the 2 most-used punch types — >= 85 % same punches,
-// 70-85 % moderate, < 70 % varied; < 20 punches → not rated
-// not enough body shots (bodyshots/bodyshots.json): body shots / (body + head) over hooks and uppercuts only —
-// >= 25 % enough, 15-25 % a few, 5-15 % too few, < 5 % head only (the old app's bodyshot_ratio numbers)
-function bodyShots() {
-  const el = $('bodyShots'), js = S.bodyShots;
-  if (!js) { el.innerHTML = ''; return; }
-  const col = {enough: '#34c759', 'a few': '#ffcc00', 'too few': '#ff9f0a', 'head only': '#ff3b30', 'not rated': '#8e8e93'}[js.rating];
-  el.innerHTML = `<div class="head num">Body shots<span><i style="background:${col}"></i>${js.rating}` +
-    (js.body_share != null ? ` · <b>${Math.round(js.body_share * 100)}%</b> (${js.n_body} of ${js.n_hooks_uppercuts} hooks + uppercuts)` : '') +
-    `</span><span class="m" title="jab and cross can't be split into head / body by the classifier, so they're not counted">≥ 25% enough · &lt; 5% head only</span></div>`;
-}
-function samePunches() {
-  const el = $('samePunch'), js = S.samePunch;
-  if (!js) { el.innerHTML = ''; return; }
-  const col = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30', 'not rated': '#8e8e93'}[js.rating];
-  const names = js.top2_types.map(t => PUNCH[t]?.name || cap(t)).join(' + ');
-  el.innerHTML = `<div class="head num">Same punches<span><i style="background:${col}"></i>${js.rating}` +
-    (js.top2_share != null ? ` · ${names} <b>${Math.round(js.top2_share * 100)}%</b>` : '') +
-    `</span><span class="m">top 2 types ≥ 85% same · &lt; 70% varied</span></div>`;
-}
-// defense after combo (defense_after_combo/): the share of offensive combos followed by a defensive move within 1 s
-// â >= 60 % good, 35-60 % moderate, < 35 % no defense after combos
-function defAfterHTML() {
-  const js = S.defAfter, col = {good: '#34c759', moderate: '#ff9f0a', 'no defense after combos': '#ff3b30', 'not rated': '#8e8e93'}[js.rating];
-  return `<div class="head num" style="margin-top:8px">Defense after combo<span><i style="background:${col}"></i>${js.rating}` +
-    (js.covered_share != null ? ` · <b>${Math.round(js.covered_share * 100)}%</b> (${js.n_covered} of ${js.n_combos})` : '') +
-    `</span><span class="m">a move within 1 s of the combo's end · ≥ 60% good</span></div>`;
+const DACOL = {good: '#34c759', moderate: '#ff9f0a', 'no defense after combos': '#ff3b30', 'not rated': '#8e8e93'};
+const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
+function punchRules() {
+  const sp = S.samePunch, bs = S.bodyShots;
+  $('punchRules').innerHTML =
+    (sp ? srow('Same punches', sp.rating, SPCOL[sp.rating], `${sp.top2_types.map(t => PUNCH[t]?.name || t).join(' + ')} ${pct(sp.top2_share)}`,
+               'share of the 2 most-used punch types \u2014 85%+ same, under 70% varied') : '') +
+    (bs ? srow('Body shots', bs.rating, BODYCOL[bs.rating], `${pct(bs.body_share)} of ${bs.n_hooks_uppercuts} hooks + uppercuts`,
+               'body share of hooks + uppercuts (jab / cross cannot be split) \u2014 25%+ enough, under 5% head only') : '');
 }
 function sameDefense() {
-  const el = $('sameDef'), js = S.sameDef;
-  if (!js) { el.innerHTML = ''; return; }
-  const line = (name, r, top, share, rule) => `<div class="head num" style="margin-top:4px">${name}<span><i style="background:${SDCOL[r]}"></i>${r}` +
-    (share != null ? ` · ${top} <b>${Math.round(share * 100)}%</b>` : '') + `</span><span class="m">${rule}</span></div>`;
-  el.innerHTML = line('Same move', js.same_move.rating, js.same_move.top_type, js.same_move.top_type_share, '≥ 80% same · &lt; 60% varied') +
-    line('Same side', js.same_side.rating, js.same_side.top_side, js.same_side.top_side_share, '≥ 80% one-sided');
+  const js = S.sameDef;
+  $('defRules').innerHTML = !js ? '' :
+    srow('Same move', js.same_move.rating, SDCOL[js.same_move.rating], `${js.same_move.top_type || ''} ${pct(js.same_move.top_type_share)}`,
+         'share of the most-used move \u2014 80%+ same, under 60% varied') +
+    srow('Same side', js.same_side.rating, SDCOL[js.same_side.rating], `${js.same_side.top_side || ''} ${pct(js.same_side.top_side_share)}`,
+         'share of the most-used side, moves with a side only \u2014 80%+ one-sided');
 }
-// combinations: how many, how many DIFFERENT sequences, and each sequence with its count (combinations/combinations.json)
-const COMBO_TOP = 3;
+function comboStats() {
+  const o = S.layerSum.offensive?.offensive, c = S.layerSum.combined?.combined, da = S.defAfter;
+  $('comboStats').innerHTML =
+    (o ? srow('Offensive', `${o.n_combinations}`, COMBO.offensive, `${o.n_different} different`, 'punches only, no pause over 0.3 s') : '') +
+    (c ? srow('Combined', `${c.n_combinations}`, COMBO.combined, `${c.n_different} different \u00b7 ${c.n_with_defense} with a move`,
+              'punches + defensive moves, no pause over 0.3 s') : '') +
+    (o?.diversity ? srow('Diversity', o.diversity.rating, DIVCOL[o.diversity.rating], `top 3 = ${pct(o.top3_share)}`,
+                         'share of combos that are one of the 3 most-used \u2014 70%+ repetitive, under 50% varied') : '') +
+    (da ? srow('Defense after combo', da.rating, DACOL[da.rating], `${pct(da.covered_share)} of ${da.n_combos}`,
+               'a defensive move within 1 s of the combo\u2019s end \u2014 60%+ good, under 35% none') : '');
+}
 function comboDist(kind, all) {
   const el = $(`comboDist-${kind}`), k = S.layerSum?.[kind]?.[kind];
   if (!k) { el.innerHTML = '<span style="color:var(--text3)">not in this folder</span>'; return; }
@@ -845,14 +858,25 @@ function comboDist(kind, all) {
   const rows = (all ? seqs : seqs.slice(0, COMBO_TOP)).map(q => `<div class="seq" title="${q.sequence.replaceAll(' > ', ' › ')}">${q.sequence.split(' > ').map(word).join('<span class="sep">›</span>')}</div>
       <div class="track"><span style="width:${q.count / max * 100}%;background:${COMBO[kind]}"></span></div><div class="num" style="text-align:right"><b>${q.count}</b></div>`).join('');
   el.className = 'combos';
-  el.innerHTML = `<div class="head num"><span><b>${k.n_combinations}</b> combinations</span><span><b>${k.n_different}</b> different</span>` +
-    (kind === 'combined' ? `<span><b>${k.n_with_defense}</b> with a defensive move</span>` : '') +
-    `</div>` + (k.diversity ? `<div class="head num" style="margin-top:4px">Diversity ${divTxt(k)}` +
-      `<span class="m" title="share of offensive combos that are one of the 3 most-used sequences">≥ 70% repetitive · &lt; 50% varied</span></div>` : '') + (seqs.length ? `<div class="list">${rows}</div>` : '') +
+  el.innerHTML = (seqs.length ? `<div class="list">${rows}</div>` : '<span style="color:var(--text3)">none</span>') +
     (seqs.length > COMBO_TOP ? `<button class="more" id="comboMore-${kind}">${all ? 'Show fewer' : `Show all ${seqs.length}`}</button>` : '') +
-    (kind === 'offensive' && S.defAfter ? defAfterHTML() : '');
+    '';
   const b = $(`comboMore-${kind}`); if (b) b.onclick = () => comboDist(kind, !all);
 }
+$('viewSeg').onclick = e => {                               // Now (this frame) | Round (the whole video)
+  const b = e.target.closest('button'); if (!b) return;
+  $('viewSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  $('nowView').style.display = b.dataset.v === 'now' ? 'contents' : 'none';
+  $('roundView').style.display = b.dataset.v === 'round' ? 'contents' : 'none';
+};
+
+// one compact row: name on the left, a colored dot + verdict + number on the right; the rule goes in the tooltip
+function srow(name, rating, color, value, rule) {
+  return `<div class="srow"${rule ? ` title="${rule}"` : ''}><span class="k">${name}</span>` +
+    `<span class="v">${color ? `<i style="background:${color}"></i>` : ''}${rating || ''}` +
+    (value ? ` <span class="m">${value}</span>` : '') + '</span></div>';
+}
+
 function buildLayers() {
   const u = {dot: (c, t) => `<span><i style="background:${c}"></i>${t}</span>`,
              count: (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {})};
@@ -869,9 +893,36 @@ function buildLayers() {
   for (const L of RULE_LAYERS) {
     const t = list.querySelector(`.toggle[data-layer="${L.key}"]`);
     t.classList.toggle('disabled', !S.has[L.key]); t.classList.toggle('on', !!(S.has[L.key] && V.layers[L.key]));
-    $(`sum-${L.key}`).innerHTML = S.has[L.key] ? L.summary(S.punches, S.layerSum[L.key], u) : '<span>not in this folder</span>';
+    const js = S.layerSum[L.key], c = S.has[L.key] ? layerChip(L.key, js) : null;
+    $(`sum-${L.key}`).innerHTML = !S.has[L.key] ? '<span>not in this folder</span>'
+      : c ? `<span><i style="background:${c.col}"></i>${c.txt}</span>` : '';
   }
+  ruleCard(u);
   layout();
+}
+// the headline verdict of a layer: its round score / rating, nothing else
+function layerChip(key, js) {
+  if (!js) return null;
+  if (key === 'arm' || key === 'hit') return js.score == null ? null : {txt: `${js.score} · ${js.band}`, col: VERD[js.band] || '#8e8e93'};
+  if (key === 'hoc') return js.round_score == null ? null : {txt: `${js.round_score} · ${js.round_band}`, col: VERD[js.round_band] || '#8e8e93'};
+  if (key === 'offensive') return js.offensive?.diversity ? {txt: js.offensive.diversity.rating, col: DIVCOL[js.offensive.diversity.rating]} : null;
+  if (key === 'combined') return js.combined ? {txt: `${js.combined.n_combinations} combos`, col: COMBO.combined} : null;
+  if (key === 'elbow') return {txt: js.rating, col: ELBOWCOL[js.rating] || '#8e8e93'};
+  return null;
+}
+// Round view: the score of every rule that has one, then each rule's counts
+function ruleCard(u) {
+  const scored = [['arm', 'Arm extension'], ['hit', 'Hit height'], ['hoc', 'Head off center']]
+    .map(([k, name]) => [name, layerChip(k, S.layerSum[k])]).filter(([, c]) => c);
+  $('scoreCard').style.display = scored.length ? '' : 'none';
+  $('scoreCard').innerHTML = '<div class="label">Round score</div>' + scored.map(([name, c]) => {
+    const [n, band] = c.txt.split(' · ');
+    return `<div class="big"><span class="k">${name}</span><span class="n" style="color:${c.col}">${n}` +
+      `<span class="k" style="margin-left:8px">${band}</span></span></div>`;
+  }).join('');
+  $('ruleCard').innerHTML = '<div class="label">Rules</div>' + RULE_LAYERS.filter(L => S.has[L.key]).map(L =>
+    `<div class="srow" style="grid-template-columns:1fr"><span class="k">${L.label}</span>` +
+    `<div class="lsum" style="color:var(--text2);font-size:11.5px;display:flex;flex-wrap:wrap;gap:4px 10px">${L.summary(S.punches, S.layerSum[L.key], u)}</div></div>`).join('');
 }
 const layerOn = k => !!(S.has?.[k] && V.layers[k]);
 

@@ -36,6 +36,17 @@ defense, and an overview of the whole video (drag it to move the window). Scroll
 hover for details; the chips in the side panel hide or show a punch / defense type. On the video: the skeleton, a ring
 on the punching wrist around impact, and pills naming the current punch / move.
 
+The side panel has two views, switched at its top:
+
+- **Now** — what is under the playhead: the facing angle, the current punch and the current defensive move, each with
+  the sections of the rule layers that are on.
+- **Round** — the whole video: the round score of every rule that has one, the punch and defense distributions with
+  their whole-video ratings (same punches, body shots, same move, same side), the combos (counts, diversity, defense
+  after combo and the most-used sequences) and each rule's counts. Every rating row names its rule in its tooltip.
+
+The **Timeline layers** card stays below both views: it only turns timeline rows on and off, and each toggle shows
+that rule's headline verdict.
+
 **Rule layers** (side panel, all off by default, the choice is remembered): each adds a timeline row, a section in
 the punch card and a video overlay for the punch under the playhead. Colors: green = fine, orange = too little,
 red = wrong / too much, gray = not judged.
