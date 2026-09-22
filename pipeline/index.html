@@ -292,8 +292,8 @@ const ZONE = {head: ['H', 'head'], body: ['B', 'body'], shoulder: ['S', 'shoulde
 //   tip(e, x, u)         → the tooltip body when hovering the rule's row (u: head line, v(verdict))
 //   row(e, x, g)         → draws the punch's block in the rule's row (g: canvas, row y / h, span, tag, ring, tx, fps)
 //   overlay(e, x, f, P, leadLeft) → optional: draws on the video for the punch under the playhead
-// ── combinations (not a rule): two kinds with the same rule — no pause > 0.2 s between elements, a defensive move
-//    longer than 0.75 s splits. offensive = punches only, combined = punches + defensive moves. An "items" layer: its
+// ── combinations (not a rule): two kinds with the same rule — no pause > 0.3 s between elements, however long
+//    each lasts. offensive = punches only, combined = punches + defensive moves. An "items" layer: its
 //    rows are the combinations themselves (combinations/<kind>.csv), one plain line each, not the punches ──
 const COMBO = {offensive: '#0a84ff', combined: '#bf5af2'};
 function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order

@@ -53,8 +53,8 @@ red = wrong / too much, gray = not judged.
   off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), colored by band (perfect / good / bad /
   critical) with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
 - **Offensive combos** and **Combined combos** (`combinations/`, not rules): the same rule for both — no pause longer
-  than 0.2 s between elements, a defensive move longer than 0.75 s splits. Offensive = punches only; combined = punches
-  and defensive moves in time order (a move may start or end one). Each combination is one plain line from its first
+  than 0.3 s between elements, however long each lasts. Offensive = punches only; combined = punches and all
+  defensive moves in time order (a move may start or end one). Each combination is one plain line from its first
   frame to its last (blue = offensive, purple = combined; singles are not drawn); hovering it lists its elements in
   order with their times; the punch card shows the combination holding that punch and how often its sequence repeats.
   Reads `offensive.csv` / `combined.csv` + `combinations.json`; the distributions card counts both (how many, how many
