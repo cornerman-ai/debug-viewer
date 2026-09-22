@@ -55,7 +55,7 @@ red = wrong / too much, gray = not judged.
 - **Offensive combos** and **Combined combos** (`combinations/`, not rules): the same rule for both — no pause longer
   than 0.3 s between elements, however long each lasts. Offensive = punches only; combined = punches and all
   defensive moves in time order (a move may start or end one). Each combination is one plain line from its first
-  frame to its last (blue = offensive, purple = combined; singles are not drawn); hovering it lists its elements in
+  frame to its last (blue = offensive, purple = combined; 2 elements minimum — a lone punch or move is not a combination); hovering it lists its elements in
   order with their times; the punch card shows the combination holding that punch and how often its sequence repeats.
   Reads `offensive.csv` / `combined.csv` + `combinations.json`; the distributions card counts both (how many, how many
   different, each sequence with its count). These are "items" layers (`items: true`): their rows are the combinations,

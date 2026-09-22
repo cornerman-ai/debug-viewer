@@ -308,14 +308,14 @@ function comboLayer(kind, label, short, what) {
   return {
     key: kind, label, short, items: true,
     csv: ['combinations', `${kind}.csv`], json: ['combinations', 'combinations.json'],
-    parseItem: (r, num) => +r.n_elements >= 2 ? {id: num(r.combo_id), sf: num(r.start_frame), ef: num(r.end_frame), n: num(r.n_elements),
-      nP: num(r.n_punches), nD: num(r.n_defenses), seq: r.sequence, els: comboEls(r)} : null,
+    parseItem: (r, num) => ({id: num(r.combo_id), sf: num(r.start_frame), ef: num(r.end_frame), n: num(r.n_elements),
+      nP: num(r.n_punches), nD: num(r.n_defenses), seq: r.sequence, els: comboEls(r)}),
     summary(P, js, {dot}) {
       const k = js?.[kind]; if (!k) return '';
       return dot(COMBO[kind], `${k.n_combinations} combinations`) + `<span>${k.n_different} different</span>` +
         (kind === 'combined' ? `<span>${k.n_with_defense} with a defensive move</span>` : '') + `<span class="m">${what}</span>`;
     },
-    card: (e, x) => `<div class="sub"><div class="h">${label}</div>` + (!x ? '<div class="empty">not in one (single)</div>' :
+    card: (e, x) => `<div class="sub"><div class="h">${label}</div>` + (!x ? '<div class="empty">not in a combination</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elements</span><b>${x.nP} punches${x.nD ? ` + ${x.nD} defense` : ''}</b>
        <span>Repeats in the video</span><b>${reps(x)}×</b></div>
        <div style="margin-top:6px;line-height:1.6">${x.els.map(m => { const nm = elName(m).name; return m.kind === 'punch' && m.sf === e.sf ? `<b>${nm}</b>` : `<span style="color:var(--text2)">${nm}</span>`; }).join(' › ')}</div>`) + '</div>',
@@ -770,7 +770,7 @@ function comboDist(kind, all) {
   el.className = 'combos';
   el.innerHTML = `<div class="head num"><span><b>${k.n_combinations}</b> combinations</span><span><b>${k.n_different}</b> different</span>` +
     (kind === 'combined' ? `<span><b>${k.n_with_defense}</b> with a defensive move</span>` : '') +
-    `<span><b>${k.n_singles}</b> singles</span></div>` + (seqs.length ? `<div class="list">${rows}</div>` : '') +
+    `</div>` + (seqs.length ? `<div class="list">${rows}</div>` : '') +
     (seqs.length > COMBO_TOP ? `<button class="more" id="comboMore-${kind}">${all ? 'Show fewer' : `Show all ${seqs.length}`}</button>` : '');
   const b = $(`comboMore-${kind}`); if (b) b.onclick = () => comboDist(kind, !all);
 }
