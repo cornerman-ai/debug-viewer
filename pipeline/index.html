@@ -297,7 +297,7 @@ const RULE_LAYERS = [
     },
     card: (e, a) => `<div class="sub"><div class="h">Arm extension ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elbow bend, rule frame</span><b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
-       <span>Passes at bend ≤</span><b>36.4° (r ≥ 0.95)</b>${a.skip ? `<span>Skipped</span><b>${a.skip}</b>` : ''}
+       ${(t => t ? `<span>Passes at bend ≤</span><b>${(2 * Math.acos(t) * 180 / Math.PI).toFixed(1)}° (r ≥ ${t})</b>` : "")(S.layerSum.arm?.config?.params?.bend_threshold)}${a.skip ? `<span>Skipped</span><b>${a.skip}</b>` : ''}
        ${a.score != null ? `<span>Punch score</span><b>${a.score.toFixed(1)}</b>` : ''}</div>
        <div class="rows num" style="opacity:.6"><span>For comparison, not judged:</span><b></b>
        <span>bend at the impact frame</span><b>${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>',
