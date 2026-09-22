@@ -188,7 +188,7 @@
         <div class="label">Rule layers</div>
         <div class="layer"><label class="toggle" data-layer="arm">Arm extension<span class="sw"></span></label><div class="lsum" id="sum-arm"></div></div>
         <div class="layer"><label class="toggle" data-layer="hip">Hip rotation<span class="sw"></span></label><div class="lsum" id="sum-hip"></div></div>
-        <div class="layer"><label class="toggle" data-layer="axi">Axiality<span class="sw"></span></label><div class="lsum" id="sum-axi"></div></div>
+        <div class="layer"><label class="toggle" data-layer="hit">Hit height<span class="sw"></span></label><div class="lsum" id="sum-hit"></div></div>
       </div>
       <div class="card">
         <div class="label">Punches</div><div class="chips" id="punchChips"></div>
@@ -246,16 +246,19 @@ const STAGES = {
   punches: ['punch_impact', 'impacts.csv'], punchesFallback: ['punch_classification', 'punches.csv'],
   punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
   angle: ['facing_angle', 'facing_angle.csv'],
-  axi: ['punch_axiality', 'axiality.csv'], hip: ['hip_rotation', 'hip_rotation.csv'],
+  hit: ['hit_height', 'hit_height.csv'], hitJson: ['hit_height', 'hit_height.json'], hip: ['hip_rotation', 'hip_rotation.csv'],
   arm: ['arm_extension', 'arm_extension.csv'], armJson: ['arm_extension', 'arm_extension.json'],
 };
 // rule verdicts → semantic Apple colors (green = fine, orange = too little, red = wrong / too much, gray = not judged)
 const VERD = {good: '#34c759', pass: '#34c759', bad_low: '#ff9500', bad_high: '#ff3b30', fail: '#ff3b30',
-              skip: '#8e8e93', unclear: '#8e8e93', judgeable: '#30b0c7', too_head_on: '#8e8e93'};
+              skip: '#8e8e93', unclear: '#8e8e93', on_target: '#34c759', off_target: '#ff3b30'};
 const VNAME = {good: 'good', pass: 'pass', bad_low: 'too little', bad_high: 'too much', fail: 'fail', skip: 'skipped',
-               unclear: 'unclear', judgeable: 'judgeable', too_head_on: 'too head-on'};
-const LAYERS = ['arm', 'hip', 'axi'];
-const LNAME = {arm: 'Arm ext.', hip: 'Hip rot.', axi: 'Axiality'};
+               unclear: 'unclear', on_target: 'on target', off_target: 'off target'};
+// hit height zones: short label for narrow blocks, name for the card / tooltip / video
+const ZONE = {head: ['H', 'head'], body: ['B', 'body'], shoulder: ['S', 'shoulder'], over_head: ['↑', 'over the head'],
+              below_belt: ['↓', 'below the belt']};
+const LAYERS = ['arm', 'hip', 'hit'];
+const LNAME = {arm: 'Arm ext.', hip: 'Hip rot.', hit: 'Hit height'};
 const ARM3 = {lead: [11, 13, 15], rear: [12, 14, 16]};         // BlazePose-33 shoulder / elbow / wrist of the orthodox lead / rear arm
 
 // ════════════════════════════ tiny helpers ════════════════════════════
@@ -325,7 +328,7 @@ async function httpList(base) {
 const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], skel: null,
            stance: 'orthodox', videoName: '', objectUrl: null, hiddenP: new Set(), hiddenD: new Set()};
 const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover: null, hoverLayer: null, lastFrame: -1,
-           layers: {arm: false, hip: false, axi: false}};
+           layers: {arm: false, hip: false, hit: false}};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 const video = $('video');
 
@@ -354,14 +357,16 @@ async function loadFolder(src) {
   S.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
     kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share,
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
-  const [axiCsv, hipCsv, armCsv, armJs] = await Promise.all([STAGES.axi, STAGES.hip, STAGES.arm].map(
-    k => src.text(k).catch(() => null)).concat(src.text(STAGES.armJson).then(JSON.parse).catch(() => null)));
+  const [hitCsv, hipCsv, armCsv, armJs, hitJs] = await Promise.all([STAGES.hit, STAGES.hip, STAGES.arm].map(
+    k => src.text(k).catch(() => null)).concat([STAGES.armJson, STAGES.hitJson].map(k => src.text(k).then(JSON.parse).catch(() => null))));
   const byKey = new Map(S.punches.map(p => [`${p.sf}|${p.hand}`, p]));
   const join = (csvText, fn) => { if (!csvText) return false;
     for (const r of parseCSV(csvText)) { const p = byKey.get(`${r.start_frame}|${r.hand}`); if (p) fn(p, r); } return true; };
   const num = v => v === '' || v === undefined ? null : +v;
   S.has = {
-    axi: join(axiCsv, (p, r) => { p.axi = {v: num(r.axiality), level: r.axial_level, gate: r.gate, status: r.status}; }),
+    hit: join(hitCsv, (p, r) => { p.hit = {verdict: r.verdict, zone: r.zone, land: num(r.land_frame), hf: num(r.height_frac),
+      pen: num(r.penalty), skip: r.skip_reason, impF: num(r.impact_frame), impZone: r.impact_zone, impVerdict: r.impact_verdict,
+      impHf: num(r.impact_height_frac), match: r.impact_matches_target}; }),
     hip: join(hipCsv, (p, r) => { p.hip = {status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
       vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
       bsi: r.ref_start_impact_lo !== undefined ? [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)] : null,
@@ -370,7 +375,7 @@ async function loadFolder(src) {
       peak: num(r.peak_bend), deg: num(r.bend_deg), score: num(r.punch_score), impDeg: num(r.impact_bend_deg),
       impVerdict: r.impact_verdict}; }),
   };
-  S.armSum = armJs;
+  S.armSum = armJs; S.hitSum = hitJs;
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
   S.dur = S.n / S.fps;
   S.hiddenP.clear(); S.hiddenD.clear();
@@ -496,11 +501,14 @@ function buildLayers() {
   const dot = (c, t) => `<span><i style="background:${c}"></i>${t}</span>`;
   const count = (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
   const P = S.punches;
-  const a = count(P, p => p.axi?.status === 'ok' ? p.axi.gate : null);
+  const hr = count(P, p => p.hit?.verdict || null), hi = count(P, p => p.hit && !p.hit.verdict ? p.hit.impVerdict || null : null);
   const h = count(P, p => p.hip?.status === 'ok' ? p.hip.vsi : null);
   const m = count(P, p => p.arm?.verdict);
   const sum = {
-    axi: dot(VERD.judgeable, `${a.judgeable || 0} judgeable`) + dot(VERD.too_head_on, `${a.too_head_on || 0} too head-on`),
+    hit: dot(VERD.on_target, `${hr.on_target || 0} on target`) + dot(VERD.off_target, `${hr.off_target || 0} off`) +
+      dot(VERD.skip, `${hr.skip || 0} skipped`) + '<span>jabs + crosses (the rule)</span>' +
+      (S.hitSum?.score != null ? `<span>round score ${S.hitSum.score} · ${S.hitSum.band} · severity ${S.hitSum.severity}</span>` : '') +
+      `<span>hooks / uppercuts at impact: ${hi.on_target || 0} on · ${hi.off_target || 0} off (dashed)</span>`,
     hip: dot(VERD.good, `${h.good || 0} good`) + dot(VERD.bad_low, `${h.bad_low || 0} too little`) +
       dot(VERD.bad_high, `${h.bad_high || 0} too much`) +
       `<span>start → impact, vs ${P.some(p => p.hip?.bsi) ? '2× the study IQR' : 'the study IQR'}</span>`,
@@ -582,11 +590,15 @@ function layerSections(e) {
        <span>Good range${r.bsi ? ' (2× IQR)' : ' (IQR)'}</span><b>${iqr(r.bsi || r.qsi)}</b>
        ${r.bsi ? `<span>IQR</span><b>${iqr(r.qsi)}</b>` : ''}</div>`) + '</div>';
   }
-  if (layerOn('axi')) {
-    const x = e.axi;
-    h += `<div class="sub"><div class="h">Axiality ${x?.status === 'ok' ? pillV(x.gate) : ''}</div>` + (!x || x.status !== 'ok' ? `<div class="empty">no value (${x?.status || 'not run'})</div>` :
-      `<div class="rows num" style="margin-top:0"><span>Along the camera axis</span><b>${x.v.toFixed(2)} · ${x.level.replace('_', ' ')}</b>
-       <span>Rules skip above</span><b>0.71 (45°)</b></div>`) + '</div>';
+  if (layerOn('hit')) {
+    const x = e.hit, zn = z => z ? (ZONE[z]?.[1] || z) : '–', pct = v => v == null ? '–' : `${(v * 100).toFixed(0)}% of stance height`;
+    h += `<div class="sub"><div class="h">Hit height ${x?.verdict ? pillV(x.verdict) : x?.impVerdict ? pillV(x.impVerdict) : ''}</div>` + (!x ? '<div class="empty">no reading</div>' :
+      `<div class="rows num" style="margin-top:0">` +
+      (x.verdict ? `<span>Rule zone</span><b>${x.skip ? 'skipped (' + x.skip + ')' : zn(x.zone)}</b>` +
+                   (x.skip ? '' : `<span>Fist height</span><b>${pct(x.hf)}${x.land != null ? ' · f ' + x.land : ''}</b>`)
+                 : `<span>Rule</span><b>jabs and crosses only</b>`) +
+      `<span>At impact</span><b>${x.impVerdict === 'skip' || !x.impVerdict ? 'skipped' : zn(x.impZone) + ' ' + pillV(x.impVerdict)}</b>` +
+      (x.match ? `<span>Model's target</span><b>${e.target} · ${x.match === 'yes' ? 'matches' : 'does not match'}</b>` : '') + '</div>') + '</div>';
   }
   return h;
 }
@@ -649,6 +661,15 @@ function drawRuleOverlay(e, f, P) {
       const ccw = ((a1 - a0 + 2 * Math.PI) % (2 * Math.PI)) > Math.PI;
       octx.lineWidth = 2.5; octx.beginPath(); octx.arc(b[0], b[1], 18, a0, a1, ccw); octx.stroke();
       overlayLabel(b[0] + 14, b[1] + 28, `elbow ${bend.toFixed(0)}°${peak ? ' · rule frame · ' + VNAME[e.arm.verdict] : ''}`, col);
+    }
+  }
+  if (layerOn('hit') && e.hit) {                              // the fist at the judged frame, with its zone
+    const x = e.hit, rule = !!x.verdict && !x.skip, fj = rule ? x.land : x.impF, v = rule ? x.verdict : x.impVerdict, z = rule ? x.zone : x.impZone;
+    if (fj != null && Math.abs(f - fj) <= 2 && v && v !== 'skip') {
+      const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2], q = P(wr);
+      if (q) { const col = VERD[v]; octx.strokeStyle = col; octx.lineWidth = 3; octx.setLineDash([5, 4]);
+        octx.beginPath(); octx.arc(q[0], q[1], 22, 0, 7); octx.stroke(); octx.setLineDash([]);
+        overlayLabel(q[0] + 26, q[1] - 18, `${ZONE[z]?.[1] || z} · ${VNAME[v]}${rule ? '' : ' (at impact)'}`, col); }
     }
   }
   if (layerOn('hip') && e.hip?.status === 'ok') {             // the hip line, colored by the start → impact verdict
@@ -784,7 +805,7 @@ function drawLayerRows(c, f, W, text, grid) {
   const fps = S.fps, font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   const span = e => { const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps); return [x0, Math.max(2, x1 - x0 - 1)]; };
   const vis = e => !S.hiddenP.has(e.type) && tx((e.ef + 1) / fps) >= L && tx(e.sf / fps) <= L + W;
-  const tag = (x, w, y, h, t) => { if (w < 30) return; c.font = font; c.fillStyle = 'rgba(0,0,0,0.75)'; c.textAlign = 'left'; c.fillText(t, x + 6, y + h / 2 + 0.5); };
+  const tag = (x, w, y, h, t) => { if (w < (t.length <= 1 ? 14 : 30)) return; c.font = font; c.fillStyle = 'rgba(0,0,0,0.75)'; c.textAlign = 'left'; c.fillText(t, x + 6, y + h / 2 + 0.5); };
   const ring = (e, k, x, y, w, h) => { if ((e.sf <= f && f <= e.ef) || (V.hover === e && V.hoverLayer === k)) {
     c.strokeStyle = text; c.lineWidth = 1.5; rr(x - 1, y + 1, w + 2, h - 2, 6); c.stroke(); } };
   if (TR.arm) {                                   // arm extension: verdict block, the rule's frame as a white tick
@@ -808,16 +829,18 @@ function drawLayerRows(c, f, W, text, grid) {
       ring(e, 'hip', x, y, w, h);
     }
   }
-  if (TR.axi) {                                   // axiality: bar height = value, dashed line at the rules' 0.71 gate
-    const [y, h] = TR.axi, base = y + h - 3, hh = h - 6, yg = base - 0.7071 * hh;
-    for (const e of S.punches) { if (!e.axi || e.axi.status !== 'ok' || !vis(e)) continue;
-      const [x, w] = span(e), bh = Math.max(2, e.axi.v * hh);
-      c.fillStyle = VERD[e.axi.gate]; rr(x, base - bh, w, bh, 3); c.fill();
-      if (w >= 30) { c.font = font; c.fillStyle = text; c.textAlign = 'left'; c.fillText(e.axi.v.toFixed(2), x + 5, Math.min(base - bh - 7, y + h / 2)); }
-      ring(e, 'axi', x, y, w, h);
+  if (TR.hit) {                                   // hit height: the rule's verdict on straights, the impact reading (dashed) on the rest
+    const [y, h] = TR.hit;
+    for (const e of S.punches) { if (!e.hit || !vis(e)) continue;
+      const x = e.hit, rule = !!x.verdict, v = rule ? x.verdict : x.impVerdict, z = rule ? x.zone : x.impZone, fj = rule ? x.land : x.impF;
+      if (!v) continue;
+      const [bx, w] = span(e), col = VERD[v] || '#8e8e93', judged = v !== 'skip';
+      c.globalAlpha = judged ? (rule ? 1 : 0.45) : 0.25; c.fillStyle = col; rr(bx, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
+      if (!rule || !judged) { c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([3, 2]); rr(bx + 0.5, y + 3.5, w - 1, h - 7, 5); c.stroke(); c.setLineDash([]); }
+      if (fj != null && judged) { const xi = tx((fj + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      if (judged && z) tag(bx, w, y, h, w > 70 ? ZONE[z]?.[1] || z : ZONE[z]?.[0] || '?');
+      ring(e, 'hit', bx, y, w, h);
     }
-    c.strokeStyle = VERD.too_head_on; c.lineWidth = 1; c.setLineDash([4, 3]);
-    c.beginPath(); c.moveTo(L, yg); c.lineTo(L + W, yg); c.stroke(); c.setLineDash([]);
   }
 }
 
@@ -935,8 +958,13 @@ function tip(e, cx, cy) {
         iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
         `<span class="m">${r.bsi ? `good = 2× the IQR around it (dark: the IQR ${iqr(r.qsi)}, the middle 50% of this punch type in the study)`
                                    : 'range = the middle 50% (IQR) of this punch type in the study'}</span>`;
-    } else { const x = e.axi;
-      el.innerHTML = head + `<span class="num">axiality ${x.v.toFixed(2)} · ${x.level.replace('_', ' ')}</span><br>${v(x.gate)} <span class="m">rules skip above 0.71</span>`;
+    } else { const x = e.hit, zn = z => ZONE[z]?.[1] || z;
+      el.innerHTML = head + (x.verdict
+        ? (x.skip ? `hit height ${v('skip')} <span class="m">(${x.skip})</span>` :
+           `<span class="num">hit height: <b>${zn(x.zone)}</b> ${v(x.verdict)}</span><br><span class="m num">fist at ${(x.hf * 100).toFixed(0)}% of stance height · f ${x.land} (the rule's frame)</span>`)
+        : `<span class="m">the rule judges jabs and crosses only</span>`) +
+        (x.impVerdict && x.impVerdict !== 'skip' ? `<br><span class="num">at impact: ${zn(x.impZone)} ${v(x.impVerdict)}</span>` +
+          (x.match ? ` <span class="m">· model's target ${e.target}: ${x.match === 'yes' ? 'matches' : 'no match'}</span>` : '') : '');
     }
   } else if (e.kind === 'p') {
     const s = styleP(e.type);

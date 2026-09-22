@@ -23,7 +23,7 @@ Chrome or Edge (it reads folders with the File System Access API) and Google Dri
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
 (fps, stance, video name), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
 `*_blazepose_full.npy` skeleton for the stick figure. A missing stage is named in the timeline header; the rest still works.
-The rule layers read `punch_axiality/axiality.csv`, `hip_rotation/hip_rotation.csv` and `arm_extension/arm_extension.{csv,json}`
+The rule layers read `arm_extension/arm_extension.{csv,json}`, `hip_rotation/hip_rotation.csv` and `hit_height/hit_height.{csv,json}`
 when present, joined to the punches by start frame and hand.
 
 Over HTTP (a static server with Range support rooted at the data folder, serving this page from the same origin):
@@ -45,7 +45,9 @@ red = wrong / too much, gray = not judged.
   with this frame's elbow bend.
 - **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a good band of 2× the study's IQR (block color and
   degrees); on the video the hip line in the verdict color. The impact → end step is in the CSV but not shown.
-- **Axiality** (`punch_axiality/`): per straight a bar as tall as its axiality, the dashed line at 0.71 where the rules
-  stop judging (gray = too head-on).
+- **Hit height** (`hit_height/`): per jab / cross the production rule's zone (head / shoulder / body / over the head /
+  below the belt; on target = green, off = red, skipped = dashed gray) with a white tick at the frame it judged; hooks
+  and uppercuts get the same zones read at their impact frame (lighter, dashed). On the video a ring on the fist at the
+  judged frame with its zone.
 
 Keys: Space play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact.
