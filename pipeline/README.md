@@ -63,6 +63,16 @@ red = wrong / too much, gray = not judged.
   not rated). These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
+- **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = |x shoulder − x elbow| / torso per arm,
+  judged only while the boxer is within 45° of facing or backing the camera and that arm isn't throwing a hook. The row
+  shows the flared stretches (≥ 0.3 s over flare 0.30), lead in the top half, rear in the bottom; the toggle's summary
+  has the per-arm share of judged frames flared and the video's rating (< 10 % tucked, 10–25 % sometimes flared,
+  ≥ 25 % flared, worse arm decides). Reads `runs.csv` + `elbow_tuck.json`.
+
+**Defense after combo** (`defense_after_combo/defense_after_combo.json`, a whole-video rule — no timeline row): under
+the offensive combo list, the share of combos followed by a defensive move within 1 s of the combo's end (≥ 60 % good,
+35–60 % moderate, < 35 % no defense after combos; fewer than 10 combos → not rated).
+
 **Same punches** (`same_punches/same_punches.json`, a whole-video rule — no timeline row): under the target
 distribution, the share of the 2 most-used punch types (≥ 85 % same punches, 70–85 % moderate, < 70 % varied; fewer
 than 20 punches → not rated). The top 2 because jab and cross are normally the most common anyway.
