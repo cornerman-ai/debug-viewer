@@ -23,7 +23,7 @@ Chrome or Edge (it reads folders with the File System Access API) and Google Dri
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
 (fps, stance, video name), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
 `*_blazepose_full.npy` skeleton for the stick figure. A missing stage is named in the timeline header; the rest still works.
-The rule layers read `arm_extension/arm_extension.{csv,json}`, `hip_rotation/hip_rotation.csv` and `hit_height/hit_height.{csv,json}`
+The rule layers read `arm_extension/arm_extension.{csv,json}`, `hip_rotation/hip_rotation.csv`, `hit_height/hit_height.{csv,json}` and `head_offcenter/head_offcenter.{csv,json}`
 when present, joined to the punches by start frame and hand.
 
 Over HTTP (a static server with Range support rooted at the data folder, serving this page from the same origin):
@@ -49,5 +49,12 @@ red = wrong / too much, gray = not judged.
   below the belt; on target = green, off = red, skipped = dashed gray) with a white tick at the frame it judged; hooks
   and uppercuts get the same zones read at their impact frame (lighter, dashed). On the video a ring on the fist at the
   judged frame with its zone.
+- **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head got
+  off a vertical line through the hips (in torso heights), colored by band (perfect / good / bad / critical) with a
+  tick at the furthest frame; on the video the hip line (dashed) and the head's distance from it.
+
+**Adding a rule layer**: one entry in `RULE_LAYERS` in `index.html` (key, label, the CSV / JSON it reads, and how to
+parse, summarize, card, tooltip, draw its row and, optionally, draw on the video). The toggle, loading, timeline row,
+hover and punch card come from that entry; nothing else changes.
 
 Keys: Space play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact.
