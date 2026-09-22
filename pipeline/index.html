@@ -236,7 +236,8 @@
       <div class="label" style="margin-top:16px">Defense</div><div class="chips" id="defChips"></div>
       <div class="dist" id="defDist"></div>
       <div class="label" style="margin-top:12px">Side</div><div class="dist" id="sideDist"></div>
-      <div class="label" style="margin-top:16px">Combinations</div><div id="comboDist"></div>
+      <div class="label" style="margin-top:16px">Offensive combos</div><div id="comboDist-offensive"></div>
+      <div class="label" style="margin-top:16px">Combined combos</div><div id="comboDist-combined"></div>
     </div>
   </div>
 </div>
@@ -291,6 +292,45 @@ const ZONE = {head: ['H', 'head'], body: ['B', 'body'], shoulder: ['S', 'shoulde
 //   tip(e, x, u)         → the tooltip body when hovering the rule's row (u: head line, v(verdict))
 //   row(e, x, g)         → draws the punch's block in the rule's row (g: canvas, row y / h, span, tag, ring, tx, fps)
 //   overlay(e, x, f, P, leadLeft) → optional: draws on the video for the punch under the playhead
+// ── combinations (not a rule): two kinds with the same rule — no pause > 0.2 s between elements, a defensive move
+//    longer than 0.75 s splits. offensive = punches only, combined = punches + defensive moves. An "items" layer: its
+//    rows are the combinations themselves (combinations/<kind>.csv), one plain line each, not the punches ──
+const COMBO = {offensive: '#0a84ff', combined: '#bf5af2'};
+function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order
+  return r.elements.split(' ; ').map(t => { const [kind, hand, type, sf] = t.split('|'); return {kind, hand, type, sf: +sf}; });
+}
+function elName(m) {
+  const st = m.kind === 'punch' ? styleP(m.type) : styleD(m.type);
+  return {c: st.c, name: `${m.hand ? cap(m.hand) + ' ' : ''}${st.name}`};
+}
+function comboLayer(kind, label, short, what) {
+  const reps = x => (S.layerSum[kind]?.[kind]?.sequences.find(q => q.sequence === x.seq) || {}).count ?? '–';
+  return {
+    key: kind, label, short, items: true,
+    csv: ['combinations', `${kind}.csv`], json: ['combinations', 'combinations.json'],
+    parseItem: (r, num) => +r.n_elements >= 2 ? {id: num(r.combo_id), sf: num(r.start_frame), ef: num(r.end_frame), n: num(r.n_elements),
+      nP: num(r.n_punches), nD: num(r.n_defenses), seq: r.sequence, els: comboEls(r)} : null,
+    summary(P, js, {dot}) {
+      const k = js?.[kind]; if (!k) return '';
+      return dot(COMBO[kind], `${k.n_combinations} combinations`) + `<span>${k.n_different} different</span>` +
+        (kind === 'combined' ? `<span>${k.n_with_defense} with a defensive move</span>` : '') + `<span class="m">${what}</span>`;
+    },
+    card: (e, x) => `<div class="sub"><div class="h">${label}</div>` + (!x ? '<div class="empty">not in one (single)</div>' :
+      `<div class="rows num" style="margin-top:0"><span>Elements</span><b>${x.nP} punches${x.nD ? ` + ${x.nD} defense` : ''}</b>
+       <span>Repeats in the video</span><b>${reps(x)}×</b></div>
+       <div style="margin-top:6px;line-height:1.6">${x.els.map(m => { const nm = elName(m).name; return m.kind === 'punch' && m.sf === e.sf ? `<b>${nm}</b>` : `<span style="color:var(--text2)">${nm}</span>`; }).join(' › ')}</div>`) + '</div>',
+    tip: (e, x) => `<b>${label.replace(/s$/, '')} · ${x.nP} punches${x.nD ? ` + ${x.nD} defense` : ''}</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s` +
+      `<div style="margin:5px 0 4px;display:grid;grid-template-columns:auto auto auto;gap:2px 10px">` +
+      x.els.map((m, i) => { const q = elName(m); return `<span class="m num">${i + 1}</span><span><span class="dot" style="background:${q.c}"></span>${q.name}</span>` +
+        `<span class="m num">${fmtT(m.sf / S.fps)}</span>`; }).join('') +
+      `</div><span class="m">this sequence repeats ${reps(x)}× in the video</span>`,
+    row(e, x, {c, y, h, tx, fps}) {                      // one plain line from the combination's first frame to its last
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      c.fillStyle = COMBO[kind]; c.globalAlpha = on ? 1 : 0.8; rr(x0, y + h / 2 - 4, Math.max(2, x1 - x0 - 1), 8, 4); c.fill(); c.globalAlpha = 1;
+    },
+  };
+}
 const roundTxt = (q, b) => q != null ? `<span>round <b>${q}</b> · ${b}</span>` : '';
 const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${v >= 0 ? 'right' : 'left'}`;
 const RULE_LAYERS = [
@@ -473,49 +513,9 @@ const RULE_LAYERS = [
       overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line · ${x.comb?.toFixed(2)} torso (0.75 impact + 0.125 · 25 % + 0.125 · 75 %) · ${VNAME[x.band]}${atImpact ? ' · IMPACT' : ''}`, col);
     },
   },
-  {
-    // not a rule: the punches grouped into combinations (no pause > 0.2 s between them; a defensive move in between
-    // keeps the combination going unless it takes longer than 0.75 s). One solid bar per combination, all one color; single punches are not drawn.
-    key: 'combo', label: 'Combinations', short: 'Combos',
-    csv: ['combinations', 'members.csv'], json: ['combinations', 'combinations.json'],
-    parse: (r, num) => r.kind === 'punch' && r.combo_id !== '' && +r.combo_n_punches >= 2 ? {id: num(r.combo_id), pos: num(r.position), csf: num(r.combo_start_frame),
-      cef: num(r.combo_end_frame), n: num(r.combo_n_punches), seq: r.combo_sequence} : null,
-    summary(P, js, {dot}) {
-      if (!js) return '';
-      const top = js.sequences.find(q => q.n_punches >= 2);
-      return dot(COMBO, `${js.n_combinations} combinations`) + `<span>${js.n_single_punches} single punches</span>` +
-        (top ? `<span>most often <b>${top.sequence}</b> × ${top.count}</span>` : '');
-    },
-    card: (e, x) => `<div class="sub"><div class="h">Combination</div>` + (!x ? '<div class="empty">not in a combination (single punch)</div>' :
-      `<div class="rows num" style="margin-top:0"><span>Punches</span><b>${x.n}${x.seq.split(' > ').length > x.n ? ' + defense' : ''}</b>
-       <span>This punch</span><b>${x.pos + 1} of ${x.seq.split(' > ').length}</b>
-       <span>Repeats in the video</span><b>${(S.layerSum.combo?.sequences.find(q => q.sequence === x.seq) || {}).count ?? '–'}×</b></div>
-       <div style="margin-top:6px;line-height:1.6">${x.seq.split(' > ').map((t, i) => i === x.pos ? `<b>${t}</b>` : `<span style="color:var(--text2)">${t}</span>`).join(' › ')}</div>`) + '</div>',
-    tip: (e, x) => `<b>Combination of ${x.n} punches${(k => k ? ` + ${k} defense` : "")(x.seq.split(" > ").length - x.n)}</b> · ${fmtT(x.csf / S.fps)} · ${((x.cef + 1 - x.csf) / S.fps).toFixed(2)} s` +
-      `<div style="margin:5px 0 4px;display:grid;grid-template-columns:auto auto auto;gap:2px 10px">` +
-      comboMembers(x).map((m, i) => `<span class="m num">${i + 1}</span><span><span class="dot" style="background:${m.c}"></span>${m.name}</span>` +
-        `<span class="m num">${fmtT(m.sf / S.fps)}</span>`).join('') +
-      `</div><span class="m">this sequence repeats ${(S.layerSum.combo?.sequences.find(q => q.sequence === x.seq) || {}).count ?? '–'}× in the video</span>`,
-    rowAll: true,                                        // drawn once per combination, not per punch (see drawLayerRows)
-    row(e, x, {c, y, h, tx, fps}) {                      // one plain line from the combination's first frame to its last
-      const x0 = Math.max(L, tx(x.csf / fps)), x1 = tx((x.cef + 1) / fps); if (x1 <= L) return;
-      const on = frameNow() >= x.csf && frameNow() <= x.cef, hov = V.hover && V.hoverLayer === 'combo' && V.hover.combo?.id === x.id;
-      c.fillStyle = COMBO; c.globalAlpha = on || hov ? 1 : 0.8; rr(x0, y + h / 2 - 4, Math.max(2, x1 - x0 - 1), 8, 4); c.fill(); c.globalAlpha = 1;
-    },
-  },
+  comboLayer('offensive', 'Offensive combos', 'Off. combos', 'punches only'),
+  comboLayer('combined', 'Combined combos', 'Comb. combos', 'punches + defensive moves'),
 ];
-const COMBO = '#0a84ff';
-// a combination's elements in order: its punches (by position) and, in the positions between them, the defensive
-// moves that start inside it
-function comboMembers(x) {
-  const P = S.punches.filter(p => p.combo?.id === x.id), D = S.defenses.filter(d => d.sf >= x.csf && d.ef <= x.cef);
-  return x.seq.split(' > ').map((t, i) => {
-    const p = P.find(q => q.combo.pos === i);
-    if (p) { const st = styleP(p.type); return {sf: p.sf, c: st.c, name: `${cap(p.hand)} ${st.name}`}; }
-    const d = D.shift(); if (!d) return {sf: x.csf, c: '#8e8e93', name: cap(t)};
-    const st = styleD(d.type); return {sf: d.sf, c: st.c, name: `${d.side ? cap(d.side) + ' ' : ''}${st.name}`};
-  });
-}
 const LAYERS = RULE_LAYERS.map(r => r.key);
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
 const RULE = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r]));
@@ -619,13 +619,14 @@ async function loadFolder(src) {
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
   const byKey = new Map(S.punches.map(p => [`${p.sf}|${p.hand}`, p]));
   const num = v => v === '' || v === undefined ? null : +v;
-  S.has = {}; S.layerSum = {};
+  S.has = {}; S.layerSum = {}; S.items = {};
   await Promise.all(RULE_LAYERS.map(async L => {           // every rule layer: its CSV joined to the punches, its JSON summary
     for (const p of S.punches) delete p[L.key];
     const [text, js] = await Promise.all([src.text(L.csv).catch(() => null),
                                           L.json ? src.text(L.json).then(JSON.parse).catch(() => null) : null]);
     S.has[L.key] = !!text; S.layerSum[L.key] = js;
     if (!text) return;
+    if (L.items) { S.items[L.key] = parseCSV(text).map(r => L.parseItem(r, num)).filter(Boolean); return; }
     for (const r of parseCSV(text)) { const p = byKey.get(`${r.start_frame}|${r.hand}`); const d = p && L.parse(r, num); if (d) p[L.key] = d; }
   }));
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
@@ -753,24 +754,25 @@ function buildChips() {
   dist($('sideDist'), [{name: 'Lead', c: dark, n: by(S.defenses, d => d.side, 'lead')},
                        {name: 'Rear', c: mid, n: by(S.defenses, d => d.side, 'rear')},
                        {name: 'No side', c: light, n: S.defenses.filter(d => d.side !== 'lead' && d.side !== 'rear').length}]);
-  comboDist();
+  comboDist('offensive'); comboDist('combined');
 }
 // combinations: how many, how many DIFFERENT sequences, and each sequence with its count (combinations/combinations.json)
 const COMBO_TOP = 8;
-function comboDist(all) {
-  const el = $('comboDist'), js = S.layerSum?.combo;
-  if (!js) { el.innerHTML = '<span style="color:var(--text3)">not in this folder</span>'; return; }
-  const seqs = js.sequences.filter(q => q.n_punches >= 2), max = Math.max(1, ...seqs.map(q => q.count));
-  const word = t => { const [h, ...k] = t.split(' '), ty = k.join(' ');         // "lead hook" → "Lead hook", "lead jab" → "Jab", "roll" → "Roll"
-    if (!k.length) return `<i style="color:var(--text2)">${cap(h)}</i>`;
+function comboDist(kind, all) {
+  const el = $(`comboDist-${kind}`), k = S.layerSum?.[kind]?.[kind];
+  if (!k) { el.innerHTML = '<span style="color:var(--text3)">not in this folder</span>'; return; }
+  const seqs = k.sequences, max = Math.max(1, ...seqs.map(q => q.count));
+  const word = t => { const [h, ...r] = t.split(' '), ty = r.join(' ');          // "lead hook" → "Lead hook", "lead jab" → "Jab", "roll" → "Roll"
+    if (!r.length) return `<i style="color:var(--text2)">${cap(h)}</i>`;
     const st = PUNCH[ty]; return ty === 'jab' || ty === 'cross' ? st?.name || cap(ty) : `${cap(h)} ${(st?.name || ty).toLowerCase()}`; };
   const rows = (all ? seqs : seqs.slice(0, COMBO_TOP)).map(q => `<div class="seq" title="${q.sequence.replaceAll(' > ', ' › ')}">${q.sequence.split(' > ').map(word).join('<span class="sep">›</span>')}</div>
-      <div class="track"><span style="width:${q.count / max * 100}%"></span></div><div class="num" style="text-align:right"><b>${q.count}</b></div>`).join('');
+      <div class="track"><span style="width:${q.count / max * 100}%;background:${COMBO[kind]}"></span></div><div class="num" style="text-align:right"><b>${q.count}</b></div>`).join('');
   el.className = 'combos';
-  el.innerHTML = `<div class="head num"><span><b>${js.n_combinations}</b> combinations</span><span><b>${seqs.length}</b> different</span>` +
-    `<span><b>${js.n_single_punches}</b> single punches</span></div>` + (seqs.length ? `<div class="list">${rows}</div>` : '') +
-    (seqs.length > COMBO_TOP ? `<button class="more" id="comboMore">${all ? 'Show fewer' : `Show all ${seqs.length}`}</button>` : '');
-  const b = $('comboMore'); if (b) b.onclick = () => comboDist(!all);
+  el.innerHTML = `<div class="head num"><span><b>${k.n_combinations}</b> combinations</span><span><b>${k.n_different}</b> different</span>` +
+    (kind === 'combined' ? `<span><b>${k.n_with_defense}</b> with a defensive move</span>` : '') +
+    `<span><b>${k.n_singles}</b> singles</span></div>` + (seqs.length ? `<div class="list">${rows}</div>` : '') +
+    (seqs.length > COMBO_TOP ? `<button class="more" id="comboMore-${kind}">${all ? 'Show fewer' : `Show all ${seqs.length}`}</button>` : '');
+  const b = $(`comboMore-${kind}`); if (b) b.onclick = () => comboDist(kind, !all);
 }
 function buildLayers() {
   const u = {dot: (c, t) => `<span><i style="background:${c}"></i>${t}</span>`,
@@ -838,7 +840,8 @@ function iqrBar(val, q, col, good) {
 }
 const pillV = v => `<span class="verdict" style="background:${VERD[v] || '#8e8e93'}">${VNAME[v] || v}</span>`;
 function layerSections(e) {
-  return RULE_LAYERS.filter(L => layerOn(L.key)).map(L => L.card(e, e[L.key])).join('');
+  return RULE_LAYERS.filter(L => layerOn(L.key)).map(L => L.card(e, L.items
+    ? (S.items[L.key] || []).find(it => it.els.some(m => m.kind === 'punch' && m.sf === e.sf)) : e[L.key])).join('');
 }
 const at = (arr, f, hidden) => arr.filter(e => e.sf <= f && f <= e.ef && !hidden.has(e.type));
 
@@ -1072,7 +1075,7 @@ function drawLayerRows(c, f, W, text, grid) {
   for (const L of RULE_LAYERS) {
     if (!TR[L.key]) continue;
     const [y, h] = TR[L.key], g = {c, y, h, span, tag, ring, tx, fps};
-    if (L.rowAll) { for (const e of S.punches) if (e[L.key]?.pos === 0) L.row(e, e[L.key], g); }   // whole-combination rows: every one, chips ignored
+    if (L.items) { for (const it of S.items[L.key] || []) L.row(it, it, g); }   // items layers: their own rows, chips ignored
     else for (const e of S.punches) if (e[L.key] && vis(e)) L.row(e, e[L.key], g);
   }
 }
@@ -1128,7 +1131,7 @@ function hit(x, y) {
   if (inRow(TR.rear)) return find(S.punches, S.hiddenP, e => e.hand === 'rear');
   if (inRow(TR.def)) return find(S.defenses, S.hiddenD, () => true);
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
-    const e = k === 'combo' ? S.punches.find(p => p.combo && p.combo.pos === 0 && f >= p.combo.csf && f <= p.combo.cef)   // anywhere on the bar
+    const e = RULE[k].items ? (S.items[k] || []).find(it => f >= it.sf && f <= it.ef)   // anywhere on the line
                             : find(S.punches, S.hiddenP, p => !!p[k]);
     V.hoverLayer = e ? k : null; return e || null;
   }
@@ -1189,7 +1192,9 @@ function tip(e, cx, cy) {
   const el = $('tip');
   if (!e) { el.style.display = 'none'; return; }
   const fps = S.fps, n = e.ef - e.sf + 1;
-  if (e.kind === 'p' && V.hoverLayer) {
+  if (V.hoverLayer && RULE[V.hoverLayer].items) {          // an items layer (combinations): the item is the hovered thing
+    el.innerHTML = RULE[V.hoverLayer].tip(e, e, {});
+  } else if (e.kind === 'p' && V.hoverLayer) {
     const s = styleP(e.type), k = V.hoverLayer, head = `<b style="color:${s.c}">●</b> <b>${cap(e.hand)} ${s.name}</b> <span class="m num">${fmtT(e.sf / fps)}</span><br>`;
     const v = x => `<b style="color:${VERD[x]}">${VNAME[x] || x}</b>`;
     el.innerHTML = RULE[k].tip(e, e[k], {head, v});
