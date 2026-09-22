@@ -43,7 +43,7 @@ red = wrong / too much, gray = not judged.
 - **Arm extension** (`arm_extension/`): per jab / cross the production rule's verdict (pass / fail; skipped = dashed),
   its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
   with this frame's elbow bend.
-- **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against the study's IQR (block color and
+- **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a good band of 2× the study's IQR (block color and
   degrees); on the video the hip line in the verdict color. The impact → end step is in the CSV but not shown.
 - **Axiality** (`punch_axiality/`): per straight a bar as tall as its axiality, the dashed line at 0.71 where the rules
   stop judging (gray = too head-on).

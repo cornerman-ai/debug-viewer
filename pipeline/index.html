@@ -93,6 +93,13 @@
   .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
   .chip .n { color: var(--text2); }
   .chip.off { opacity: 0.38; }
+  .dist { margin-top: 10px; }
+  .dist .bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--fill); gap: 2px; }
+  .dist .bar span { display: block; height: 100%; min-width: 3px; }
+  .dist .legend { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 6px; font-size: 11.5px; color: var(--text2); }
+  .dist .legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
+  .dist .legend b { color: var(--text); font-weight: 600; }
+  .dist .note { font-size: 11px; color: var(--text3); margin-top: 4px; }
   .keys { color: var(--text2); font-size: 11.5px; line-height: 1.7; }
   .layer { display: flex; flex-direction: column; gap: 3px; padding: 7px 0; border-top: 0.5px solid var(--sep); }
   .layer:first-of-type { border-top: 0; padding-top: 0; }
@@ -185,6 +192,8 @@
       </div>
       <div class="card">
         <div class="label">Punches</div><div class="chips" id="punchChips"></div>
+        <div class="dist" id="punchDist"></div>
+        <div class="label" style="margin-top:12px">Target</div><div class="dist" id="targetDist"></div>
         <div class="label" style="margin-top:12px">Defense</div><div class="chips" id="defChips"></div>
       </div>
       <div class="card keys">
@@ -355,6 +364,7 @@ async function loadFolder(src) {
     axi: join(axiCsv, (p, r) => { p.axi = {v: num(r.axiality), level: r.axial_level, gate: r.gate, status: r.status}; }),
     hip: join(hipCsv, (p, r) => { p.hip = {status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
       vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
+      bsi: r.ref_start_impact_lo !== undefined ? [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)] : null,
       qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact)}; }),
     arm: join(armCsv, (p, r) => { if (!r.verdict) return; p.arm = {verdict: r.verdict, skip: r.skip_reason, peakF: num(r.peak_frame),
       peak: num(r.peak_bend), deg: num(r.bend_deg), score: num(r.punch_score), impDeg: num(r.impact_bend_deg),
@@ -466,6 +476,21 @@ function buildChips() {
   };
   mk($('punchChips'), PUNCH, S.punches, S.hiddenP);
   mk($('defChips'), DEF, S.defenses, S.hiddenD);
+  // distributions over ALL detected punches (the chips above only hide / show them on the timeline)
+  const n = S.punches.length;
+  const dist = (el, parts, note) => {
+    const tot = parts.reduce((a, x) => a + x.n, 0);
+    if (!tot) { el.innerHTML = '<span style="color:var(--text3)">none</span>'; return; }
+    el.innerHTML = `<div class="bar">${parts.filter(x => x.n).map(x => `<span style="flex:${x.n};background:${x.c}" title="${x.name} ${x.n}"></span>`).join('')}</div>
+      <div class="legend num">${parts.filter(x => x.n).map(x => `<span><i style="background:${x.c}"></i>${x.name} <b>${Math.round(x.n / tot * 100)}%</b></span>`).join('')}</div>` +
+      (note ? `<div class="note">${note}</div>` : '');
+  };
+  dist($('punchDist'), Object.entries(PUNCH).map(([t, st]) => ({name: st.name, c: st.c, n: count(S.punches, t)})));
+  const tg = t => S.punches.filter(p => p.target === t).length;
+  const unknown = n - tg('head') - tg('body');
+  dist($('targetDist'), [{name: 'Head', c: css('--text'), n: tg('head')}, {name: 'Body', c: '#8e8e93', n: tg('body')},
+                         {name: 'Unknown', c: css('--fill2'), n: unknown}],
+       unknown ? `Unknown = jabs and crosses: the punch model can't tell their target (${unknown} of ${n}).` : '');
 }
 function buildLayers() {
   const dot = (c, t) => `<span><i style="background:${c}"></i>${t}</span>`;
@@ -477,7 +502,8 @@ function buildLayers() {
   const sum = {
     axi: dot(VERD.judgeable, `${a.judgeable || 0} judgeable`) + dot(VERD.too_head_on, `${a.too_head_on || 0} too head-on`),
     hip: dot(VERD.good, `${h.good || 0} good`) + dot(VERD.bad_low, `${h.bad_low || 0} too little`) +
-      dot(VERD.bad_high, `${h.bad_high || 0} too much`) + '<span>start → impact, vs the study IQR</span>',
+      dot(VERD.bad_high, `${h.bad_high || 0} too much`) +
+      `<span>start → impact, vs ${P.some(p => p.hip?.bsi) ? '2× the study IQR' : 'the study IQR'}</span>`,
     arm: dot(VERD.pass, `${m.pass || 0} pass`) + dot(VERD.fail, `${m.fail || 0} fail`) + dot(VERD.skip, `${(m.skip || 0) + (m.unclear || 0)} skipped`) +
       (S.armSum?.score != null ? `<span>round score ${S.armSum.score} · ${S.armSum.band} · severity ${S.armSum.severity}</span>` : ''),
   };
@@ -527,6 +553,17 @@ function eventCard(el, label, e, f) {
   }
 }
 const iqr = q => q.map(x => x == null ? '–' : x.toFixed(1)).join('–') + '°';
+// a small scale 0°..max: the IQR as a shaded band, this punch's value as a marker in its verdict color
+function iqrBar(val, q, col, good) {
+  const max = Math.max(60, Math.ceil(Math.max(val, (good || q)[1] ?? 0) / 15) * 15 + 15), pct = x => `${Math.min(100, x / max * 100)}%`;
+  return `<div style="position:relative;height:14px;margin:6px 0 3px;width:220px">
+    <div style="position:absolute;left:0;right:0;top:6px;height:2px;background:var(--fill2);border-radius:1px"></div>
+    ${good ? `<div style="position:absolute;left:${pct(good[0])};width:calc(${pct(good[1])} - ${pct(good[0])});top:3px;height:8px;background:var(--fill);border:1px solid var(--fill2);box-sizing:border-box;border-radius:4px"></div>` : ''}
+    <div style="position:absolute;left:${pct(q[0])};width:calc(${pct(q[1])} - ${pct(q[0])});top:3px;height:8px;background:var(--fill2);border-radius:4px"></div>
+    <div style="position:absolute;left:calc(${pct(val)} - 1.5px);top:0;width:3px;height:14px;background:${col};border-radius:2px"></div>
+    <span class="m num" style="position:absolute;right:0;top:-13px;font-size:10px">${max}°</span>
+    <span class="m num" style="position:absolute;left:0;top:-13px;font-size:10px">0°</span></div>`;
+}
 const pillV = v => `<span class="verdict" style="background:${VERD[v] || '#8e8e93'}">${VNAME[v] || v}</span>`;
 function layerSections(e) {
   let h = '';
@@ -542,7 +579,8 @@ function layerSections(e) {
     const r = e.hip;
     h += `<div class="sub"><div class="h">Hip rotation ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
       `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
-       <span>Typical (IQR)</span><b>${iqr(r.qsi)}</b></div>`) + '</div>';
+       <span>Good range${r.bsi ? ' (2× IQR)' : ' (IQR)'}</span><b>${iqr(r.bsi || r.qsi)}</b>
+       ${r.bsi ? `<span>IQR</span><b>${iqr(r.qsi)}</b>` : ''}</div>`) + '</div>';
   }
   if (layerOn('axi')) {
     const x = e.axi;
@@ -892,8 +930,11 @@ function tip(e, cx, cy) {
         `<span class="num">elbow bend ${a.deg == null ? '–' : a.deg.toFixed(1) + '°'} at the rule frame f ${a.peakF ?? '–'}</span><br>` +
         `<span class="m num">at impact ${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} · passes at ≤ 36.4°${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span>`;
     } else if (k === 'hip') { const r = e.hip;
-      el.innerHTML = head + `<span class="num">hip rotation start → impact ${r.si.toFixed(1)}° ${v(r.vsi)}</span><br>` +
-        `<span class="m num">typical (IQR) ${iqr(r.qsi)}</span>`;
+      el.innerHTML = head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)}</span><br>` +
+        `<span class="num">good range for a ${e.hand} ${s.name.toLowerCase()}: <b>${iqr(r.bsi || r.qsi)}</b></span>` +
+        iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
+        `<span class="m">${r.bsi ? `good = 2× the IQR around it (dark: the IQR ${iqr(r.qsi)}, the middle 50% of this punch type in the study)`
+                                   : 'range = the middle 50% (IQR) of this punch type in the study'}</span>`;
     } else { const x = e.axi;
       el.innerHTML = head + `<span class="num">axiality ${x.v.toFixed(2)} · ${x.level.replace('_', ' ')}</span><br>${v(x.gate)} <span class="m">rules skip above 0.71</span>`;
     }
