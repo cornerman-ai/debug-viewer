@@ -914,7 +914,13 @@ function hit(x, y) {
   if (x < L) return null;
   const t = xt(x), f = Math.floor(t * S.fps);
   const inRow = ([ry, rh]) => y >= ry && y <= ry + rh;
-  const find = (arr, hidden, pred) => arr.find(e => !hidden.has(e.type) && pred(e) && f >= e.sf - 1 && f <= e.ef + 1);
+  // overlapping blocks: the rightmost one wins (the latest start — also the one drawn on top); blocks the cursor is
+  // really inside beat the ±1-frame slack that only makes thin blocks easier to hit
+  const find = (arr, hidden, pred) => {
+    const ok = arr.filter(e => !hidden.has(e.type) && pred(e));
+    const last = xs => xs.reduce((b, e) => (!b || e.sf >= b.sf ? e : b), null);
+    return last(ok.filter(e => f >= e.sf && f <= e.ef)) || last(ok.filter(e => f >= e.sf - 1 && f <= e.ef + 1));
+  };
   if (inRow(TR.lead)) return find(S.punches, S.hiddenP, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, S.hiddenP, e => e.hand === 'rear');
   if (inRow(TR.def)) return find(S.defenses, S.hiddenD, () => true);
