@@ -234,6 +234,7 @@
       <div class="dist" id="punchDist"></div>
       <div class="label" style="margin-top:12px">Hand</div><div class="dist" id="handDist"></div>
       <div class="label" style="margin-top:12px">Target</div><div class="dist" id="targetDist"></div>
+      <div class="combos" id="samePunch" style="margin-top:10px"></div>
       <div class="label" style="margin-top:16px">Defense</div><div class="chips" id="defChips"></div>
       <div class="dist" id="defDist"></div>
       <div class="label" style="margin-top:12px">Side</div><div class="dist" id="sideDist"></div>
@@ -636,6 +637,7 @@ async function loadFolder(src) {
     for (const r of parseCSV(text)) { const p = byKey.get(`${r.start_frame}|${r.hand}`); const d = p && L.parse(r, num); if (d) p[L.key] = d; }
   }));
   S.sameDef = await src.text(['same_defense', 'same_defense.json']).then(JSON.parse).catch(() => null);
+  S.samePunch = await src.text(['same_punches', 'same_punches.json']).then(JSON.parse).catch(() => null);
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
   S.dur = S.n / S.fps;
   S.hiddenP.clear(); S.hiddenD.clear();
@@ -761,11 +763,22 @@ function buildChips() {
   dist($('sideDist'), [{name: 'Lead', c: dark, n: by(S.defenses, d => d.side, 'lead')},
                        {name: 'Rear', c: mid, n: by(S.defenses, d => d.side, 'rear')},
                        {name: 'No side', c: light, n: S.defenses.filter(d => d.side !== 'lead' && d.side !== 'rear').length}]);
-  comboDist('offensive'); comboDist('combined'); sameDefense();
+  comboDist('offensive'); comboDist('combined'); sameDefense(); samePunches();
 }
 // same defense (same_defense/same_defense.json): the most-used move type (>= 80 % same defense, 60-80 % moderate,
 // < 60 % varied) and the most-used side (>= 80 % one-sided); < 10 moves → not rated
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
+// same punches (same_punches/same_punches.json): the share of the 2 most-used punch types — >= 85 % same punches,
+// 70-85 % moderate, < 70 % varied; < 20 punches → not rated
+function samePunches() {
+  const el = $('samePunch'), js = S.samePunch;
+  if (!js) { el.innerHTML = ''; return; }
+  const col = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30', 'not rated': '#8e8e93'}[js.rating];
+  const names = js.top2_types.map(t => PUNCH[t]?.name || cap(t)).join(' + ');
+  el.innerHTML = `<div class="head num">Same punches<span><i style="background:${col}"></i>${js.rating}` +
+    (js.top2_share != null ? ` · ${names} <b>${Math.round(js.top2_share * 100)}%</b>` : '') +
+    `</span><span class="m">top 2 types ≥ 85% same · &lt; 70% varied</span></div>`;
+}
 function sameDefense() {
   const el = $('sameDef'), js = S.sameDef;
   if (!js) { el.innerHTML = ''; return; }

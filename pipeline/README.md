@@ -63,6 +63,10 @@ red = wrong / too much, gray = not judged.
   not rated). These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
+**Same punches** (`same_punches/same_punches.json`, a whole-video rule — no timeline row): under the target
+distribution, the share of the 2 most-used punch types (≥ 85 % same punches, 70–85 % moderate, < 70 % varied; fewer
+than 20 punches → not rated). The top 2 because jab and cross are normally the most common anyway.
+
 **Same defense** (`same_defense/same_defense.json`, a whole-video rule — no timeline row): under the defense
 distributions, the most-used move type (≥ 80 % same defense, 60–80 % moderate, < 60 % varied) and the most-used side
 among moves that have one (≥ 80 % one-sided); fewer than 10 moves → not rated. The defense model finds rolls far
