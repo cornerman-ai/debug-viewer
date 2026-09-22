@@ -475,7 +475,7 @@ const RULE_LAYERS = [
   },
   {
     // not a rule: the punches grouped into combinations (no pause > 0.2 s between them; a defensive move in between
-    // keeps the combination going). One solid bar per combination, all one color; single punches are not drawn.
+    // keeps the combination going unless it takes longer than 0.75 s). One solid bar per combination, all one color; single punches are not drawn.
     key: 'combo', label: 'Combinations', short: 'Combos',
     csv: ['combinations', 'members.csv'], json: ['combinations', 'combinations.json'],
     parse: (r, num) => r.kind === 'punch' && r.combo_id !== '' && +r.combo_n_punches >= 2 ? {id: num(r.combo_id), pos: num(r.position), csf: num(r.combo_start_frame),
