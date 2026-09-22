@@ -464,7 +464,40 @@ const RULE_LAYERS = [
       overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line · ${x.comb?.toFixed(2)} torso (0.75 impact + 0.125 · 25 % + 0.125 · 75 %) · ${VNAME[x.band]}${atImpact ? ' · IMPACT' : ''}`, col);
     },
   },
+  {
+    // not a rule: the punches grouped into combinations (no pause > 0.5 s between them; a defensive move in between
+    // keeps the combination going). Two alternating blues tell neighbouring combinations apart, gray = a single punch.
+    key: 'combo', label: 'Combinations', short: 'Combos',
+    csv: ['combinations', 'members.csv'], json: ['combinations', 'combinations.json'],
+    parse: (r, num) => r.kind === 'punch' && r.combo_id !== '' ? {id: num(r.combo_id), pos: num(r.position), csf: num(r.combo_start_frame),
+      cef: num(r.combo_end_frame), n: num(r.combo_n_punches), seq: r.combo_sequence} : null,
+    summary(P, js, {dot}) {
+      if (!js) return '';
+      const top = js.sequences.find(q => q.n_punches >= 2);
+      return dot(COMBO[0], `${js.n_combinations} combinations`) + dot('#8e8e93', `${js.n_single_punches} single`) +
+        (top ? `<span>most often <b>${top.sequence}</b> × ${top.count}</span>` : '');
+    },
+    card: (e, x) => `<div class="sub"><div class="h">Combination</div>` + (!x ? '<div class="empty">no combination</div>' :
+      x.n < 2 ? '<div class="empty">single punch</div>' :
+      `<div class="rows num" style="margin-top:0"><span>Punches</span><b>${x.n}${x.seq.split(' > ').length > x.n ? ' + defense' : ''}</b>
+       <span>This punch</span><b>${x.pos + 1} of ${x.seq.split(' > ').length}</b>
+       <span>Repeats in the video</span><b>${(S.layerSum.combo?.sequences.find(q => q.sequence === x.seq) || {}).count ?? '–'}×</b></div>
+       <div style="margin-top:6px;line-height:1.6">${x.seq.split(' > ').map((t, i) => i === x.pos ? `<b>${t}</b>` : `<span style="color:var(--text2)">${t}</span>`).join(' › ')}</div>`) + '</div>',
+    tip: (e, x, {head}) => head + (x.n < 2 ? '<span class="m">single punch</span>'
+      : `<span class="num">combination of <b>${x.n}</b> · punch ${x.pos + 1}</span><br><span>${x.seq.replaceAll(' > ', ' › ')}</span>`),
+    row(e, x, {c, y, h, span, tag, ring, tx, fps}) {      // a thin bar over the whole combination, each punch a block on it
+      const col = x.n < 2 ? '#8e8e93' : COMBO[x.id % 2], [bx, w] = span(e);
+      if (x.n >= 2 && x.pos === 0 || x.n >= 2 && tx(x.csf / fps) < L) {
+        const x0 = Math.max(L, tx(x.csf / fps)), x1 = tx((x.cef + 1) / fps);
+        c.fillStyle = col; c.globalAlpha = 0.35; rr(x0, y + h / 2 - 3, Math.max(2, x1 - x0), 6, 3); c.fill(); c.globalAlpha = 1;
+      }
+      c.fillStyle = col; rr(bx, y + 3, w, h - 6, 5); c.fill();
+      if (x.pos === 0 && x.n >= 2) tag(bx, w, y, h, `${x.n}`);
+      ring(e, 'combo', bx, y, w, h);
+    },
+  },
 ];
+const COMBO = ['#0a84ff', '#64d2ff'];
 const LAYERS = RULE_LAYERS.map(r => r.key);
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
 const RULE = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r]));
