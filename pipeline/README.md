@@ -63,6 +63,11 @@ red = wrong / too much, gray = not judged.
   not rated). These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
+**Same defense** (`same_defense/same_defense.json`, a whole-video rule — no timeline row): under the defense
+distributions, the most-used move type (≥ 80 % same defense, 60–80 % moderate, < 60 % varied) and the most-used side
+among moves that have one (≥ 80 % one-sided); fewer than 10 moves → not rated. The defense model finds rolls far
+better than slips, so a high roll share is partly the model.
+
 **Adding a rule layer**: one entry in `RULE_LAYERS` in `index.html` (key, label, the CSV / JSON it reads, and how to
 parse, summarize, card, tooltip, draw its row and, optionally, draw on the video). The toggle, loading, timeline row,
 hover and punch card come from that entry; nothing else changes.
