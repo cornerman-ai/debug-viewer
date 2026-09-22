@@ -223,15 +223,11 @@
     <div class="card">
       <div class="label">Punches</div><div class="chips" id="punchChips"></div>
       <div class="dist" id="punchDist"></div>
+      <div class="label" style="margin-top:12px">Hand</div><div class="dist" id="handDist"></div>
       <div class="label" style="margin-top:12px">Target</div><div class="dist" id="targetDist"></div>
-      <div class="label" style="margin-top:12px">Defense</div><div class="chips" id="defChips"></div>
+      <div class="label" style="margin-top:16px">Defense</div><div class="chips" id="defChips"></div>
       <div class="dist" id="defDist"></div>
-    </div>
-    <div class="card keys">
-      <kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame · <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd> 1 s<br>
-      <kbd>↑</kbd><kbd>↓</kbd> previous / next event · <kbd>I</kbd> jump to impact<br>
-      Timeline: scroll to zoom · drag to pan · click to seek · scroll over the row names to scroll the rows<br>
-      Video: scroll to zoom · drag to pan · double-click or <kbd>0</kbd> resets · <kbd>+</kbd><kbd>−</kbd> zoom
+      <div class="label" style="margin-top:12px">Side</div><div class="dist" id="sideDist"></div>
     </div>
   </div>
 </div>
@@ -286,6 +282,7 @@ const ZONE = {head: ['H', 'head'], body: ['B', 'body'], shoulder: ['S', 'shoulde
 //   tip(e, x, u)         → the tooltip body when hovering the rule's row (u: head line, v(verdict))
 //   row(e, x, g)         → draws the punch's block in the rule's row (g: canvas, row y / h, span, tag, ring, tx, fps)
 //   overlay(e, x, f, P, leadLeft) → optional: draws on the video for the punch under the playhead
+const roundTxt = (q, b) => q != null ? `<span>round <b>${q}</b> · ${b}</span>` : '';
 const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${v >= 0 ? 'right' : 'left'}`;
 const RULE_LAYERS = [
   {
@@ -296,8 +293,7 @@ const RULE_LAYERS = [
     summary(P, js, {dot, count}) {
       const m = count(P, p => p.arm?.verdict);
       return dot(VERD.pass, `${m.pass || 0} pass`) + dot(VERD.fail, `${m.fail || 0} fail`) +
-        dot(VERD.skip, `${(m.skip || 0) + (m.unclear || 0)} skipped`) +
-        (js?.score != null ? `<span>round score ${js.score} · ${js.band} · severity ${js.severity}</span>` : '');
+        dot(VERD.skip, `${(m.skip || 0) + (m.unclear || 0)} skipped`) + roundTxt(js?.score, js?.band);
     },
     card: (e, a) => `<div class="sub"><div class="h">Arm extension ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elbow bend, rule frame</span><b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
@@ -342,8 +338,7 @@ const RULE_LAYERS = [
     summary(P, js, {dot, count}) {
       const h = count(P, p => p.hip?.status === 'ok' ? p.hip.vsi : null);
       return dot(VERD.good, `${h.good || 0} good`) + dot(VERD.bad_low, `${h.bad_low || 0} too little`) +
-        dot(VERD.bad_high, `${h.bad_high || 0} too much`) +
-        `<span>start → impact, vs ${P.some(p => p.hip?.bsi) ? '2× the study IQR' : 'the study IQR'}</span>`;
+        dot(VERD.bad_high, `${h.bad_high || 0} too much`);
     },
     card: (e, r) => `<div class="sub"><div class="h">Hip rotation ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
       `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
@@ -377,11 +372,9 @@ const RULE_LAYERS = [
       pen: num(r.penalty), skip: r.skip_reason, impF: num(r.impact_frame), impZone: r.impact_zone, impVerdict: r.impact_verdict,
       impHf: num(r.impact_height_frac), match: r.impact_matches_target}),
     summary(P, js, {dot, count}) {
-      const hr = count(P, p => p.hit?.verdict || null), hi = count(P, p => p.hit && !p.hit.verdict ? p.hit.impVerdict || null : null);
+      const hr = count(P, p => p.hit?.verdict || null);
       return dot(VERD.on_target, `${hr.on_target || 0} on target`) + dot(VERD.off_target, `${hr.off_target || 0} off`) +
-        dot(VERD.skip, `${hr.skip || 0} skipped`) + '<span>jabs + crosses (the rule)</span>' +
-        (js?.score != null ? `<span>round score ${js.score} · ${js.band} · severity ${js.severity}</span>` : '') +
-        `<span>hooks / uppercuts at impact: ${hi.on_target || 0} on · ${hi.off_target || 0} off (dashed)</span>`;
+        dot(VERD.skip, `${hr.skip || 0} skipped`) + roundTxt(js?.score, js?.band);
     },
     card(e, x) {
       const zn = z => z ? (ZONE[z]?.[1] || z) : '–', pct = v => v == null ? '–' : `${(v * 100).toFixed(0)}% of stance height`;
@@ -430,11 +423,10 @@ const RULE_LAYERS = [
       max: num(r.max_offset), maxF: num(r.max_frame),
       skip: r.skip_reason, facing: num(r.facing_mean)}),
     summary(P, js, {dot, count}) {
-      const b = count(P, p => p.hoc?.band || null), n = P.filter(p => p.hoc?.score != null).length;
+      const b = count(P, p => p.hoc?.band || null);
       return dot(VERD.perfect, `${b.perfect || 0} perfect`) + dot(VERD.good, `${b.good || 0} good`) +
         dot(VERD.bad, `${b.bad || 0} bad`) + dot(VERD.critical, `${b.critical || 0} critical`) +
-        `<span>0.75·impact + 0.125·(25 %) + 0.125·(75 %) · judged only facing or backing the camera (±45°): ${n} of ${P.length}</span>` +
-        (js?.round_score != null ? `<span>round score ${js.round_score} · ${js.round_band}</span>` : '');
+        roundTxt(js?.round_score, js?.round_band);
     },
     card: (e, x) => `<div class="sub"><div class="h">Head off center line ${x?.band ? pillV(x.band) : ''}</div>` +
       (!x ? '<div class="empty">no reading</div>' :
@@ -701,11 +693,15 @@ function buildChips() {
   };
   dist($('punchDist'), Object.entries(PUNCH).map(([t, st]) => ({name: st.name, c: st.c, n: count(S.punches, t)})));
   dist($('defDist'), Object.entries(DEF).map(([t, st]) => ({name: st.name, c: st.c, n: count(S.defenses, t)})));
-  const tg = t => S.punches.filter(p => p.target === t).length;
-  const unknown = n - tg('head') - tg('body');
-  dist($('targetDist'), [{name: 'Head', c: css('--text'), n: tg('head')}, {name: 'Body', c: '#8e8e93', n: tg('body')},
-                         {name: 'Unknown', c: css('--fill2'), n: unknown}],
-       unknown ? `Unknown = jabs and crosses: the punch model can't tell their target (${unknown} of ${n}).` : '');
+  const by = (arr, f, v) => arr.filter(x => f(x) === v).length, dark = css('--text'), mid = '#8e8e93', light = css('--fill2');
+  dist($('handDist'), [{name: 'Lead', c: dark, n: by(S.punches, p => p.hand, 'lead')},
+                       {name: 'Rear', c: mid, n: by(S.punches, p => p.hand, 'rear')}]);
+  dist($('targetDist'), [{name: 'Head', c: dark, n: by(S.punches, p => p.target, 'head')},
+                         {name: 'Body', c: mid, n: by(S.punches, p => p.target, 'body')},
+                         {name: 'Unknown', c: light, n: S.punches.filter(p => p.target !== 'head' && p.target !== 'body').length}]);
+  dist($('sideDist'), [{name: 'Lead', c: dark, n: by(S.defenses, d => d.side, 'lead')},
+                       {name: 'Rear', c: mid, n: by(S.defenses, d => d.side, 'rear')},
+                       {name: 'No side', c: light, n: S.defenses.filter(d => d.side !== 'lead' && d.side !== 'rear').length}]);
 }
 function buildLayers() {
   const u = {dot: (c, t) => `<span><i style="background:${c}"></i>${t}</span>`,
