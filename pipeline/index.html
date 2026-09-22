@@ -69,8 +69,8 @@
   .stage video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; transform-origin: 0 0; }
   .stage.zoomed { cursor: grab; }
   .stage.panning { cursor: grabbing; }
-  .zoombtn { position: absolute; top: 12px; right: 12px; display: none; border: 0; cursor: pointer; pointer-events: auto; }
-  .zoombtn.show { display: inline-flex; }
+  .stage .zoombtn { position: absolute; top: 12px; right: 12px; display: none; border: 0; cursor: pointer; pointer-events: auto; }
+  .stage .zoombtn.show { display: inline-flex; }
   .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .stage .hud { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-weight: 600; font-size: 13px;
@@ -121,7 +121,8 @@
   .timeline { padding: 10px 0 8px; }
   .tl-head { display: flex; align-items: center; gap: 10px; padding: 0 14px 8px; }
   .tl-head .label { margin: 0; }
-  #tl { display: block; width: 100%; height: 318px; cursor: default; touch-action: none; transition: height .2s; }
+  #tl { display: block; width: 100%; height: 318px; cursor: default; touch-action: none; }
+  .tl-scroll { max-height: 46vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
   .tooltip { position: fixed; z-index: 50; pointer-events: none; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45;
     background: var(--panel); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--shadow); border: 0.5px solid var(--sep);
     display: none; max-width: 260px; }
@@ -205,7 +206,7 @@
       <div class="card keys">
         <kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame · <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd> 1 s<br>
         <kbd>↑</kbd><kbd>↓</kbd> previous / next event · <kbd>I</kbd> jump to impact<br>
-        Timeline: scroll to zoom · drag to pan · click to seek<br>
+        Timeline: scroll to zoom · drag to pan · click to seek · scroll over the row names to scroll the rows<br>
         Video: scroll to zoom · drag to pan · double-click or <kbd>0</kbd> resets · <kbd>+</kbd><kbd>−</kbd> zoom
       </div>
     </div>
@@ -222,7 +223,7 @@
       <label class="toggle on" id="followToggle"><span class="sw"></span>Follow playhead</label>
       <div class="seg" id="rateSeg"><button data-r="0.25">¼×</button><button data-r="0.5">½×</button><button data-r="1" class="on">1×</button><button data-r="2">2×</button></div>
     </div>
-    <canvas id="tl"></canvas>
+    <div class="tl-scroll" id="tlScroll"><canvas id="tl"></canvas></div>
   </div>
 </div>
 <div class="tooltip" id="tip"></div>
@@ -697,14 +698,19 @@ const L = 78, RPAD = 14;                                        // left gutter f
 let TR = {};
 function layout() {
   TR = {ruler: [0, 24], angle: [30, 128], lead: [166, 30], rear: [200, 30], def: [240, 30]};
-  let y = 280;
+  const any = LAYERS.some(layerOn);
+  let y = any ? 296 : 280;                                     // 16 px for the "RULES" caption when there are rule rows
   for (const k of LAYERS) if (layerOn(k)) { TR[k] = [y, 26]; y += 30; }
-  TR.bottom = y - (y === 280 ? 10 : 4);                        // lowest edge of the scrolling rows
+  if (any) TR.rules = 285;
+  TR.bottom = y - (any ? 4 : 10);                              // lowest edge of the scrolling rows
   TR.over = [TR.bottom + 14, 30];
   tl.style.height = `${TR.over[0] + TR.over[1] + 4}px`;
 }
 layout();
 let TW = 0, TH = 0;
+const tlScroll = $('tlScroll');
+new ResizeObserver(() => { resize(); V.dirty = true; }).observe(tl);
+tlScroll.addEventListener('scroll', () => { V.dirty = true; });
 const tx = t => L + (t - V.t0) / (V.t1 - V.t0) * (TW - L - RPAD);
 const xt = x => V.t0 + (x - L) / (TW - L - RPAD) * (V.t1 - V.t0);
 const ox = t => L + t / S.dur * (TW - L - RPAD);
@@ -741,8 +747,14 @@ function drawTimeline(f) {
   const W = TW - L - RPAD;
   // track backgrounds + names
   const names = {angle: 'Facing', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
+  if (TR.rules) {                                             // the rule rows' section caption + divider
+    c.fillStyle = text3; c.textAlign = 'left'; c.font = '600 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+    c.fillText('RULES', 8, TR.rules); c.strokeStyle = sep; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(50, TR.rules + 0.5); c.lineTo(L + W, TR.rules + 0.5); c.stroke();
+    c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  }
   for (const [k, v] of Object.entries(TR)) {
-    if (k === 'ruler' || k === 'bottom') continue;
+    if (k === 'ruler' || k === 'bottom' || k === 'rules') continue;
     const [y, h] = v;
     c.fillStyle = track; rr(L, y, W, h, 7); c.fill();
     c.fillStyle = text2; c.textAlign = 'right'; c.fillText(names[k], k === 'angle' ? L - 36 : L - 12, y + h / 2);
@@ -799,6 +811,15 @@ function drawTimeline(f) {
   const xp = tx((f + 0.5) / fps);
   c.strokeStyle = ph; c.lineWidth = 1.5; c.beginPath(); c.moveTo(xp, 20); c.lineTo(xp, TR.bottom); c.stroke();
   c.fillStyle = ph; rr(xp - 5, 16, 10, 8, 2.5); c.fill();
+  const sy = tlScroll.scrollTop;
+  if (sy > 0) {                                               // sticky ruler: time labels + playhead cap at the top of the view
+    c.fillStyle = css('--panel-solid'); c.fillRect(0, sy, TW, 24);
+    c.strokeStyle = sep; c.lineWidth = 1; c.beginPath(); c.moveTo(0, sy + 24.5); c.lineTo(TW, sy + 24.5); c.stroke();
+    c.textAlign = 'center'; c.fillStyle = text3;
+    for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step)
+      c.fillText(step < 1 ? t.toFixed(1) + ' s' : fmtT(t).replace(/\.\d+$/, ''), tx(t), sy + 12);
+    c.fillStyle = ph; rr(xp - 5, sy + 16, 10, 8, 2.5); c.fill();
+  }
   c.restore();
   // overview: the whole video, events as ticks, the visible window as a lens
   const [oy, oh] = TR.over;
@@ -939,8 +960,9 @@ tl.addEventListener('pointerup', e => {
 });
 tl.addEventListener('pointerleave', () => { if (!drag) { V.hover = null; V.dirty = true; tip(null); } });
 tl.addEventListener('wheel', e => {
-  e.preventDefault();
   const r = tl.getBoundingClientRect(), x = e.clientX - r.left, w = V.t1 - V.t0;
+  if (x < L && !e.shiftKey && tlScroll.scrollHeight > tlScroll.clientHeight) return;   // native scroll of the rows
+  e.preventDefault();
   if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) {     // pan: trackpad sideways swipe, or shift + wheel
     const d = (e.shiftKey ? e.deltaY : e.deltaX) / (TW - L - RPAD) * w; V.t0 += d; V.t1 += d;
   } else {                                                           // zoom around the cursor
