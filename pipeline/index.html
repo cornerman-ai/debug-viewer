@@ -235,6 +235,7 @@
       <div class="label" style="margin-top:12px">Hand</div><div class="dist" id="handDist"></div>
       <div class="label" style="margin-top:12px">Target</div><div class="dist" id="targetDist"></div>
       <div class="combos" id="samePunch" style="margin-top:10px"></div>
+      <div class="combos" id="bodyShots" style="margin-top:2px"></div>
       <div class="label" style="margin-top:16px">Defense</div><div class="chips" id="defChips"></div>
       <div class="dist" id="defDist"></div>
       <div class="label" style="margin-top:12px">Side</div><div class="dist" id="sideDist"></div>
@@ -638,6 +639,7 @@ async function loadFolder(src) {
   }));
   S.sameDef = await src.text(['same_defense', 'same_defense.json']).then(JSON.parse).catch(() => null);
   S.samePunch = await src.text(['same_punches', 'same_punches.json']).then(JSON.parse).catch(() => null);
+  S.bodyShots = await src.text(['bodyshots', 'bodyshots.json']).then(JSON.parse).catch(() => null);
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
   S.dur = S.n / S.fps;
   S.hiddenP.clear(); S.hiddenD.clear();
@@ -763,13 +765,23 @@ function buildChips() {
   dist($('sideDist'), [{name: 'Lead', c: dark, n: by(S.defenses, d => d.side, 'lead')},
                        {name: 'Rear', c: mid, n: by(S.defenses, d => d.side, 'rear')},
                        {name: 'No side', c: light, n: S.defenses.filter(d => d.side !== 'lead' && d.side !== 'rear').length}]);
-  comboDist('offensive'); comboDist('combined'); sameDefense(); samePunches();
+  comboDist('offensive'); comboDist('combined'); sameDefense(); samePunches(); bodyShots();
 }
 // same defense (same_defense/same_defense.json): the most-used move type (>= 80 % same defense, 60-80 % moderate,
 // < 60 % varied) and the most-used side (>= 80 % one-sided); < 10 moves → not rated
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
 // same punches (same_punches/same_punches.json): the share of the 2 most-used punch types — >= 85 % same punches,
 // 70-85 % moderate, < 70 % varied; < 20 punches → not rated
+// not enough body shots (bodyshots/bodyshots.json): body shots / (body + head) over hooks and uppercuts only —
+// >= 25 % enough, 15-25 % a few, 5-15 % too few, < 5 % head only (the old app's bodyshot_ratio numbers)
+function bodyShots() {
+  const el = $('bodyShots'), js = S.bodyShots;
+  if (!js) { el.innerHTML = ''; return; }
+  const col = {enough: '#34c759', 'a few': '#ffcc00', 'too few': '#ff9f0a', 'head only': '#ff3b30', 'not rated': '#8e8e93'}[js.rating];
+  el.innerHTML = `<div class="head num">Body shots<span><i style="background:${col}"></i>${js.rating}` +
+    (js.body_share != null ? ` · <b>${Math.round(js.body_share * 100)}%</b> (${js.n_body} of ${js.n_hooks_uppercuts} hooks + uppercuts)` : '') +
+    `</span><span class="m" title="jab and cross can't be split into head / body by the classifier, so they're not counted">≥ 25% enough · &lt; 5% head only</span></div>`;
+}
 function samePunches() {
   const el = $('samePunch'), js = S.samePunch;
   if (!js) { el.innerHTML = ''; return; }

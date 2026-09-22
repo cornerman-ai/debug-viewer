@@ -67,6 +67,11 @@ red = wrong / too much, gray = not judged.
 distribution, the share of the 2 most-used punch types (≥ 85 % same punches, 70–85 % moderate, < 70 % varied; fewer
 than 20 punches → not rated). The top 2 because jab and cross are normally the most common anyway.
 
+**Body shots** (`bodyshots/bodyshots.json`, a whole-video rule — no timeline row): under same punches, body shots /
+(body + head) over hooks and uppercuts only (the classifier can't split jab / cross into head / body): ≥ 25 % enough,
+15–25 % a few, 5–15 % too few, < 5 % head only; fewer than 10 hooks + uppercuts → not rated. The old app's
+bodyshot_ratio numbers.
+
 **Same defense** (`same_defense/same_defense.json`, a whole-video rule — no timeline row): under the defense
 distributions, the most-used move type (≥ 80 % same defense, 60–80 % moderate, < 60 % varied) and the most-used side
 among moves that have one (≥ 80 % one-sided); fewer than 10 moves → not rated. The defense model finds rolls far
