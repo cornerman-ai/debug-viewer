@@ -113,6 +113,14 @@
   .dist .legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
   .dist .legend b { color: var(--text); font-weight: 600; }
   .dist .note { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .combos .head { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 11.5px; color: var(--text2); }
+  .combos .head b { color: var(--text); font-weight: 600; }
+  .combos .list { display: grid; grid-template-columns: minmax(0, 1fr) 90px 28px; gap: 5px 10px; align-items: center; margin-top: 8px; font-size: 12px; }
+  .combos .seq { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .combos .seq .sep { color: var(--text3); margin: 0 3px; }
+  .combos .track { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
+  .combos .track span { display: block; height: 100%; background: #0a84ff; border-radius: 3px; }
+  .combos .more { margin-top: 6px; font-size: 11.5px; color: var(--accent); cursor: pointer; background: none; border: 0; padding: 0; }
   .keys { color: var(--text2); font-size: 11.5px; line-height: 1.7; }
   .layer { display: flex; flex-direction: column; gap: 3px; padding: 7px 0; border-top: 0.5px solid var(--sep); }
   .layer:first-of-type { border-top: 0; padding-top: 0; }
@@ -228,6 +236,7 @@
       <div class="label" style="margin-top:16px">Defense</div><div class="chips" id="defChips"></div>
       <div class="dist" id="defDist"></div>
       <div class="label" style="margin-top:12px">Side</div><div class="dist" id="sideDist"></div>
+      <div class="label" style="margin-top:16px">Combinations</div><div id="comboDist"></div>
     </div>
   </div>
 </div>
@@ -746,6 +755,24 @@ function buildChips() {
   dist($('sideDist'), [{name: 'Lead', c: dark, n: by(S.defenses, d => d.side, 'lead')},
                        {name: 'Rear', c: mid, n: by(S.defenses, d => d.side, 'rear')},
                        {name: 'No side', c: light, n: S.defenses.filter(d => d.side !== 'lead' && d.side !== 'rear').length}]);
+  comboDist();
+}
+// combinations: how many, how many DIFFERENT sequences, and each sequence with its count (combinations/combinations.json)
+const COMBO_TOP = 8;
+function comboDist(all) {
+  const el = $('comboDist'), js = S.layerSum?.combo;
+  if (!js) { el.innerHTML = '<span style="color:var(--text3)">not in this folder</span>'; return; }
+  const seqs = js.sequences.filter(q => q.n_punches >= 2), max = Math.max(1, ...seqs.map(q => q.count));
+  const word = t => { const [h, ...k] = t.split(' '), ty = k.join(' ');         // "lead hook" → "Lead hook", "lead jab" → "Jab", "roll" → "Roll"
+    if (!k.length) return `<i style="color:var(--text2)">${cap(h)}</i>`;
+    const st = PUNCH[ty]; return ty === 'jab' || ty === 'cross' ? st?.name || cap(ty) : `${cap(h)} ${(st?.name || ty).toLowerCase()}`; };
+  const rows = (all ? seqs : seqs.slice(0, COMBO_TOP)).map(q => `<div class="seq" title="${q.sequence.replaceAll(' > ', ' › ')}">${q.sequence.split(' > ').map(word).join('<span class="sep">›</span>')}</div>
+      <div class="track"><span style="width:${q.count / max * 100}%"></span></div><div class="num" style="text-align:right"><b>${q.count}</b></div>`).join('');
+  el.className = 'combos';
+  el.innerHTML = `<div class="head num"><span><b>${js.n_combinations}</b> combinations</span><span><b>${seqs.length}</b> different</span>` +
+    `<span><b>${js.n_single_punches}</b> single punches</span></div>` + (seqs.length ? `<div class="list">${rows}</div>` : '') +
+    (seqs.length > COMBO_TOP ? `<button class="more" id="comboMore">${all ? 'Show fewer' : `Show all ${seqs.length}`}</button>` : '');
+  const b = $('comboMore'); if (b) b.onclick = () => comboDist(!all);
 }
 function buildLayers() {
   const u = {dot: (c, t) => `<span><i style="background:${c}"></i>${t}</span>`,
