@@ -496,13 +496,11 @@ const RULE_LAYERS = [
       comboMembers(x).map((m, i) => `<span class="m num">${i + 1}</span><span><span class="dot" style="background:${m.c}"></span>${m.name}</span>` +
         `<span class="m num">${fmtT(m.sf / S.fps)}</span>`).join('') +
       `</div><span class="m">this sequence repeats ${(S.layerSum.combo?.sequences.find(q => q.sequence === x.seq) || {}).count ?? '–'}× in the video</span>`,
-    row(e, x, {c, y, h, tag, tx, fps}) {                 // ONE solid bar per combination (drawn once: by its first punch, or
-      if (x.pos !== 0 && tx(x.csf / fps) >= L) return;     // by any punch when the start is scrolled off to the left)
-      const x0 = tx(x.csf / fps), x1 = tx((x.cef + 1) / fps), bx = Math.max(L, x0), w = Math.max(2, x1 - bx - 1);
-      c.fillStyle = COMBO; rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, `${x.n}`);
-      const f = frameNow(), hov = V.hover && V.hoverLayer === 'combo' && V.hover.combo?.id === x.id;
-      if ((x.csf <= f && f <= x.cef) || hov) { c.strokeStyle = css('--text'); c.lineWidth = 1.5; rr(bx - 1, y + 1, w + 2, h - 2, 6); c.stroke(); }
+    rowAll: true,                                        // drawn once per combination, not per punch (see drawLayerRows)
+    row(e, x, {c, y, h, tx, fps}) {                      // one plain line from the combination's first frame to its last
+      const x0 = Math.max(L, tx(x.csf / fps)), x1 = tx((x.cef + 1) / fps); if (x1 <= L) return;
+      const on = frameNow() >= x.csf && frameNow() <= x.cef, hov = V.hover && V.hoverLayer === 'combo' && V.hover.combo?.id === x.id;
+      c.fillStyle = COMBO; c.globalAlpha = on || hov ? 1 : 0.8; rr(x0, y + h / 2 - 4, Math.max(2, x1 - x0 - 1), 8, 4); c.fill(); c.globalAlpha = 1;
     },
   },
 ];
@@ -1074,7 +1072,8 @@ function drawLayerRows(c, f, W, text, grid) {
   for (const L of RULE_LAYERS) {
     if (!TR[L.key]) continue;
     const [y, h] = TR[L.key], g = {c, y, h, span, tag, ring, tx, fps};
-    for (const e of S.punches) if (e[L.key] && vis(e)) L.row(e, e[L.key], g);
+    if (L.rowAll) { for (const e of S.punches) if (e[L.key]?.pos === 0) L.row(e, e[L.key], g); }   // whole-combination rows: every one, chips ignored
+    else for (const e of S.punches) if (e[L.key] && vis(e)) L.row(e, e[L.key], g);
   }
 }
 
