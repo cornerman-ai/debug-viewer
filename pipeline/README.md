@@ -58,7 +58,9 @@ red = wrong / too much, gray = not judged.
   frame to its last (blue = offensive, purple = combined; 2 elements minimum — a lone punch or move is not a combination); hovering it lists its elements in
   order with their times; the punch card shows the combination holding that punch and how often its sequence repeats.
   Reads `offensive.csv` / `combined.csv` + `combinations.json`; the distributions card counts both (how many, how many
-  different, each sequence with its count). These are "items" layers (`items: true`): their rows are the combinations,
+  different, each sequence with its count) and rates offensive combo diversity by the top-3 share (the share of
+  combos that are one of the 3 most-used sequences: ≥ 70 % repetitive, 50–70 % moderate, < 50 % varied, < 10 combos
+  not rated). These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
 **Adding a rule layer**: one entry in `RULE_LAYERS` in `index.html` (key, label, the CSV / JSON it reads, and how to
