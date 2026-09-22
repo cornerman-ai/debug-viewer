@@ -49,9 +49,9 @@ red = wrong / too much, gray = not judged.
   below the belt; on target = green, off = red, skipped = dashed gray) with a white tick at the frame it judged; hooks
   and uppercuts get the same zones read at their impact frame (lighter, dashed). On the video a ring on the fist at the
   judged frame with its zone.
-- **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head got
-  off a vertical line through the hips (in torso heights), colored by band (perfect / good / bad / critical) with a
-  tick at the furthest frame; on the video the hip line (dashed) and the head's distance from it.
+- **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head is
+  off a vertical line through the hips AT THE IMPACT FRAME (in torso heights), colored by band (perfect / good / bad /
+  critical) with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
 
 **Adding a rule layer**: one entry in `RULE_LAYERS` in `index.html` (key, label, the CSV / JSON it reads, and how to
 parse, summarize, card, tooltip, draw its row and, optionally, draw on the video). The toggle, loading, timeline row,

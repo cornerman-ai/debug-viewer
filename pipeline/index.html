@@ -424,44 +424,47 @@ const RULE_LAYERS = [
   {
     key: 'hoc', label: 'Head off center line', short: 'Head off ctr',
     csv: ['head_offcenter', 'head_offcenter.csv'], json: ['head_offcenter', 'head_offcenter.json'],
-    parse: (r, num) => ({score: num(r.score), band: r.band, peakF: num(r.peak_frame), peak: num(r.peak_offset),
-      start: num(r.start_offset), skip: r.skip_reason, facing: num(r.facing_mean)}),
+    parse: (r, num) => ({score: num(r.score), band: r.band, impF: num(r.impact_frame), usedF: num(r.impact_used_frame),
+      off: num(r.impact_offset), start: num(r.start_offset), max: num(r.max_offset), maxF: num(r.max_frame),
+      skip: r.skip_reason, facing: num(r.facing_mean)}),
     summary(P, js, {dot, count}) {
       const b = count(P, p => p.hoc?.band || null), n = P.filter(p => p.hoc?.score != null).length;
       return dot(VERD.perfect, `${b.perfect || 0} perfect`) + dot(VERD.good, `${b.good || 0} good`) +
         dot(VERD.bad, `${b.bad || 0} bad`) + dot(VERD.critical, `${b.critical || 0} critical`) +
-        `<span>judged only facing or backing the camera (±45°): ${n} of ${P.length}</span>` +
+        `<span>at the impact frame · judged only facing or backing the camera (±45°): ${n} of ${P.length}</span>` +
         (js?.round_score != null ? `<span>round score ${js.round_score} · ${js.round_band}</span>` : '');
     },
     card: (e, x) => `<div class="sub"><div class="h">Head off center line ${x?.band ? pillV(x.band) : ''}</div>` +
       (!x ? '<div class="empty">no reading</div>' :
        x.score == null ? `<div class="empty">not judged${x.skip === 'side_on' ? ' — side-on: the head moves in depth, the camera can\'t see it' : x.skip ? ' (' + x.skip + ')' : ''}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Head off the hip line, furthest</span><b>${offTxt(x.peak)}${x.peakF != null ? ' · f ' + x.peakF : ''}</b>
-        <span>At the punch's start</span><b>${offTxt(x.start)}</b>
-        <span>Score</span><b>${x.score.toFixed(0)} (full at ≥ 0.25 torso off)</b></div>`) + '</div>',
+       `<div class="rows num" style="margin-top:0"><span>Head off the hip line at impact</span><b>${offTxt(x.off)} · f ${x.usedF}</b>
+        <span>Score</span><b>${x.score.toFixed(0)} (full at ≥ 0.25 torso off)</b></div>
+        <div class="rows num" style="opacity:.6"><span>For reference, not judged:</span><b></b>
+        <span>furthest in the punch</span><b>${offTxt(x.max)}${x.maxF != null ? ' · f ' + x.maxF : ''}</b>
+        <span>at the punch's start</span><b>${offTxt(x.start)}</b></div>`) + '</div>',
     tip: (e, x, {head, v}) => x.score == null
       ? head + `<span class="m">head off center: not judged${x.skip === 'side_on' ? ' (side-on)' : x.skip ? ' (' + x.skip + ')' : ''}</span>`
-      : head + `<span class="num">head off the center line: <b>${offTxt(x.peak)}</b> at its furthest · ${v(x.band)}</span><br>` +
-        `<span class="m num">score ${x.score.toFixed(0)} (0 = head stayed on the line, 100 = ≥ 0.25 torso off) · at the start ${offTxt(x.start)}</span>`,
-    row(e, x, {c, y, h, span, tag, ring, tx, fps}) {       // judged punches only: band color, a tick at the furthest frame
+      : head + `<span class="num">head off the center line at impact: <b>${offTxt(x.off)}</b> · ${v(x.band)}</span><br>` +
+        `<span class="m num">score ${x.score.toFixed(0)} (0 = head on the line, 100 = ≥ 0.25 torso off) · for reference: furthest ${offTxt(x.max)}</span>`,
+    row(e, x, {c, y, h, span, tag, ring, tx, fps}) {       // judged punches only: band color, a tick at the impact frame
       if (x.score == null) return;
       const [bx, w] = span(e);
       c.fillStyle = VERD[x.band] || '#8e8e93'; rr(bx, y + 3, w, h - 6, 5); c.fill();
-      if (x.peakF != null) { const xi = tx((x.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      if (x.usedF != null) { const xi = tx((x.usedF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       tag(bx, w, y, h, `${x.score.toFixed(0)}`);
       ring(e, 'hoc', bx, y, w, h);
     },
-    overlay(e, x, f, P) {                                  // the vertical hip line and the head's distance from it
+    overlay(e, x, f, P) {                                  // the vertical hip line and the head's distance from it (label = the impact reading)
       if (x.score == null) return;
       const l = P(23), rt = P(24); if (!(l && rt)) return;
       const hd = [...Array(11).keys()].map(P).filter(Boolean); if (!hd.length) return;
       const hx = (Math.min(...hd.map(q => q[0])) + Math.max(...hd.map(q => q[0]))) / 2, hy = hd.reduce((a, q) => a + q[1], 0) / hd.length;
-      const cx = (l[0] + rt[0]) / 2, cy = (l[1] + rt[1]) / 2, col = VERD[x.band] || '#8e8e93';
+      const cx = (l[0] + rt[0]) / 2, cy = (l[1] + rt[1]) / 2, col = VERD[x.band] || '#8e8e93', atImpact = Math.abs(f - x.usedF) <= 1;
       octx.strokeStyle = col; octx.lineWidth = 2; octx.setLineDash([6, 5]);
       octx.beginPath(); octx.moveTo(cx, cy); octx.lineTo(cx, hy - 40); octx.stroke(); octx.setLineDash([]);
-      octx.lineWidth = 3; octx.beginPath(); octx.moveTo(cx, hy); octx.lineTo(hx, hy); octx.stroke();
-      octx.fillStyle = col; octx.beginPath(); octx.arc(hx, hy, 6, 0, 7); octx.fill();
-      overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line · furthest ${offTxt(x.peak)} · ${VNAME[x.band]}`, col);
+      octx.lineWidth = atImpact ? 4 : 2.5; octx.beginPath(); octx.moveTo(cx, hy); octx.lineTo(hx, hy); octx.stroke();
+      octx.fillStyle = col; octx.beginPath(); octx.arc(hx, hy, atImpact ? 7 : 5, 0, 7); octx.fill();
+      overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line at impact · ${offTxt(x.off)} · ${VNAME[x.band]}${atImpact ? ' · IMPACT' : ''}`, col);
     },
   },
 ];
