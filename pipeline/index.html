@@ -588,8 +588,9 @@ function layerSections(e) {
     h += `<div class="sub"><div class="h">Arm extension ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elbow bend, rule frame</span><b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
        <span>Passes at bend ≤</span><b>36.4° (r ≥ 0.95)</b>${a.skip ? `<span>Skipped</span><b>${a.skip}</b>` : ''}
-       ${a.score != null ? `<span>Punch score</span><b>${a.score.toFixed(1)}</b>` : ''}
-       <span>Bend at impact</span><b>${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>';
+       ${a.score != null ? `<span>Punch score</span><b>${a.score.toFixed(1)}</b>` : ''}</div>
+       <div class="rows num" style="opacity:.6"><span>For comparison, not judged:</span><b></b>
+       <span>bend at the impact frame</span><b>${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>';
   }
   if (layerOn('hip')) {
     const r = e.hip;
@@ -605,7 +606,7 @@ function layerSections(e) {
       (x.verdict ? `<span>Rule zone</span><b>${x.skip ? 'skipped (' + x.skip + ')' : zn(x.zone)}</b>` +
                    (x.skip ? '' : `<span>Fist height</span><b>${pct(x.hf)}${x.land != null ? ' · f ' + x.land : ''}</b>`)
                  : `<span>Rule</span><b>jabs and crosses only</b>`) +
-      `<span>At impact</span><b>${x.impVerdict === 'skip' || !x.impVerdict ? 'skipped' : zn(x.impZone) + ' ' + pillV(x.impVerdict)}</b>` +
+      `<span>${x.verdict ? 'At impact (comparison, not judged)' : 'At impact (our reading)'}</span><b>${x.impVerdict === 'skip' || !x.impVerdict ? 'skipped' : zn(x.impZone) + ' ' + pillV(x.impVerdict)}</b>` +
       (x.match ? `<span>Model's target</span><b>${e.target} · ${x.match === 'yes' ? 'matches' : 'does not match'}</b>` : '') + '</div>') + '</div>';
   }
   return h;
@@ -958,8 +959,8 @@ function tip(e, cx, cy) {
     const v = x => `<b style="color:${VERD[x]}">${VNAME[x] || x}</b>`;
     if (k === 'arm') { const a = e.arm;
       el.innerHTML = head + `arm extension ${v(a.verdict)}${a.skip ? ` <span class="m">(${a.skip})</span>` : ''}<br>` +
-        `<span class="num">elbow bend ${a.deg == null ? '–' : a.deg.toFixed(1) + '°'} at the rule frame f ${a.peakF ?? '–'}</span><br>` +
-        `<span class="m num">at impact ${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} · passes at ≤ 36.4°${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span>`;
+        `<span class="num">elbow bend <b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}</b> at the rule frame f ${a.peakF ?? '–'} · passes at ≤ 36.4°${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span><br>` +
+        `<span class="m num">for comparison, not judged: ${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} at the impact frame${a.impVerdict && a.impVerdict !== 'skip' ? ' (would ' + a.impVerdict + ')' : ''}</span>`;
     } else if (k === 'hip') { const r = e.hip;
       el.innerHTML = head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)}</span><br>` +
         `<span class="num">good range for a ${e.hand} ${s.name.toLowerCase()}: <b>${iqr(r.bsi || r.qsi)}</b></span>` +
@@ -971,7 +972,7 @@ function tip(e, cx, cy) {
         ? (x.skip ? `hit height ${v('skip')} <span class="m">(${x.skip})</span>` :
            `<span class="num">hit height: <b>${zn(x.zone)}</b> ${v(x.verdict)}</span><br><span class="m num">fist at ${(x.hf * 100).toFixed(0)}% of stance height · f ${x.land} (the rule's frame)</span>`)
         : `<span class="m">the rule judges jabs and crosses only</span>`) +
-        (x.impVerdict && x.impVerdict !== 'skip' ? `<br><span class="num">at impact: ${zn(x.impZone)} ${v(x.impVerdict)}</span>` +
+        (x.impVerdict && x.impVerdict !== 'skip' ? `<br><span class="${x.verdict ? 'm ' : ''}num">${x.verdict ? 'for comparison, not judged — at the impact frame' : 'our reading at the impact frame'}: ${zn(x.impZone)} ${v(x.impVerdict)}</span>` +
           (x.match ? ` <span class="m">· model's target ${e.target}: ${x.match === 'yes' ? 'matches' : 'no match'}</span>` : '') : '');
     }
   } else if (e.kind === 'p') {
