@@ -513,8 +513,8 @@ const RULE_LAYERS = [
       overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line · ${x.comb?.toFixed(2)} torso (0.75 impact + 0.125 · 25 % + 0.125 · 75 %) · ${VNAME[x.band]}${atImpact ? ' · IMPACT' : ''}`, col);
     },
   },
-  comboLayer('offensive', 'Offensive combos', 'Off. combos', 'punches only'),
-  comboLayer('combined', 'Combined combos', 'Comb. combos', 'punches + defensive moves'),
+  comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
+  comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
 ];
 const LAYERS = RULE_LAYERS.map(r => r.key);
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
