@@ -762,7 +762,7 @@ function buildChips() {
   comboDist('offensive'); comboDist('combined');
 }
 // combinations: how many, how many DIFFERENT sequences, and each sequence with its count (combinations/combinations.json)
-const COMBO_TOP = 8;
+const COMBO_TOP = 3;
 function comboDist(kind, all) {
   const el = $(`comboDist-${kind}`), k = S.layerSum?.[kind]?.[kind];
   if (!k) { el.innerHTML = '<span style="color:var(--text3)">not in this folder</span>'; return; }
