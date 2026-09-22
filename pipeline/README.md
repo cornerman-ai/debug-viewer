@@ -52,7 +52,7 @@ red = wrong / too much, gray = not judged.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head is
   off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), colored by band (perfect / good / bad /
   critical) with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
-- **Combinations** (`combinations/`, not a rule): the punches grouped into combinations — no pause longer than 0.5 s
+- **Combinations** (`combinations/`, not a rule): the punches grouped into combinations — no pause longer than 0.2 s
   between them, a defensive move in between keeps it going. A thin bar spans each combination with its punches as
   blocks on it (two alternating blues, the first punch tagged with the count; gray = a single punch); the card shows
   the sequence with this punch in bold and how often it repeats in the video. Reads `members.csv` + `combinations.json`.
