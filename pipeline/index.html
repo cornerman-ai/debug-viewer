@@ -466,38 +466,49 @@ const RULE_LAYERS = [
   },
   {
     // not a rule: the punches grouped into combinations (no pause > 0.2 s between them; a defensive move in between
-    // keeps the combination going). Two alternating blues tell neighbouring combinations apart, gray = a single punch.
+    // keeps the combination going). One solid bar per combination, all one color; single punches are not drawn.
     key: 'combo', label: 'Combinations', short: 'Combos',
     csv: ['combinations', 'members.csv'], json: ['combinations', 'combinations.json'],
-    parse: (r, num) => r.kind === 'punch' && r.combo_id !== '' ? {id: num(r.combo_id), pos: num(r.position), csf: num(r.combo_start_frame),
+    parse: (r, num) => r.kind === 'punch' && r.combo_id !== '' && +r.combo_n_punches >= 2 ? {id: num(r.combo_id), pos: num(r.position), csf: num(r.combo_start_frame),
       cef: num(r.combo_end_frame), n: num(r.combo_n_punches), seq: r.combo_sequence} : null,
     summary(P, js, {dot}) {
       if (!js) return '';
       const top = js.sequences.find(q => q.n_punches >= 2);
-      return dot(COMBO[0], `${js.n_combinations} combinations`) + dot('#8e8e93', `${js.n_single_punches} single`) +
+      return dot(COMBO, `${js.n_combinations} combinations`) + `<span>${js.n_single_punches} single punches</span>` +
         (top ? `<span>most often <b>${top.sequence}</b> × ${top.count}</span>` : '');
     },
-    card: (e, x) => `<div class="sub"><div class="h">Combination</div>` + (!x ? '<div class="empty">no combination</div>' :
-      x.n < 2 ? '<div class="empty">single punch</div>' :
+    card: (e, x) => `<div class="sub"><div class="h">Combination</div>` + (!x ? '<div class="empty">not in a combination (single punch)</div>' :
       `<div class="rows num" style="margin-top:0"><span>Punches</span><b>${x.n}${x.seq.split(' > ').length > x.n ? ' + defense' : ''}</b>
        <span>This punch</span><b>${x.pos + 1} of ${x.seq.split(' > ').length}</b>
        <span>Repeats in the video</span><b>${(S.layerSum.combo?.sequences.find(q => q.sequence === x.seq) || {}).count ?? '–'}×</b></div>
        <div style="margin-top:6px;line-height:1.6">${x.seq.split(' > ').map((t, i) => i === x.pos ? `<b>${t}</b>` : `<span style="color:var(--text2)">${t}</span>`).join(' › ')}</div>`) + '</div>',
-    tip: (e, x, {head}) => head + (x.n < 2 ? '<span class="m">single punch</span>'
-      : `<span class="num">combination of <b>${x.n}</b> · punch ${x.pos + 1}</span><br><span>${x.seq.replaceAll(' > ', ' › ')}</span>`),
-    row(e, x, {c, y, h, span, tag, ring, tx, fps}) {      // a thin bar over the whole combination, each punch a block on it
-      const col = x.n < 2 ? '#8e8e93' : COMBO[x.id % 2], [bx, w] = span(e);
-      if (x.n >= 2 && x.pos === 0 || x.n >= 2 && tx(x.csf / fps) < L) {
-        const x0 = Math.max(L, tx(x.csf / fps)), x1 = tx((x.cef + 1) / fps);
-        c.fillStyle = col; c.globalAlpha = 0.35; rr(x0, y + h / 2 - 3, Math.max(2, x1 - x0), 6, 3); c.fill(); c.globalAlpha = 1;
-      }
-      c.fillStyle = col; rr(bx, y + 3, w, h - 6, 5); c.fill();
-      if (x.pos === 0 && x.n >= 2) tag(bx, w, y, h, `${x.n}`);
-      ring(e, 'combo', bx, y, w, h);
+    tip: (e, x) => `<b>Combination of ${x.n} punches${(k => k ? ` + ${k} defense` : "")(x.seq.split(" > ").length - x.n)}</b> · ${fmtT(x.csf / S.fps)} · ${((x.cef + 1 - x.csf) / S.fps).toFixed(2)} s` +
+      `<div style="margin:5px 0 4px;display:grid;grid-template-columns:auto auto auto;gap:2px 10px">` +
+      comboMembers(x).map((m, i) => `<span class="m num">${i + 1}</span><span><span class="dot" style="background:${m.c}"></span>${m.name}</span>` +
+        `<span class="m num">${fmtT(m.sf / S.fps)}</span>`).join('') +
+      `</div><span class="m">this sequence repeats ${(S.layerSum.combo?.sequences.find(q => q.sequence === x.seq) || {}).count ?? '–'}× in the video</span>`,
+    row(e, x, {c, y, h, tag, tx, fps}) {                 // ONE solid bar per combination (drawn once: by its first punch, or
+      if (x.pos !== 0 && tx(x.csf / fps) >= L) return;     // by any punch when the start is scrolled off to the left)
+      const x0 = tx(x.csf / fps), x1 = tx((x.cef + 1) / fps), bx = Math.max(L, x0), w = Math.max(2, x1 - bx - 1);
+      c.fillStyle = COMBO; rr(bx, y + 3, w, h - 6, 5); c.fill();
+      tag(bx, w, y, h, `${x.n}`);
+      const f = frameNow(), hov = V.hover && V.hoverLayer === 'combo' && V.hover.combo?.id === x.id;
+      if ((x.csf <= f && f <= x.cef) || hov) { c.strokeStyle = css('--text'); c.lineWidth = 1.5; rr(bx - 1, y + 1, w + 2, h - 2, 6); c.stroke(); }
     },
   },
 ];
-const COMBO = ['#0a84ff', '#64d2ff'];
+const COMBO = '#0a84ff';
+// a combination's elements in order: its punches (by position) and, in the positions between them, the defensive
+// moves that start inside it
+function comboMembers(x) {
+  const P = S.punches.filter(p => p.combo?.id === x.id), D = S.defenses.filter(d => d.sf >= x.csf && d.ef <= x.cef);
+  return x.seq.split(' > ').map((t, i) => {
+    const p = P.find(q => q.combo.pos === i);
+    if (p) { const st = styleP(p.type); return {sf: p.sf, c: st.c, name: `${cap(p.hand)} ${st.name}`}; }
+    const d = D.shift(); if (!d) return {sf: x.csf, c: '#8e8e93', name: cap(t)};
+    const st = styleD(d.type); return {sf: d.sf, c: st.c, name: `${d.side ? cap(d.side) + ' ' : ''}${st.name}`};
+  });
+}
 const LAYERS = RULE_LAYERS.map(r => r.key);
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
 const RULE = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r]));
@@ -1090,7 +1101,11 @@ function hit(x, y) {
   if (inRow(TR.lead)) return find(S.punches, S.hiddenP, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, S.hiddenP, e => e.hand === 'rear');
   if (inRow(TR.def)) return find(S.defenses, S.hiddenD, () => true);
-  for (const k of LAYERS) if (TR[k] && inRow(TR[k])) { const e = find(S.punches, S.hiddenP, p => !!p[k]); V.hoverLayer = e ? k : null; return e || null; }
+  for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
+    const e = k === 'combo' ? S.punches.find(p => p.combo && p.combo.pos === 0 && f >= p.combo.csf && f <= p.combo.cef)   // anywhere on the bar
+                            : find(S.punches, S.hiddenP, p => !!p[k]);
+    V.hoverLayer = e ? k : null; return e || null;
+  }
   return null;
 }
 let drag = null;

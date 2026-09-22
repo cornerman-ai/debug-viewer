@@ -53,9 +53,9 @@ red = wrong / too much, gray = not judged.
   off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), colored by band (perfect / good / bad /
   critical) with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
 - **Combinations** (`combinations/`, not a rule): the punches grouped into combinations — no pause longer than 0.2 s
-  between them, a defensive move in between keeps it going. A thin bar spans each combination with its punches as
-  blocks on it (two alternating blues, the first punch tagged with the count; gray = a single punch); the card shows
-  the sequence with this punch in bold and how often it repeats in the video. Reads `members.csv` + `combinations.json`.
+  between them, a defensive move in between keeps it going. One solid blue bar per combination, tagged with its
+  punch count (single punches are not drawn); hovering it lists its punches and defensive moves in order with their
+  times; the card shows the sequence with this punch in bold and how often it repeats in the video. Reads `members.csv` + `combinations.json`.
 
 **Adding a rule layer**: one entry in `RULE_LAYERS` in `index.html` (key, label, the CSV / JSON it reads, and how to
 parse, summarize, card, tooltip, draw its row and, optionally, draw on the video). The toggle, loading, timeline row,
