@@ -195,6 +195,7 @@
         <div class="dist" id="punchDist"></div>
         <div class="label" style="margin-top:12px">Target</div><div class="dist" id="targetDist"></div>
         <div class="label" style="margin-top:12px">Defense</div><div class="chips" id="defChips"></div>
+        <div class="dist" id="defDist"></div>
       </div>
       <div class="card keys">
         <kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame · <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd> 1 s<br>
@@ -491,6 +492,7 @@ function buildChips() {
       (note ? `<div class="note">${note}</div>` : '');
   };
   dist($('punchDist'), Object.entries(PUNCH).map(([t, st]) => ({name: st.name, c: st.c, n: count(S.punches, t)})));
+  dist($('defDist'), Object.entries(DEF).map(([t, st]) => ({name: st.name, c: st.c, n: count(S.defenses, t)})));
   const tg = t => S.punches.filter(p => p.target === t).length;
   const unknown = n - tg('head') - tg('body');
   dist($('targetDist'), [{name: 'Head', c: css('--text'), n: tg('head')}, {name: 'Body', c: '#8e8e93', n: tg('body')},
