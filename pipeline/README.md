@@ -50,7 +50,7 @@ red = wrong / too much, gray = not judged.
   and uppercuts get the same zones read at their impact frame (lighter, dashed). On the video a ring on the fist at the
   judged frame with its zone.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head is
-  off a vertical line through the hips — ½ at the impact frame + ¼ at the punch's start + ¼ at its end (in torso heights), colored by band (perfect / good / bad /
+  off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), colored by band (perfect / good / bad /
   critical) with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
 
 **Adding a rule layer**: one entry in `RULE_LAYERS` in `index.html` (key, label, the CSV / JSON it reads, and how to
