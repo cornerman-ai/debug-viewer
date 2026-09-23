@@ -127,7 +127,7 @@
   .combos .head { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 11.5px; color: var(--text2); }
   .combos .head b { color: var(--text); font-weight: 600; }
   .combos .head i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
-  .combos .list { display: grid; grid-template-columns: minmax(0, 1fr) 90px 28px; gap: 5px 10px; align-items: center; margin-top: 8px; font-size: 12px; }
+  .combos .list { display: grid; grid-template-columns: minmax(0, 1fr) 72px 24px 34px; gap: 5px 10px; align-items: center; margin-top: 8px; font-size: 12px; }
   .combos .seq { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .combos .seq .sep { color: var(--text3); margin: 0 3px; }
   .combos .track { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; }
@@ -886,7 +886,9 @@ function comboDist(kind, all) {
     if (!r.length) return `<i style="color:var(--text2)">${cap(h)}</i>`;
     const st = PUNCH[ty]; return ty === 'jab' || ty === 'cross' ? st?.name || cap(ty) : `${cap(h)} ${(st?.name || ty).toLowerCase()}`; };
   const rows = (all ? seqs : seqs.slice(0, COMBO_TOP)).map(q => `<div class="seq" title="${q.sequence.replaceAll(' > ', ' › ')}">${q.sequence.split(' > ').map(word).join('<span class="sep">›</span>')}</div>
-      <div class="track"><span style="width:${q.count / max * 100}%;background:${COMBO[kind]}"></span></div><div class="num" style="text-align:right"><b>${q.count}</b></div>`).join('');
+      <div class="track"><span style="width:${q.count / max * 100}%;background:${COMBO[kind]}"></span></div>` +
+      `<div class="num" style="text-align:right"><b>${q.count}</b></div>` +
+      `<div class="num" style="text-align:right;color:var(--text3)">${Math.round(q.count / k.n_combinations * 100)}%</div>`).join('');
   el.className = 'combos';
   el.innerHTML = (seqs.length ? `<div class="list">${rows}</div>` : '<span style="color:var(--text3)">none</span>') +
     (seqs.length > COMBO_TOP ? `<button class="more" id="comboMore-${kind}">${all ? 'Show fewer' : `Show all ${seqs.length}`}</button>` : '') +
