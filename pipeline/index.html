@@ -921,15 +921,26 @@ function layerChip(key, js) {
   if (key === 'elbow') return {txt: js.rating, col: ELBOWCOL[js.rating] || '#8e8e93'};
   return null;
 }
+// how many punches each scored rule passed / failed / could not judge
+function scoreCounts(key) {
+  const has = p => p[key], n = f => S.punches.filter(p => has(p) && f(p[key])).length;
+  if (key === 'arm') return {pass: n(x => x.verdict === 'pass'), fail: n(x => x.verdict === 'fail'),
+                             skip: n(x => x.verdict === 'skip' || x.verdict === 'unclear')};
+  if (key === 'hit') return {pass: n(x => x.verdict === 'on_target'), fail: n(x => x.verdict === 'off_target'),
+                             skip: n(x => x.verdict === 'skip')};
+  return {pass: n(x => x.band === 'perfect' || x.band === 'good'),   // head off center: the good half of the bands
+          fail: n(x => x.band === 'bad' || x.band === 'critical'), skip: n(x => x.score == null)};
+}
 // Round view: the score of every rule that has one, then each rule's counts
 function ruleCard(u) {
   const scored = [['arm', 'Arm extension'], ['hit', 'Hit height'], ['hoc', 'Head off center']]
-    .map(([k, name]) => [name, layerChip(k, S.layerSum[k])]).filter(([, c]) => c);
+    .map(([k, name]) => [name, layerChip(k, S.layerSum[k]), k]).filter(([, c]) => c);
   $('scoreCard').style.display = scored.length ? '' : 'none';
-  $('scoreCard').innerHTML = '<div class="label">Round score</div>' + scored.map(([name, c]) => {
-    const [n, band] = c.txt.split(' · ');
-    return `<div class="big"><span class="k">${name}</span><span class="n" style="color:${c.col}">${n}` +
-      `<span class="k" style="margin-left:8px">${band}</span></span></div>`;
+  $('scoreCard').innerHTML = '<div class="label">Round score</div>' + scored.map(([name, c, key]) => {
+    const [n, band] = c.txt.split(' · '), q = scoreCounts(key);
+    return `<div class="big" style="padding-bottom:0"><span class="k">${name}</span><span class="n" style="color:${c.col}">${n}` +
+      `<span class="k" style="margin-left:8px">${band}</span></span></div>` +
+      `<div class="k" style="color:var(--text3);font-size:11.5px;padding-bottom:6px">${q.pass} passed · ${q.fail} failed · ${q.skip} skipped</div>`;
   }).join('');
   $('ruleCard').innerHTML = '<div class="label">Rules</div>' + RULE_LAYERS.filter(L => S.has[L.key]).map(L =>
     `<div class="srow" style="grid-template-columns:1fr"><span class="k">${L.label}</span>` +
