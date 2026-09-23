@@ -905,10 +905,8 @@ function buildLayers() {
 // which facing angles a layer judges in (0° = facing the camera, ±180° = back to it). Side-on rules skip
 // head-on punches, front / back rules skip side-on ones, the rest read every angle.
 const SIDE_ON = '(45°, 135°) ∪ (−135°, −45°)', FRONT_BACK = '(−45°, 45°) ∪ (135°, 180°] ∪ [−180°, −135°)';
-const ANY_ANGLE = '(−180°, 180°]';
 const GATE = {arm: [SIDE_ON, 'side-on'], hit: [SIDE_ON, 'side-on'], hoc: [FRONT_BACK, 'front or back'],
-              elbow: [FRONT_BACK, 'front or back'], hip: [ANY_ANGLE, 'any angle'],
-              offensive: [ANY_ANGLE, 'any angle'], combined: [ANY_ANGLE, 'any angle']};
+              elbow: [FRONT_BACK, 'front or back']};          // the rest read every angle, nothing to say
 function gateTxt(key) {
   const g = GATE[key];
   return g ? `<span class="m" title="the facing angles this rule judges in — 0° = facing the camera, ±180° = back to it">` +
@@ -935,7 +933,7 @@ function ruleCard(u) {
   }).join('');
   $('ruleCard').innerHTML = '<div class="label">Rules</div>' + RULE_LAYERS.filter(L => S.has[L.key]).map(L =>
     `<div class="srow" style="grid-template-columns:1fr"><span class="k">${L.label}</span>` +
-    `<div class="lsum" style="color:var(--text2);font-size:11.5px;display:flex;flex-wrap:wrap;gap:4px 10px">${L.summary(S.punches, S.layerSum[L.key], u)}${gateTxt(L.key)}</div></div>`).join('');
+    `<div class="lsum" style="color:var(--text2);font-size:11.5px;display:flex;flex-wrap:wrap;gap:4px 10px">${L.summary(S.punches, S.layerSum[L.key], u)}</div></div>`).join('');
 }
 const layerOn = k => !!(S.has?.[k] && V.layers[k]);
 
