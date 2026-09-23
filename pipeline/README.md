@@ -55,7 +55,7 @@ red = wrong / too much, gray = not judged.
   its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
   with this frame's elbow bend.
 - **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a good band of 2× the study's IQR (block color and
-  degrees); on the video the hip line in the verdict color. The impact → end step is in the CSV but not shown.
+  degrees); the round rating is the share of judged punches inside the band (≥ 80 % good, 65–80 % mixed, < 65 % poor, from `hip_rotation.json`); on the video the hip line in the verdict color. The impact → end step is in the CSV but not shown.
 - **Hit height** (`hit_height/`): per jab / cross the production rule's zone (head / shoulder / body / over the head /
   below the belt; on target = green, off = red, skipped = dashed gray) with a white tick at the frame it judged; hooks
   and uppercuts get the same zones read at their impact frame (lighter, dashed). On the video a ring on the fist at the
@@ -71,7 +71,7 @@ red = wrong / too much, gray = not judged.
   Reads `offensive.csv` / `combined.csv` + `combinations.json`; the distributions card counts both (how many, how many
   different, each sequence with its count) and rates offensive combo diversity by the top-3 share (the share of
   combos that are one of the 3 most-used sequences: ≥ 70 % repetitive, 50–70 % moderate, < 50 % varied, < 10 combos
-  not rated). These are "items" layers (`items: true`): their rows are the combinations,
+  not rated) — combined combos get the same rating, with the caveat that the defense model's noise inflates it. These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = |x shoulder − x elbow| / torso per arm,

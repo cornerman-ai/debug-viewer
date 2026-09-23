@@ -712,6 +712,7 @@ async function loadFolder(src) {
   S.bodyShots = await src.text(['bodyshots', 'bodyshots.json']).then(JSON.parse).catch(() => null);
   S.defAfter = await src.text(['defense_after_combo', 'defense_after_combo.json']).then(JSON.parse).catch(() => null);
   S.angleChg = await src.text(['angle_change', 'angle_change.json']).then(JSON.parse).catch(() => null);
+  S.hipSum = await src.text(['hip_rotation', 'hip_rotation.json']).then(JSON.parse).catch(() => null);
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
   S.dur = S.n / S.fps;
   S.hiddenP.clear(); S.hiddenD.clear();
@@ -845,6 +846,7 @@ const BODYCOL = {enough: '#34c759', 'a few': '#ffcc00', 'too few': '#ff9f0a', 'h
 const SPCOL = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30', 'not rated': '#8e8e93'};
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
 const ACCOL = {good: '#34c759', some: '#ff9f0a', 'stays square': '#ff3b30', 'not rated': '#8e8e93'};
+const HIPCOL = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const DACOL = {good: '#34c759', moderate: '#ff9f0a', 'no defense after combos': '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
 function comboStats() {
@@ -993,16 +995,15 @@ function ruleCard() {
                + 'the score is 100 at 0.25 torso off the line and 0 when the head never leaves it',
          bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD},
     calc: `the worst 10 % of the ${q.pass + q.fail} punch scores, averaged`}));
-  const hip = count(P, p => p.hip?.status === 'ok' ? p.hip.vsi : null);                 // 13
-  const hipN = (hip.good || 0) + (hip.bad_low || 0) + (hip.bad_high || 0);
-  if (hipN) add('Hip rotation', pct(hip.good / hipN), '#8e8e93', null, {
+  const hp = S.hipSum;                                                                 // 13
+  if (hp) add('Hip rotation', hp.rating, HIPCOL[hp.rating], null, {
     what: 'do the hips turn into the punch, or does he arm-punch?',
-    on: `every punch with a readable hip line, from its start to impact (${hipN})`,
+    on: `every punch with a readable hip line, from its start to impact (${hp.n_judged} of ${hp.n_punches})`,
     th: {rule: 'each punch type has its own good band: twice the middle half of what the study’s boxers did '
                + '(lead jab 0–25°, rear cross 4–51°, lead hook 6–61°, …)',
-         bands: [['inside', 'good'], ['below', 'too little'], ['above', 'too much']],
-         pal: {good: '#34c759', 'too little': '#ff9f0a', 'too much': '#ff3b30'}},
-    calc: `${hip.good || 0} inside the band / ${hipN} punches \u00b7 ${hip.bad_low || 0} too little \u00b7 ${hip.bad_high || 0} too much`});
+         bands: [['≥ 80 %', 'good'], ['65–80 %', 'mixed'], ['< 65 %', 'poor']], pal: HIPCOL},
+    calc: `${hp.n_good} inside the band / ${hp.n_judged} punches = ${pct(hp.good_share)} · ` +
+          `${hp.n_too_little} too little · ${hp.n_too_much} too much`});
   if (bs) add('Body shots', bs.rating, BODYCOL[bs.rating], null, {                      // 14
     what: 'does he go downstairs, or hunt the head only?',
     on: `hooks and uppercuts (${bs.n_hooks_uppercuts}) \u00b7 jab and cross cannot be split into head / body`,
@@ -1015,11 +1016,12 @@ function ruleCard() {
     th: {rule: 'the share of all combos taken by the 3 most-used sequences',
          bands: [['≥ 70 %', 'repetitive'], ['50–70 %', 'moderate'], ['< 50 %', 'varied']], pal: DIVCOL},
     calc: `top 3 sequences / ${off.n_combinations} combos = ${pct(off.top3_share)}`});
-  if (cmb) add('Same combined combos', pct(cmb.top3_share), '#8e8e93', null, {          // 17
+  if (cmb?.diversity) add('Same combined combos', cmb.diversity.rating, DIVCOL[cmb.diversity.rating], null, {   // 17
     what: 'the same question with the defensive moves included',
     on: `every combined combo (${cmb.n_combinations}, ${cmb.n_different} different)`,
-    th: {rule: 'the same top-3 share, but not rated — the defense model’s noise inflates how many different '
-               + 'sequences there are', bands: []},
+    th: {rule: 'the same top-3 share — but the defense model’s noise inflates how many different sequences '
+               + 'there are, so read it next to the offensive rating, not alone',
+         bands: [['≥ 70 %', 'repetitive'], ['50–70 %', 'moderate'], ['< 50 %', 'varied']], pal: DIVCOL},
     calc: `top 3 sequences / ${cmb.n_combinations} combos = ${pct(cmb.top3_share)}`});
   if (sd) add('Same defense', sd.same_move.rating, SDCOL[sd.same_move.rating], null, {  // 18
     what: 'does he only ever use one move, or always go to one side?',
