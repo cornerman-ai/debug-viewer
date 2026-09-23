@@ -76,7 +76,9 @@ red = wrong / too much, gray = not judged.
 
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = |x shoulder − x elbow| / torso per arm,
   judged only while the boxer is within 45° of facing or backing the camera and that arm isn't throwing a hook. The row
-  shows the flared stretches (≥ 0.3 s over flare 0.30), lead in the top half, rear in the bottom; the toggle's summary
+  shows every judged stretch of ≥ 0.3 s, green tucked (< 0.20), yellow borderline (0.20–0.30), red flared (≥ 0.30),
+  lead in the top half, rear in the bottom; a hole means those frames could not be judged (side-on, a hook by that
+  arm, joints not visible); the toggle's summary
   has the per-arm share of judged frames flared and the video's rating (< 10 % tucked, 10–25 % sometimes flared,
   ≥ 25 % flared, worse arm decides). Reads `runs.csv` + `elbow_tuck.json`.
 

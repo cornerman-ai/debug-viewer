@@ -329,6 +329,7 @@ const ZONE = {head: ['H', 'head'], body: ['B', 'body'], shoulder: ['S', 'shoulde
 //    rows are the combinations themselves (combinations/<kind>.csv), one plain line each, not the punches ──
 const COMBO = {offensive: '#0a84ff', combined: '#bf5af2'};
 // combo diversity (offensive only): top-3 share >= 70 % repetitive, 50-70 % moderate, < 50 % varied, < 10 combos not rated
+const ELBOWSTATE = {tucked: '#34c759', borderline: '#ffcc00', flared: '#ff3b30'};   // per-stretch colour on the row
 const ELBOWCOL = {tucked: '#34c759', 'sometimes flared': '#ff9f0a', flared: '#ff3b30', 'not rated': '#8e8e93'};
 const DIVCOL = {varied: '#34c759', moderate: '#ff9f0a', repetitive: '#ff3b30', 'not rated': '#8e8e93'};
 function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order
@@ -554,23 +555,25 @@ const RULE_LAYERS = [
   {
     // elbow tuck (elbow_tuck/): the lens's flare = |x shoulder - x elbow| / torso per arm, judged only while the
     // boxer is within 45 deg of facing / backing the camera and that arm isn't throwing a hook. The row shows the
-    // flared stretches (>= 0.3 s over flare 0.30), lead in the top half, rear in the bottom.
+    // judged stretches of >= 0.3 s, coloured by state (tucked / borderline / flared), lead in the top half, rear in
+    // the bottom; a hole means the rule could not judge those frames.
     key: 'elbow', label: 'Elbow tuck', short: 'Elbow tuck', items: true,
     csv: ['elbow_tuck', 'runs.csv'], json: ['elbow_tuck', 'elbow_tuck.json'],
-    parseItem: (r, num) => ({arm: r.arm, sf: num(r.start_frame), ef: num(r.end_frame), peak: num(r.peak_flare), mean: num(r.mean_flare)}),
+    parseItem: (r, num) => ({arm: r.arm, state: r.state || 'flared', sf: num(r.start_frame), ef: num(r.end_frame),
+      peak: num(r.peak_flare), mean: num(r.mean_flare)}),
     summary(P, js, {dot}) {
       if (!js) return '';
       const a = js.arms, pct = v => v?.flared_share == null ? '–' : `${Math.round(v.flared_share * 100)}%`;   // eslint-disable-line
       return `<span>lead <b>${pct(a.lead)}</b> flared</span><span>rear <b>${pct(a.rear)}</b></span>`;
     },
     card: (e, x) => '',                                  // per-frame rule: nothing punch-specific to show
-    tip: (e, x) => `<b>Elbow flared · ${cap(x.arm)} arm</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s<br>` +
+    tip: (e, x) => `<b>Elbow ${x.state} · ${cap(x.arm)} arm</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s<br>` +
       `<span class="num">peak <b>${x.peak.toFixed(2)}</b> · mean ${x.mean.toFixed(2)} torso from the shoulder</span><br>` +
-      `<span class="m">flared above 0.30 · only judged front-on, hooks excluded</span>`,
+      `<span class="m">tucked &lt; 0.20 · borderline 0.20–0.30 · flared ≥ 0.30 · only judged front-on, hooks excluded</span>`,
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const top = x.arm === 'lead', f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
-      c.fillStyle = '#ff9f0a'; c.globalAlpha = on ? 1 : 0.85;
+      c.fillStyle = ELBOWSTATE[x.state] || '#ff9f0a'; c.globalAlpha = on ? 1 : 0.85;
       rr(x0, y + (top ? 3 : h / 2), Math.max(2, x1 - x0 - 1), h / 2 - 3, 3); c.fill(); c.globalAlpha = 1;
     },
   },
