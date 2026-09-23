@@ -873,8 +873,8 @@ const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
 function comboStats() {
   const o = S.layerSum.offensive?.offensive, c = S.layerSum.combined?.combined;
   $('comboStats').innerHTML =
-    (o ? srow('Offensive', `${o.n_combinations}`, COMBO.offensive, `${o.n_different} different`, 'punches only, no pause over 0.3 s') : '') +
-    (c ? srow('Combined', `${c.n_combinations}`, COMBO.combined, `${c.n_different} different \u00b7 ${c.n_with_defense} with a move`,
+    (o ? srow('Offensive', `${o.n_combinations}`, COMBO.offensive, `${o.n_different} unique`, 'punches only, no pause over 0.3 s') : '') +
+    (c ? srow('Combined', `${c.n_combinations}`, COMBO.combined, `${c.n_different} unique`,
               'punches + defensive moves, no pause over 0.3 s') : '') +
     '';
 }
@@ -896,8 +896,10 @@ function comboDist(kind, all) {
 $('viewSeg').onclick = e => {                               // Now (this frame) | Round (the whole video)
   const b = e.target.closest('button'); if (!b) return;
   $('viewSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
-  $('nowView').style.display = b.dataset.v === 'now' ? 'contents' : 'none';
-  $('roundView').style.display = b.dataset.v === 'round' ? 'contents' : 'none';
+  const now = b.dataset.v === 'now';
+  $('nowView').style.display = now ? 'contents' : 'none';
+  $('roundView').style.display = now ? 'none' : 'contents';
+  $('layersCard').style.display = now ? '' : 'none';      // the timeline toggles belong to Now
 };
 
 // one compact row: name on the left, a colored dot + verdict + number on the right; the rule goes in the tooltip
