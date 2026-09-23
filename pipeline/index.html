@@ -360,10 +360,12 @@ function comboLayer(kind, label, short, what) {
       x.els.map((m, i) => { const q = elName(m); return `<span class="m num">${i + 1}</span><span><span class="dot" style="background:${q.c}"></span>${q.name}</span>` +
         `<span class="m num">${fmtT(m.sf / S.fps)}</span>`; }).join('') +
       `</div><span class="m">this sequence repeats ${reps(x)}× in the video</span>`,
-    row(e, x, {c, y, h, tx, fps}) {                      // one plain line from the combination's first frame to its last
+    row(e, x, {c, y, h, tag, tx, fps}) {                 // one plain line from the combination's first frame to its last
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
-      c.fillStyle = COMBO[kind]; c.globalAlpha = on ? 1 : 0.8; rr(x0, y + h / 2 - 4, Math.max(2, x1 - x0 - 1), 8, 4); c.fill(); c.globalAlpha = 1;
+      const w = Math.max(2, x1 - x0 - 1);
+      c.fillStyle = COMBO[kind]; c.globalAlpha = on ? 1 : 0.8; rr(x0, y + h / 2 - 7, w, 14, 5); c.fill(); c.globalAlpha = 1;
+      tag(x0, w, y, h, `${x.n}`);
     },
   };
 }
@@ -394,7 +396,7 @@ const RULE_LAYERS = [
       else { c.globalAlpha = 0.25; c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
              c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([3, 2]); rr(x + 0.5, y + 3.5, w - 1, h - 7, 5); c.stroke(); c.setLineDash([]); }
       if (a.peakF != null) { const xi = tx((a.peakF + 0.5) / fps); c.strokeStyle = judged ? '#fff' : col; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      if (judged && a.deg != null) tag(x, w, y, h, `${a.deg.toFixed(0)}°`);
+      if (judged && a.deg != null) tag(x, w, y, h, `${(180 - a.deg).toFixed(0)}°`);   // the angle at the elbow: 180° = straight
       ring(e, 'arm', x, y, w, h);
     },
     overlay(e, a, f, P, leadLeft) {                        // the punching arm, colored by the rule's verdict
@@ -409,7 +411,7 @@ const RULE_LAYERS = [
       const bend = 180 - ang * 180 / Math.PI, a0 = Math.atan2(u[1], u[0]), a1 = Math.atan2(v[1], v[0]);
       const ccw = ((a1 - a0 + 2 * Math.PI) % (2 * Math.PI)) > Math.PI;
       octx.lineWidth = 2.5; octx.beginPath(); octx.arc(pb[0], pb[1], 18, a0, a1, ccw); octx.stroke();
-      overlayLabel(pb[0] + 14, pb[1] + 28, `elbow ${bend.toFixed(0)}°${peak ? ' · rule frame · ' + VNAME[a.verdict] : ''}`, col);
+      overlayLabel(pb[0] + 14, pb[1] + 28, `elbow ${(180 - bend).toFixed(0)}°${peak ? ' · rule frame · ' + VNAME[a.verdict] : ''}`, col);
     },
   },
   {
@@ -486,7 +488,8 @@ const RULE_LAYERS = [
       c.globalAlpha = judged ? (rule ? 1 : 0.45) : 0.25; c.fillStyle = col; rr(bx, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
       if (!rule || !judged) { c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([3, 2]); rr(bx + 0.5, y + 3.5, w - 1, h - 7, 5); c.stroke(); c.setLineDash([]); }
       if (fj != null && judged) { const xi = tx((fj + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      if (judged && z) tag(bx, w, y, h, w > 70 ? ZONE[z]?.[1] || z : ZONE[z]?.[0] || '?');
+      const hf = rule ? x.hf : x.impHf, zn = w > 70 ? ZONE[z]?.[1] || z : ZONE[z]?.[0] || '?';
+      if (judged && z) tag(bx, w, y, h, hf == null ? zn : `${hf.toFixed(2)} · ${zn}`);
       ring(e, 'hit', bx, y, w, h);
     },
     overlay(e, x, f, P, leadLeft) {                        // the fist at the judged frame, with its zone
@@ -495,7 +498,7 @@ const RULE_LAYERS = [
       const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2], q = P(wr); if (!q) return;
       const col = VERD[v]; octx.strokeStyle = col; octx.lineWidth = 3; octx.setLineDash([5, 4]);
       octx.beginPath(); octx.arc(q[0], q[1], 22, 0, 7); octx.stroke(); octx.setLineDash([]);
-      overlayLabel(q[0] + 26, q[1] - 18, `${ZONE[z]?.[1] || z} · ${VNAME[v]}${rule ? '' : ' (at impact)'}`, col);
+      overlayLabel(q[0] + 26, q[1] - 18, `${(rule ? x.hf : x.impHf) != null ? (rule ? x.hf : x.impHf).toFixed(2) + ' · ' : ''}${ZONE[z]?.[1] || z} · ${VNAME[v]}${rule ? '' : ' (at impact)'}`, col);
     },
   },
   {
@@ -531,7 +534,7 @@ const RULE_LAYERS = [
       const [bx, w] = span(e);
       c.fillStyle = VERD[x.band] || '#8e8e93'; rr(bx, y + 3, w, h - 6, 5); c.fill();
       if (x.usedF != null) { const xi = tx((x.usedF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      tag(bx, w, y, h, `${x.score.toFixed(0)}`);
+      tag(bx, w, y, h, x.comb == null ? `${x.score.toFixed(0)}` : `${x.comb.toFixed(2)} torso`);
       ring(e, 'hoc', bx, y, w, h);
     },
     overlay(e, x, f, P) {                                  // the vertical hip line and the head's distance from it (label = the impact reading)
