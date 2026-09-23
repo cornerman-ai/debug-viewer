@@ -579,7 +579,7 @@ const RULE_LAYERS = [
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const top = x.arm === 'lead', f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
-      const skip = !!ELBOWSKIP[x.state], w = Math.max(2, x1 - x0 - 1), hh = h / 2 - 3;
+      const skip = !!ELBOWSKIP[x.state], w = Math.max(2, x1 - x0), hh = h / 2 - 3;   // no 1 px gap: the row is continuous
       c.fillStyle = skip ? css('--fill2') : (ELBOWSTATE[x.state] || '#ff9f0a');
       c.globalAlpha = skip ? (on ? 0.85 : 0.5) : (on ? 1 : 0.85);
       if (skip) rr(x0, y + (top ? 3 : h / 2) + hh / 2 - 1.5, w, 3, 1.5);   // a thin gray strip, not a block
@@ -1025,7 +1025,7 @@ function iqrBar(val, q, col, good) {
 const pillV = v => `<span class="verdict" style="background:${VERD[v] || '#8e8e93'}">${VNAME[v] || v}</span>`;
 function layerSections(e) {
   return RULE_LAYERS.filter(L => layerOn(L.key)).map(L => L.card(e, L.items
-    ? (S.items[L.key] || []).find(it => it.els.some(m => m.kind === 'punch' && m.sf === e.sf)) : e[L.key])).join('');
+    ? (S.items[L.key] || []).find(it => it.els?.some(m => m.kind === 'punch' && m.sf === e.sf)) : e[L.key])).join('');
 }
 const at = (arr, f, hidden) => arr.filter(e => e.sf <= f && f <= e.ef && !hidden.has(e.type));
 
