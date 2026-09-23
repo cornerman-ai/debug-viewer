@@ -330,6 +330,9 @@ const ZONE = {head: ['H', 'head'], body: ['B', 'body'], shoulder: ['S', 'shoulde
 const COMBO = {offensive: '#0a84ff', combined: '#bf5af2'};
 // combo diversity (offensive only): top-3 share >= 70 % repetitive, 50-70 % moderate, < 50 % varied, < 10 combos not rated
 const ELBOWSTATE = {tucked: '#34c759', borderline: '#ffcc00', flared: '#ff3b30'};   // per-stretch colour on the row
+// stretches the rule cannot judge: a flat gray strip, the reason in the tooltip
+const ELBOWSKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
+                   hook: 'this arm is throwing a hook'};
 const ELBOWCOL = {tucked: '#34c759', 'sometimes flared': '#ff9f0a', flared: '#ff3b30', 'not rated': '#8e8e93'};
 const DIVCOL = {varied: '#34c759', moderate: '#ff9f0a', repetitive: '#ff3b30', 'not rated': '#8e8e93'};
 function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order
@@ -567,14 +570,21 @@ const RULE_LAYERS = [
       return `<span>lead <b>${pct(a.lead)}</b> flared</span><span>rear <b>${pct(a.rear)}</b></span>`;
     },
     card: (e, x) => '',                                  // per-frame rule: nothing punch-specific to show
-    tip: (e, x) => `<b>Elbow ${x.state} · ${cap(x.arm)} arm</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s<br>` +
+    tip: (e, x) => ELBOWSKIP[x.state]
+      ? `<b>Not judged · ${cap(x.arm)} arm</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s<br>` +
+        `<span>${ELBOWSKIP[x.state]}</span><br><span class="m">the elbow can only be read front-on, with both shoulders, elbows and hips visible</span>`
+      : `<b>Elbow ${x.state} · ${cap(x.arm)} arm</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s<br>` +
       `<span class="num">peak <b>${x.peak.toFixed(2)}</b> · mean ${x.mean.toFixed(2)} torso from the shoulder</span><br>` +
       `<span class="m">tucked &lt; 0.20 · borderline 0.20–0.30 · flared ≥ 0.30 · only judged front-on, hooks excluded</span>`,
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const top = x.arm === 'lead', f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
-      c.fillStyle = ELBOWSTATE[x.state] || '#ff9f0a'; c.globalAlpha = on ? 1 : 0.85;
-      rr(x0, y + (top ? 3 : h / 2), Math.max(2, x1 - x0 - 1), h / 2 - 3, 3); c.fill(); c.globalAlpha = 1;
+      const skip = !!ELBOWSKIP[x.state], w = Math.max(2, x1 - x0 - 1), hh = h / 2 - 3;
+      c.fillStyle = skip ? css('--fill2') : (ELBOWSTATE[x.state] || '#ff9f0a');
+      c.globalAlpha = skip ? (on ? 0.85 : 0.5) : (on ? 1 : 0.85);
+      if (skip) rr(x0, y + (top ? 3 : h / 2) + hh / 2 - 1.5, w, 3, 1.5);   // a thin gray strip, not a block
+      else rr(x0, y + (top ? 3 : h / 2), w, hh, 3);
+      c.fill(); c.globalAlpha = 1;
     },
   },
 ];
