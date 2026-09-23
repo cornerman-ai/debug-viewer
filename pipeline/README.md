@@ -51,10 +51,6 @@ that rule's headline verdict.
 the punch card and a video overlay for the punch under the playhead. Colors: green = fine, orange = too little,
 red = wrong / too much, gray = not judged.
 
-- **Angle change** (`angle_change/`): the old pivot-rate rule on the per-punch facing angle — a ratchet that fires
-  when the swing around its anchor reaches 100°, either way. The punch where it fires is a full green block ("new
-  angle"), the others show how much swing is open. The round row is seconds per change through an S-curve (0 at 12 s,
-  50 at 25 s, 100 at 60 s). Reads `punches.csv` + `angle_change.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the production rule's verdict (pass / fail; skipped = dashed),
   its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
   with this frame's elbow bend.
@@ -85,6 +81,10 @@ red = wrong / too much, gray = not judged.
   a joint it needs is not visible, or that arm is throwing a hook). Lead in the top half, rear in the bottom; the toggle's summary
   has the per-arm share of judged frames flared and the video's rating (< 10 % tucked, 10–25 % sometimes flared,
   ≥ 25 % flared, worse arm decides). Reads `runs.csv` + `elbow_tuck.json`.
+
+**Angle change** (`angle_change/angle_change.json`, a whole-video rule — no timeline row): per combined combo, the
+mean facing during it against the most different smoothed facing in the 2 s after it; a turn of ≥ 45° counts as a
+change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than 5 readable combos → not rated.
 
 **Defense after combo** (`defense_after_combo/defense_after_combo.json`, a whole-video rule — no timeline row): under
 the offensive combo list, the share of combos followed by a defensive move within 1 s of the combo's end (≥ 60 % good,
