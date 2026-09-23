@@ -264,7 +264,6 @@
         <div class="sep-t"><div class="label">Offensive</div><div id="comboDist-offensive"></div></div>
         <div class="sep-t"><div class="label">Combined</div><div id="comboDist-combined"></div></div>
       </div>
-      <div class="card" id="ruleCard"></div>
     </div>
 
     <div class="card" id="layersCard">
@@ -320,7 +319,8 @@ const ZONE = {head: ['H', 'head'], body: ['B', 'body'], shoulder: ['S', 'shoulde
 // section, tooltip and video overlay all come from it — no other code changes. An entry:
 //   key, label (the toggle), short (the timeline row's name), csv / json: [stage folder, file] in the video folder,
 //   parse(row, num)      → this punch's data from its CSV row (joined by start frame + hand), or null to leave it out
-//   summary(P, json, u)  → the toggle's one-line summary (u: dot(color, text), count(punches, key-fn))
+//   summary(P, json, u)  → the rule's counts (u: dot(color, text), count(punches, key-fn)); kept for reuse, the
+//                          panel does not render it now — the Round view shows only the scores
 //   card(e, x)           → the punch card's section (x = e[key], may be undefined)
 //   tip(e, x, u)         → the tooltip body when hovering the rule's row (u: head line, v(verdict))
 //   row(e, x, g)         → draws the punch's block in the rule's row (g: canvas, row y / h, span, tag, ring, tx, fps)
@@ -884,8 +884,6 @@ function srow(name, rating, color, value, rule) {
 }
 
 function buildLayers() {
-  const u = {dot: (c, t) => `<span><i style="background:${c}"></i>${t}</span>`,
-             count: (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {})};
   const list = $('layerList');
   if (!list.children.length) {                             // the toggles, once
     list.innerHTML = RULE_LAYERS.map(L => `<div class="layer"><label class="toggle" data-layer="${L.key}">${L.label}<span class="sw"></span></label>` +
@@ -900,12 +898,10 @@ function buildLayers() {
   for (const L of RULE_LAYERS) {
     const t = list.querySelector(`.toggle[data-layer="${L.key}"]`);
     t.classList.toggle('disabled', !S.has[L.key]); t.classList.toggle('on', !!(S.has[L.key] && V.layers[L.key]));
-    const js = S.layerSum[L.key], c = S.has[L.key] ? layerChip(L.key, js) : null;
-    $(`sum-${L.key}`).innerHTML = !S.has[L.key] ? '<span>not in this folder</span>'
-      : (c ? `<span><i style="background:${c.col}"></i>${c.txt}</span>` : '');
+    $(`sum-${L.key}`).innerHTML = S.has[L.key] ? '' : '<span>not in this folder</span>';
     $(`scope-${L.key}`).innerHTML = S.has[L.key] ? scopeTxt(L.key) : '';
   }
-  ruleCard(u);
+  ruleCard();
   layout();
 }
 // the headline verdict of a layer: its round score / rating, nothing else
@@ -944,8 +940,8 @@ function scoreCounts(key) {
   return {pass: n(x => x.band === 'perfect' || x.band === 'good'),   // head off center: the good half of the bands
           fail: n(x => x.band === 'bad' || x.band === 'critical'), skip: n(x => x.score == null)};
 }
-// Round view: the score of every rule that has one, then each rule's counts
-function ruleCard(u) {
+// Round view: the score of every rule that has one, with how many punches it passed / failed / skipped
+function ruleCard() {
   const scored = [['arm', 'Arm extension'], ['hit', 'Hit height'], ['hoc', 'Head off center']]
     .map(([k, name]) => [name, layerChip(k, S.layerSum[k]), k]).filter(([, c]) => c);
   $('scoreCard').style.display = scored.length ? '' : 'none';
@@ -955,9 +951,6 @@ function ruleCard(u) {
       `<span class="k" style="margin-left:8px">${band}</span></span></div>` +
       `<div class="k" style="color:var(--text3);font-size:11.5px;padding-bottom:6px">${q.pass} passed · ${q.fail} failed · ${q.skip} skipped</div>`;
   }).join('');
-  $('ruleCard').innerHTML = '<div class="label">Rules</div>' + RULE_LAYERS.filter(L => S.has[L.key]).map(L =>
-    `<div class="srow" style="grid-template-columns:1fr"><span class="k">${L.label}</span>` +
-    `<div class="lsum" style="color:var(--text2);font-size:11.5px;display:flex;flex-wrap:wrap;gap:4px 10px">${L.summary(S.punches, S.layerSum[L.key], u)}</div></div>`).join('');
 }
 const layerOn = k => !!(S.has?.[k] && V.layers[k]);
 
