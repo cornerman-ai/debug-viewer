@@ -371,6 +371,8 @@ function comboLayer(kind, label, short, what) {
 }
 const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${v >= 0 ? 'right' : 'left'}`;
 const RULE_LAYERS = [
+  comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
+  comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
   {
     key: 'arm', label: 'Arm extension', short: 'Arm ext.',
     csv: ['arm_extension', 'arm_extension.csv'], json: ['arm_extension', 'arm_extension.json'],
@@ -550,8 +552,6 @@ const RULE_LAYERS = [
       overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line · ${x.comb?.toFixed(2)} torso (0.75 impact + 0.125 · 25 % + 0.125 · 75 %) · ${VNAME[x.band]}${atImpact ? ' · IMPACT' : ''}`, col);
     },
   },
-  comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
-  comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
   {
     // elbow tuck (elbow_tuck/): the lens's flare = |x shoulder - x elbow| / torso per arm, judged only while the
     // boxer is within 45 deg of facing / backing the camera and that arm isn't throwing a hook. The row shows the
