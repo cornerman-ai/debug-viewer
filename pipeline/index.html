@@ -140,6 +140,8 @@
   .layer .lsum { color: var(--text2); font-size: 11.5px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
   .layer .lsum i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
   .layer .lsum .m, .lsum .m { color: var(--text3); }
+  .scope { display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; margin-top: 3px; font-size: 11.5px; line-height: 1.45; color: var(--text3); }
+  .scope span:nth-child(odd) { color: var(--text3); opacity: 0.75; }
   .event .sub { margin-top: 10px; padding-top: 8px; border-top: 0.5px solid var(--sep); }
   .event .sub .h { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
     display: flex; align-items: center; gap: 6px; }
@@ -883,7 +885,8 @@ function buildLayers() {
              count: (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {})};
   const list = $('layerList');
   if (!list.children.length) {                             // the toggles, once
-    list.innerHTML = RULE_LAYERS.map(L => `<div class="layer"><label class="toggle" data-layer="${L.key}">${L.label}<span class="sw"></span></label><div class="lsum" id="sum-${L.key}"></div></div>`).join('');
+    list.innerHTML = RULE_LAYERS.map(L => `<div class="layer"><label class="toggle" data-layer="${L.key}">${L.label}<span class="sw"></span></label>` +
+      `<div class="lsum" id="sum-${L.key}"></div><div id="scope-${L.key}"></div></div>`).join('');
     list.querySelectorAll('.toggle[data-layer]').forEach(t => t.onclick = e => {
       e.preventDefault(); const k = t.dataset.layer; if (!S.has?.[k]) return;
       V.layers[k] = !V.layers[k]; t.classList.toggle('on', V.layers[k]);
@@ -896,21 +899,28 @@ function buildLayers() {
     t.classList.toggle('disabled', !S.has[L.key]); t.classList.toggle('on', !!(S.has[L.key] && V.layers[L.key]));
     const js = S.layerSum[L.key], c = S.has[L.key] ? layerChip(L.key, js) : null;
     $(`sum-${L.key}`).innerHTML = !S.has[L.key] ? '<span>not in this folder</span>'
-      : (c ? `<span><i style="background:${c.col}"></i>${c.txt}</span>` : '') + gateTxt(L.key);
+      : (c ? `<span><i style="background:${c.col}"></i>${c.txt}</span>` : '');
+    $(`scope-${L.key}`).innerHTML = S.has[L.key] ? scopeTxt(L.key) : '';
   }
   ruleCard(u);
   layout();
 }
 // the headline verdict of a layer: its round score / rating, nothing else
-// which facing angles a layer judges in (0° = facing the camera, ±180° = back to it). Side-on rules skip
-// head-on punches, front / back rules skip side-on ones, the rest read every angle.
-const SIDE_ON = '(45°, 135°) ∪ (−135°, −45°)', FRONT_BACK = '(−45°, 45°) ∪ (135°, 180°] ∪ [−180°, −135°)';
-const GATE = {arm: [SIDE_ON, 'side-on'], hit: [SIDE_ON, 'side-on'], hoc: [FRONT_BACK, 'front or back'],
-              elbow: [FRONT_BACK, 'front or back']};          // the rest read every angle, nothing to say
-function gateTxt(key) {
-  const g = GATE[key];
-  return g ? `<span class="m" title="the facing angles this rule judges in — 0° = facing the camera, ±180° = back to it">` +
-    `facing ∈ ${g[0]} · ${g[1]}</span>` : '';
+// What each layer covers, in two lines under its toggle. "angles" is the facing angle the rule can be read at:
+// front (within 45° of the camera), back (within 45° of straight away), side-on (everything between).
+const ALL_ANGLES = 'front, back, side-on';
+const SCOPE = {
+  arm:       {moves: 'jab, cross',                              angles: 'side-on'},
+  hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
+  hit:       {moves: 'jab, cross (hook, uppercut at impact)',   angles: 'side-on'},
+  hoc:       {moves: 'every punch',                             angles: 'front, back'},
+  elbow:     {moves: 'every frame except hooks',                angles: 'front, back'},
+  offensive: {moves: 'punches',                                 angles: ALL_ANGLES},
+  combined:  {moves: 'punches, defensive moves',                angles: ALL_ANGLES},
+};
+function scopeTxt(key) {
+  const c = SCOPE[key];
+  return c ? `<div class="scope"><span>moves:</span><span>${c.moves}</span><span>angles:</span><span>${c.angles}</span></div>` : '';
 }
 function layerChip(key, js) {
   if (!js) return null;
