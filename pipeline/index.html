@@ -139,6 +139,7 @@
   .layer .toggle.disabled { opacity: 0.4; pointer-events: none; }
   .layer .lsum { color: var(--text2); font-size: 11.5px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
   .layer .lsum i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
+  .layer .lsum .m, .lsum .m { color: var(--text3); }
   .event .sub { margin-top: 10px; padding-top: 8px; border-top: 0.5px solid var(--sep); }
   .event .sub .h { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
     display: flex; align-items: center; gap: 6px; }
@@ -895,12 +896,24 @@ function buildLayers() {
     t.classList.toggle('disabled', !S.has[L.key]); t.classList.toggle('on', !!(S.has[L.key] && V.layers[L.key]));
     const js = S.layerSum[L.key], c = S.has[L.key] ? layerChip(L.key, js) : null;
     $(`sum-${L.key}`).innerHTML = !S.has[L.key] ? '<span>not in this folder</span>'
-      : c ? `<span><i style="background:${c.col}"></i>${c.txt}</span>` : '';
+      : (c ? `<span><i style="background:${c.col}"></i>${c.txt}</span>` : '') + gateTxt(L.key);
   }
   ruleCard(u);
   layout();
 }
 // the headline verdict of a layer: its round score / rating, nothing else
+// which facing angles a layer judges in (0° = facing the camera, ±180° = back to it). Side-on rules skip
+// head-on punches, front / back rules skip side-on ones, the rest read every angle.
+const SIDE_ON = '(45°, 135°) ∪ (−135°, −45°)', FRONT_BACK = '(−45°, 45°) ∪ (135°, 180°] ∪ [−180°, −135°)';
+const ANY_ANGLE = '(−180°, 180°]';
+const GATE = {arm: [SIDE_ON, 'side-on'], hit: [SIDE_ON, 'side-on'], hoc: [FRONT_BACK, 'front or back'],
+              elbow: [FRONT_BACK, 'front or back'], hip: [ANY_ANGLE, 'any angle'],
+              offensive: [ANY_ANGLE, 'any angle'], combined: [ANY_ANGLE, 'any angle']};
+function gateTxt(key) {
+  const g = GATE[key];
+  return g ? `<span class="m" title="the facing angles this rule judges in — 0° = facing the camera, ±180° = back to it">` +
+    `facing ∈ ${g[0]} · ${g[1]}</span>` : '';
+}
 function layerChip(key, js) {
   if (!js) return null;
   if (key === 'arm' || key === 'hit') return js.score == null ? null : {txt: `${js.score} · ${js.band}`, col: VERD[js.band] || '#8e8e93'};
@@ -922,7 +935,7 @@ function ruleCard(u) {
   }).join('');
   $('ruleCard').innerHTML = '<div class="label">Rules</div>' + RULE_LAYERS.filter(L => S.has[L.key]).map(L =>
     `<div class="srow" style="grid-template-columns:1fr"><span class="k">${L.label}</span>` +
-    `<div class="lsum" style="color:var(--text2);font-size:11.5px;display:flex;flex-wrap:wrap;gap:4px 10px">${L.summary(S.punches, S.layerSum[L.key], u)}</div></div>`).join('');
+    `<div class="lsum" style="color:var(--text2);font-size:11.5px;display:flex;flex-wrap:wrap;gap:4px 10px">${L.summary(S.punches, S.layerSum[L.key], u)}${gateTxt(L.key)}</div></div>`).join('');
 }
 const layerOn = k => !!(S.has?.[k] && V.layers[k]);
 
