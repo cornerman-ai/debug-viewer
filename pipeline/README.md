@@ -51,6 +51,10 @@ that rule's headline verdict.
 the punch card and a video overlay for the punch under the playhead. Colors: green = fine, orange = too little,
 red = wrong / too much, gray = not judged.
 
+- **Angle change** (`angle_change/`): the old pivot-rate rule on the per-punch facing angle — a ratchet that fires
+  when the swing around its anchor reaches 100°, either way. The punch where it fires is a full green block ("new
+  angle"), the others show how much swing is open. The round row is seconds per change through an S-curve (0 at 12 s,
+  50 at 25 s, 100 at 60 s). Reads `punches.csv` + `angle_change.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the production rule's verdict (pass / fail; skipped = dashed),
   its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
   with this frame's elbow bend.

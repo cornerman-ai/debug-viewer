@@ -374,6 +374,37 @@ function comboLayer(kind, label, short, what) {
 }
 const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${v >= 0 ? 'right' : 'left'}`;
 const RULE_LAYERS = [
+  {
+    // angle change (angle_change/): the pivot-rate ratchet on the per-punch facing angle. A punch is marked when the
+    // swing around the anchor reaches 100 deg — that punch is where the boxer has changed angle; the others show how
+    // much swing is open so far.
+    key: 'pivot', label: 'Angle change', short: 'Angle chg',
+    csv: ['angle_change', 'punches.csv'], json: ['angle_change', 'angle_change.json'],
+    parse: (r, num) => r.facing_mean === '' ? null : {facing: num(r.facing_mean), anchor: num(r.anchor),
+      d: num(r.d_from_anchor), swing: num(r.swing_open), fired: r.fired === 'yes'},
+    summary(P, js, {dot}) {
+      if (!js) return '';
+      return dot(js.fired ? '#34c759' : '#8e8e93', `${js.n_changes} changes`) +
+        (js.sec_per_change ? `<span>one every <b>${js.sec_per_change}s</b></span>` : '');
+    },
+    card: (e, x) => `<div class="sub"><div class="h">Angle change</div>` + (!x ? '<div class="empty">no facing for this punch</div>' :
+      `<div class="rows num" style="margin-top:0"><span>Facing here</span><b>${x.facing.toFixed(0)}°</b>
+       <span>Anchor</span><b>${x.anchor == null ? '–' : x.anchor.toFixed(0) + '°'}</b>
+       <span>Turned from the anchor</span><b>${x.d == null ? '–' : x.d.toFixed(0) + '°'}</b>
+       <span>Swing open</span><b>${x.swing == null ? '–' : x.swing.toFixed(0)}° of 100°</b>
+       <span>Angle changed here</span><b>${x.fired ? 'yes' : 'no'}</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + `<span class="num">${x.fired ? '<b>angle changed here</b>' : 'swing open <b>' + (x.swing ?? 0).toFixed(0) + '°</b> of 100°'}</span><br>` +
+      `<span class="num">facing ${x.facing.toFixed(0)}° · anchor ${x.anchor == null ? '–' : x.anchor.toFixed(0) + '°'} · turned ${x.d == null ? '–' : x.d.toFixed(0) + '°'}</span><br>` +
+      `<span class="m">a 100° swing around the anchor, either way, counts as a new angle</span>`,
+    row(e, x, {c, y, h, span, tag, ring}) {              // a full block where the angle changed, a faint one elsewhere
+      const [bx, w] = span(e);
+      c.fillStyle = x.fired ? '#34c759' : css('--fill2'); c.globalAlpha = x.fired ? 1 : 0.9;
+      rr(bx, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
+      if (x.fired) tag(bx, w, y, h, 'new angle');
+      else if (x.swing != null) tag(bx, w, y, h, `${x.swing.toFixed(0)}°`);
+      ring(e, 'pivot', bx, y, w, h);
+    },
+  },
   comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
   comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
   {
@@ -903,6 +934,7 @@ function buildLayers() {
 // front (within 45° of the camera), back (within 45° of straight away), side-on (everything between).
 const ALL_ANGLES = 'front, back, side-on';
 const SCOPE = {
+  pivot:     {moves: 'every punch',                             angles: 'front, back, side-on'},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
   hit:       {moves: 'every punch',                             angles: 'side-on'},
@@ -945,8 +977,10 @@ function ruleCard() {
     const c = layerChip(key, S.layerSum[key]); if (!c) return;
     const [n, band] = c.txt.split(' \u00b7 '), q = scoreCounts(key);
     add(name, n, c.col, `${q.pass} passed \u00b7 ${q.fail} failed \u00b7 ${q.skip} skipped`, band);
-    rows[rows.length - 1].band = band;
   };
+  const pv = S.layerSum.pivot;                                                        // 1
+  if (pv?.score != null) add('Angle change', pv.score.toFixed(0), VERD[pv.band] || '#8e8e93',
+                             `${pv.n_changes} changes \u00b7 one every ${pv.sec_per_change}s`, pv.band);
   scored('arm', 'Arm extension');                                                     // 2
   if (da) add('Defense after combo', da.rating, DACOL[da.rating],                      // 7
               `${pct(da.covered_share)} of ${da.n_combos} combos followed by a move`);
