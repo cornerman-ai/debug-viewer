@@ -391,12 +391,12 @@ const RULE_LAYERS = [
       `<span class="num">elbow bend <b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}</b> at the rule frame f ${a.peakF ?? '–'} · passes at ≤ 36.4°${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span><br>` +
       `<span class="m num">for comparison, not judged: ${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} at the impact frame${a.impVerdict && a.impVerdict !== 'skip' ? ' (would ' + a.impVerdict + ')' : ''}</span>`,
     row(e, a, {c, y, h, span, tag, ring, tx, fps}) {       // verdict block, the rule's frame as a white tick
-      const [x, w] = span(e), judged = a.verdict === 'pass' || a.verdict === 'fail', col = VERD[a.verdict] || '#8e8e93';
-      if (judged) { c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill(); }
-      else { c.globalAlpha = 0.25; c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
-             c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([3, 2]); rr(x + 0.5, y + 3.5, w - 1, h - 7, 5); c.stroke(); c.setLineDash([]); }
-      if (a.peakF != null) { const xi = tx((a.peakF + 0.5) / fps); c.strokeStyle = judged ? '#fff' : col; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      if (judged && a.deg != null) tag(x, w, y, h, `${(180 - a.deg).toFixed(0)}°`);   // the angle at the elbow: 180° = straight
+      const judged = a.verdict === 'pass' || a.verdict === 'fail';
+      if (!judged) return;                                 // skipped punches are not drawn
+      const [x, w] = span(e), col = VERD[a.verdict] || '#8e8e93';
+      c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill();
+      if (a.peakF != null) { const xi = tx((a.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      if (a.deg != null) tag(x, w, y, h, `${(180 - a.deg).toFixed(0)}°`);   // the angle at the elbow: 180° = straight
       ring(e, 'arm', x, y, w, h);
     },
     overlay(e, a, f, P, leadLeft) {                        // the punching arm, colored by the rule's verdict
@@ -482,12 +482,12 @@ const RULE_LAYERS = [
           (x.match ? ` <span class="m">· model's target ${e.target}: ${x.match === 'yes' ? 'matches' : 'no match'}</span>` : '') : '');
     },
     row(e, x, {c, y, h, span, tag, ring, tx, fps}) {       // the rule's verdict on straights, the impact reading (dashed) on the rest
-      const rule = !!x.verdict, v = rule ? x.verdict : x.impVerdict, z = rule ? x.zone : x.impZone, fj = rule ? x.land : x.impF;
-      if (!v) return;
-      const [bx, w] = span(e), col = VERD[v] || '#8e8e93', judged = v !== 'skip';
-      c.globalAlpha = judged ? (rule ? 1 : 0.45) : 0.25; c.fillStyle = col; rr(bx, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
-      if (!rule || !judged) { c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([3, 2]); rr(bx + 0.5, y + 3.5, w - 1, h - 7, 5); c.stroke(); c.setLineDash([]); }
-      if (fj != null && judged) { const xi = tx((fj + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      const rule = !!x.verdict && x.verdict !== 'skip', v = rule ? x.verdict : x.impVerdict, z = rule ? x.zone : x.impZone, fj = rule ? x.land : x.impF;
+      if (!v || v === 'skip') return;                      // skipped punches are not drawn
+      const [bx, w] = span(e), col = VERD[v] || '#8e8e93', judged = true;
+      c.globalAlpha = rule ? 1 : 0.45; c.fillStyle = col; rr(bx, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
+      if (!rule) { c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([3, 2]); rr(bx + 0.5, y + 3.5, w - 1, h - 7, 5); c.stroke(); c.setLineDash([]); }
+      if (fj != null) { const xi = tx((fj + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       const hf = rule ? x.hf : x.impHf, zn = w > 70 ? ZONE[z]?.[1] || z : ZONE[z]?.[0] || '?';
       if (judged && z) tag(bx, w, y, h, hf == null ? zn : `${hf.toFixed(2)} · ${zn}`);
       ring(e, 'hit', bx, y, w, h);
