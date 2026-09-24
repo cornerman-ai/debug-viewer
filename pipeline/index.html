@@ -383,6 +383,37 @@ const RULE_LAYERS = [
   comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
   comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
   {
+    // defense after combo (defense_after_combo/combos.csv): the defensive move that covered an offensive combo, drawn
+    // where the move is. Combos nobody covered are a short hollow mark at the combo's end frame.
+    key: 'defcov', label: 'Defense after combo', short: 'Def. after', items: true,
+    csv: ['defense_after_combo', 'combos.csv'], json: ['defense_after_combo', 'defense_after_combo.json'],
+    parseItem: (r, num) => r.covered === '1'
+      ? {covered: true, sf: num(r.move_start_frame), ef: num(r.move_end_frame), type: r.move_type, side: r.move_side,
+         delay: num(r.delay_s), seq: r.sequence, endF: num(r.end_frame)}
+      : {covered: false, sf: num(r.end_frame), ef: num(r.end_frame), seq: r.sequence, endF: num(r.end_frame)},
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => x.covered
+      ? `<b>Covered \u00b7 ${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type}</b> \u00b7 ${fmtT(x.sf / S.fps)}<br>` +
+        `<span class="num">starts ${x.delay >= 0 ? x.delay.toFixed(2) + ' s after' : (-x.delay).toFixed(2) + ' s before'} the combo ends</span><br>` +
+        `<span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span>`
+      : `<b>No defense after this combo</b> \u00b7 ${fmtT(x.endF / S.fps)}<br>` +
+        `<span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>` +
+        `<span class="m">nothing started within 1 s of the end</span>`,
+    row(e, x, {c, y, h, tx, fps}) {
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      if (x.covered) {
+        const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+        c.fillStyle = '#34c759'; c.globalAlpha = on ? 1 : 0.85;
+        rr(x0, y + 3, Math.max(3, x1 - x0 - 1), h - 6, 5); c.fill(); c.globalAlpha = 1;
+      } else {                                            // an uncovered combo: a hollow tick where it ended
+        const xi = tx((x.endF + 1) / fps); if (xi < L) return;
+        c.strokeStyle = '#ff3b30'; c.lineWidth = 2; c.globalAlpha = on ? 1 : 0.6;
+        c.beginPath(); c.moveTo(xi, y + 4); c.lineTo(xi, y + h - 4); c.stroke(); c.globalAlpha = 1;
+      }
+    },
+  },
+  {
     key: 'arm', label: 'Arm extension', short: 'Arm ext.',
     csv: ['arm_extension', 'arm_extension.csv'], json: ['arm_extension', 'arm_extension.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, peakF: num(r.peak_frame), peak: num(r.peak_bend),
@@ -917,6 +948,7 @@ function buildLayers() {
 // front (within 45° of the camera), back (within 45° of straight away), side-on (everything between).
 const ALL_ANGLES = 'front, back, side-on';
 const SCOPE = {
+  defcov:    {moves: 'defensive moves after an offensive combo',  angles: 'front, back, side-on'},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
   hit:       {moves: 'every punch',                             angles: 'side-on'},

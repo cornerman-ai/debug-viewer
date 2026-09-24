@@ -86,9 +86,10 @@ red = wrong / too much, gray = not judged.
 mean facing during it against the most different smoothed facing in the 2 s after it; a turn of ≥ 45° counts as a
 change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than 5 readable combos → not rated.
 
-**Defense after combo** (`defense_after_combo/defense_after_combo.json`, a whole-video rule — no timeline row): under
-the offensive combo list, the share of combos followed by a defensive move within 1 s of the combo's end (≥ 60 % good,
-35–60 % moderate, < 35 % no defense after combos; fewer than 10 combos → not rated).
+- **Defense after combo** (`defense_after_combo/combos.csv` + `.json`): the defensive move that covered an offensive
+  combo, drawn in green where the move is; a combo nobody covered is a red tick at its end frame. Hovering a move says
+  how long after the combo it started and which combo it was. The round rating is the share of combos covered
+  (≥ 60 % good, 35–60 % moderate, < 35 % no defense after combos; fewer than 10 combos → not rated).
 
 **Same punches** (`same_punches/same_punches.json`, a whole-video rule — no timeline row): under the target
 distribution, the share of the 2 most-used punch types (≥ 85 % same punches, 70–85 % moderate, < 70 % varied; fewer
