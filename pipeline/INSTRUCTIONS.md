@@ -1,0 +1,73 @@
+# Adding a rule to the pipeline viewer
+
+A rule is built in the backend (`cornerman-backend/combined_pipeline/research/run_<rule>.py`, writing
+`Ambo/data/pipeline_tests/<video>/<stage>/`). Showing it here is part of implementing it, not a separate task.
+
+## 1. Decide where it goes
+
+**By what the rule judges, not by how interesting it is.**
+
+| The rule judges | Where it goes |
+| --- | --- |
+| punches, frames, defensive moves or combos — anything that happens at a point in time | a **timeline layer** (`RULE_LAYERS`) **and** a Round score row |
+| the round as a whole — one number or verdict for the video | the **Round score card only**, no timeline row |
+
+Examples as of 2026-09-24. Timeline + Round score: arm extension, hip rotation, hit height, head off center line,
+elbow tuck, offensive / combined combos. Round score only: angle change, defense after combo, same punches, same
+defense, body shots, combo diversity.
+
+A timeline row for a number that never changes during the video is noise — it draws the same thing everywhere.
+
+## 2a. A timeline layer
+
+One entry in `RULE_LAYERS` in `index.html`; the toggle, file loading, row, hover and punch card all come from it.
+
+```js
+{
+  key: 'myrule', label: 'My rule', short: 'My rule',        // short = the timeline row's name, keep it narrow
+  csv: ['my_rule', 'punches.csv'], json: ['my_rule', 'my_rule.json'],
+  parse: (r, num) => r.verdict ? {verdict: r.verdict, deg: num(r.some_angle)} : null,   // joined by start frame + hand
+  summary(P, js, {dot, count}) { ... },                      // kept for reuse; the panel does not render it now
+  card: (e, x) => `<div class="sub">…</div>`,                // the punch card section in the Now view
+  tip:  (e, x, {head, v}) => `…`,                            // the timeline tooltip
+  row(e, x, {c, y, h, span, tag, ring, tx, fps}) { ... },     // draw the punch's block in this rule's row
+  overlay(e, x, f, P, leadLeft) { ... },                     // optional: draw on the video
+}
+```
+
+Rules whose rows are not punches (combos, stretches of frames) use `items: true` plus `parseItem`; then `row` is
+called once per item, `S.items[key]` holds them, and hover hits anything under the cursor in that row.
+
+House style for a row: draw only what the rule judged (skipped punches are not drawn), keep the block's colour the
+verdict's colour, and put the measured value in the tag (`tag(x, w, y, h, '163°')`) rather than a score.
+
+Also add the rule to `SCOPE` so the toggle says what it covers:
+
+```js
+myrule: {moves: 'jab, cross', angles: 'side-on'},            // angles: front, back, side-on
+```
+
+## 2b. A Round score row
+
+In `ruleCard()` in `index.html`, one `add(name, value, colour, band, info)` call in the Notion rule order. `value` is
+the 0–100 score where the rule has one, otherwise its rating word. `info` carries the four lines every row shows:
+
+```js
+add('My rule', js.rating, MYCOL[js.rating], null, {
+  what: 'the coaching question in one plain line, ending in a question mark',
+  on:   'what it was measured on, with the counts (70 of 81 judged)',
+  th:   {rule: 'how the number is produced, in one sentence',
+         bands: [['≥ 50 %', 'good'], ['25–50 %', 'some'], ['< 25 %', 'bad']], pal: MYCOL},
+  calc: '29 turned / 34 combos = 85%'});                     // the actual sum, with this video's numbers
+```
+
+Numbers in those lines come from the data, never hardcoded. The whole-video JSON is loaded next to the others in
+`load()` (`S.myRule = await src.text(['my_rule', 'my_rule.json'])…`).
+
+## 3. Before pushing
+
+- Open both test videos in the browser and check the new row / rating renders with no console errors.
+- Update `README.md` (the layer list, or the whole-video rule list).
+- Push `debug-viewer` main — it deploys to <https://cornerman-ai.github.io/debug-viewer/pipeline/>.
+
+The backend repo follows the usual rule: commit and push only when asked.
