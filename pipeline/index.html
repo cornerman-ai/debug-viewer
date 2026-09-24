@@ -412,7 +412,7 @@ const GUARDCOL = {ok: '#34c759', low: '#ff3b30', low_short: '#ffcc00'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
-const FACECOL = {front: '#0a84ff', 'side-on': '#ff9f0a', back: '#bf5af2'};
+const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
 const STANCECOL = {ok: '#34c759', narrow: '#ff3b30', shallow: '#ff3b30', narrow_short: '#ffcc00',
                    shallow_short: '#ffcc00'};
 const STANCESKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
