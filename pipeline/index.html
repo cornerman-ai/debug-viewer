@@ -471,25 +471,22 @@ const RULE_LAYERS = [
     },
   },
   {
-    // slip distance (slip_distance/moves.csv): how far the head travelled sideways during a defensive move, from
-    // where it started to its furthest point, in torso lengths. Slips are rated; rolls and ducks are drawn paler,
-    // for reference only — a roll is supposed to travel further.
+    // slip distance (slip_distance/moves.csv): how far the head travelled sideways during a SLIP, from where it
+    // started to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose.
     key: 'slipd', label: 'Slip distance', short: 'Slip dist.', items: true,
     csv: ['slip_distance', 'moves.csv'], json: ['slip_distance', 'slip_distance.json'],
     parseItem: (r, num) => r.verdict ? {type: r.defense_type, side: r.side, sf: num(r.start_frame), ef: num(r.end_frame),
-      travel: num(r.travel), peakF: num(r.peak_frame), verdict: r.verdict, rated: r.defense_type === 'slip'} : null,
+      travel: num(r.travel), peakF: num(r.peak_frame), verdict: r.verdict} : null,
     summary: () => '',
     card: () => '',
     tip: (e, x) => `<b>${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type} · ${SLIPNAME[x.verdict]}</b> · ` +
       `${fmtT(x.sf / S.fps)}<br><span class="num">the head travelled <b>${x.travel.toFixed(2)}</b> torso from where it started</span><br>` +
-      `<span class="m">short below 0.20 · far above 0.70` + (x.rated ? '' : ' · rolls and ducks are shown for reference, not rated') + `</span>`,
+      `<span class="m">short below 0.20 · far above 0.70 torso</span>`,
     row(e, x, {c, y, h, span, tag, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
-      c.fillStyle = SLIPCOL[x.verdict]; c.globalAlpha = x.rated ? (on ? 1 : 0.9) : (on ? 0.6 : 0.4);
+      c.fillStyle = SLIPCOL[x.verdict]; c.globalAlpha = on ? 1 : 0.9;
       rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
-      if (!x.rated) { c.strokeStyle = SLIPCOL[x.verdict]; c.lineWidth = 1; c.setLineDash([3, 2]);
-        rr(x0 + 0.5, y + 3.5, w - 1, h - 7, 5); c.stroke(); c.setLineDash([]); }
       if (x.peakF != null) { const xi = tx((x.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
         c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       tag(x0, w, y, h, `${x.travel.toFixed(2)}`);
@@ -1072,7 +1069,7 @@ const ALL_ANGLES = 'front, back, side-on';
 const SCOPE = {
   defcov:    {moves: 'defensive moves after an offensive combo',  angles: 'front, back, side-on'},
   guard:     {moves: 'every frame, per hand, while that hand is not punching', angles: 'front, back, side-on'},
-  slipd:     {moves: 'slips (rolls and ducks shown, not rated)', angles: 'front, back'},
+  slipd:     {moves: 'slips only',                              angles: 'front, back'},
   stance_width: {moves: 'every frame',                          angles: 'front, back'},
   stance_depth: {moves: 'every frame',                          angles: 'side-on'},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
@@ -1203,8 +1200,8 @@ function ruleCard() {
   const sl = S.slipD;                                                                  // 21 + 22
   if (sl) add('Slip distance', sl.rating, SLIPRATE[sl.rating], null, {
     what: 'when he slips, does the head move far enough — and not too far?',
-    on: `${sl.n_slips} slips · ${sl.judged_slips} judged, the rest skipped (thrown side-on, where the camera cannot `
-        + `see the head move sideways) · rolls and ducks are measured for reference, never rated`,
+    on: `${sl.n_slips} slips · ${sl.judged_slips} judged, the rest skipped (side-on, where the camera cannot see `
+        + `the head move sideways) · rolls and ducks are not measured`,
     th: {event: {label: 'per slip', rule: 'travel = how far the head got from where it started, in torso lengths',
                  bands: [['< 0.20', 'too short'], ['0.20–0.70', 'good distance'], ['> 0.70', 'too far']],
                  pal: {'too short': '#ff9f0a', 'good distance': '#34c759', 'too far': '#ff3b30'}},
