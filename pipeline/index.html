@@ -122,10 +122,12 @@
   .big { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; }
   .big .n { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
   .big .n.small { font-size: 14px; }
-  .grp { font-size: 10.5px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em;
-    margin: 10px 0 2px; }
-  .grp:first-of-type { margin-top: 2px; }
-  .rule { padding: 6px 0; border-top: 0.5px solid var(--sep); }
+  .grp { display: flex; align-items: center; gap: 8px; margin: 16px 0 6px; font-size: 10.5px; font-weight: 700;
+    color: var(--text2); text-transform: uppercase; letter-spacing: 0.07em; }
+  .grp::after { content: ''; flex: 1; height: 1px; background: var(--sep); }
+  .grp .n { font-weight: 600; color: var(--text3); letter-spacing: 0; text-transform: none; }
+  .grpbox { border-radius: 10px; background: var(--fill); padding: 2px 10px; }
+  .rule { padding: 8px 0; border-top: 0.5px solid var(--sep); }
   .rule:first-of-type { border-top: 0; }
   .exp { display: grid; grid-template-columns: 68px 1fr; gap: 1px 10px; margin-top: 2px; font-size: 11.5px; line-height: 1.5; color: var(--text2); }
   .exp > span:nth-child(odd) { color: var(--text3); }
@@ -1098,7 +1100,7 @@ function ruleCard() {
 
   $('scoreCard').style.display = rows.length ? '' : 'none';
   // rules that judge each punch / move / frame first, then the ones that only rate the round
-  const groups = [['judged event by event', rows.filter(r => r.th.event)],
+  const groups = [['per punch · move · frame', rows.filter(r => r.th.event)],
                   ['round summary only', rows.filter(r => !r.th.event)]];
   const rule = r => {
     const big = /^[\d.]+$/.test(r.value);
@@ -1117,7 +1119,7 @@ function ruleCard() {
   };
   $('scoreCard').innerHTML = '<div class="label">Round score</div>' +
     groups.filter(([, g]) => g.length).map(([name, g]) =>
-      `<div class="grp">${name}</div>` + g.map(rule).join('')).join('');
+      `<div class="grp">${name}<span class="n">${g.length}</span></div><div class="grpbox">${g.map(rule).join('')}</div>`).join('');
 }
 const layerOn = k => !!(S.has?.[k] && V.layers[k]);
 
