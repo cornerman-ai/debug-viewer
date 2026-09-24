@@ -56,8 +56,11 @@ the 0–100 score where the rule has one, otherwise its rating word. `info` carr
 add('My rule', js.rating, MYCOL[js.rating], null, {
   what: 'the coaching question in one plain line, ending in a question mark',
   on:   'what it was measured on, with the counts (70 of 81 judged)',
-  th:   {rule: 'how the number is produced, in one sentence',
-         bands: [['≥ 50 %', 'good'], ['25–50 %', 'some'], ['< 25 %', 'bad']], pal: MYCOL},
+  th:   {                                                    // two groups; drop either if the rule has no such level
+    event: {label: 'per punch', rule: 'what is measured on one punch / move / frame / combo',
+            bands: [['≥ 157°', 'pass'], ['< 157°', 'fail']], pal: VERD, note: 'optional second line'},
+    round: {label: 'per round', rule: 'how the round number is produced',
+            bands: [['≥ 50 %', 'good'], ['25–50 %', 'some'], ['< 25 %', 'bad']], pal: MYCOL}},
   calc: '29 turned / 34 combos = 85%'});                     // the actual sum, with this video's numbers
 ```
 
