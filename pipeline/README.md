@@ -74,6 +74,10 @@ red = wrong / too much, gray = not judged.
   not rated) — combined combos get the same rating, with the caveat that the defense model's noise inflates it. These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
+- **Slip distance** (`slip_distance/`): per defensive move, how far the head travelled sideways from where it
+  started, in torso lengths, with a white tick at the furthest frame. Slips are rated (orange < 0.20 too short,
+  green 0.20–0.70, red > 0.70 too far); rolls and ducks are drawn paler and dashed, measured for reference only.
+  Judged front-on / back-on only. Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
   hand is not punching — low above 0.60. Continuous row, lead in the top half, rear in the bottom: green guard up,
   red low, yellow low but too short to count, a thin gray strip where the rule cannot judge (that hand throwing, or a
