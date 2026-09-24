@@ -965,32 +965,32 @@ function ruleCard() {
 
   if (ac) add('Angle change', ac.rating, ACCOL[ac.rating], null, {                     // 1
     what: 'after attacking, does he step off the line he attacked from?',
-    on: `every combined combo — punches and defensive moves (${ac.n_readable} of ${ac.n_combos} readable)`,
+    on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (no facing angle to read)`,
     th: {rule: 'a turn of ≥ 45° within 2 s of the combo ending counts as a change',
          bands: [['≥ 50 %', 'good'], ['25–50 %', 'some'], ['< 25 %', 'stays square']], pal: ACCOL},
     calc: `${ac.n_changed} turned / ${ac.n_readable} combos = ${pct(ac.changed_share)}`});
   scored('arm', 'Arm extension', q => ({                                               // 2
     what: 'does the arm reach full extension on a straight punch?',
-    on: `jabs and crosses seen side-on, at the frame of furthest reach (${q.pass + q.fail} of ${q.pass + q.fail + q.skip} judged)`,
+    on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on to read the arm)`,
     th: {rule: 'a punch passes at an elbow angle ≥ 157° (a bend of 23° or less); the punch score falls from 100 at a '
                + '23° bend to 0 at 60°',
          bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD},
     calc: `mean punch score over the ${q.pass + q.fail} judged punches`}));
   if (da) add('Defense after combo', da.rating, DACOL[da.rating], null, {               // 7
     what: 'does he defend right after he throws, or stand there?',
-    on: `every offensive combo (${da.n_combos})`,
+    on: `${da.n_combos} offensive combos (punches only) · all judged`,
     th: {rule: 'a defensive move starting within 1 s of the combo ending covers it (0.2 s early still counts)',
          bands: [['≥ 60 %', 'good'], ['35–60 %', 'moderate'], ['< 35 %', 'no defense after combos']], pal: DACOL},
     calc: `${da.n_covered} covered / ${da.n_combos} combos = ${pct(da.covered_share)}`});
   if (el) add('Elbow tuck', el.rating, ELBOWCOL[el.rating], null, {                     // 8
     what: 'does the elbow stay in, or flare out to the side?',
-    on: `frames where he is front-on or back-on and that arm is not throwing a hook (lead ${el.arms.lead.judged_frames}, rear ${el.arms.rear.judged_frames})`,
+    on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook)`,
     th: {rule: 'flare = the sideways shoulder → elbow gap in torso lengths; a frame counts as flared at ≥ 0.30',
          bands: [['< 10 %', 'tucked'], ['10–25 %', 'sometimes flared'], ['≥ 25 %', 'flared']], pal: ELBOWCOL},
     calc: `worse arm: lead ${pct(el.arms.lead.flared_share)} \u00b7 rear ${pct(el.arms.rear.flared_share)} of judged frames flared`});
   scored('hoc', 'Head off center line', q => ({                                         // 11
     what: 'does the head leave the center line while punching, or stay a still target?',
-    on: `punches thrown front-on or back-on (${q.pass + q.fail} of ${q.pass + q.fail + q.skip} judged)`,
+    on: `${q.pass + q.fail + q.skip} punches · ${q.pass + q.fail} judged, ${q.skip} skipped (thrown side-on, where the camera cannot see the head move sideways)`,
     th: {rule: 'offset = 0.75 × at impact + 0.125 × a quarter into the punch + 0.125 × three quarters in; '
                + 'the score is 100 at 0.25 torso off the line and 0 when the head never leaves it',
          bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD},
@@ -998,7 +998,7 @@ function ruleCard() {
   const hp = S.hipSum;                                                                 // 13
   if (hp) add('Hip rotation', hp.rating, HIPCOL[hp.rating], null, {
     what: 'do the hips turn into the punch, or does he arm-punch?',
-    on: `every punch with a readable hip line, from its start to impact (${hp.n_judged} of ${hp.n_punches})`,
+    on: `${hp.n_punches} punches · ${hp.n_judged} judged from start to impact, ${hp.n_punches - hp.n_judged} skipped (no impact frame or no readable hip line)`,
     th: {rule: 'each punch type has its own good band: twice the middle half of what the study’s boxers did '
                + '(lead jab 0–25°, rear cross 4–51°, lead hook 6–61°, …)',
          bands: [['≥ 80 %', 'good'], ['65–80 %', 'mixed'], ['< 65 %', 'poor']], pal: HIPCOL},
@@ -1006,39 +1006,39 @@ function ruleCard() {
           `${hp.n_too_little} too little · ${hp.n_too_much} too much`});
   if (bs) add('Body shots', bs.rating, BODYCOL[bs.rating], null, {                      // 14
     what: 'does he go downstairs, or hunt the head only?',
-    on: `hooks and uppercuts (${bs.n_hooks_uppercuts}) \u00b7 jab and cross cannot be split into head / body`,
+    on: `${bs.n_hooks_uppercuts} hooks and uppercuts · all judged · the ${bs.n_jab_cross_not_counted} jabs and crosses are left out (the model cannot tell a head jab from a body jab)`,
     th: {rule: 'the share of hooks and uppercuts that land on the body',
          bands: [['≥ 25 %', 'enough'], ['15–25 %', 'a few'], ['5–15 %', 'too few'], ['< 5 %', 'head only']], pal: BODYCOL},
     calc: `${bs.n_body} to the body / ${bs.n_hooks_uppercuts} = ${pct(bs.body_share)}`});
   if (off?.diversity) add('Same offensive combos', off.diversity.rating, DIVCOL[off.diversity.rating], null, {   // 16
     what: 'does he keep throwing the same few combinations?',
-    on: `every offensive combo (${off.n_combinations}, ${off.n_different} different)`,
+    on: `${off.n_combinations} offensive combos · all judged · ${off.n_different} different sequences among them`,
     th: {rule: 'the share of all combos taken by the 3 most-used sequences',
          bands: [['≥ 70 %', 'repetitive'], ['50–70 %', 'moderate'], ['< 50 %', 'varied']], pal: DIVCOL},
     calc: `top 3 sequences / ${off.n_combinations} combos = ${pct(off.top3_share)}`});
   if (cmb?.diversity) add('Same combined combos', cmb.diversity.rating, DIVCOL[cmb.diversity.rating], null, {   // 17
     what: 'the same question with the defensive moves included',
-    on: `every combined combo (${cmb.n_combinations}, ${cmb.n_different} different)`,
+    on: `${cmb.n_combinations} combined combos · all judged · ${cmb.n_different} different sequences among them`,
     th: {rule: 'the same top-3 share — but the defense model’s noise inflates how many different sequences '
                + 'there are, so read it next to the offensive rating, not alone',
          bands: [['≥ 70 %', 'repetitive'], ['50–70 %', 'moderate'], ['< 50 %', 'varied']], pal: DIVCOL},
     calc: `top 3 sequences / ${cmb.n_combinations} combos = ${pct(cmb.top3_share)}`});
   if (sd) add('Same defense', sd.same_move.rating, SDCOL[sd.same_move.rating], null, {  // 18
     what: 'does he only ever use one move, or always go to one side?',
-    on: `every defensive move (${sd.n_moves}) \u00b7 the side only over the ${sd.n_with_side} that have one`,
+    on: `${sd.n_moves} defensive moves · all judged for the move · the side only over the ${sd.n_with_side} that have one (a duck has none)`,
     th: {rule: 'the share of the most-used move, and separately of the most-used side',
          bands: [['≥ 80 %', 'same defense'], ['60–80 %', 'moderate'], ['< 60 %', 'varied'],
                  ['side ≥ 80 %', 'one-sided']], pal: SDCOL},
     calc: `${sd.same_move.top_type} ${pct(sd.same_move.top_type_share)} of moves \u00b7 side ${sd.same_side.top_side} ${pct(sd.same_side.top_side_share)} (${sd.same_side.rating})`});
   if (sp) add('Same punches', sp.rating, SPCOL[sp.rating], null, {                      // 19
     what: 'does he throw anything beyond his two favourite punches?',
-    on: `every punch by type (${sp.n_punches})`,
+    on: `${sp.n_punches} punches · all judged, grouped by punch type`,
     th: {rule: 'the share of all punches taken by the 2 most-used types',
          bands: [['≥ 85 %', 'same punches'], ['70–85 %', 'moderate'], ['< 70 %', 'varied']], pal: SPCOL},
     calc: `${sp.top2_types.map(t => PUNCH[t]?.name || t).join(' + ')} / ${sp.n_punches} punches = ${pct(sp.top2_share)}`});
   scored('hit', 'Hit height', q => ({                                                   // 25
     what: 'would the punch land somewhere useful on an opponent his own size?',
-    on: `jabs and crosses at furthest reach, hooks and uppercuts at impact (${q.pass + q.fail} of ${q.pass + q.fail + q.skip} judged)`,
+    on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on) · hooks and uppercuts are read at their impact frame on the timeline, not here`,
     th: {rule: 'the fist’s height on an opponent his own size: head or body is on target, shoulder, over the head '
                + 'and below the belt are off',
          bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD},
