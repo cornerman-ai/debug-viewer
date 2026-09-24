@@ -104,7 +104,7 @@ distributions, the most-used move type (≥ 80 % same defense, 60–80 % moderat
 among moves that have one (≥ 80 % one-sided); fewer than 10 moves → not rated. The defense model finds rolls far
 better than slips, so a high roll share is partly the model.
 
-**Adding a rule**: see [INSTRUCTIONS.md](INSTRUCTIONS.md). In short — a rule that judges punches, frames, defensive
+**Adding a rule**: see [instructions.md](instructions.md). In short — a rule that judges punches, frames, defensive
 moves or combos gets a timeline layer (one entry in `RULE_LAYERS` in `index.html`) plus a Round score row; a rule that
 only rates the round gets the Round score row alone, with no timeline row.
 
