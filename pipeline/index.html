@@ -411,6 +411,8 @@ const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30', low_short: '#ffcc00'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
+// the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
+const FACECOL = {front: '#0a84ff', 'side-on': '#ff9f0a', back: '#bf5af2'};
 const STANCECOL = {ok: '#34c759', narrow: '#ff3b30', shallow: '#ff3b30', narrow_short: '#ffcc00',
                    shallow_short: '#ffcc00'};
 const STANCESKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
@@ -1449,11 +1451,11 @@ const tl = $('tl'), tctx = tl.getContext('2d');
 const L = 78, RPAD = 14;                                        // left gutter for track names
 let TR = {};
 function layout() {
-  TR = {ruler: [0, 24], angle: [30, 128], lead: [166, 30], rear: [200, 30], def: [240, 30]};
+  TR = {ruler: [0, 24], angle: [30, 190], lead: [228, 30], rear: [262, 30], def: [302, 30]};
   const any = LAYERS.some(layerOn);
-  let y = any ? 296 : 280;                                     // 16 px for the "RULES" caption when there are rule rows
+  let y = any ? 358 : 342;                                     // 16 px for the "RULES" caption when there are rule rows
   for (const k of LAYERS) if (layerOn(k)) { TR[k] = [y, 26]; y += 30; }
-  if (any) TR.rules = 285;
+  if (any) TR.rules = 347;
   TR.bottom = y - (any ? 4 : 10);                              // lowest edge of the scrolling rows
   TR.over = [TR.bottom + 14, 30];
   tl.style.height = `${TR.over[0] + TR.over[1] + 4}px`;
@@ -1570,26 +1572,32 @@ function drawTimeline(f) {
   }
   // ±45° and ±135°: the cuts every gated rule uses — front / side-on / back
   for (const g of [-135, -45, 45, 135]) {
-    c.strokeStyle = text3; c.globalAlpha = 0.45; c.lineWidth = 1; c.setLineDash([4, 4]);
+    c.strokeStyle = sep; c.lineWidth = 1;
     c.beginPath(); c.moveTo(L, ymap(g)); c.lineTo(L + W, ymap(g)); c.stroke();
-    c.setLineDash([]); c.globalAlpha = 1;
   }
-  c.save(); c.font = '600 8.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-  c.fillStyle = text3; c.globalAlpha = 0.8; c.textAlign = 'left';
-  for (const [lo, hi, name] of [[135, 180, 'back'], [-45, 45, 'front'], [-180, -135, 'back']])
-    c.fillText(name, L + 6, (ymap(lo) + ymap(hi)) / 2);
-  for (const [lo, hi] of [[45, 135], [-135, -45]]) c.fillText('side-on', L + 6, (ymap(lo) + ymap(hi)) / 2);
+  c.save(); c.font = '600 9px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  c.textAlign = 'left';
+  for (const [lo, hi, name] of [[135, 180, 'back'], [45, 135, 'side-on'], [-45, 45, 'front'],
+                                [-135, -45, 'side-on'], [-180, -135, 'back']]) {
+    c.fillStyle = FACECOL[name]; c.globalAlpha = 0.12;
+    c.fillRect(L, ymap(hi), W, ymap(lo) - ymap(hi));         // a faint band so the bucket reads at a glance
+    c.globalAlpha = 0.9; c.fillText(name, L + 6, (ymap(lo) + ymap(hi)) / 2);
+  }
   c.globalAlpha = 1; c.restore();
   c.restore(); c.fillStyle = text3; c.textAlign = 'right'; c.font = '500 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-  for (const g of [-180, -90, 0, 90, 180]) c.fillText(`${g}°`, L - 6, ymap(g));
+  for (const g of [-180, -135, -90, -45, 0, 45, 90, 135, 180]) c.fillText(`${g}°`, L - 6, ymap(g));
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   c.save(); c.beginPath(); c.rect(L, 0, W, TR.over[0] - 4); c.clip();
   if (S.hasAngle) {
     const f0 = Math.max(0, Math.floor(V.t0 * fps) - 1), f1 = Math.min(S.n - 1, Math.ceil(V.t1 * fps) + 1);
     const every = Math.max(1, Math.floor((f1 - f0) / (W * 1.5)));   // never more dots than ~1.5 per pixel
     const r = (f1 - f0) / W > 1 ? 1.2 : 1.8;
-    c.fillStyle = acc;
-    for (let i = f0; i <= f1; i += every) { if (!S.pose[i]) continue; const x = tx(i / fps); c.fillRect(x - r, ymap(S.angle[i]) - r, 2 * r, 2 * r); }
+    for (let i = f0; i <= f1; i += every) {
+      if (!S.pose[i]) continue;
+      const a = S.angle[i], x = tx(i / fps);
+      c.fillStyle = FACECOL[Math.abs(a) <= 45 ? 'front' : Math.abs(a) >= 135 ? 'back' : 'side-on'];
+      c.fillRect(x - r, ymap(a) - r, 2 * r, 2 * r);          // the dot says which bucket this frame is in
+    }
   }
   // punch + defense blocks
   const block = (e, y, h, s, active) => {

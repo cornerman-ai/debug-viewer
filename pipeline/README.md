@@ -31,7 +31,7 @@ Over HTTP (a static server with Range support rooted at the data folder, serving
 
 ## Using it
 
-Timeline rows: facing angle (0° = to the camera, ±180° = back), lead and rear punches (white tick = impact frame),
+Timeline rows: facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands every gated rule reads, each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
 defense, and an overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
 hover for details; the chips in the side panel hide or show a punch / defense type. On the video: the skeleton, a ring
 on the punching wrist around impact, and pills naming the current punch / move.
