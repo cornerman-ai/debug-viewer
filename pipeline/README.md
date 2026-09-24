@@ -51,6 +51,9 @@ that rule's headline verdict.
 the punch card and a video overlay for the punch under the playhead. Colors: green = fine, orange = too little,
 red = wrong / too much, gray = not judged.
 
+- **Hand drop / telegraph** (`hand_drop/`): per punch, how far the throwing hand dipped below ITS OWN guard in the
+  0.4 s before the punch started (green no dip, red telegraph at ≥ 0.25 torso), with the dip on the block. Reads
+  `punches.csv` + `hand_drop.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the production rule's verdict (pass / fail; skipped = dashed),
   its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
   with this frame's elbow bend.
