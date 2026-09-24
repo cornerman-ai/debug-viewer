@@ -83,12 +83,12 @@ red = wrong / too much, gray = not judged.
   far). Rolls and ducks are not measured. Judged front-on / back-on only. Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
   hand is not punching — low above 0.60. Continuous row, lead in the top half, rear in the bottom: green guard up,
-  red low, yellow low but too short to count, a thin gray strip where the rule cannot judge (that hand throwing, or a
-  joint not visible). Round rating = the share of judged frames inside a low stretch on the worse hand
+  red low, and a thin gray strip for everything left out of the round — that hand throwing, a joint not visible, or a
+  drop too short to count. Round rating = the share of judged frames inside a low stretch on the worse hand
   (< 10 % good, 10–25 % sometimes low, ≥ 25 % low). Reads `runs.csv` + `guard_height.json`.
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
-  — green fine, red too small, yellow too small but too short to count, a thin gray strip where the rule cannot
-  judge (the wrong side of the camera, or a joint not visible). Width = ankle-to-ankle distance in torso lengths,
+  — green fine, red too small, and a thin gray strip for everything left out of the round — the wrong side of the
+  camera, a joint not visible, or a stretch too short to count. Width = ankle-to-ankle distance in torso lengths,
   read front-on, narrow below 0.50; depth = the horizontal ankle gap in leg lengths, read side-on, shallow below
   0.50. The round rating is the share of judged frames inside a sustained bad stretch (bridged over 0.5 s, at least
   1 s long): < 15 % good, 15–30 % sometimes, ≥ 30 % bad. Read `runs.csv` + the stage's `.json`.

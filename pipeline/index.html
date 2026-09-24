@@ -408,15 +408,17 @@ const STANCE = {
 const SLIPCOL = {short: '#ff9f0a', ok: '#34c759', far: '#ff3b30'};
 const SLIPNAME = {short: 'too short', ok: 'good distance', far: 'too far'};
 const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
-const GUARDCOL = {ok: '#34c759', low: '#ff3b30', low_short: '#ffcc00'};
-const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
+const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
+const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing',
+                   low_short: 'a drop too short to count — left out of the round'};
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
-const STANCECOL = {ok: '#34c759', narrow: '#ff3b30', shallow: '#ff3b30', narrow_short: '#ffcc00',
-                   shallow_short: '#ffcc00'};
+const STANCECOL = {ok: '#34c759', narrow: '#ff3b30', shallow: '#ff3b30'};
 const STANCESKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
-                    front_on: 'the boxer is front-on'};
+                    front_on: 'the boxer is front-on',
+                    narrow_short: 'narrow, but too short to count — left out of the round',
+                    shallow_short: 'shallow, but too short to count — left out of the round'};
 function stanceLayer(kind) {
   const C = STANCE[kind];
   return {
@@ -429,7 +431,7 @@ function stanceLayer(kind) {
     tip: (e, x) => {
       const t = `\u00b7 ${fmtT(x.sf / S.fps)} \u00b7 ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
       if (STANCESKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${STANCESKIP[x.state]}</span>`;
-      const name = x.state === 'ok' ? 'Fine' : x.state === C.bad ? cap(C.bad) : `${cap(C.bad)}, too short to count`;
+      const name = x.state === 'ok' ? 'Fine' : cap(C.bad);
       return `<b>${name}</b> ${t}<br><span class="num">lowest ${x.min?.toFixed(2)} \u00b7 mean ${x.mean?.toFixed(2)} ${C.unit}</span><br>` +
         `<span class="m">${C.rule}</span>`;
     },
@@ -766,9 +768,9 @@ const RULE_LAYERS = [
     tip: (e, x) => {
       const one = it => {
         const nm = GUARDSKIP[it.state] ? `not judged — ${GUARDSKIP[it.state]}`
-          : it.state === 'ok' ? 'guard up' : it.state === 'low' ? '<b>guard low</b>' : 'low, too short to count';
-        const num = GUARDSKIP[it.state] ? '' :
-          ` <span class="num">(lowest ${it.max?.toFixed(2)} · mean ${it.mean?.toFixed(2)} torso)</span>`;
+          : it.state === 'ok' ? 'guard up' : '<b>guard low</b>';
+        const num = it.max == null ? '' :
+          ` <span class="num">(lowest ${it.max.toFixed(2)} · mean ${it.mean.toFixed(2)} torso)</span>`;
         return `<span style="color:${GUARDSKIP[it.state] ? 'var(--text3)' : GUARDCOL[it.state]}">●</span> ` +
                `${cap(it.hand)} hand: ${nm}${num}`;
       };
