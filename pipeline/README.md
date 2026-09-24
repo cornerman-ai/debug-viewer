@@ -74,6 +74,12 @@ red = wrong / too much, gray = not judged.
   not rated) — combined combos get the same rating, with the caveat that the defense model's noise inflates it. These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
+- **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
+  — green fine, red too small, yellow too small but too short to count, a thin gray strip where the rule cannot
+  judge (the wrong side of the camera, or a joint not visible). Width = ankle-to-ankle distance in torso lengths,
+  read front-on, narrow below 0.50; depth = the horizontal ankle gap in leg lengths, read side-on, shallow below
+  0.50. The round rating is the share of judged frames inside a sustained bad stretch (bridged over 0.5 s, at least
+  1 s long): < 15 % good, 15–30 % sometimes, ≥ 30 % bad. Read `runs.csv` + the stage's `.json`.
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = |x shoulder − x elbow| / torso per arm,
   judged only while the boxer is within 45° of facing or backing the camera and that arm isn't throwing a hook. The row
   is continuous — every frame belongs to a stretch: green tucked (< 0.20), yellow borderline (0.20–0.30), red flared

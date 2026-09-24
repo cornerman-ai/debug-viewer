@@ -387,7 +387,57 @@ function comboLayer(kind, label, short, what) {
   };
 }
 const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${v >= 0 ? 'right' : 'left'}`;
+// ââ stance width / depth: the same shape, one per axis. Both are per-frame rules whose rows are continuous
+//    stretches (ok / too small / too short to count / not judged), like elbow tuck. ââ
+const STANCE = {
+  width: {label: 'Stance width', short: 'Stance w.', stage: 'stance_width', json: 'stance_width.json',
+          bad: 'narrow', short_state: 'narrow_short', metric: 'sep', unit: 'torso',
+          what: 'are the feet a proper distance apart, seen from the front?',
+          rule: 'sep = the ankle-to-ankle distance in torso lengths; a frame is narrow below 0.50',
+          roundRule: 'the share of judged frames inside a narrow stretch (bridged over 0.5 s, at least 1 s long)',
+          bands: [['< 15 %', 'good'], ['15\u201330 %', 'sometimes narrow'], ['\u2265 30 %', 'narrow']],
+          scope: {moves: 'every frame', angles: 'front, back'}},
+  depth: {label: 'Stance depth', short: 'Stance d.', stage: 'stance_depth', json: 'stance_depth.json',
+          bad: 'shallow', short_state: 'shallow_short', metric: 'depth', unit: 'leg',
+          what: 'is one foot properly in front of the other, seen from the side?',
+          rule: 'depth = the horizontal ankle gap in leg lengths; a frame is shallow below 0.50',
+          roundRule: 'the share of judged frames inside a shallow stretch (bridged over 0.5 s, at least 1 s long)',
+          bands: [['< 15 %', 'good'], ['15\u201330 %', 'sometimes shallow'], ['\u2265 30 %', 'shallow']],
+          scope: {moves: 'every frame', angles: 'side-on'}},
+};
+const STANCECOL = {ok: '#34c759', narrow: '#ff3b30', shallow: '#ff3b30', narrow_short: '#ffcc00',
+                   shallow_short: '#ffcc00'};
+const STANCESKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
+                    front_on: 'the boxer is front-on'};
+function stanceLayer(kind) {
+  const C = STANCE[kind];
+  return {
+    key: `stance_${kind}`, label: C.label, short: C.short, items: true,
+    csv: [C.stage, 'runs.csv'], json: [C.stage, C.json],
+    parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
+      min: num(r[`min_${C.metric}`]), mean: num(r[`mean_${C.metric}`])}),
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const t = `\u00b7 ${fmtT(x.sf / S.fps)} \u00b7 ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
+      if (STANCESKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${STANCESKIP[x.state]}</span>`;
+      const name = x.state === 'ok' ? 'Fine' : x.state === C.bad ? cap(C.bad) : `${cap(C.bad)}, too short to count`;
+      return `<b>${name}</b> ${t}<br><span class="num">lowest ${x.min?.toFixed(2)} \u00b7 mean ${x.mean?.toFixed(2)} ${C.unit}</span><br>` +
+        `<span class="m">${C.rule}</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, skip = !!STANCESKIP[x.state];
+      const w = Math.max(2, x1 - x0);
+      c.fillStyle = skip ? css('--fill2') : STANCECOL[x.state];
+      c.globalAlpha = skip ? (on ? 0.85 : 0.5) : (on ? 1 : 0.85);
+      if (skip) rr(x0, y + h / 2 - 1.5, w, 3, 1.5); else rr(x0, y + 3, w, h - 6, 4);
+      c.fill(); c.globalAlpha = 1;
+    },
+  };
+}
 const RULE_LAYERS = [
+  stanceLayer('width'), stanceLayer('depth'),
   comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
   comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
   {
@@ -752,6 +802,8 @@ async function loadFolder(src) {
   S.defAfter = await src.text(['defense_after_combo', 'defense_after_combo.json']).then(JSON.parse).catch(() => null);
   S.angleChg = await src.text(['angle_change', 'angle_change.json']).then(JSON.parse).catch(() => null);
   S.hipSum = await src.text(['hip_rotation', 'hip_rotation.json']).then(JSON.parse).catch(() => null);
+  S.stanceW = await src.text(['stance_width', 'stance_width.json']).then(JSON.parse).catch(() => null);
+  S.stanceD = await src.text(['stance_depth', 'stance_depth.json']).then(JSON.parse).catch(() => null);
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
   S.dur = S.n / S.fps;
   S.hiddenP.clear(); S.hiddenD.clear();
@@ -885,6 +937,8 @@ const BODYCOL = {enough: '#34c759', 'a few': '#ffcc00', 'too few': '#ff9f0a', 'h
 const SPCOL = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30', 'not rated': '#8e8e93'};
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
 const ACCOL = {good: '#34c759', some: '#ff9f0a', 'stays square': '#ff3b30', 'not rated': '#8e8e93'};
+const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes shallow': '#ff9f0a',
+                    narrow: '#ff3b30', shallow: '#ff3b30', 'not rated': '#8e8e93'};
 const HIPCOL = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const DACOL = {good: '#34c759', moderate: '#ff9f0a', 'no defense after combos': '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
@@ -957,6 +1011,8 @@ function buildLayers() {
 const ALL_ANGLES = 'front, back, side-on';
 const SCOPE = {
   defcov:    {moves: 'defensive moves after an offensive combo',  angles: 'front, back, side-on'},
+  stance_width: {moves: 'every frame',                          angles: 'front, back'},
+  stance_depth: {moves: 'every frame',                          angles: 'side-on'},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
   hit:       {moves: 'every punch',                             angles: 'side-on'},
@@ -1082,6 +1138,25 @@ function ruleCard() {
                  bands: [['≥ 80 %', 'same defense'], ['60–80 %', 'moderate'], ['< 60 %', 'varied'],
                          ['side ≥ 80 %', 'one-sided']], pal: SDCOL}},
     calc: `${sd.same_move.top_type} ${pct(sd.same_move.top_type_share)} of moves \u00b7 side ${sd.same_side.top_side} ${pct(sd.same_side.top_side_share)} (${sd.same_side.rating})`});
+  const stW = S.stanceW, stD = S.stanceD;
+  if (stW) add('Stance width', stW.rating, STANCERATE[stW.rating], null, {             // 24
+    what: STANCE.width.what,
+    on: `${stW.n_frames.toLocaleString()} frames \u00b7 ${stW.judged_frames.toLocaleString()} judged, the rest skipped `
+        + `(side-on, or a joint not visible)`,
+    th: {event: {label: 'per frame', rule: STANCE.width.rule,
+                 bands: [['\u2265 0.50', 'fine'], ['< 0.50', 'narrow']], pal: {fine: '#34c759', narrow: '#ff3b30'}},
+         round: {label: 'per round', rule: STANCE.width.roundRule, bands: STANCE.width.bands, pal: STANCERATE}},
+    calc: `${stW.narrow_frames.toLocaleString()} of ${stW.judged_frames.toLocaleString()} judged frames = `
+          + `${pct(stW.narrow_share)} \u00b7 median ${stW.median_sep} torso`});
+  if (stD) add('Stance depth', stD.rating, STANCERATE[stD.rating], null, {             // 23
+    what: STANCE.depth.what,
+    on: `${stD.n_frames.toLocaleString()} frames \u00b7 ${stD.judged_frames.toLocaleString()} judged, the rest skipped `
+        + `(front-on, or a joint not visible)`,
+    th: {event: {label: 'per frame', rule: STANCE.depth.rule,
+                 bands: [['\u2265 0.50', 'fine'], ['< 0.50', 'shallow']], pal: {fine: '#34c759', shallow: '#ff3b30'}},
+         round: {label: 'per round', rule: STANCE.depth.roundRule, bands: STANCE.depth.bands, pal: STANCERATE}},
+    calc: `${stD.shallow_frames.toLocaleString()} of ${stD.judged_frames.toLocaleString()} judged frames = `
+          + `${pct(stD.shallow_share)} \u00b7 median ${stD.median_depth} leg`});
   if (sp) add('Same punches', sp.rating, SPCOL[sp.rating], null, {                      // 19
     what: 'does he throw anything beyond his two favourite punches?',
     on: `${sp.n_punches} punches · all judged, grouped by punch type`,
