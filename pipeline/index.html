@@ -1568,6 +1568,18 @@ function drawTimeline(f) {
   for (const g of [-180, -90, 0, 90, 180]) {
     c.strokeStyle = g === 0 ? sep : grid; c.lineWidth = 1; c.beginPath(); c.moveTo(L, ymap(g)); c.lineTo(L + W, ymap(g)); c.stroke();
   }
+  // ±45° and ±135°: the cuts every gated rule uses — front / side-on / back
+  for (const g of [-135, -45, 45, 135]) {
+    c.strokeStyle = text3; c.globalAlpha = 0.45; c.lineWidth = 1; c.setLineDash([4, 4]);
+    c.beginPath(); c.moveTo(L, ymap(g)); c.lineTo(L + W, ymap(g)); c.stroke();
+    c.setLineDash([]); c.globalAlpha = 1;
+  }
+  c.save(); c.font = '600 8.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  c.fillStyle = text3; c.globalAlpha = 0.8; c.textAlign = 'left';
+  for (const [lo, hi, name] of [[135, 180, 'back'], [-45, 45, 'front'], [-180, -135, 'back']])
+    c.fillText(name, L + 6, (ymap(lo) + ymap(hi)) / 2);
+  for (const [lo, hi] of [[45, 135], [-135, -45]]) c.fillText('side-on', L + 6, (ymap(lo) + ymap(hi)) / 2);
+  c.globalAlpha = 1; c.restore();
   c.restore(); c.fillStyle = text3; c.textAlign = 'right'; c.font = '500 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   for (const g of [-180, -90, 0, 90, 180]) c.fillText(`${g}°`, L - 6, ymap(g));
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
