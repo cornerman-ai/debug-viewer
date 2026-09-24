@@ -965,7 +965,7 @@ function ruleCard() {
 
   if (ac) add('Angle change', ac.rating, ACCOL[ac.rating], null, {                     // 1
     what: 'after attacking, does he step off the line he attacked from?',
-    on: `every combined combo (${ac.n_readable} of ${ac.n_combos} readable)`,
+    on: `every offensive combo — punches only (${ac.n_readable} of ${ac.n_combos} readable)`,
     th: {rule: 'a turn of ≥ 45° within 2 s of the combo ending counts as a change',
          bands: [['≥ 50 %', 'good'], ['25–50 %', 'some'], ['< 25 %', 'stays square']], pal: ACCOL},
     calc: `${ac.n_changed} turned / ${ac.n_readable} combos = ${pct(ac.changed_share)}`});

@@ -82,7 +82,7 @@ red = wrong / too much, gray = not judged.
   has the per-arm share of judged frames flared and the video's rating (< 10 % tucked, 10–25 % sometimes flared,
   ≥ 25 % flared, worse arm decides). Reads `runs.csv` + `elbow_tuck.json`.
 
-**Angle change** (`angle_change/angle_change.json`, a whole-video rule — no timeline row): per combined combo, the
+**Angle change** (`angle_change/angle_change.json`, a whole-video rule — no timeline row): per offensive combo, the
 mean facing during it against the most different smoothed facing in the 2 s after it; a turn of ≥ 45° counts as a
 change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than 5 readable combos → not rated.
 
