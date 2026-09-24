@@ -97,8 +97,7 @@ than 20 punches → not rated). The top 2 because jab and cross are normally the
 
 **Body shots** (`bodyshots/bodyshots.json`, a whole-video rule — no timeline row): under same punches, body shots /
 (body + head) over hooks and uppercuts only (the classifier can't split jab / cross into head / body): ≥ 25 % enough,
-15–25 % a few, 5–15 % too few, < 5 % head only; fewer than 10 hooks + uppercuts → not rated. The old app's
-bodyshot_ratio numbers.
+15–25 % a few, 5–15 % too few, < 5 % head only; fewer than 10 hooks + uppercuts → not rated. The numbers were inherited from the archived app; no lens has one for this.
 
 **Same defense** (`same_defense/same_defense.json`, a whole-video rule — no timeline row): under the defense
 distributions, the most-used move type (≥ 80 % same defense, 60–80 % moderate, < 60 % varied) and the most-used side
