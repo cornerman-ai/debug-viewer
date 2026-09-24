@@ -64,7 +64,16 @@ add('My rule', js.rating, MYCOL[js.rating], null, {
 Numbers in those lines come from the data, never hardcoded. The whole-video JSON is loaded next to the others in
 `load()` (`S.myRule = await src.text(['my_rule', 'my_rule.json'])…`).
 
-## 3. Before pushing
+## 3. When a rule changes
+
+A rule's wording in the viewer is part of the rule. Every time the backend rule changes — a threshold, a window, what
+it is measured on, which frames it skips — update its **Round score row in the same commit**: the `what`, `on`, `th`
+(the rule line and the bands) and `calc` lines, plus the timeline tooltip if it repeats the rule. Then re-run the
+stage on both test videos so the numbers in the row come from the new rule, and check the row in the browser.
+
+A row that still explains the old rule is worse than no row: it is read as the current truth.
+
+## 4. Before pushing
 
 - Open both test videos in the browser and check the new row / rating renders with no console errors.
 - Update `README.md` (the layer list, or the whole-video rule list).
