@@ -1019,7 +1019,7 @@ function ruleCard() {
     on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook)`,
     th: {rule: 'flare = the sideways shoulder → elbow gap in torso lengths; a frame counts as flared at ≥ 0.30',
          bands: [['< 10 %', 'tucked'], ['10–25 %', 'sometimes flared'], ['≥ 25 %', 'flared']], pal: ELBOWCOL},
-    calc: `worse arm: lead ${pct(el.arms.lead.flared_share)} \u00b7 rear ${pct(el.arms.rear.flared_share)} of judged frames flared`});
+    calc: `lead ${el.arms.lead.flared_frames.toLocaleString()} of ${el.arms.lead.judged_frames.toLocaleString()} frames flared = ${pct(el.arms.lead.flared_share)} · rear ${el.arms.rear.flared_frames.toLocaleString()} of ${el.arms.rear.judged_frames.toLocaleString()} = ${pct(el.arms.rear.flared_share)} · the worse arm (${el.worse_arm || '–'}) sets the rating`});
   scored('hoc', 'Head off center line', q => ({                                         // 11
     what: 'does the head leave the center line while punching, or stay a still target?',
     on: `${q.pass + q.fail + q.skip} punches · ${q.pass + q.fail} judged, ${q.skip} skipped (thrown side-on, where the camera cannot see the head move sideways)`,
