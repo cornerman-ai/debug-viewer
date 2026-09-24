@@ -122,6 +122,9 @@
   .big { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; }
   .big .n { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
   .big .n.small { font-size: 14px; }
+  .grp { font-size: 10.5px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em;
+    margin: 10px 0 2px; }
+  .grp:first-of-type { margin-top: 2px; }
   .rule { padding: 6px 0; border-top: 0.5px solid var(--sep); }
   .rule:first-of-type { border-top: 0; }
   .exp { display: grid; grid-template-columns: 68px 1fr; gap: 1px 10px; margin-top: 2px; font-size: 11.5px; line-height: 1.5; color: var(--text2); }
@@ -1094,7 +1097,10 @@ function ruleCard() {
     calc: `the worst 10 % of the ${q.pass + q.fail} punch scores, averaged`}));
 
   $('scoreCard').style.display = rows.length ? '' : 'none';
-  $('scoreCard').innerHTML = '<div class="label">Round score</div>' + rows.map(r => {
+  // rules that judge each punch / move / frame first, then the ones that only rate the round
+  const groups = [['judged event by event', rows.filter(r => r.th.event)],
+                  ['round summary only', rows.filter(r => !r.th.event)]];
+  const rule = r => {
     const big = /^[\d.]+$/.test(r.value);
     return `<div class="rule">` +
       `<div class="big"><span class="k">${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${r.color}">${r.value}` +
@@ -1108,7 +1114,10 @@ function ruleCard() {
           `<span class="num">${when}</span><span style="color:${g.pal?.[verdict] || 'var(--text2)'}">${verdict}</span>`).join('') + '</div>' : '') +
         `</span></div>`).join('')}</span>` +
       `<span>round</span><span>${r.calc}</span></div></div>`;
-  }).join('');
+  };
+  $('scoreCard').innerHTML = '<div class="label">Round score</div>' +
+    groups.filter(([, g]) => g.length).map(([name, g]) =>
+      `<div class="grp">${name}</div>` + g.map(rule).join('')).join('');
 }
 const layerOn = k => !!(S.has?.[k] && V.layers[k]);
 
