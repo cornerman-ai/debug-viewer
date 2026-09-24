@@ -395,11 +395,11 @@ const RULE_LAYERS = [
     card: () => '',
     tip: (e, x) => x.covered
       ? `<b>Covered \u00b7 ${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type}</b> \u00b7 ${fmtT(x.sf / S.fps)}<br>` +
-        `<span class="num">starts ${x.delay >= 0 ? x.delay.toFixed(2) + ' s after' : (-x.delay).toFixed(2) + ' s before'} the combo ends</span><br>` +
+        `<span class="num">${x.delay >= 0 ? 'starts ' + x.delay.toFixed(2) + ' s after the combo ends' : 'starts during the combo, ' + (-x.delay).toFixed(2) + ' s before it ends'}</span><br>` +
         `<span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span>`
       : `<b>No defense after this combo</b> \u00b7 ${fmtT(x.endF / S.fps)}<br>` +
         `<span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>` +
-        `<span class="m">nothing started within 1 s of the end</span>`,
+        `<span class="m">nothing started during it or within 1 s of the end</span>`,
     row(e, x, {c, y, h, tx, fps}) {
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
       if (x.covered) {
@@ -1011,7 +1011,7 @@ function ruleCard() {
   if (da) add('Defense after combo', da.rating, DACOL[da.rating], null, {               // 7
     what: 'does he defend right after he throws, or stand there?',
     on: `${da.n_combos} offensive combos (punches only) · all judged`,
-    th: {rule: 'a defensive move starting within 1 s of the combo ending covers it (0.2 s early still counts)',
+    th: {rule: 'a defensive move starting anywhere from the combo’s first frame to 1 s after its last one covers it',
          bands: [['≥ 60 %', 'good'], ['35–60 %', 'moderate'], ['< 35 %', 'no defense after combos']], pal: DACOL},
     calc: `${da.n_covered} covered / ${da.n_combos} combos = ${pct(da.covered_share)}`});
   if (el) add('Elbow tuck', el.rating, ELBOWCOL[el.rating], null, {                     // 8

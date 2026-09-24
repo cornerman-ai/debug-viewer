@@ -88,7 +88,7 @@ change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than
 
 - **Defense after combo** (`defense_after_combo/combos.csv` + `.json`): the defensive move that covered an offensive
   combo, drawn in green where the move is; a combo nobody covered is a red tick at its end frame. Hovering a move says
-  how long after the combo it started and which combo it was. The round rating is the share of combos covered
+  how long after the combo it started and which combo it was. A move counts when it starts anywhere from the combo's first frame to 1 s after its last. The round rating is the share of combos covered
   (≥ 60 % good, 35–60 % moderate, < 35 % no defense after combos; fewer than 10 combos → not rated).
 
 **Same punches** (`same_punches/same_punches.json`, a whole-video rule — no timeline row): under the target
