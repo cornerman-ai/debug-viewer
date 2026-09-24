@@ -56,6 +56,10 @@ red = wrong / too much, gray = not judged.
   with this frame's elbow bend.
 - **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a good band of 2× the study's IQR (block color and
   degrees); the round rating is the share of judged punches inside the band (≥ 80 % good, 65–80 % mixed, < 65 % poor, from `hip_rotation.json`); on the video the hip line in the verdict color. The impact → end step is in the CSV but not shown.
+- **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
+  turn of the punching shoulder against a good band of 2× the study's IQR for that punch type, block coloured by
+  verdict with the degrees on it; on the video the shoulder line in the verdict colour. The CSV also carries
+  `shoulder_minus_hip`, the separation the biomechanics papers measure, unjudged for now.
 - **Hit height** (`hit_height/`): per jab / cross the production rule's zone (head / shoulder / body / over the head /
   below the belt; on target = green, off = red, skipped = dashed gray) with a white tick at the frame it judged; hooks
   and uppercuts get the same zones read at their impact frame (lighter, dashed). On the video a ring on the fist at the

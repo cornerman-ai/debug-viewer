@@ -443,56 +443,6 @@ function stanceLayer(kind) {
   };
 }
 const RULE_LAYERS = [
-  {
-    // guard height (guard_height/): per hand, how far the wrist sits below the nose while that hand is not punching.
-    // Continuous row like elbow tuck — lead in the top half, rear in the bottom.
-    key: 'guard', label: 'Guard height', short: 'Guard', items: true,
-    csv: ['guard_height', 'runs.csv'], json: ['guard_height', 'guard_height.json'],
-    parseItem: (r, num) => ({hand: r.hand, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
-      max: num(r.max_drop), mean: num(r.mean_drop)}),
-    summary: () => '',
-    card: () => '',
-    tip: (e, x) => {
-      const t = `· ${cap(x.hand)} hand · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
-      if (GUARDSKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${GUARDSKIP[x.state]}</span>`;
-      const name = x.state === 'ok' ? 'Guard up' : x.state === 'low' ? 'Guard low' : 'Low, too short to count';
-      return `<b>${name}</b> ${t}<br><span class="num">lowest ${x.max?.toFixed(2)} · mean ${x.mean?.toFixed(2)} torso below the nose</span><br>` +
-        `<span class="m">low below 0.60 torso, while that hand is not punching</span>`;
-    },
-    row(e, x, {c, y, h, tx, fps}) {
-      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
-      const top = x.hand === 'lead', f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
-      const skip = !!GUARDSKIP[x.state], w = Math.max(2, x1 - x0), hh = h / 2 - 3;
-      c.fillStyle = skip ? css('--fill2') : GUARDCOL[x.state];
-      c.globalAlpha = skip ? (on ? 0.85 : 0.45) : (on ? 1 : 0.85);
-      if (skip) rr(x0, y + (top ? 3 : h / 2) + hh / 2 - 1.5, w, 3, 1.5);
-      else rr(x0, y + (top ? 3 : h / 2), w, hh, 3);
-      c.fill(); c.globalAlpha = 1;
-    },
-  },
-  {
-    // slip distance (slip_distance/moves.csv): how far the head travelled sideways during a SLIP, from where it
-    // started to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose.
-    key: 'slipd', label: 'Slip distance', short: 'Slip dist.', items: true,
-    csv: ['slip_distance', 'moves.csv'], json: ['slip_distance', 'slip_distance.json'],
-    parseItem: (r, num) => r.verdict ? {type: r.defense_type, side: r.side, sf: num(r.start_frame), ef: num(r.end_frame),
-      travel: num(r.travel), peakF: num(r.peak_frame), verdict: r.verdict} : null,
-    summary: () => '',
-    card: () => '',
-    tip: (e, x) => `<b>${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type} · ${SLIPNAME[x.verdict]}</b> · ` +
-      `${fmtT(x.sf / S.fps)}<br><span class="num">the head travelled <b>${x.travel.toFixed(2)}</b> torso from where it started</span><br>` +
-      `<span class="m">short below 0.20 · far above 0.70 torso</span>`,
-    row(e, x, {c, y, h, span, tag, tx, fps}) {
-      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
-      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
-      c.fillStyle = SLIPCOL[x.verdict]; c.globalAlpha = on ? 1 : 0.9;
-      rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
-      if (x.peakF != null) { const xi = tx((x.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
-        c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      tag(x0, w, y, h, `${x.travel.toFixed(2)}`);
-    },
-  },
-  stanceLayer('width'), stanceLayer('depth'),
   comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
   comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
   {
@@ -524,6 +474,28 @@ const RULE_LAYERS = [
         c.strokeStyle = '#ff3b30'; c.lineWidth = 2; c.globalAlpha = on ? 1 : 0.6;
         c.beginPath(); c.moveTo(xi, y + 4); c.lineTo(xi, y + h - 4); c.stroke(); c.globalAlpha = 1;
       }
+    },
+  },
+  {
+    // slip distance (slip_distance/moves.csv): how far the head travelled sideways during a SLIP, from where it
+    // started to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose.
+    key: 'slipd', label: 'Slip distance', short: 'Slip dist.', items: true,
+    csv: ['slip_distance', 'moves.csv'], json: ['slip_distance', 'slip_distance.json'],
+    parseItem: (r, num) => r.verdict ? {type: r.defense_type, side: r.side, sf: num(r.start_frame), ef: num(r.end_frame),
+      travel: num(r.travel), peakF: num(r.peak_frame), verdict: r.verdict} : null,
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => `<b>${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type} · ${SLIPNAME[x.verdict]}</b> · ` +
+      `${fmtT(x.sf / S.fps)}<br><span class="num">the head travelled <b>${x.travel.toFixed(2)}</b> torso from where it started</span><br>` +
+      `<span class="m">short below 0.20 · far above 0.70 torso</span>`,
+    row(e, x, {c, y, h, span, tag, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
+      c.fillStyle = SLIPCOL[x.verdict]; c.globalAlpha = on ? 1 : 0.9;
+      rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
+      if (x.peakF != null) { const xi = tx((x.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      tag(x0, w, y, h, `${x.travel.toFixed(2)}`);
     },
   },
   {
@@ -567,6 +539,43 @@ const RULE_LAYERS = [
       const ccw = ((a1 - a0 + 2 * Math.PI) % (2 * Math.PI)) > Math.PI;
       octx.lineWidth = 2.5; octx.beginPath(); octx.arc(pb[0], pb[1], 18, a0, a1, ccw); octx.stroke();
       overlayLabel(pb[0] + 14, pb[1] + 28, `elbow ${(180 - bend).toFixed(0)}°${peak ? ' · rule frame · ' + VNAME[a.verdict] : ''}`, col);
+    },
+  },
+  {
+    key: 'shoulder', label: 'Shoulder rotation', short: 'Shoulder rot.',
+    csv: ['shoulder_rotation', 'shoulder_rotation.csv'],
+    parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
+      vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
+      bsi: r.ref_start_impact_lo !== undefined ? [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)] : null,
+      qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact)}),
+    summary(P, js, {dot, count}) {
+      const h = count(P, p => p.hip?.status === 'ok' ? p.hip.vsi : null);
+      return dot(VERD.good, `${h.good || 0} good`) + dot(VERD.bad_low, `${h.bad_low || 0} too little`) +
+        dot(VERD.bad_high, `${h.bad_high || 0} too much`);
+    },
+    card: (e, r) => `<div class="sub"><div class="h">Shoulder rotation ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
+      `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
+       <span>Good range${r.bsi ? ' (2× IQR)' : ' (IQR)'}</span><b>${iqr(r.bsi || r.qsi)}</b>
+       ${r.bsi ? `<span>IQR</span><b>${iqr(r.qsi)}</b>` : ''}</div>`) + '</div>',
+    tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">no rotation (${r.status})</span>` :
+      head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)}</span><br>` +
+      `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi || r.qsi)}</b></span>` +
+      iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
+      `<span class="m">${r.bsi ? `good = 2× the IQR around it (dark: the IQR ${iqr(r.qsi)}, the middle 50% of this punch type in the study)`
+                                 : 'range = the middle 50% (IQR) of this punch type in the study'}</span>`,
+    row(e, r, {c, y, h, span, tag, ring}) {                // the start → impact verdict
+      if (r.status !== 'ok') return;
+      const [x, w] = span(e);
+      c.fillStyle = VERD[r.vsi]; rr(x, y + 3, w, h - 6, 5); c.fill();
+      tag(x, w, y, h, `${r.si.toFixed(0)}°`);
+      ring(e, 'shoulder', x, y, w, h);
+    },
+    overlay(e, r, f, P) {                                  // the shoulder line, colored by the start → impact verdict
+      if (r.status !== 'ok') return;
+      const l = P(11), rt = P(12); if (!(l && rt)) return;
+      const col = VERD[r.vsi]; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
+      octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
+      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `shoulders ${r.si.toFixed(0)}° · ${VNAME[r.vsi]}`, col);
     },
   },
   {
@@ -736,7 +745,35 @@ const RULE_LAYERS = [
       else rr(x0, y + (top ? 3 : h / 2), w, hh, 3);
       c.fill(); c.globalAlpha = 1;
     },
+  },  {
+    // guard height (guard_height/): per hand, how far the wrist sits below the nose while that hand is not punching.
+    // Continuous row like elbow tuck — lead in the top half, rear in the bottom.
+    key: 'guard', label: 'Guard height', short: 'Guard', items: true,
+    csv: ['guard_height', 'runs.csv'], json: ['guard_height', 'guard_height.json'],
+    parseItem: (r, num) => ({hand: r.hand, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
+      max: num(r.max_drop), mean: num(r.mean_drop)}),
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const t = `· ${cap(x.hand)} hand · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
+      if (GUARDSKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${GUARDSKIP[x.state]}</span>`;
+      const name = x.state === 'ok' ? 'Guard up' : x.state === 'low' ? 'Guard low' : 'Low, too short to count';
+      return `<b>${name}</b> ${t}<br><span class="num">lowest ${x.max?.toFixed(2)} · mean ${x.mean?.toFixed(2)} torso below the nose</span><br>` +
+        `<span class="m">low below 0.60 torso, while that hand is not punching</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const top = x.hand === 'lead', f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      const skip = !!GUARDSKIP[x.state], w = Math.max(2, x1 - x0), hh = h / 2 - 3;
+      c.fillStyle = skip ? css('--fill2') : GUARDCOL[x.state];
+      c.globalAlpha = skip ? (on ? 0.85 : 0.45) : (on ? 1 : 0.85);
+      if (skip) rr(x0, y + (top ? 3 : h / 2) + hh / 2 - 1.5, w, 3, 1.5);
+      else rr(x0, y + (top ? 3 : h / 2), w, hh, 3);
+      c.fill(); c.globalAlpha = 1;
+    },
   },
+  stanceLayer('width'), stanceLayer('depth'),
+
 ];
 const LAYERS = RULE_LAYERS.map(r => r.key);
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
@@ -857,6 +894,7 @@ async function loadFolder(src) {
   S.defAfter = await src.text(['defense_after_combo', 'defense_after_combo.json']).then(JSON.parse).catch(() => null);
   S.angleChg = await src.text(['angle_change', 'angle_change.json']).then(JSON.parse).catch(() => null);
   S.hipSum = await src.text(['hip_rotation', 'hip_rotation.json']).then(JSON.parse).catch(() => null);
+  S.shSum = await src.text(['shoulder_rotation', 'shoulder_rotation.json']).then(JSON.parse).catch(() => null);
   S.stanceW = await src.text(['stance_width', 'stance_width.json']).then(JSON.parse).catch(() => null);
   S.guard = await src.text(['guard_height', 'guard_height.json']).then(JSON.parse).catch(() => null);
   S.slipD = await src.text(['slip_distance', 'slip_distance.json']).then(JSON.parse).catch(() => null);
@@ -1074,6 +1112,7 @@ const SCOPE = {
   stance_depth: {moves: 'every frame',                          angles: 'side-on'},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
+  shoulder:  {moves: 'every punch',                             angles: ALL_ANGLES},
   hit:       {moves: 'every punch',                             angles: 'side-on'},
   hoc:       {moves: 'every punch',                             angles: 'front, back'},
   elbow:     {moves: 'every frame except hooks',                angles: 'front, back'},
@@ -1210,6 +1249,19 @@ function ruleCard() {
     calc: sl.judged_slips ? `${sl.slip_verdicts.ok || 0} good · ${sl.slip_verdicts.short || 0} too short · `
           + `${sl.slip_verdicts.far || 0} too far of ${sl.judged_slips} judged slips`
           : 'no slip could be read front-on'});
+  const shr = S.shSum;                                                                 // 20
+  if (shr) add('Shoulder rotation', shr.rating, HIPCOL[shr.rating], null, {
+    what: 'do the shoulders turn into the punch, or does the arm go alone?',
+    on: `${shr.n_punches} punches \u00b7 ${shr.n_judged} judged from start to impact, ${shr.n_punches - shr.n_judged} `
+        + `skipped (no impact frame or no readable shoulder line)`,
+    th: {event: {label: 'per punch', rule: 'each punch type has its own good band: twice the middle half of what the '
+                        + 'study\u2019s boxers\u2019 shoulders did (lead jab 0\u201340\u00b0, rear cross 11\u201373\u00b0, rear hook 22\u201382\u00b0, \u2026)',
+                 bands: [['inside', 'good'], ['below', 'too little'], ['above', 'too much']],
+                 pal: {good: '#34c759', 'too little': '#ff9f0a', 'too much': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged punches inside the band',
+                 bands: [['\u2265 80 %', 'good'], ['65\u201380 %', 'mixed'], ['< 65 %', 'poor']], pal: HIPCOL}},
+    calc: `${shr.n_good} inside the band / ${shr.n_judged} punches = ${pct(shr.good_share)} \u00b7 `
+          + `${shr.n_too_little} too little \u00b7 ${shr.n_too_much} too much`});
   const gu = S.guard;                                                                  // 9
   if (gu) add('Guard height', gu.rating, GUARDRATE[gu.rating], null, {
     what: 'does a hand drop while it is not punching?',
