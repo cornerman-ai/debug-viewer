@@ -719,7 +719,7 @@ const RULE_LAYERS = [
     // boxer is within 45 deg of facing / backing the camera and that arm isn't throwing a hook. The row shows the
     // judged stretches of >= 0.3 s, coloured by state (tucked / borderline / flared), lead in the top half, rear in
     // the bottom; a hole means the rule could not judge those frames.
-    key: 'elbow', label: 'Elbow tuck', short: 'Elbow tuck', items: true,
+    key: 'elbow', label: 'Elbow tuck', short: 'Elbow tuck', items: true, split: 'arm',
     csv: ['elbow_tuck', 'runs.csv'], json: ['elbow_tuck', 'elbow_tuck.json'],
     parseItem: (r, num) => ({arm: r.arm, state: r.state || 'flared', sf: num(r.start_frame), ef: num(r.end_frame),
       peak: num(r.peak_flare), mean: num(r.mean_flare)}),
@@ -729,12 +729,19 @@ const RULE_LAYERS = [
       return `<span>lead <b>${pct(a.lead)}</b> flared</span><span>rear <b>${pct(a.rear)}</b></span>`;
     },
     card: (e, x) => '',                                  // per-frame rule: nothing punch-specific to show
-    tip: (e, x) => ELBOWSKIP[x.state]
-      ? `<b>Not judged · ${cap(x.arm)} arm</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s<br>` +
-        `<span>${ELBOWSKIP[x.state]}</span><br><span class="m">the elbow can only be read front-on, with both shoulders, elbows and hips visible</span>`
-      : `<b>Elbow ${x.state} · ${cap(x.arm)} arm</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s<br>` +
-      `<span class="num">peak <b>${x.peak.toFixed(2)}</b> · mean ${x.mean.toFixed(2)} torso from the shoulder</span><br>` +
-      `<span class="m">tucked &lt; 0.20 · borderline 0.20–0.30 · flared ≥ 0.30 · only judged front-on, hooks excluded</span>`,
+    tip: (e, x) => {
+      const one = it => {
+        const nm = ELBOWSKIP[it.state] ? `not judged — ${ELBOWSKIP[it.state]}`
+          : it.state === 'flared' ? '<b>flared</b>' : it.state;
+        const num = ELBOWSKIP[it.state] ? ''
+          : ` <span class="num">(peak ${it.peak?.toFixed(2)} · mean ${it.mean?.toFixed(2)} torso)</span>`;
+        return `<span style="color:${ELBOWSKIP[it.state] ? 'var(--text3)' : ELBOWSTATE[it.state]}">●</span> `
+             + `${cap(it.arm)} arm: ${nm}${num}`;
+      };
+      const rows = (x.both || [x]).slice().sort(a => a.arm === 'lead' ? -1 : 1);
+      return `<b>Elbow tuck</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>')
+           + `<br><span class="m">tucked &lt; 0.20 · borderline 0.20–0.30 · flared ≥ 0.30 · front-on only, hooks excluded</span>`;
+    },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const top = x.arm === 'lead', f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
@@ -748,18 +755,24 @@ const RULE_LAYERS = [
   },  {
     // guard height (guard_height/): per hand, how far the wrist sits below the nose while that hand is not punching.
     // Continuous row like elbow tuck — lead in the top half, rear in the bottom.
-    key: 'guard', label: 'Guard height', short: 'Guard', items: true,
+    key: 'guard', label: 'Guard height', short: 'Guard', items: true, split: 'hand',
     csv: ['guard_height', 'runs.csv'], json: ['guard_height', 'guard_height.json'],
     parseItem: (r, num) => ({hand: r.hand, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
       max: num(r.max_drop), mean: num(r.mean_drop)}),
     summary: () => '',
     card: () => '',
     tip: (e, x) => {
-      const t = `· ${cap(x.hand)} hand · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
-      if (GUARDSKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${GUARDSKIP[x.state]}</span>`;
-      const name = x.state === 'ok' ? 'Guard up' : x.state === 'low' ? 'Guard low' : 'Low, too short to count';
-      return `<b>${name}</b> ${t}<br><span class="num">lowest ${x.max?.toFixed(2)} · mean ${x.mean?.toFixed(2)} torso below the nose</span><br>` +
-        `<span class="m">low below 0.60 torso, while that hand is not punching</span>`;
+      const one = it => {
+        const nm = GUARDSKIP[it.state] ? `not judged — ${GUARDSKIP[it.state]}`
+          : it.state === 'ok' ? 'guard up' : it.state === 'low' ? '<b>guard low</b>' : 'low, too short to count';
+        const num = GUARDSKIP[it.state] ? '' :
+          ` <span class="num">(lowest ${it.max?.toFixed(2)} · mean ${it.mean?.toFixed(2)} torso)</span>`;
+        return `<span style="color:${GUARDSKIP[it.state] ? 'var(--text3)' : GUARDCOL[it.state]}">●</span> ` +
+               `${cap(it.hand)} hand: ${nm}${num}`;
+      };
+      const rows = (x.both || [x]).sort(a => a.hand === 'lead' ? -1 : 1);
+      return `<b>Guard height</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>') +
+        `<br><span class="m">low below 0.60 torso below the nose, while that hand is not punching</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
@@ -1530,7 +1543,15 @@ function drawTimeline(f) {
     if (k === 'ruler' || k === 'bottom' || k === 'rules') continue;
     const [y, h] = v;
     c.fillStyle = track; rr(L, y, W, h, 7); c.fill();
-    c.fillStyle = text2; c.textAlign = 'right'; c.fillText(names[k], k === 'angle' ? L - 36 : L - 12, y + h / 2);
+    c.fillStyle = text2; c.textAlign = 'right';
+    if (RULE[k]?.split) {                                    // a split row: its name, then lead / rear per half
+      c.fillText(names[k], L - 12, y + h / 2);
+      c.fillStyle = text3; c.font = '500 8.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+      c.textAlign = 'left'; c.fillText('lead', L + 4, y + h / 4 + 1); c.fillText('rear', L + 4, y + 3 * h / 4 - 1);
+      c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textAlign = 'right';
+    } else {
+      c.fillText(names[k], k === 'angle' ? L - 36 : L - 12, y + h / 2);
+    }
   }
   // ruler + vertical grid
   const step = niceStep(V.t1 - V.t0, W);
@@ -1670,8 +1691,18 @@ function hit(x, y) {
   if (inRow(TR.rear)) return find(S.punches, S.hiddenP, e => e.hand === 'rear');
   if (inRow(TR.def)) return find(S.defenses, S.hiddenD, () => true);
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
-    const e = RULE[k].items ? (S.items[k] || []).find(it => f >= it.sf && f <= it.ef)   // anywhere on the line
-                            : find(S.punches, S.hiddenP, p => !!p[k]);
+    const L_ = RULE[k];
+    let e;
+    if (L_.items && L_.split) {                              // two half-rows: the cursor's half picks the hand / arm
+      const [ry, rh] = TR[k], side = y < ry + rh / 2 ? 'lead' : 'rear';
+      const at = (S.items[k] || []).filter(it => f >= it.sf && f <= it.ef);
+      e = at.find(it => it[L_.split] === side) || at[0];
+      if (e) e = {...e, both: at};                           // the tooltip shows every hand at this frame
+    } else if (L_.items) {
+      e = (S.items[k] || []).find(it => f >= it.sf && f <= it.ef);
+    } else {
+      e = find(S.punches, S.hiddenP, p => !!p[k]);
+    }
     V.hoverLayer = e ? k : null; return e || null;
   }
   return null;
