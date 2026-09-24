@@ -405,6 +405,9 @@ const STANCE = {
           bands: [['< 15 %', 'good'], ['15\u201330 %', 'sometimes shallow'], ['\u2265 30 %', 'shallow']],
           scope: {moves: 'every frame', angles: 'side-on'}},
 };
+const GUARDCOL = {ok: '#34c759', low: '#ff3b30', low_short: '#ffcc00'};
+const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
+const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 const STANCECOL = {ok: '#34c759', narrow: '#ff3b30', shallow: '#ff3b30', narrow_short: '#ffcc00',
                    shallow_short: '#ffcc00'};
 const STANCESKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
@@ -437,6 +440,33 @@ function stanceLayer(kind) {
   };
 }
 const RULE_LAYERS = [
+  {
+    // guard height (guard_height/): per hand, how far the wrist sits below the nose while that hand is not punching.
+    // Continuous row like elbow tuck — lead in the top half, rear in the bottom.
+    key: 'guard', label: 'Guard height', short: 'Guard', items: true,
+    csv: ['guard_height', 'runs.csv'], json: ['guard_height', 'guard_height.json'],
+    parseItem: (r, num) => ({hand: r.hand, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
+      max: num(r.max_drop), mean: num(r.mean_drop)}),
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const t = `· ${cap(x.hand)} hand · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
+      if (GUARDSKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${GUARDSKIP[x.state]}</span>`;
+      const name = x.state === 'ok' ? 'Guard up' : x.state === 'low' ? 'Guard low' : 'Low, too short to count';
+      return `<b>${name}</b> ${t}<br><span class="num">lowest ${x.max?.toFixed(2)} · mean ${x.mean?.toFixed(2)} torso below the nose</span><br>` +
+        `<span class="m">low below 0.60 torso, while that hand is not punching</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const top = x.hand === 'lead', f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      const skip = !!GUARDSKIP[x.state], w = Math.max(2, x1 - x0), hh = h / 2 - 3;
+      c.fillStyle = skip ? css('--fill2') : GUARDCOL[x.state];
+      c.globalAlpha = skip ? (on ? 0.85 : 0.45) : (on ? 1 : 0.85);
+      if (skip) rr(x0, y + (top ? 3 : h / 2) + hh / 2 - 1.5, w, 3, 1.5);
+      else rr(x0, y + (top ? 3 : h / 2), w, hh, 3);
+      c.fill(); c.globalAlpha = 1;
+    },
+  },
   stanceLayer('width'), stanceLayer('depth'),
   comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
   comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
@@ -803,6 +833,7 @@ async function loadFolder(src) {
   S.angleChg = await src.text(['angle_change', 'angle_change.json']).then(JSON.parse).catch(() => null);
   S.hipSum = await src.text(['hip_rotation', 'hip_rotation.json']).then(JSON.parse).catch(() => null);
   S.stanceW = await src.text(['stance_width', 'stance_width.json']).then(JSON.parse).catch(() => null);
+  S.guard = await src.text(['guard_height', 'guard_height.json']).then(JSON.parse).catch(() => null);
   S.stanceD = await src.text(['stance_depth', 'stance_depth.json']).then(JSON.parse).catch(() => null);
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
   S.dur = S.n / S.fps;
@@ -1011,6 +1042,7 @@ function buildLayers() {
 const ALL_ANGLES = 'front, back, side-on';
 const SCOPE = {
   defcov:    {moves: 'defensive moves after an offensive combo',  angles: 'front, back, side-on'},
+  guard:     {moves: 'every frame, per hand, while that hand is not punching', angles: 'front, back, side-on'},
   stance_width: {moves: 'every frame',                          angles: 'front, back'},
   stance_depth: {moves: 'every frame',                          angles: 'side-on'},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
@@ -1138,6 +1170,19 @@ function ruleCard() {
                  bands: [['≥ 80 %', 'same defense'], ['60–80 %', 'moderate'], ['< 60 %', 'varied'],
                          ['side ≥ 80 %', 'one-sided']], pal: SDCOL}},
     calc: `${sd.same_move.top_type} ${pct(sd.same_move.top_type_share)} of moves \u00b7 side ${sd.same_side.top_side} ${pct(sd.same_side.top_side_share)} (${sd.same_side.rating})`});
+  const gu = S.guard;                                                                  // 9
+  if (gu) add('Guard height', gu.rating, GUARDRATE[gu.rating], null, {
+    what: 'does a hand drop while it is not punching?',
+    on: `${gu.n_frames.toLocaleString()} frames · judged lead ${gu.hands.lead.judged_frames.toLocaleString()}, `
+        + `rear ${gu.hands.rear.judged_frames.toLocaleString()} · the rest skipped (that hand throwing, or a joint not visible)`,
+    th: {event: {label: 'per frame', rule: 'drop = how far the wrist sits below the nose, in torso lengths',
+                 bands: [['≤ 0.60', 'guard up'], ['> 0.60', 'low']], pal: {'guard up': '#34c759', low: '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged frames inside a low stretch (bridged over 0.3 s, at least 0.3 s long), worse hand',
+                 bands: [['< 10 %', 'good'], ['10–25 %', 'sometimes low'], ['≥ 25 %', 'low']], pal: GUARDRATE}},
+    calc: `lead ${gu.hands.lead.low_frames.toLocaleString()} of ${gu.hands.lead.judged_frames.toLocaleString()} = `
+          + `${pct(gu.hands.lead.low_share)} · rear ${gu.hands.rear.low_frames.toLocaleString()} of `
+          + `${gu.hands.rear.judged_frames.toLocaleString()} = ${pct(gu.hands.rear.low_share)} · the worse hand `
+          + `(${gu.worse_hand || '–'}) sets the rating`});
   const stW = S.stanceW, stD = S.stanceD;
   if (stW) add('Stance width', stW.rating, STANCERATE[stW.rating], null, {             // 24
     what: STANCE.width.what,
