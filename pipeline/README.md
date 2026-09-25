@@ -49,7 +49,9 @@ that rule's headline verdict.
 
 **Rule layers** (side panel, all off by default, the choice is remembered): each adds a timeline row, a section in
 the punch card and a video overlay for the punch under the playhead. Colors: green = fine, orange = too little,
-red = wrong / too much, gray = not judged.
+red = wrong / too much. A stretch the rule threw out — a joint it needs not visible, a punch in flight, the wrong
+camera angle, or a violation too short to count — is a **dashed gray mid-line**, not a gap: the row is continuous,
+so an empty-looking stretch always means "left out on purpose", never "nothing happened".
 
 - **Hand drop before punch** (`hand_drop/`): per punch, how far the throwing hand dipped below ITS OWN guard in the
   0.4 s before the punch started (green no dip, red dips at ≥ 0.25 torso), with the dip on the block. Reads
