@@ -54,6 +54,13 @@ red = wrong / too much, gray = not judged.
 - **Hand drop before punch** (`hand_drop/`): per punch, how far the throwing hand dipped below ITS OWN guard in the
   0.4 s before the punch started (green no dip, red dips at ≥ 0.25 torso), with the dip on the block. Reads
   `punches.csv` + `hand_drop.json`.
+- **Hand return path** (`hand_return_path/`): the research lens ported to Python, constants unchanged. Per jab /
+  cross, from the landing frame: the fist's height against its own shoulder over the next 1.5 s, and the U-dip =
+  min(how far it sank below the landing height, how far it climbed back) — both halves required, so a hand settling
+  into a low guard or a body shot rising from a low landing read zero. Green under 0.20 torso, red at or above, with
+  the dip on the block and a white tick at the lowest frame; skipped punches are not drawn. Judged side-on only.
+  Round = the worst 10 % of punch scores, banded 95/80/55. **Reads harsh on the test videos** (42 % and 58 % of
+  judged punches fail) — see `combined_pipeline/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
 - **Idle hand at impact** (`idle_hand/`): per punch, the hand that is NOT throwing, read at the impact frame —
   how far it sits below its own guard (that hand's median height over the video outside its own punches). Green
   still up, red dropped at ≥ 0.20 torso, nothing drawn where the idle wrist isn't visible. Round rating = the share
