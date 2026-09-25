@@ -189,4 +189,11 @@ better than slips, so a high roll share is partly the model.
 moves or combos gets a timeline layer (one entry in `RULE_LAYERS` in `index.html`) plus a Round score row; a rule that
 only rates the round gets the Round score row alone, with no timeline row.
 
-Keys: Space play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact.
+**Isolating one camera angle**: shift-click a band in the facing row (front / side-on / back) and the timeline keeps
+only the stretches the boxer spent in that band at full strength — everything else fades back and stops answering the
+cursor, so a rule's row can be read against the view it is actually judged in. The bands are the same ±45° / ±135°
+cuts the gated rules use. The chosen band is outlined in the facing row and named in a chip beside the zoom buttons;
+shift-click it again, click the chip, or press Esc to clear. Faded is not hidden on purpose — the shape of the round
+stays visible around the selection.
+
+Keys: Space play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact · Esc clear the angle filter.

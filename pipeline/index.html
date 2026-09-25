@@ -183,6 +183,12 @@
   .welcome .actions { display: flex; flex-direction: column; gap: 10px; align-items: center; }
   .welcome .fine { color: var(--text3); font-size: 12px; margin-top: 18px; }
   .welcome .err { color: #ff3b30; font-size: 13px; margin-top: 14px; white-space: pre-line; }
+  .facechip { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px;
+    background: var(--fill); color: var(--text); font-size: 12px; font-weight: 600; padding: 4px 9px 4px 10px;
+    cursor: pointer; white-space: nowrap; box-shadow: 0 0 0 0.5px var(--sep); }
+  .facechip:hover { background: var(--fill2); }
+  .facechip .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .facechip .x { color: var(--text2); font-size: 13px; line-height: 1; margin-left: 1px; }
   .banner { display: none; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 10px; background: var(--fill); font-size: 12.5px; }
   .banner.show { display: flex; }
 </style>
@@ -234,6 +240,7 @@
           <button data-s="5">5 s</button><button data-s="10" class="on">10 s</button><button data-s="30">30 s</button><button data-s="60">1 min</button><button data-s="0">All</button>
         </div>
         <div class="spacer"></div>
+        <button class="facechip" id="faceChip" hidden title="clear the angle filter (Esc)"></button>
         <div class="banner" id="banner"></div>
         <label class="toggle on" id="skelToggle"><span class="sw"></span>Skeleton</label>
         <label class="toggle on" id="followToggle"><span class="sw"></span>Follow playhead</label>
@@ -418,6 +425,23 @@ const GRECCOL = {recovers: '#34c759', sometimes: '#ff9f0a', 'hands stay down': '
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
+// Which band a frame is in — the same cuts every gated rule reads. null when there is no pose or no angle there.
+const faceBand = f => {
+  if (!S.hasAngle || !S.pose?.[f]) return null;
+  const a = S.angle[f];
+  return !Number.isFinite(a) ? null : Math.abs(a) <= 45 ? 'front' : Math.abs(a) >= 135 ? 'back' : 'side-on';
+};
+const inFilter = f => !V.faceFilter || faceBand(f) === V.faceFilter;
+function setFaceFilter(band) {                       // null clears it
+  V.faceFilter = V.faceFilter === band ? null : band;
+  const chip = $('faceChip');
+  if (chip) {
+    chip.hidden = !V.faceFilter;
+    if (V.faceFilter) chip.innerHTML = `<span class="dot" style="background:${FACECOL[V.faceFilter]}"></span>` +
+      `${V.faceFilter} only<span class="x">×</span>`;
+  }
+  V.hover = null; V.dirty = true;
+}
 const STANCECOL = {ok: '#34c759', narrow: '#ff3b30', shallow: '#ff3b30'};
 const STANCESKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
                     front_on: 'the boxer is front-on',
@@ -1059,6 +1083,7 @@ async function httpList(base) {
 const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], skel: null,
            stance: 'orthodox', videoName: '', objectUrl: null, hiddenP: new Set(), hiddenD: new Set()};
 const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover: null, hoverLayer: null, lastFrame: -1,
+           faceFilter: null,   // 'front' | 'side-on' | 'back': shift-click a band in the facing row to isolate it,
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 const video = $('video');
@@ -1932,9 +1957,14 @@ function drawTimeline(f) {
   c.textAlign = 'left';
   for (const [lo, hi, name] of [[135, 180, 'back'], [45, 135, 'side-on'], [-45, 45, 'front'],
                                 [-135, -45, 'side-on'], [-180, -135, 'back']]) {
-    c.fillStyle = FACECOL[name]; c.globalAlpha = 0.12;
+    const picked = V.faceFilter === name;
+    c.fillStyle = FACECOL[name]; c.globalAlpha = picked ? 0.30 : V.faceFilter ? 0.05 : 0.12;
     c.fillRect(L, ymap(hi), W, ymap(lo) - ymap(hi));         // a faint band so the bucket reads at a glance
-    c.globalAlpha = 0.9; c.fillText(name, L + 6, (ymap(lo) + ymap(hi)) / 2);
+    if (picked) {                                            // the isolated band gets an outline, not just more colour
+      c.globalAlpha = 0.9; c.strokeStyle = FACECOL[name]; c.lineWidth = 1.5;
+      c.strokeRect(L + 0.5, ymap(hi) + 0.5, W - 1, ymap(lo) - ymap(hi) - 1);
+    }
+    c.globalAlpha = V.faceFilter && !picked ? 0.35 : 0.9; c.fillText(name, L + 6, (ymap(lo) + ymap(hi)) / 2);
   }
   c.globalAlpha = 1; c.restore();
   c.restore(); c.fillStyle = text3; c.textAlign = 'right'; c.font = '500 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
@@ -1974,6 +2004,7 @@ function drawTimeline(f) {
     block(e, e.hand === 'lead' ? TR.lead[0] : TR.rear[0], TR.lead[1], styleP(e.type), e.sf <= f && f <= e.ef);
   for (const e of S.defenses) if (!S.hiddenD.has(e.type)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
   drawLayerRows(c, f, W, text, grid);
+  drawFaceVeil(c, W, text);                               // shift-click a facing band: everything else fades back
   // playhead
   const xp = tx((f + 0.5) / fps);
   c.strokeStyle = ph; c.lineWidth = 1.5; c.beginPath(); c.moveTo(xp, 20); c.lineTo(xp, TR.bottom); c.stroke();
@@ -1998,6 +2029,28 @@ function drawTimeline(f) {
   c.strokeStyle = ph; c.lineWidth = 1.5; const xo = ox(f / fps); c.beginPath(); c.moveTo(xo, oy); c.lineTo(xo, oy + oh); c.stroke();
 }
 
+
+// The angle filter's veil. Brushing-and-linking, the data-viz way round: the frames outside the chosen band stay
+// on screen but fade back, so the shape of the round is not lost — and they stop answering the cursor (see hit()).
+// Drawn over the event rows only; the facing row above keeps its full trace, because that row IS the control.
+function drawFaceVeil(c, W, text) {
+  if (!V.faceFilter || !S.n) return;
+  const fps = S.fps, top = TR.lead[0] - 2, bot = TR.bottom;
+  const f0 = Math.max(0, Math.floor(V.t0 * fps) - 1), f1 = Math.min(S.n - 1, Math.ceil(V.t1 * fps) + 1);
+  c.save(); c.beginPath(); c.rect(L, top, W, bot - top); c.clip();
+  c.fillStyle = css('--bg') || '#fff'; c.globalAlpha = 0.74;
+  let run = null;                                          // coalesce neighbouring out-of-band frames into one rect
+  for (let i = f0; i <= f1 + 1; i++) {
+    const out = i <= f1 && !inFilter(i);
+    if (out && run === null) run = i;
+    if (!out && run !== null) {
+      const x0 = tx(run / fps), x1 = tx(i / fps);
+      if (x1 > L && x0 < L + W) c.fillRect(Math.max(L, x0), top, Math.min(L + W, x1) - Math.max(L, x0), bot - top);
+      run = null;
+    }
+  }
+  c.globalAlpha = 1; c.restore();
+}
 function drawLayerRows(c, f, W, text, grid) {
   const fps = S.fps, font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   const span = e => { const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps); return [x0, Math.max(2, x1 - x0 - 1)]; };
@@ -2052,6 +2105,7 @@ function setFollow(on) { V.follow = on; $('followToggle').classList.toggle('on',
 function hit(x, y) {
   if (x < L) return null;
   const t = xt(x), f = Math.floor(t * S.fps);
+  if (!inFilter(f) && y >= TR.lead[0]) return null;        // faded by the angle filter: not clickable either
   const inRow = ([ry, rh]) => y >= ry && y <= ry + rh;
   // overlapping blocks: the rightmost one wins (the latest start — also the one drawn on top); blocks the cursor is
   // really inside beat the ±1-frame slack that only makes thin blocks easier to hit
@@ -2088,6 +2142,14 @@ tl.addEventListener('pointerdown', e => {
     drag = {mode: 'over'}; const w = V.t1 - V.t0, t = (x - L) / (TW - L - RPAD) * S.dur;
     V.t0 = t - w / 2; V.t1 = t + w / 2; clampView(); setFollow(false); V.dirty = true; return;
   }
+  if (e.shiftKey && x >= L) {                              // shift-click a facing band to isolate it everywhere
+    const [ay, ah] = TR.angle;
+    if (y >= ay && y <= ay + ah) {
+      const a = (ay + ah / 2 - y) / (ah / 2 - 6) * 180;    // the inverse of the row's ymap
+      setFaceFilter(Math.abs(a) <= 45 ? 'front' : Math.abs(a) >= 135 ? 'back' : 'side-on');
+    } else setFaceFilter(null);
+    return;
+  }
   drag = {mode: 'main', x0: x, y0: y, t0: V.t0, t1: V.t1, moved: false};
 });
 tl.addEventListener('pointermove', e => {
@@ -2118,6 +2180,7 @@ tl.addEventListener('pointerup', e => {
   drag = null; tl.style.cursor = 'default';
 });
 tl.addEventListener('pointerleave', () => { if (!drag) { V.hover = null; V.dirty = true; tip(null); } });
+$('faceChip').addEventListener('click', () => setFaceFilter(null));
 tl.addEventListener('wheel', e => {
   const r = tl.getBoundingClientRect(), x = e.clientX - r.left, w = V.t1 - V.t0;
   if (x < L && !e.shiftKey && tlScroll.scrollHeight > tlScroll.clientHeight) return;   // native scroll of the rows
@@ -2207,6 +2270,7 @@ $('stage').addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (!S.src || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  if (e.code === 'Escape' && V.faceFilter) { e.preventDefault(); setFaceFilter(null); return; }
   const f = frameNow(), events = S.punches.filter(p => !S.hiddenP.has(p.type)).concat(S.defenses.filter(d => !S.hiddenD.has(d.type))).sort((a, b) => a.sf - b.sf);
   if (e.code === 'Space') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
   else if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
