@@ -541,11 +541,14 @@ const RULE_LAYERS = [
       ` · worse: <b>${x.worse}</b></span><br>` +
       `<span class="m">${x.seq.replaceAll(' > ', ' › ')}</span><br>` +
       `<span class="m">read 0.33–0.43 s after the last element; 0.15 lower or more counts as not recovered</span>`,
-    row(e, x, {c, y, h, tx, fps}) {
+    row(e, x, {c, y, h, tx, fps, tag}) {
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const w = Math.max(3, x1 - x0 - 1);
       c.fillStyle = x.verdict === 'recovered' ? '#34c759' : '#ff3b30'; c.globalAlpha = on ? 1 : 0.85;
-      rr(x0, y + 3, Math.max(3, x1 - x0 - 1), h - 6, 5); c.fill(); c.globalAlpha = 1;
+      rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
+      // the worse hand's drop, which is the number the verdict was made on
+      if (x.slip != null) tag(x0, w, y, h, `${x.slip >= 0 ? '+' : ''}${x.slip.toFixed(2)} ${x.worse}`);
     },
   },
   {
