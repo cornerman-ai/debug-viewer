@@ -57,6 +57,12 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Hand drop before punch** (`hand_drop/`): per punch, how far the throwing hand dipped below ITS OWN guard in the
   0.4 s before the punch started (green no dip, red dips at ≥ 0.25 torso), with the dip on the block. Reads
   `punches.csv` + `hand_drop.json`.
+- **Punch speed** (`punch_speed/`): per punch, the time from its first frame to the impact, with the milliseconds
+  on the block — green inside the band for that punch type, red above it. The band is the upper quartile of the
+  type across 8,166 labelled punches, shifted onto our own detector (a person marks a punch's start at the windup,
+  the decoder starts it later). Every angle is judged: a time is not foreshortened. Round rating = the share of
+  judged punches above their band (< 10 % sharp, 10–25 % mixed, ≥ 25 % slow). Reads `punches.csv` +
+  `punch_speed.json`.
 - **Balance at impact** (`balance/`): per punch, where the head sits across the base of support — the widest span
   of the ankles, heels and toes — at the impact frame, read side-on. Green inside the feet, red past either edge,
   with the position on the block; nothing drawn for punches thrown head-on or with the feet out of view. The card
