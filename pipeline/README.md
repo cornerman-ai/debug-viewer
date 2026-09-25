@@ -54,6 +54,12 @@ red = wrong / too much, gray = not judged.
 - **Hand drop before punch** (`hand_drop/`): per punch, how far the throwing hand dipped below ITS OWN guard in the
   0.4 s before the punch started (green no dip, red dips at ≥ 0.25 torso), with the dip on the block. Reads
   `punches.csv` + `hand_drop.json`.
+- **Idle hand at impact** (`idle_hand/`): per punch, the hand that is NOT throwing, read at the impact frame —
+  how far it sits below its own guard (that hand's median height over the video outside its own punches). Green
+  still up, red dropped at ≥ 0.20 torso, nothing drawn where the idle wrist isn't visible. Round rating = the share
+  of judged punches whose idle hand was down (< 10 % holds, 10–25 % sometimes drops, ≥ 25 % drops). One frame and
+  not the punch's window because punches overlap inside a combination, which would leave most punches unjudgeable.
+  Reads `punches.csv` + `idle_hand.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the production rule's verdict (pass / fail; skipped = dashed),
   its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
   with this frame's elbow bend.

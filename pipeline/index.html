@@ -412,6 +412,7 @@ const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing',
                    low_short: 'a drop too short to count — left out of the round'};
 const DROPRATE = {good: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
+const IDLECOL = {holds: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
@@ -528,6 +529,32 @@ const RULE_LAYERS = [
       rr(bx, y + 3, w, h - 6, 5); c.fill();
       tag(bx, w, y, h, `${x.dip.toFixed(2)}`);
       ring(e, 'drop', bx, y, w, h);
+    },
+  },
+  {
+    key: 'idle', label: 'Idle hand at impact', short: 'Idle hand',
+    csv: ['idle_hand', 'punches.csv'], json: ['idle_hand', 'idle_hand.json'],
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, slip: num(r.slip), idle: r.idle_hand, base: num(r.baseline)}
+      : {verdict: '', skip: r.skip_reason, idle: r.idle_hand},
+    summary: () => '',
+    card: (e, x) => `<div class="sub"><div class="h">The idle hand at this impact</div>` +
+      (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'no_impact_frame' ? 'no impact frame for this punch'
+                                                 : 'the idle wrist is not visible at the impact frame'}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Idle hand</span><b>${x.idle}</b>
+        <span>Below its own guard</span><b>${x.slip.toFixed(2)} torso</b>
+        <span>Its guard sits at</span><b>${x.base.toFixed(2)} torso below the nose</b>
+        <span>Verdict</span><b>${x.verdict === 'drops' ? 'dropped' : 'still up'}</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">the idle wrist is not readable at the impact frame</span>` :
+      `<span class="num">the ${x.idle} hand was ${x.verdict === 'drops' ? '<b>down</b>' : 'still up'} · ` +
+      `<b>${x.slip.toFixed(2)}</b> torso below its own guard</span><br>` +
+      `<span class="m">read at the impact frame; 0.20 torso below its own guard or more counts as dropped</span>`),
+    row(e, x, {c, y, h, span, tag, ring}) {
+      if (!x.verdict) return;                                // nothing readable: draw nothing
+      const [bx, w] = span(e);
+      c.fillStyle = x.verdict === 'drops' ? '#ff3b30' : '#34c759';
+      rr(bx, y + 3, w, h - 6, 5); c.fill();
+      tag(bx, w, y, h, `${x.slip.toFixed(2)}`);
+      ring(e, 'idle', bx, y, w, h);
     },
   },
   {
@@ -1166,6 +1193,7 @@ const SCOPE = {
   stance_width: {moves: 'every frame',                          angles: 'front, back'},
   stance_depth: {moves: 'every frame',                          angles: 'side-on'},
   drop:      {moves: 'every punch, the hand that throws',       angles: ALL_ANGLES},
+  idle:      {moves: 'every punch at its impact frame, the hand that does not throw', angles: ALL_ANGLES},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
   shoulder:  {moves: 'every punch',                             angles: ALL_ANGLES},
@@ -1380,6 +1408,20 @@ function ruleCard() {
                  bands: [['< 20 %', 'working'], ['20–40 %', 'patchy'], ['≥ 40 %', 'stalling']], pal: WORKCOL}},
     calc: `${wr.dead_seconds}s dead in ${wr.n_dead_gaps} gaps / ${wr.duration_seconds}s = ${pct(wr.dead_share)} · `
           + `${wr.punches_per_minute} punches/min, ${wr.actions_per_minute} actions/min · longest gap ${wr.longest_dead_s}s`});
+  const ih = S.layerSum.idle;                                                          //  7
+  if (ih) add('Idle hand at impact', ih.rating, IDLECOL[ih.rating], null, {
+    what: 'when one hand lands, is the other one still guarding?',
+    on: `${ih.n_punches} punches · ${ih.judged_punches} judged at their impact frame, `
+        + `${ih.n_punches - ih.judged_punches} skipped (no impact frame, or the idle wrist not visible)`,
+    th: {event: {label: 'per punch', rule: 'the idle hand at the impact frame, against its own guard — its median '
+                       + 'height over the video outside its own punches',
+                 bands: [['< 0.20 torso', 'still up'], ['≥ 0.20', 'dropped']],
+                 pal: {'still up': '#34c759', dropped: '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged punches whose idle hand was down',
+                 bands: [['< 10 %', 'holds'], ['10–25 %', 'sometimes drops'], ['≥ 25 %', 'drops']], pal: IDLECOL}},
+    calc: `${ih.drop_punches} of ${ih.judged_punches} judged punches = ${pct(ih.slip_share)} · `
+          + `lead idle ${ih.by_idle_hand.lead.drops}/${ih.by_idle_hand.lead.judged}, `
+          + `rear idle ${ih.by_idle_hand.rear.drops}/${ih.by_idle_hand.rear.judged}`});
   const hb = S.handBal;                                                                //  6
   if (hb) add('Hand balance', hb.rating, HANDBALCOL[hb.rating], null, {
     what: 'does he use both hands, or live on one of them?',
