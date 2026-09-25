@@ -63,11 +63,11 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   the decoder starts it later). Every angle is judged: a time is not foreshortened. Round rating = the share of
   judged punches above their band (< 10 % sharp, 10–25 % mixed, ≥ 25 % slow). Reads `punches.csv` +
   `punch_speed.json`.
-- **Balance at impact** (`balance/`): per punch, where the head sits across the base of support — the widest span
-  of the ankles, heels and toes — at the impact frame, read side-on. Green inside the feet, red past either edge,
-  with the position on the block; nothing drawn for punches thrown head-on or with the feet out of view. The card
-  and tooltip carry the shoulders and hips too, unjudged, so a lean can be told from a lunge. Round rating = the
-  share of judged punches whose head left the base (< 5 % balanced, 5–15 % sometimes, ≥ 15 % falls in). Reads
+- **Balance at impact** (`balance/`): per punch at the impact frame, read side-on, two checks — the head must stay
+  between the ankles, and the hips within 0.15 of the ankle distance from their midpoint. Either failing turns the
+  block red, labelled with which one gave way (`head`, `hips`, `head+hips`); a passing punch carries the head's
+  position instead. Nothing is drawn for punches thrown head-on or with the feet out of view. Round rating = the
+  share of judged punches failing either check (< 20 % balanced, 20–40 % mixed, ≥ 40 % off balance). Reads
   `punches.csv` + `balance.json`.
 - **Hand return path** (`hand_return_path/`): per jab / cross, between the landing and the end of the punch, the
   fist's height against its own shoulder must not drop below where it was at the punch's start or where it was at
