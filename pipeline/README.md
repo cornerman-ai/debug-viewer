@@ -125,6 +125,14 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   red low, and a dashed gray line for everything the rule could not look at — that hand throwing, or a joint not
   visible. Round rating = the share of judged frames low on the worse hand, every frame counting however brief
   (< 10 % good, 10–25 % sometimes low, ≥ 25 % low). Reads `runs.csv` + `guard_height.json`.
+- **Hips bladed** (`bladedness_hips/`) and **Shoulders bladed** (`bladedness_shoulders/`): both per frame outside
+  punches, both continuous rows. The angle is that line's turn out of the image plane from the 3D landmarks — 0°
+  chest-on, 90° side-on — and the two cuts per axis are a coach's verdicts on 30 frames (hips 18.2 / 27.9,
+  shoulders 12.7 / 17.6): red squared, orange between, green fine. There is no upper edge; he never called anyone
+  too bladed. Round rating = the share of judged frames below the squared cut (< 15 % good, 15–30 % sometimes
+  squared, ≥ 30 % squared). **The angle is measured against the camera**, which stands in for the opponent only on
+  the curated frontal set — neither test video is in it, so read these two as a demonstration of the rule rather
+  than a verdict on the boxer. Read `runs.csv` + the stage's `.json`.
 - **Chin height** (`chin_height/`) and **Chin depth** (`chin_depth/`): both per frame outside punches, both
   continuous rows, both reading the skeleton chin (`nose + 2.25 × nose→mouth` — BlazePose has no jaw landmark).
   Height is the chin against a line at the lead shoulder in shoulder widths, with the lens's own bands (red chin up,

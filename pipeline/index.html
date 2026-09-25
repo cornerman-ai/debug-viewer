@@ -519,6 +519,41 @@ function chinLayer(kind) {
     },
   };
 }
+const BLADE = {
+  hips:      {stage: 'bladedness_hips', label: 'Hips bladed', short: 'Hips blade', cuts: [18.2, 27.9]},
+  shoulders: {stage: 'bladedness_shoulders', label: 'Shoulders bladed', short: 'Sh. blade', cuts: [12.7, 17.6]},
+};
+const BLADECOL = {squared: '#ff3b30', between: '#ff9f0a', bladed: '#34c759'};
+const BLADESKIP = {no_pose: 'a joint it needs is not visible', punching: 'a punch is in flight'};
+const BLADERATE = {good: '#34c759', 'sometimes squared': '#ff9f0a', squared: '#ff3b30', 'not rated': '#8e8e93'};
+function bladeLayer(kind) {
+  const C = BLADE[kind];
+  return {
+    key: `blade_${kind}`, label: C.label, short: C.short, items: true,
+    csv: [C.stage, 'runs.csv'], json: [C.stage, `${C.stage}.json`],
+    parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame)}),
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const t = `\u00b7 ${fmtT(x.sf / S.fps)} \u00b7 ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
+      if (BLADESKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${BLADESKIP[x.state]}</span>`;
+      const name = x.state === 'squared' ? 'Squared up' : x.state === 'between' ? 'In between' : 'Bladed enough';
+      return `<b>${name}</b> ${t}<br>` +
+        `<span class="m">the ${kind} line against the camera: under ${C.cuts[0]}\u00b0 squared, over ${C.cuts[1]}\u00b0 fine ` +
+        `\u2014 a coach's cuts, and only meaningful where the camera stands in for the opponent</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, skip = !!BLADESKIP[x.state];
+      const w = Math.max(2, x1 - x0);
+      if (skip) { skipStrip(c, x0, w, y + h / 2, on, x.state); return; }
+      c.fillStyle = BLADECOL[x.state] || '#8e8e93';
+      c.globalAlpha = on ? 1 : 0.85;
+      rr(x0, y + 3, w, h - 6, 4);
+      c.fill(); c.globalAlpha = 1;
+    },
+  };
+}
 const RULE_LAYERS = [
   comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
   comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
@@ -1039,6 +1074,7 @@ const RULE_LAYERS = [
   },
   stanceLayer('width'), stanceLayer('depth'),
   chinLayer('height'), chinLayer('depth'),
+  bladeLayer('hips'), bladeLayer('shoulders'),
 
 ];
 const LAYERS = RULE_LAYERS.map(r => r.key);
@@ -1392,6 +1428,8 @@ const SCOPE = {
   grec:      {moves: 'every combined combo, both hands',        angles: ALL_ANGLES},
   chin_height: {moves: 'every frame outside a punch',           angles: ALL_ANGLES},
   chin_depth:  {moves: 'every frame outside a punch',           angles: 'side-on'},
+  blade_hips:      {moves: 'every frame outside a punch',       angles: ALL_ANGLES},
+  blade_shoulders: {moves: 'every frame outside a punch',       angles: ALL_ANGLES},
   hrp:       {moves: 'jab, cross',                              angles: ALL_ANGLES},
   bal:       {moves: 'every punch at its impact frame',         angles: 'side-on'},
   speed:     {moves: 'every punch with an impact frame',        angles: ALL_ANGLES},
@@ -1626,6 +1664,25 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the worst 10 % of the punch scores, averaged',
                  bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
     calc: `${q.fail} of ${q.pass + q.fail} judged punches loop · the worst 10 % of their scores, averaged`}));
+  for (const kind of ['hips', 'shoulders']) {                                        // 18, 19
+    const bd = S.layerSum[`blade_${kind}`], C = BLADE[kind];
+    if (!bd) continue;
+    add(C.label, bd.rating, BLADERATE[bd.rating], null, {
+      what: `is he standing square to the opponent, seen at the ${kind}?`,
+      on: `${bd.n_frames.toLocaleString()} frames · ${bd.judged_frames.toLocaleString()} judged outside punches · `
+          + `median ${bd.median_deg}° — but the angle is measured against the CAMERA, which only stands in for the `
+          + `opponent on the curated frontal set, and neither test video is in it`,
+      th: {event: {label: 'per frame', rule: `the ${kind} line's angle out of the image plane, from the 3D landmarks `
+                          + `— 0° is chest-on, 90° side-on. The two cuts are a coach's verdicts on 30 frames, the only `
+                          + `bladedness thresholds that exist; there is no upper edge, because he never called anyone too bladed`,
+                   bands: [[`< ${C.cuts[0]}°`, 'squared'], [`${C.cuts[0]}–${C.cuts[1]}°`, 'between'], [`> ${C.cuts[1]}°`, 'fine']],
+                   pal: {squared: '#ff3b30', between: '#ff9f0a', fine: '#34c759'}},
+           round: {label: 'per round', rule: 'the share of judged frames below the squared cut',
+                   bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes squared'], ['≥ 30 %', 'squared']], pal: BLADERATE}},
+      calc: `${bd.squared_frames.toLocaleString()} of ${bd.judged_frames.toLocaleString()} judged frames = `
+            + `${pct(bd.squared_share)} · between ${bd.between_frames.toLocaleString()}, `
+            + `bladed ${bd.bladed_frames.toLocaleString()}`});
+  }
   const chh = S.layerSum.chin_height;                                                 //  9
   if (chh) add('Chin height', chh.rating, CHINRATE[chh.rating], null, {
     what: 'is the chin down behind the lead shoulder, or riding above it?',
