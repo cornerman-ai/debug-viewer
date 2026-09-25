@@ -105,7 +105,7 @@ red = wrong / too much, gray = not judged.
   torso lengths, with a white tick at the furthest frame (orange < 0.20 too short, green 0.20–0.70, red > 0.70 too
   far). Rolls and ducks are not measured. Judged front-on / back-on only. Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
-  hand is not punching — low above 0.60. Continuous row, lead in the top half, rear in the bottom: green guard up,
+  hand is not punching — low above 0.30, the lens's own line, the same one the idle-hand rule uses. Continuous row, lead in the top half, rear in the bottom: green guard up,
   red low, and a thin gray strip for everything left out of the round — that hand throwing, a joint not visible, or a
   drop too short to count. Round rating = the share of judged frames inside a low stretch on the worse hand
   (< 10 % good, 10–25 % sometimes low, ≥ 25 % low). Reads `runs.csv` + `guard_height.json`.

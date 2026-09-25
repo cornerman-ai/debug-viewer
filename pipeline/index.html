@@ -893,7 +893,7 @@ const RULE_LAYERS = [
       };
       const rows = (x.both || [x]).sort(a => a.hand === 'lead' ? -1 : 1);
       return `<b>Guard height</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>') +
-        `<br><span class="m">low below 0.60 torso below the nose, while that hand is not punching</span>`;
+        `<br><span class="m">low below 0.30 torso below the nose, while that hand is not punching</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
@@ -1431,8 +1431,10 @@ function ruleCard() {
     what: 'does a hand drop while it is not punching?',
     on: `${gu.n_frames.toLocaleString()} frames · judged lead ${gu.hands.lead.judged_frames.toLocaleString()}, `
         + `rear ${gu.hands.rear.judged_frames.toLocaleString()} · the rest skipped (that hand throwing, or a joint not visible)`,
-    th: {event: {label: 'per frame', rule: 'drop = how far the wrist sits below the nose, in torso lengths',
-                 bands: [['≤ 0.60', 'guard up'], ['> 0.60', 'low']], pal: {'guard up': '#34c759', low: '#ff3b30'}},
+    th: {event: {label: 'per frame', rule: 'drop = how far the wrist sits below the nose, in torso lengths — the '
+                        + 'lens’s absolute line, the same one the idle-hand rule uses. For scale the shoulder line sits '
+                        + '0.17–0.20 below the nose, and a guard belongs at cheekbone height, above it',
+                 bands: [['≤ 0.30', 'guard up'], ['> 0.30', 'low']], pal: {'guard up': '#34c759', low: '#ff3b30'}},
          round: {label: 'per round', rule: 'the share of judged frames inside a low stretch (bridged over 0.3 s, at least 0.3 s long), worse hand',
                  bands: [['< 10 %', 'good'], ['10–25 %', 'sometimes low'], ['≥ 25 %', 'low']], pal: GUARDRATE}},
     calc: `lead ${gu.hands.lead.low_frames.toLocaleString()} of ${gu.hands.lead.judged_frames.toLocaleString()} = `
