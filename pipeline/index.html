@@ -558,26 +558,30 @@ const RULE_LAYERS = [
   {
     key: 'idle', label: 'Idle hand at impact', short: 'Idle hand',
     csv: ['idle_hand', 'punches.csv'], json: ['idle_hand', 'idle_hand.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, slip: num(r.slip), idle: r.idle_hand, base: num(r.baseline)}
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), slip: num(r.slip), idle: r.idle_hand, base: num(r.baseline)}
       : {verdict: '', skip: r.skip_reason, idle: r.idle_hand},
     summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">The idle hand at this impact</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'no_impact_frame' ? 'no impact frame for this punch'
                                                  : 'the idle wrist is not visible at the impact frame'}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Idle hand</span><b>${x.idle}</b>
-        <span>Below its own guard</span><b>${x.slip.toFixed(2)} torso</b>
-        <span>Its guard sits at</span><b>${x.base.toFixed(2)} torso below the nose</b>
-        <span>Verdict</span><b>${x.verdict === 'drops' ? 'dropped' : 'still up'}</b></div>`) + '</div>',
+        <span>Below the nose</span><b>${x.drop.toFixed(2)} torso</b>
+        <span>Low from</span><b>0.30 torso (the lens's guard line)</b>
+        <span>Verdict</span><b>${x.verdict === 'drops' ? 'low' : 'up'}</b></div>
+       <div class="rows num" style="opacity:.6"><span>For context, not judged:</span><b></b>
+        <span>this hand's own guard sits at</span><b>${x.base == null ? '–' : x.base.toFixed(2) + ' torso'}</b>
+        <span>so this punch is</span><b>${x.slip == null ? '–' : (x.slip >= 0 ? '+' : '') + x.slip.toFixed(2) + ' torso vs his own habit'}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">the idle wrist is not readable at the impact frame</span>` :
-      `<span class="num">the ${x.idle} hand was ${x.verdict === 'drops' ? '<b>down</b>' : 'still up'} · ` +
-      `<b>${x.slip.toFixed(2)}</b> torso below its own guard</span><br>` +
-      `<span class="m">read at the impact frame; 0.20 torso below its own guard or more counts as dropped</span>`),
+      `<span class="num">the ${x.idle} hand was ${x.verdict === 'drops' ? '<b>low</b>' : 'up'} · ` +
+      `<b>${x.drop.toFixed(2)}</b> torso below the nose</span><br>` +
+      `<span class="m">read at the impact frame; 0.30 torso or lower is low — an absolute line, not this boxer's habit` +
+      `${x.slip == null ? '' : ` (his own guard sits at ${x.base.toFixed(2)})`}</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;                                // nothing readable: draw nothing
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'drops' ? '#ff3b30' : '#34c759';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, `${x.slip.toFixed(2)}`);
+      tag(bx, w, y, h, `${x.drop.toFixed(2)}`);
       ring(e, 'idle', bx, y, w, h);
     },
   },
@@ -1498,16 +1502,17 @@ function ruleCard() {
           + `rear ${gr.by_hand.rear.not_recovered}/${gr.by_hand.rear.judged}`});
   const ih = S.layerSum.idle;                                                          //  7
   if (ih) add('Idle hand at impact', ih.rating, IDLECOL[ih.rating], null, {
-    what: 'when one hand lands, is the other one still guarding?',
+    what: 'when one hand lands, is the other one still up where a guard belongs?',
     on: `${ih.n_punches} punches · ${ih.judged_punches} judged at their impact frame, `
         + `${ih.n_punches - ih.judged_punches} skipped (no impact frame, or the idle wrist not visible)`,
-    th: {event: {label: 'per punch', rule: 'the idle hand at the impact frame, against its own guard — its median '
-                       + 'height over the video outside its own punches',
-                 bands: [['< 0.20 torso', 'still up'], ['≥ 0.20', 'dropped']],
-                 pal: {'still up': '#34c759', dropped: '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches whose idle hand was down',
+    th: {event: {label: 'per punch', rule: 'how far the idle hand sits below the nose at the impact frame — an '
+                       + 'absolute line from the lens, not this boxer’s own habit, because holding the hands low all '
+                       + 'round is not a reason to pass. For scale, the shoulder line sits 0.17–0.20 torso below the nose',
+                 bands: [['< 0.30 torso', 'up'], ['≥ 0.30', 'low']],
+                 pal: {up: '#34c759', low: '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged punches whose idle hand was low',
                  bands: [['< 10 %', 'holds'], ['10–25 %', 'sometimes drops'], ['≥ 25 %', 'drops']], pal: IDLECOL}},
-    calc: `${ih.drop_punches} of ${ih.judged_punches} judged punches = ${pct(ih.slip_share)} · `
+    calc: `${ih.drop_punches} of ${ih.judged_punches} judged punches = ${pct(ih.low_share)} · `
           + `lead idle ${ih.by_idle_hand.lead.drops}/${ih.by_idle_hand.lead.judged}, `
           + `rear idle ${ih.by_idle_hand.rear.drops}/${ih.by_idle_hand.rear.judged}`});
   const hb = S.handBal;                                                                //  6

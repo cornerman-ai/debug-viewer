@@ -62,10 +62,11 @@ red = wrong / too much, gray = not judged.
   Round = the worst 10 % of punch scores, banded 95/80/55. **Reads harsh on the test videos** (42 % and 58 % of
   judged punches fail) — see `combined_pipeline/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
 - **Idle hand at impact** (`idle_hand/`): per punch, the hand that is NOT throwing, read at the impact frame —
-  how far it sits below its own guard (that hand's median height over the video outside its own punches). Green
-  still up, red dropped at ≥ 0.20 torso, nothing drawn where the idle wrist isn't visible. Round rating = the share
-  of judged punches whose idle hand was down (< 10 % holds, 10–25 % sometimes drops, ≥ 25 % drops). One frame and
-  not the punch's window because punches overlap inside a combination, which would leave most punches unjudgeable.
+  how far it sits below the nose. Green up, red low at ≥ 0.30 torso (the lens's guard line, an absolute one: a boxer
+  who holds his hands low all round must not pass), nothing drawn where the idle wrist isn't visible. That hand's
+  own median guard is shown in the card beside the verdict, unjudged. Round rating = the share of judged punches
+  whose idle hand was low (< 10 % holds, 10–25 % sometimes drops, ≥ 25 % drops). One frame and not the punch's
+  window because punches overlap inside a combination, which would leave most punches unjudgeable.
   Reads `punches.csv` + `idle_hand.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the production rule's verdict (pass / fail; skipped = dashed),
   its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
