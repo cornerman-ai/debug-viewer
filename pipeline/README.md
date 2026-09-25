@@ -112,6 +112,11 @@ change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than
   how long after the combo it started and which combo it was. A move counts when it starts anywhere from the combo's first frame to 1 s after its last. The round rating is the share of combos covered
   (≥ 60 % good, 35–60 % moderate, < 35 % no defense after combos; fewer than 10 combos → not rated).
 
+**Hand balance** (`hand_balance/hand_balance.json`, a whole-video rule — no timeline row): the share of punches
+thrown with the rear hand — 30–50 % balanced, 20–30 % lead-heavy, 50–60 % rear-heavy, < 20 % lead only, > 60 % rear
+only; fewer than 30 punches → not rated. The band is off-centre on purpose: the lead hand should throw more, the jab
+being the most thrown punch. Each hand's punch types sit beside it, unjudged.
+
 **Combination length** (`combo_length/combo_length.json`, a whole-video rule — no timeline row): over the offensive
 combinations `run_combinations.py` already wrote, the share that are 3 punches or more — ≥ 40 % builds, 20–40 %
 short, < 20 % one-twos only; fewer than 10 combinations → not rated. The mean length, the longest, the spread by

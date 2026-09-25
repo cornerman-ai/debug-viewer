@@ -946,6 +946,7 @@ async function loadFolder(src) {
   S.workRate = await src.text(['work_rate', 'work_rate.json']).then(JSON.parse).catch(() => null);
   S.decay = await src.text(['output_decay', 'output_decay.json']).then(JSON.parse).catch(() => null);
   S.comboLen = await src.text(['combo_length', 'combo_length.json']).then(JSON.parse).catch(() => null);
+  S.handBal = await src.text(['hand_balance', 'hand_balance.json']).then(JSON.parse).catch(() => null);
   S.slipD = await src.text(['slip_distance', 'slip_distance.json']).then(JSON.parse).catch(() => null);
   S.stanceD = await src.text(['stance_depth', 'stance_depth.json']).then(JSON.parse).catch(() => null);
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
@@ -1087,6 +1088,8 @@ const HIPCOL = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated':
 const WORKCOL = {working: '#34c759', patchy: '#ff9f0a', stalling: '#ff3b30', 'not rated': '#8e8e93'};
 const DECAYCOL = {holds: '#34c759', fades: '#ff9f0a', 'drops off': '#ff3b30', 'not rated': '#8e8e93'};
 const COMBOLENCOL = {builds: '#34c759', short: '#ff9f0a', 'one-twos only': '#ff3b30', 'not rated': '#8e8e93'};
+const HANDBALCOL = {balanced: '#34c759', 'lead-heavy': '#ff9f0a', 'rear-heavy': '#ff9f0a',
+                    'lead only': '#ff3b30', 'rear only': '#ff3b30', 'not rated': '#8e8e93'};
 const DACOL = {good: '#34c759', moderate: '#ff9f0a', 'no defense after combos': '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
 function comboStats() {
@@ -1377,6 +1380,18 @@ function ruleCard() {
                  bands: [['< 20 %', 'working'], ['20–40 %', 'patchy'], ['≥ 40 %', 'stalling']], pal: WORKCOL}},
     calc: `${wr.dead_seconds}s dead in ${wr.n_dead_gaps} gaps / ${wr.duration_seconds}s = ${pct(wr.dead_share)} · `
           + `${wr.punches_per_minute} punches/min, ${wr.actions_per_minute} actions/min · longest gap ${wr.longest_dead_s}s`});
+  const hb = S.handBal;                                                                //  6
+  if (hb) add('Hand balance', hb.rating, HANDBALCOL[hb.rating], null, {
+    what: 'does he use both hands, or live on one of them?',
+    on: `${hb.n_punches} punches · all judged, grouped by hand`,
+    th: {round: {label: 'per round', rule: 'the share of punches thrown with the rear hand — the band is not centred '
+                        + 'on 50 % because the lead hand is supposed to throw more, the jab being the most thrown punch',
+                 bands: [['30–50 %', 'balanced'], ['20–30 %', 'lead-heavy'], ['50–60 %', 'rear-heavy'],
+                         ['< 20 %', 'lead only'], ['> 60 %', 'rear only']], pal: HANDBALCOL}},
+    calc: `${hb.n_rear} rear / ${hb.n_punches} punches = ${pct(hb.rear_share)} · lead ${hb.n_lead} (`
+          + `${Object.entries(hb.by_hand.lead).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${PUNCH[k]?.name || k} ${v}`).join(', ')}`
+          + `) · rear ${hb.n_rear} (`
+          + `${Object.entries(hb.by_hand.rear).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${PUNCH[k]?.name || k} ${v}`).join(', ')})`});
   const cl = S.comboLen;                                                               // 26
   if (cl) add('Combination length', cl.rating, COMBOLENCOL[cl.rating], null, {
     what: 'does he build anything longer than a one-two?',
