@@ -945,6 +945,7 @@ async function loadFolder(src) {
   S.handDrop = await src.text(['hand_drop', 'hand_drop.json']).then(JSON.parse).catch(() => null);
   S.workRate = await src.text(['work_rate', 'work_rate.json']).then(JSON.parse).catch(() => null);
   S.decay = await src.text(['output_decay', 'output_decay.json']).then(JSON.parse).catch(() => null);
+  S.comboLen = await src.text(['combo_length', 'combo_length.json']).then(JSON.parse).catch(() => null);
   S.slipD = await src.text(['slip_distance', 'slip_distance.json']).then(JSON.parse).catch(() => null);
   S.stanceD = await src.text(['stance_depth', 'stance_depth.json']).then(JSON.parse).catch(() => null);
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
@@ -1085,6 +1086,7 @@ const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes s
 const HIPCOL = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const WORKCOL = {working: '#34c759', patchy: '#ff9f0a', stalling: '#ff3b30', 'not rated': '#8e8e93'};
 const DECAYCOL = {holds: '#34c759', fades: '#ff9f0a', 'drops off': '#ff3b30', 'not rated': '#8e8e93'};
+const COMBOLENCOL = {builds: '#34c759', short: '#ff9f0a', 'one-twos only': '#ff3b30', 'not rated': '#8e8e93'};
 const DACOL = {good: '#34c759', moderate: '#ff9f0a', 'no defense after combos': '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
 function comboStats() {
@@ -1375,6 +1377,15 @@ function ruleCard() {
                  bands: [['< 20 %', 'working'], ['20–40 %', 'patchy'], ['≥ 40 %', 'stalling']], pal: WORKCOL}},
     calc: `${wr.dead_seconds}s dead in ${wr.n_dead_gaps} gaps / ${wr.duration_seconds}s = ${pct(wr.dead_share)} · `
           + `${wr.punches_per_minute} punches/min, ${wr.actions_per_minute} actions/min · longest gap ${wr.longest_dead_s}s`});
+  const cl = S.comboLen;                                                               // 26
+  if (cl) add('Combination length', cl.rating, COMBOLENCOL[cl.rating], null, {
+    what: 'does he build anything longer than a one-two?',
+    on: `${cl.n_combinations} offensive combos · all judged · ${cl.n_solo_punches} of ${cl.n_punches} punches were thrown solo and are not in any of them`,
+    th: {round: {label: 'per round', rule: 'the share of combinations that are 3 punches or more',
+                 bands: [['≥ 40 %', 'builds'], ['20–40 %', 'short'], ['< 20 %', 'one-twos only']], pal: COMBOLENCOL}},
+    calc: `${cl.n_long} of ${cl.n_combinations} combos are 3+ = ${pct(cl.long_share)} · `
+          + `${Object.entries(cl.by_n_elements).map(([k, v]) => `${v} of ${k}`).join(', ')} · `
+          + `mean ${cl.mean_elements}, longest ${cl.longest} · ${pct(cl.solo_share)} of punches thrown solo`});
   const dc = S.decay;                                                                  // 29
   if (dc) add('Output through the round', dc.rating, DECAYCOL[dc.rating], null, {
     what: 'does he still throw at the end what he threw at the start?',

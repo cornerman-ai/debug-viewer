@@ -112,6 +112,11 @@ change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than
   how long after the combo it started and which combo it was. A move counts when it starts anywhere from the combo's first frame to 1 s after its last. The round rating is the share of combos covered
   (≥ 60 % good, 35–60 % moderate, < 35 % no defense after combos; fewer than 10 combos → not rated).
 
+**Combination length** (`combo_length/combo_length.json`, a whole-video rule — no timeline row): over the offensive
+combinations `run_combinations.py` already wrote, the share that are 3 punches or more — ≥ 40 % builds, 20–40 %
+short, < 20 % one-twos only; fewer than 10 combinations → not rated. The mean length, the longest, the spread by
+length and the share of punches thrown outside any combination sit beside it, unjudged.
+
 **Output through the round** (`output_decay/output_decay.json`, a whole-video rule — no timeline row): the video cut
 into three equal thirds, punches counted in each, the last third against the first — < 15 % fewer holds, 15–35 %
 fades, ≥ 35 % drops off; under 90 s or 30 punches → not rated. The per-third counts, rates and dead shares are shown
