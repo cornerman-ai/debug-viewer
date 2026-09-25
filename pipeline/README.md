@@ -112,6 +112,12 @@ change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than
   how long after the combo it started and which combo it was. A move counts when it starts anywhere from the combo's first frame to 1 s after its last. The round rating is the share of combos covered
   (≥ 60 % good, 35–60 % moderate, < 35 % no defense after combos; fewer than 10 combos → not rated).
 
+**Output through the round** (`output_decay/output_decay.json`, a whole-video rule — no timeline row): the video cut
+into three equal thirds, punches counted in each, the last third against the first — < 15 % fewer holds, 15–35 %
+fades, ≥ 35 % drops off; under 90 s or 30 punches → not rated. The per-third counts, rates and dead shares are shown
+beside it, unjudged, to separate a slower rate from more standing. It needs one continuous round to mean anything —
+neither test video is one. `thirds.csv` has the per-third rows.
+
 **Work rate** (`work_rate/work_rate.json`, a whole-video rule — no timeline row): a frame counts as work when a
 punch or a defensive move covers it; a stretch with neither lasting ≥ 3 s is dead time (shorter gaps are the normal
 breathing between combos, or a step or two around the bag). The rating is the share of the video inside those

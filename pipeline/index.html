@@ -944,6 +944,7 @@ async function loadFolder(src) {
   S.guard = await src.text(['guard_height', 'guard_height.json']).then(JSON.parse).catch(() => null);
   S.handDrop = await src.text(['hand_drop', 'hand_drop.json']).then(JSON.parse).catch(() => null);
   S.workRate = await src.text(['work_rate', 'work_rate.json']).then(JSON.parse).catch(() => null);
+  S.decay = await src.text(['output_decay', 'output_decay.json']).then(JSON.parse).catch(() => null);
   S.slipD = await src.text(['slip_distance', 'slip_distance.json']).then(JSON.parse).catch(() => null);
   S.stanceD = await src.text(['stance_depth', 'stance_depth.json']).then(JSON.parse).catch(() => null);
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
@@ -1083,6 +1084,7 @@ const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes s
                     narrow: '#ff3b30', shallow: '#ff3b30', 'not rated': '#8e8e93'};
 const HIPCOL = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const WORKCOL = {working: '#34c759', patchy: '#ff9f0a', stalling: '#ff3b30', 'not rated': '#8e8e93'};
+const DECAYCOL = {holds: '#34c759', fades: '#ff9f0a', 'drops off': '#ff3b30', 'not rated': '#8e8e93'};
 const DACOL = {good: '#34c759', moderate: '#ff9f0a', 'no defense after combos': '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
 function comboStats() {
@@ -1373,6 +1375,15 @@ function ruleCard() {
                  bands: [['< 20 %', 'working'], ['20–40 %', 'patchy'], ['≥ 40 %', 'stalling']], pal: WORKCOL}},
     calc: `${wr.dead_seconds}s dead in ${wr.n_dead_gaps} gaps / ${wr.duration_seconds}s = ${pct(wr.dead_share)} · `
           + `${wr.punches_per_minute} punches/min, ${wr.actions_per_minute} actions/min · longest gap ${wr.longest_dead_s}s`});
+  const dc = S.decay;                                                                  // 29
+  if (dc) add('Output through the round', dc.rating, DECAYCOL[dc.rating], null, {
+    what: 'does he still throw at the end what he threw at the start?',
+    on: `${dc.duration_seconds}s of video cut into three equal thirds · ${dc.n_punches} punches, all counted`,
+    th: {round: {label: 'per round', rule: 'punches in the last third against the first third',
+                 bands: [['< 15 % fewer', 'holds'], ['15–35 % fewer', 'fades'], ['≥ 35 % fewer', 'drops off']], pal: DECAYCOL}},
+    calc: `${dc.per_third.map(t => `${t.n_punches} (${t.punches_per_minute}/min`
+             + (t.dead_share === '' ? '' : `, ${pct(t.dead_share)} dead`) + ')').join(' → ')} · `
+          + `${dc.first_third} → ${dc.last_third} = ${dc.drop >= 0 ? `${pct(dc.drop)} fewer` : `${pct(-dc.drop)} more`}`});
   scored('hit', 'Hit height', q => ({                                                   // 25
     what: 'would the punch land somewhere useful on an opponent his own size?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on) · hooks and uppercuts are read at their impact frame on the timeline, not here`,
