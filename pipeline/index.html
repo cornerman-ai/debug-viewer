@@ -608,7 +608,7 @@ const RULE_LAYERS = [
        <div class="rows num" style="opacity:.6"><span>For comparison, not judged:</span><b></b>
        <span>bend at the impact frame</span><b>${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>',
     tip: (e, a, {head, v}) => head + `arm extension ${v(a.verdict)}${a.skip ? ` <span class="m">(${a.skip})</span>` : ''}<br>` +
-      `<span class="num">elbow bend <b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}</b> at the rule frame f ${a.peakF ?? '–'} · passes at ≤ 36.4°${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span><br>` +
+      `<span class="num">elbow bend <b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}</b> at the rule frame f ${a.peakF ?? '–'} · passes at ≤ ${(t => t ? (2 * Math.acos(t) * 180 / Math.PI).toFixed(1) : '23.1')(S.layerSum.arm?.config?.params?.bend_threshold)}°${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span><br>` +
       `<span class="m num">for comparison, not judged: ${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} at the impact frame${a.impVerdict && a.impVerdict !== 'skip' ? ' (would ' + a.impVerdict + ')' : ''}</span>`,
     row(e, a, {c, y, h, span, tag, ring, tx, fps}) {       // verdict block, the rule's frame as a white tick
       const judged = a.verdict === 'pass' || a.verdict === 'fail';

@@ -76,6 +76,17 @@ stage on both test videos so the numbers in the row come from the new rule, and 
 
 A row that still explains the old rule is worse than no row: it is read as the current truth.
 
+The same commit also updates the backend's three documents, which are written to be read together and must never
+contradict each other or the viewer:
+
+- `combined_pipeline/rule_explanations.md` — what the rule measures and the fault it catches. Two lines, no numbers
+  unless the number *is* the rule.
+- `combined_pipeline/changes.md` — only what differs from the app or the lens, and anything tried and dropped.
+- `combined_pipeline/threshold_source.md` — every number, marked **lens** or **ours**, with where it came from.
+
+A new rule adds a row to all three. A changed threshold changes it in `threshold_source.md` and, if the reasoning
+moved with it, in `changes.md`.
+
 ## 4. Before pushing
 
 - Open both test videos in the browser and check the new row / rating renders with no console errors.
