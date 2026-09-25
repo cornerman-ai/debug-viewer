@@ -60,13 +60,14 @@ red = wrong / too much, gray = not judged.
   and tooltip carry the shoulders and hips too, unjudged, so a lean can be told from a lunge. Round rating = the
   share of judged punches whose head left the base (< 5 % balanced, 5–15 % sometimes, ≥ 15 % falls in). Reads
   `punches.csv` + `balance.json`.
-- **Hand return path** (`hand_return_path/`): the research lens ported to Python, constants unchanged. Per jab /
-  cross, from the landing frame: the fist's height against its own shoulder over the next 1.5 s, and the U-dip =
-  min(how far it sank below the landing height, how far it climbed back) — both halves required, so a hand settling
-  into a low guard or a body shot rising from a low landing read zero. Green under 0.20 torso, red at or above, with
-  the dip on the block and a white tick at the lowest frame; skipped punches are not drawn. Judged side-on only.
-  Round = the worst 10 % of punch scores, banded 95/80/55. **Reads harsh on the test videos** (42 % and 58 % of
-  judged punches fail) — see `combined_pipeline/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
+- **Hand return path** (`hand_return_path/`): per jab / cross, between the landing and the end of the punch, the
+  fist's height against its own shoulder must not drop below where it was at the punch's start or where it was at
+  impact; the dip is measured from the lower of those two, so a punch that started or landed low is not punished
+  for being there. Green under 0.10 torso, red at or above, with the dip on the block; punches with no impact
+  frame, a lost wrist or a tracking jump are not drawn. Every angle is judged — the measurement is vertical. Round
+  = the worst 10 % of punch scores, banded 95/80/55. The lens's own 1.5 s window and descent/recovery pair were
+  tried first and read 42 % / 58 % — see `combined_pipeline/changes.md`. Reads `punches.csv` +
+  `hand_return_path.json`.
 - **Idle hand at impact** (`idle_hand/`): per punch, the hand that is NOT throwing, read at the impact frame —
   how far it sits below the nose. Green up, red low at ≥ 0.40 torso (the same line guard height uses, an absolute one: a boxer
   who holds his hands low all round must not pass), nothing drawn where the idle wrist isn't visible. That hand's
