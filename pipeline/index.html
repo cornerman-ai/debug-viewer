@@ -486,10 +486,9 @@ const CHIN = {
 };
 const CHINCOL = {over: '#ff3b30', over_short: '#8e8e93', level: '#ff9f0a', under: '#34c759',
                  out: '#ff3b30', out_short: '#8e8e93', tucked: '#34c759'};
-const CHINSKIP = {no_reading: 'a joint the chin needs is not visible', punching: 'a punch is in flight',
-                  front_on: 'not side-on — the depth axis points at the camera',
-                  over_short: 'too short to count — left out of the round entirely',
-                  out_short: 'too short to count — left out of the round entirely'};
+const CHINSKIP = {no_reading: 'a joint the chin needs is not visible, or a punch is in flight',
+                  punching: 'a punch is in flight',
+                  front_on: 'not side-on — the depth axis points at the camera'};
 const CHINRATE = {good: '#34c759', sometimes: '#ff9f0a', bad: '#ff3b30', 'not rated': '#8e8e93'};
 function chinLayer(kind) {
   const C = CHIN[kind];
@@ -1545,7 +1544,7 @@ function ruleCard() {
                         + '0.17–0.20 below the nose and a guard belongs at cheekbone height, above it, so this forgives '
                         + 'about a fifth of a torso under the shoulders',
                  bands: [['≤ 0.40', 'guard up'], ['> 0.40', 'low']], pal: {'guard up': '#34c759', low: '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged frames inside a low stretch (bridged over 0.3 s, at least 0.3 s long), worse hand',
+         round: {label: 'per round', rule: 'the share of judged frames with that hand low — every frame counts, however brief; the worse hand decides',
                  bands: [['< 10 %', 'good'], ['10–25 %', 'sometimes low'], ['≥ 25 %', 'low']], pal: GUARDRATE}},
     calc: `lead ${gu.hands.lead.low_frames.toLocaleString()} of ${gu.hands.lead.judged_frames.toLocaleString()} = `
           + `${pct(gu.hands.lead.low_share)} · rear ${gu.hands.rear.low_frames.toLocaleString()} of `
@@ -1602,12 +1601,12 @@ function ruleCard() {
   if (chh) add('Chin height', chh.rating, CHINRATE[chh.rating], null, {
     what: 'is the chin down behind the lead shoulder, or riding above it?',
     on: `${chh.n_frames.toLocaleString()} frames · ${chh.judged_frames.toLocaleString()} judged outside punches · `
-        + `${chh.over_short_frames.toLocaleString()} more were chin-up too briefly to count and are left out of the round entirely`,
+        + `the rest skipped (a punch in flight, or a joint the chin needs not visible)`,
     th: {event: {label: 'per frame', rule: 'the chin (nose + 2.25 × nose→mouth, since BlazePose has no jaw) against a '
                         + 'line at the lead shoulder, in shoulder widths. The two cut-offs are the lens’s, fitted on a coach’s labels',
                  bands: [['above the line', 'chin up'], ['around it', 'level'], ['below it', 'tucked']],
                  pal: {'chin up': '#ff3b30', level: '#ff9f0a', tucked: '#34c759'}},
-         round: {label: 'per round', rule: 'the share of judged frames inside a sustained chin-up stretch (bridged over 0.5 s, at least 1 s long)',
+         round: {label: 'per round', rule: 'the share of judged frames with the chin up — every frame counts, however brief',
                  bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes'], ['≥ 30 %', 'bad']], pal: CHINRATE}},
     calc: `${chh.over_frames.toLocaleString()} of ${chh.judged_frames.toLocaleString()} judged frames = `
           + `${pct(chh.over_share)} · median ${chh.median_height_norm} shoulder widths`});
@@ -1615,12 +1614,12 @@ function ruleCard() {
   if (chd) add('Chin depth', chd.rating, CHINRATE[chd.rating], null, {
     what: 'does the chin sit behind the front of the lead shoulder, or stick out past it?',
     on: `${chd.n_frames.toLocaleString()} frames · ${chd.judged_frames.toLocaleString()} judged (outside punches and side-on only — `
-        + `head-on the depth axis points at the camera) · ${chd.out_short_frames.toLocaleString()} more were out too briefly to count`,
+        + `head-on the depth axis points at the camera)`,
     th: {event: {label: 'per frame', rule: 'the chin against the shoulder’s front — the lead keypoint pushed forward by '
                         + '0.101 torso, because the joint centre sits inside the deltoid — in torso lengths',
                  bands: [['≤ 0.10 torso in front', 'tucked'], ['> 0.10', 'chin out']],
                  pal: {tucked: '#34c759', 'chin out': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged frames inside a sustained chin-out stretch (bridged over 0.5 s, at least 1 s long)',
+         round: {label: 'per round', rule: 'the share of judged frames with the chin out — every frame counts, however brief',
                  bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes'], ['≥ 30 %', 'bad']], pal: CHINRATE}},
     calc: `${chd.out_frames.toLocaleString()} of ${chd.judged_frames.toLocaleString()} judged frames = `
           + `${pct(chd.out_share)} · median gap ${chd.median_gap} torso`});

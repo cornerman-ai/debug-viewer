@@ -50,7 +50,7 @@ that rule's headline verdict.
 **Rule layers** (side panel, all off by default, the choice is remembered): each adds a timeline row, a section in
 the punch card and a video overlay for the punch under the playhead. Colors: green = fine, orange = too little,
 red = wrong / too much. A stretch the rule threw out — a joint it needs not visible, a punch in flight, the wrong
-camera angle, or a violation too short to count — is a **dashed gray mid-line**, not a gap: the row is continuous,
+camera angle — is a **dashed gray mid-line**, not a gap: the row is continuous,
 so an empty-looking stretch always means "left out on purpose", never "nothing happened".
 
 - **Hand drop before punch** (`hand_drop/`): per punch, how far the throwing hand dipped below ITS OWN guard in the
@@ -115,23 +115,23 @@ so an empty-looking stretch always means "left out on purpose", never "nothing h
   far). Rolls and ducks are not measured. Judged front-on / back-on only. Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
   hand is not punching — low above 0.40, the same absolute line the idle-hand rule uses (the lens says 0.30). Continuous row, lead in the top half, rear in the bottom: green guard up,
-  red low, and a thin gray strip for everything left out of the round — that hand throwing, a joint not visible, or a
-  drop too short to count. Round rating = the share of judged frames inside a low stretch on the worse hand
+  red low, and a dashed gray line for everything the rule could not look at — that hand throwing, or a joint not
+  visible. Round rating = the share of judged frames low on the worse hand, every frame counting however brief
   (< 10 % good, 10–25 % sometimes low, ≥ 25 % low). Reads `runs.csv` + `guard_height.json`.
 - **Chin height** (`chin_height/`) and **Chin depth** (`chin_depth/`): both per frame outside punches, both
   continuous rows, both reading the skeleton chin (`nose + 2.25 × nose→mouth` — BlazePose has no jaw landmark).
   Height is the chin against a line at the lead shoulder in shoulder widths, with the lens's own bands (red chin up,
   orange level, green tucked) — those two cut-offs were fitted on a coach's labels. Depth is the chin against the
   shoulder's front (the lead keypoint pushed forward 0.101 torso) in torso lengths, red past 0.10, read side-on
-  only. A thin gray strip is everything left out: a joint not visible, a punch in flight, the wrong camera angle, or
-  a stretch too short to count. Round rating = the share of judged frames inside a sustained bad stretch (bridged
-  over 0.5 s, at least 1 s): < 15 % good, 15–30 % sometimes, ≥ 30 % bad. Read `runs.csv` + the stage's `.json`.
+  only. A dashed gray line is everything the rule could not look at: a joint not visible, a punch in flight, or the
+  wrong camera angle. Round rating = the share of judged frames that are bad, every frame counting however
+  brief: < 15 % good, 15–30 % sometimes, ≥ 30 % bad. Read `runs.csv` + the stage's `.json`.
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
-  — green fine, red too small, and a thin gray strip for everything left out of the round — the wrong side of the
-  camera, a joint not visible, or a stretch too short to count. Width = ankle-to-ankle distance in torso lengths,
+  — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of
+  the camera, or a joint not visible. Width = ankle-to-ankle distance in torso lengths,
   read front-on, narrow below 0.50; depth = the horizontal ankle gap in leg lengths, read side-on, shallow below
-  0.50. The round rating is the share of judged frames inside a sustained bad stretch (bridged over 0.5 s, at least
-  1 s long): < 15 % good, 15–30 % sometimes, ≥ 30 % bad. Read `runs.csv` + the stage's `.json`.
+  0.50. The round rating is the share of judged frames that are bad, every frame counting however brief:
+  < 15 % good, 15–30 % sometimes, ≥ 30 % bad. Read `runs.csv` + the stage's `.json`.
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = |x shoulder − x elbow| / torso per arm,
   judged only while the boxer is within 45° of facing or backing the camera and that arm isn't throwing a hook. The row
   is continuous — every frame belongs to a stretch: green tucked (< 0.20), yellow borderline (0.20–0.30), red flared
