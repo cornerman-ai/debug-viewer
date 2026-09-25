@@ -54,6 +54,12 @@ red = wrong / too much, gray = not judged.
 - **Hand drop before punch** (`hand_drop/`): per punch, how far the throwing hand dipped below ITS OWN guard in the
   0.4 s before the punch started (green no dip, red dips at ≥ 0.25 torso), with the dip on the block. Reads
   `punches.csv` + `hand_drop.json`.
+- **Balance at impact** (`balance/`): per punch, where the head sits across the base of support — the widest span
+  of the ankles, heels and toes — at the impact frame, read side-on. Green inside the feet, red past either edge,
+  with the position on the block; nothing drawn for punches thrown head-on or with the feet out of view. The card
+  and tooltip carry the shoulders and hips too, unjudged, so a lean can be told from a lunge. Round rating = the
+  share of judged punches whose head left the base (< 5 % balanced, 5–15 % sometimes, ≥ 15 % falls in). Reads
+  `punches.csv` + `balance.json`.
 - **Hand return path** (`hand_return_path/`): the research lens ported to Python, constants unchanged. Per jab /
   cross, from the landing frame: the fist's height against its own shoulder over the next 1.5 s, and the U-dip =
   min(how far it sank below the landing height, how far it climbed back) — both halves required, so a hand settling

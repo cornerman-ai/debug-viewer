@@ -413,6 +413,7 @@ const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that h
                    low_short: 'a drop too short to count — left out of the round'};
 const DROPRATE = {good: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
 const IDLECOL = {holds: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
+const BALCOL = {balanced: '#34c759', sometimes: '#ff9f0a', 'falls in': '#ff3b30', 'not rated': '#8e8e93'};
 const GRECCOL = {recovers: '#34c759', sometimes: '#ff9f0a', 'hands stay down': '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
@@ -624,6 +625,36 @@ const RULE_LAYERS = [
       rr(bx, y + 3, w, h - 6, 5); c.fill();
       tag(bx, w, y, h, `${x.drop.toFixed(2)}`);
       ring(e, 'idle', bx, y, w, h);
+    },
+  },
+  {
+    // balance at impact (balance/punches.csv): where the head sits across the base of support — the widest span of
+    // the foot landmarks — at the frame the punch lands. 0 = the back edge, 1 = the front edge.
+    key: 'bal', label: 'Balance at impact', short: 'Balance',
+    csv: ['balance', 'punches.csv'], json: ['balance', 'balance.json'],
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, head: num(r.head_pos), hip: num(r.hip_pos),
+      sh: num(r.shoulder_pos), base: num(r.base_width)} : {verdict: '', skip: r.skip_reason},
+    summary: () => '',
+    card: (e, x) => `<div class="sub"><div class="h">Balance at impact</div>` +
+      (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_side_on' ? 'thrown head-on — balance is a fore-aft fault, invisible from there'
+                                                : 'the feet or the body are not visible at the impact frame'}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Head across the base</span><b>${x.head.toFixed(2)}</b>
+        <span>Base of support</span><b>${x.base.toFixed(2)} torso wide</b>
+        <span>Verdict</span><b>${x.verdict}</b></div>
+       <div class="rows num" style="opacity:.6"><span>For context, not judged:</span><b></b>
+        <span>shoulders</span><b>${x.sh.toFixed(2)}</b>
+        <span>hips</span><b>${x.hip.toFixed(2)}</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${x.skip}</span>` :
+      `<span class="num">head at <b>${x.head.toFixed(2)}</b> across his base · ${x.verdict}</span><br>` +
+      `<span class="m">0 = over the back edge of the feet, 1 = over the front edge; past either one he is holding ` +
+      `his weight where his feet are not (shoulders ${x.sh.toFixed(2)}, hips ${x.hip.toFixed(2)})</span>`),
+    row(e, x, {c, y, h, span, tag, ring}) {
+      if (!x.verdict) return;
+      const [bx, w] = span(e);
+      c.fillStyle = x.verdict === 'balanced' ? '#34c759' : '#ff3b30';
+      rr(bx, y + 3, w, h - 6, 5); c.fill();
+      tag(bx, w, y, h, `${x.head.toFixed(2)}`);
+      ring(e, 'bal', bx, y, w, h);
     },
   },
   {
@@ -1302,6 +1333,7 @@ const SCOPE = {
   chin_height: {moves: 'every frame outside a punch',           angles: ALL_ANGLES},
   chin_depth:  {moves: 'every frame outside a punch',           angles: 'side-on'},
   hrp:       {moves: 'jab, cross',                              angles: 'side-on'},
+  bal:       {moves: 'every punch at its impact frame',         angles: 'side-on'},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
   shoulder:  {moves: 'every punch',                             angles: ALL_ANGLES},
@@ -1559,6 +1591,19 @@ function ruleCard() {
                  bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes'], ['≥ 30 %', 'bad']], pal: CHINRATE}},
     calc: `${chd.out_frames.toLocaleString()} of ${chd.judged_frames.toLocaleString()} judged frames = `
           + `${pct(chd.out_share)} · median gap ${chd.median_gap} torso`});
+  const bal = S.layerSum.bal;                                                          //  1
+  if (bal) add('Balance at impact', bal.rating, BALCOL[bal.rating], null, {
+    what: 'when the punch lands, is his head still over his own feet?',
+    on: `${bal.n_punches} punches · ${bal.judged_punches} judged side-on (fore-aft is the axis this fault lives on), `
+        + `${bal.n_punches - bal.judged_punches} skipped (thrown head-on, no impact frame, or the feet not visible)`,
+    th: {event: {label: 'per punch', rule: 'where the head sits across the base of support — the widest span of the '
+                        + 'ankles, heels and toes — at the impact frame. There is no chosen number: the edge of the base is the line',
+                 bands: [['inside the feet', 'balanced'], ['past the front edge', 'falls in'], ['past the back edge', 'leans back']],
+                 pal: {balanced: '#34c759', 'falls in': '#ff3b30', 'leans back': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged punches whose head left the base',
+                 bands: [['< 5 %', 'balanced'], ['5–15 %', 'sometimes'], ['≥ 15 %', 'falls in']], pal: BALCOL}},
+    calc: `${bal.falls_in + bal.leans_back} of ${bal.judged_punches} judged punches = ${pct(bal.out_share)} · `
+          + `${bal.falls_in} falling in, ${bal.leans_back} leaning back · head sits at ${bal.median_head_pos} of the base`});
   const gr = S.layerSum.grec;                                                          //  3
   if (gr) add('Guard after combo', gr.rating, GRECCOL[gr.rating], null, {
     what: 'once the combination is over, are the hands back where they started?',
