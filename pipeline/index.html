@@ -943,6 +943,7 @@ async function loadFolder(src) {
   S.stanceW = await src.text(['stance_width', 'stance_width.json']).then(JSON.parse).catch(() => null);
   S.guard = await src.text(['guard_height', 'guard_height.json']).then(JSON.parse).catch(() => null);
   S.handDrop = await src.text(['hand_drop', 'hand_drop.json']).then(JSON.parse).catch(() => null);
+  S.workRate = await src.text(['work_rate', 'work_rate.json']).then(JSON.parse).catch(() => null);
   S.slipD = await src.text(['slip_distance', 'slip_distance.json']).then(JSON.parse).catch(() => null);
   S.stanceD = await src.text(['stance_depth', 'stance_depth.json']).then(JSON.parse).catch(() => null);
   if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
@@ -1081,6 +1082,7 @@ const ACCOL = {good: '#34c759', some: '#ff9f0a', 'stays square': '#ff3b30', 'not
 const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes shallow': '#ff9f0a',
                     narrow: '#ff3b30', shallow: '#ff3b30', 'not rated': '#8e8e93'};
 const HIPCOL = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
+const WORKCOL = {working: '#34c759', patchy: '#ff9f0a', stalling: '#ff3b30', 'not rated': '#8e8e93'};
 const DACOL = {good: '#34c759', moderate: '#ff9f0a', 'no defense after combos': '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
 function comboStats() {
@@ -1361,6 +1363,16 @@ function ruleCard() {
     th: {round: {label: 'per round', rule: 'the share of all punches taken by the 2 most-used types',
                  bands: [['≥ 85 %', 'same punches'], ['70–85 %', 'moderate'], ['< 70 %', 'varied']], pal: SPCOL}},
     calc: `${sp.top2_types.map(t => PUNCH[t]?.name || t).join(' + ')} / ${sp.n_punches} punches = ${pct(sp.top2_share)}`});
+  const wr = S.workRate;                                                               // 28
+  if (wr) add('Work rate', wr.rating, WORKCOL[wr.rating], null, {
+    what: 'does he keep working, or does the round have holes in it?',
+    on: `${wr.duration_seconds}s of video · ${wr.n_punches} punches and ${wr.n_moves} defensive moves · all judged`,
+    th: {round: {label: 'per round', rule: 'a stretch with no punch and no defensive move lasting 3 s or more is dead '
+                        + 'time (shorter gaps are the normal breathing between combos, or a step or two around the bag); '
+                        + 'the rating is the share of the round inside those stretches',
+                 bands: [['< 20 %', 'working'], ['20–40 %', 'patchy'], ['≥ 40 %', 'stalling']], pal: WORKCOL}},
+    calc: `${wr.dead_seconds}s dead in ${wr.n_dead_gaps} gaps / ${wr.duration_seconds}s = ${pct(wr.dead_share)} · `
+          + `${wr.punches_per_minute} punches/min, ${wr.actions_per_minute} actions/min · longest gap ${wr.longest_dead_s}s`});
   scored('hit', 'Hit height', q => ({                                                   // 25
     what: 'would the punch land somewhere useful on an opponent his own size?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on) · hooks and uppercuts are read at their impact frame on the timeline, not here`,

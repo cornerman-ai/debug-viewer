@@ -112,6 +112,15 @@ change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than
   how long after the combo it started and which combo it was. A move counts when it starts anywhere from the combo's first frame to 1 s after its last. The round rating is the share of combos covered
   (≥ 60 % good, 35–60 % moderate, < 35 % no defense after combos; fewer than 10 combos → not rated).
 
+**Work rate** (`work_rate/work_rate.json`, a whole-video rule — no timeline row): a frame counts as work when a
+punch or a defensive move covers it; a stretch with neither lasting ≥ 3 s is dead time (shorter gaps are the normal
+breathing between combos, or a step or two around the bag). The rating is the share of the video inside those
+stretches: < 20 % working, 20–40 % patchy, ≥ 40 % stalling; under 60 s of video → not rated. Punches and actions per
+minute are shown beside it, unjudged — punch rate is a style, standing still is not. Footwork between punches is not
+credited: crediting a 45° facing change within 1–2 s as work was measured and drove dead time to 0–2 % on both test
+videos, because the unsmoothed facing model flips front/back and its turn signal does not separate moving from
+standing. `gaps.csv` lists every dead stretch.
+
 **Same punches** (`same_punches/same_punches.json`, a whole-video rule — no timeline row): under the target
 distribution, the share of the 2 most-used punch types (≥ 85 % same punches, 70–85 % moderate, < 70 % varied; fewer
 than 20 punches → not rated). The top 2 because jab and cross are normally the most common anyway.
