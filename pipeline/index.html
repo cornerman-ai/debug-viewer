@@ -413,6 +413,7 @@ const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that h
                    low_short: 'a drop too short to count — left out of the round'};
 const DROPRATE = {good: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
 const IDLECOL = {holds: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
+const GRECCOL = {recovers: '#34c759', sometimes: '#ff9f0a', 'hands stay down': '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
@@ -480,6 +481,29 @@ const RULE_LAYERS = [
         c.strokeStyle = '#ff3b30'; c.lineWidth = 2; c.globalAlpha = on ? 1 : 0.6;
         c.beginPath(); c.moveTo(xi, y + 4); c.lineTo(xi, y + h - 4); c.stroke(); c.globalAlpha = 1;
       }
+    },
+  },
+  {
+    // guard recovery (guard_recovery/combos.csv): per combined combo, each hand's mean height over the 4 frames
+    // before it started against +10..+13 frames after it ended — past the ~0.17 s a hand takes to come home.
+    key: 'grec', label: 'Guard after combo', short: 'Guard back', items: true,
+    csv: ['guard_recovery', 'combos.csv'], json: ['guard_recovery', 'guard_recovery.json'],
+    parseItem: (r, num) => r.verdict
+      ? {sf: num(r.start_frame), ef: num(r.end_frame), seq: r.sequence, verdict: r.verdict,
+         worse: r.worse_hand, slip: num(r.slip), lead: num(r.slip_lead), rear: num(r.slip_rear)}
+      : null,
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => `<b>Guard after this combo · ${x.verdict === 'recovered' ? 'back up' : 'still down'}</b><br>` +
+      `<span class="num">lead ${x.lead >= 0 ? '+' : ''}${x.lead.toFixed(2)} · rear ${x.rear >= 0 ? '+' : ''}${x.rear.toFixed(2)} torso against where they were before the combo` +
+      ` · worse: <b>${x.worse}</b></span><br>` +
+      `<span class="m">${x.seq.replaceAll(' > ', ' › ')}</span><br>` +
+      `<span class="m">read 0.33–0.43 s after the last element; 0.15 lower or more counts as not recovered</span>`,
+    row(e, x, {c, y, h, tx, fps}) {
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      c.fillStyle = x.verdict === 'recovered' ? '#34c759' : '#ff3b30'; c.globalAlpha = on ? 1 : 0.85;
+      rr(x0, y + 3, Math.max(3, x1 - x0 - 1), h - 6, 5); c.fill(); c.globalAlpha = 1;
     },
   },
   {
@@ -1228,6 +1252,7 @@ const SCOPE = {
   stance_depth: {moves: 'every frame',                          angles: 'side-on'},
   drop:      {moves: 'every punch, the hand that throws',       angles: ALL_ANGLES},
   idle:      {moves: 'every punch at its impact frame, the hand that does not throw', angles: ALL_ANGLES},
+  grec:      {moves: 'every combined combo, both hands',        angles: ALL_ANGLES},
   hrp:       {moves: 'jab, cross',                              angles: 'side-on'},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
@@ -1457,6 +1482,20 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the worst 10 % of the punch scores, averaged',
                  bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
     calc: `${q.fail} of ${q.pass + q.fail} judged punches loop · the worst 10 % of their scores, averaged`}));
+  const gr = S.layerSum.grec;                                                          //  3
+  if (gr) add('Guard after combo', gr.rating, GRECCOL[gr.rating], null, {
+    what: 'once the combination is over, are the hands back where they started?',
+    on: `${gr.n_combinations} combined combos · ${gr.judged} judged, ${gr.n_combinations - gr.judged} skipped `
+        + `(another punch or move landed inside a window, or a joint was not visible)`,
+    th: {event: {label: 'per combo', rule: 'each hand’s mean height over the 4 frames before the combo started '
+                        + 'against 0.33–0.43 s after its last frame — past the ~0.17 s a hand needs to come home; the worse hand decides',
+                 bands: [['< 0.15 torso lower', 'back up'], ['≥ 0.15', 'still down']],
+                 pal: {'back up': '#34c759', 'still down': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged combos that ended with the guard down',
+                 bands: [['< 20 %', 'recovers'], ['20–40 %', 'sometimes'], ['≥ 40 %', 'hands stay down']], pal: GRECCOL}},
+    calc: `${gr.not_recovered} of ${gr.judged} judged combos = ${pct(gr.not_recovered_share)} · `
+          + `lead ${gr.by_hand.lead.not_recovered}/${gr.by_hand.lead.judged}, `
+          + `rear ${gr.by_hand.rear.not_recovered}/${gr.by_hand.rear.judged}`});
   const ih = S.layerSum.idle;                                                          //  7
   if (ih) add('Idle hand at impact', ih.rating, IDLECOL[ih.rating], null, {
     what: 'when one hand lands, is the other one still guarding?',

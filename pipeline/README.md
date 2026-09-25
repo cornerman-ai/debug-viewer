@@ -94,6 +94,12 @@ red = wrong / too much, gray = not judged.
   not rated) — combined combos get the same rating, with the caveat that the defense model's noise inflates it. These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
+- **Guard after combo** (`guard_recovery/`): per combined combo, each hand's mean height over the 4 frames before it
+  started against 0.33–0.43 s after its last frame — past the ~0.17 s a hand needs to come home. One bar per combo,
+  green when both hands are back, red when the worse one is still ≥ 0.15 torso lower; hovering gives both hands'
+  numbers. Combos whose windows are touched by another punch or move, or missing a joint, are not drawn. Round
+  rating = the share of judged combos that ended with the guard down (< 20 % recovers, 20–40 % sometimes, ≥ 40 %
+  hands stay down). An "items" layer. Reads `combos.csv` + `guard_recovery.json`.
 - **Slip distance** (`slip_distance/`): per slip, how far the head travelled sideways from where it started, in
   torso lengths, with a white tick at the furthest frame (orange < 0.20 too short, green 0.20–0.70, red > 0.70 too
   far). Rolls and ducks are not measured. Judged front-on / back-on only. Reads `moves.csv` + `slip_distance.json`.
