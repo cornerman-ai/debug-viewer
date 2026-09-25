@@ -109,6 +109,14 @@ red = wrong / too much, gray = not judged.
   red low, and a thin gray strip for everything left out of the round — that hand throwing, a joint not visible, or a
   drop too short to count. Round rating = the share of judged frames inside a low stretch on the worse hand
   (< 10 % good, 10–25 % sometimes low, ≥ 25 % low). Reads `runs.csv` + `guard_height.json`.
+- **Chin height** (`chin_height/`) and **Chin depth** (`chin_depth/`): both per frame outside punches, both
+  continuous rows, both reading the skeleton chin (`nose + 2.25 × nose→mouth` — BlazePose has no jaw landmark).
+  Height is the chin against a line at the lead shoulder in shoulder widths, with the lens's own bands (red chin up,
+  orange level, green tucked) — those two cut-offs were fitted on a coach's labels. Depth is the chin against the
+  shoulder's front (the lead keypoint pushed forward 0.101 torso) in torso lengths, red past 0.10, read side-on
+  only. A thin gray strip is everything left out: a joint not visible, a punch in flight, the wrong camera angle, or
+  a stretch too short to count. Round rating = the share of judged frames inside a sustained bad stretch (bridged
+  over 0.5 s, at least 1 s): < 15 % good, 15–30 % sometimes, ≥ 30 % bad. Read `runs.csv` + the stage's `.json`.
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
   — green fine, red too small, and a thin gray strip for everything left out of the round — the wrong side of the
   camera, a joint not visible, or a stretch too short to count. Width = ankle-to-ankle distance in torso lengths,

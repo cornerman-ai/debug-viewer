@@ -432,10 +432,10 @@ function stanceLayer(kind) {
     summary: () => '',
     card: () => '',
     tip: (e, x) => {
-      const t = `\u00b7 ${fmtT(x.sf / S.fps)} \u00b7 ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
+      const t = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
       if (STANCESKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${STANCESKIP[x.state]}</span>`;
       const name = x.state === 'ok' ? 'Fine' : cap(C.bad);
-      return `<b>${name}</b> ${t}<br><span class="num">lowest ${x.min?.toFixed(2)} \u00b7 mean ${x.mean?.toFixed(2)} ${C.unit}</span><br>` +
+      return `<b>${name}</b> ${t}<br><span class="num">lowest ${x.min?.toFixed(2)} · mean ${x.mean?.toFixed(2)} ${C.unit}</span><br>` +
         `<span class="m">${C.rule}</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
@@ -443,6 +443,47 @@ function stanceLayer(kind) {
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, skip = !!STANCESKIP[x.state];
       const w = Math.max(2, x1 - x0);
       c.fillStyle = skip ? css('--fill2') : STANCECOL[x.state];
+      c.globalAlpha = skip ? (on ? 0.85 : 0.5) : (on ? 1 : 0.85);
+      if (skip) rr(x0, y + h / 2 - 1.5, w, 3, 1.5); else rr(x0, y + 3, w, h - 6, 4);
+      c.fill(); c.globalAlpha = 1;
+    },
+  };
+}
+const CHIN = {
+  height: {stage: 'chin_height', json: 'chin_height.json', label: 'Chin height', short: 'Chin height',
+           bad: 'chin up', good: 'tucked', mid: 'level',
+           rule: 'the chin against a line at the lead shoulder, in shoulder widths — the lens’s bands, fitted on a coach’s labels'},
+  depth:  {stage: 'chin_depth', json: 'chin_depth.json', label: 'Chin depth', short: 'Chin depth',
+           bad: 'chin out', good: 'tucked', mid: null,
+           rule: 'the chin against the front of the lead shoulder, in torso lengths, read side-on only'},
+};
+const CHINCOL = {over: '#ff3b30', over_short: '#8e8e93', level: '#ff9f0a', under: '#34c759',
+                 out: '#ff3b30', out_short: '#8e8e93', tucked: '#34c759'};
+const CHINSKIP = {no_reading: 'a joint the chin needs is not visible', punching: 'a punch is in flight',
+                  front_on: 'not side-on — the depth axis points at the camera',
+                  over_short: 'too short to count — left out of the round entirely',
+                  out_short: 'too short to count — left out of the round entirely'};
+const CHINRATE = {good: '#34c759', sometimes: '#ff9f0a', bad: '#ff3b30', 'not rated': '#8e8e93'};
+function chinLayer(kind) {
+  const C = CHIN[kind];
+  return {
+    key: `chin_${kind}`, label: C.label, short: C.short, items: true,
+    csv: [C.stage, 'runs.csv'], json: [C.stage, C.json],
+    parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame)}),
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const t = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
+      if (CHINSKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${CHINSKIP[x.state]}</span>`;
+      const name = x.state === 'under' || x.state === 'tucked' ? C.good
+                 : x.state === 'level' ? C.mid : C.bad;
+      return `<b>${cap(name)}</b> ${t}<br><span class="m">${C.rule}</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, skip = !!CHINSKIP[x.state];
+      const w = Math.max(2, x1 - x0);
+      c.fillStyle = skip ? css('--fill2') : CHINCOL[x.state] || '#8e8e93';
       c.globalAlpha = skip ? (on ? 0.85 : 0.5) : (on ? 1 : 0.85);
       if (skip) rr(x0, y + h / 2 - 1.5, w, 3, 1.5); else rr(x0, y + 3, w, h - 6, 4);
       c.fill(); c.globalAlpha = 1;
@@ -464,10 +505,10 @@ const RULE_LAYERS = [
     summary: () => '',
     card: () => '',
     tip: (e, x) => x.covered
-      ? `<b>Covered \u00b7 ${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type}</b> \u00b7 ${fmtT(x.sf / S.fps)}<br>` +
+      ? `<b>Covered · ${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type}</b> · ${fmtT(x.sf / S.fps)}<br>` +
         `<span class="num">${x.delay >= 0 ? 'starts ' + x.delay.toFixed(2) + ' s after the combo ends' : 'starts during the combo, ' + (-x.delay).toFixed(2) + ' s before it ends'}</span><br>` +
         `<span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span>`
-      : `<b>No defense after this combo</b> \u00b7 ${fmtT(x.endF / S.fps)}<br>` +
+      : `<b>No defense after this combo</b> · ${fmtT(x.endF / S.fps)}<br>` +
         `<span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>` +
         `<span class="m">nothing started during it or within 1 s of the end</span>`,
     row(e, x, {c, y, h, tx, fps}) {
@@ -907,6 +948,7 @@ const RULE_LAYERS = [
     },
   },
   stanceLayer('width'), stanceLayer('depth'),
+  chinLayer('height'), chinLayer('depth'),
 
 ];
 const LAYERS = RULE_LAYERS.map(r => r.key);
@@ -1257,6 +1299,8 @@ const SCOPE = {
   drop:      {moves: 'every punch, the hand that throws',       angles: ALL_ANGLES},
   idle:      {moves: 'every punch at its impact frame, the hand that does not throw', angles: ALL_ANGLES},
   grec:      {moves: 'every combined combo, both hands',        angles: ALL_ANGLES},
+  chin_height: {moves: 'every frame outside a punch',           angles: ALL_ANGLES},
+  chin_depth:  {moves: 'every frame outside a punch',           angles: 'side-on'},
   hrp:       {moves: 'jab, cross',                              angles: 'side-on'},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
@@ -1303,7 +1347,7 @@ function ruleCard() {
   const cnt = (key, f) => P.filter(p => p[key] && f(p[key])).length;
   const scored = (key, name, info) => {
     const c = layerChip(key, S.layerSum[key]); if (!c) return;
-    const [n, band] = c.txt.split(' \u00b7 ');
+    const [n, band] = c.txt.split(' · ');
     add(name, n, c.col, band, info(scoreCounts(key)));
   };
 
@@ -1385,7 +1429,7 @@ function ruleCard() {
     th: {round: {label: 'per round', rule: 'the share of the most-used move, and separately of the most-used side',
                  bands: [['≥ 80 %', 'same defense'], ['60–80 %', 'moderate'], ['< 60 %', 'varied'],
                          ['side ≥ 80 %', 'one-sided']], pal: SDCOL}},
-    calc: `${sd.same_move.top_type} ${pct(sd.same_move.top_type_share)} of moves \u00b7 side ${sd.same_side.top_side} ${pct(sd.same_side.top_side_share)} (${sd.same_side.rating})`});
+    calc: `${sd.same_move.top_type} ${pct(sd.same_move.top_type_share)} of moves · side ${sd.same_side.top_side} ${pct(sd.same_side.top_side_share)} (${sd.same_side.rating})`});
   const sl = S.slipD;                                                                  // 21 + 22
   if (sl) add('Slip distance', sl.rating, SLIPRATE[sl.rating], null, {
     what: 'when he slips, does the head move far enough — and not too far?',
@@ -1402,7 +1446,7 @@ function ruleCard() {
   const shr = S.shSum;                                                                 // 20
   if (shr) add('Shoulder rotation', shr.rating, HIPCOL[shr.rating], null, {
     what: 'do the shoulders turn into the punch, or does the arm go alone?',
-    on: `${shr.n_punches} punches \u00b7 ${shr.n_judged} judged from start to impact, ${shr.n_punches - shr.n_judged} `
+    on: `${shr.n_punches} punches · ${shr.n_judged} judged from start to impact, ${shr.n_punches - shr.n_judged} `
         + `skipped (no impact frame or no readable shoulder line)`,
     th: {event: {label: 'per punch', rule: 'each punch type has its own good band: twice the middle half of what the '
                         + 'study\u2019s boxers\u2019 shoulders did (lead jab 0\u201340\u00b0, rear cross 11\u201373\u00b0, rear hook 22\u201382\u00b0, \u2026)',
@@ -1410,13 +1454,13 @@ function ruleCard() {
                  pal: {good: '#34c759', 'too little': '#ff9f0a', 'too much': '#ff3b30'}},
          round: {label: 'per round', rule: 'the share of judged punches inside the band',
                  bands: [['\u2265 80 %', 'good'], ['65\u201380 %', 'mixed'], ['< 65 %', 'poor']], pal: HIPCOL}},
-    calc: `${shr.n_good} inside the band / ${shr.n_judged} punches = ${pct(shr.good_share)} \u00b7 `
-          + `${shr.n_too_little} too little \u00b7 ${shr.n_too_much} too much`});
+    calc: `${shr.n_good} inside the band / ${shr.n_judged} punches = ${pct(shr.good_share)} · `
+          + `${shr.n_too_little} too little · ${shr.n_too_much} too much`});
   const hd = S.handDrop;                                                               // 10
   if (hd) add('Hand drop before punch', hd.rating, DROPRATE[hd.rating], null, {
     what: 'does the hand dip before it throws, showing the punch is coming?',
-    on: `${hd.n_punches} punches \u00b7 ${hd.judged_punches} judged, ${hd.n_punches - hd.judged_punches} skipped `
-        + `(no reading in the 0.4 s before the punch) \u00b7 lead ${hd.by_hand.lead.dips}/${hd.by_hand.lead.judged}, `
+    on: `${hd.n_punches} punches · ${hd.judged_punches} judged, ${hd.n_punches - hd.judged_punches} skipped `
+        + `(no reading in the 0.4 s before the punch) · lead ${hd.by_hand.lead.dips}/${hd.by_hand.lead.judged}, `
         + `rear ${hd.by_hand.rear.dips}/${hd.by_hand.rear.judged}`,
     th: {event: {label: 'per punch', rule: 'how far the hand goes below ITS OWN guard (this boxer\u2019s median, '
                         + `lead ${hd.baseline.lead}, rear ${hd.baseline.rear} torso below the nose) in the 0.4 s before the punch`,
@@ -1445,22 +1489,22 @@ function ruleCard() {
   const stW = S.stanceW, stD = S.stanceD;
   if (stW) add('Stance width', stW.rating, STANCERATE[stW.rating], null, {             // 24
     what: STANCE.width.what,
-    on: `${stW.n_frames.toLocaleString()} frames \u00b7 ${stW.judged_frames.toLocaleString()} judged, the rest skipped `
+    on: `${stW.n_frames.toLocaleString()} frames · ${stW.judged_frames.toLocaleString()} judged, the rest skipped `
         + `(side-on, or a joint not visible)`,
     th: {event: {label: 'per frame', rule: STANCE.width.rule,
                  bands: [['\u2265 0.50', 'fine'], ['< 0.50', 'narrow']], pal: {fine: '#34c759', narrow: '#ff3b30'}},
          round: {label: 'per round', rule: STANCE.width.roundRule, bands: STANCE.width.bands, pal: STANCERATE}},
     calc: `${stW.narrow_frames.toLocaleString()} of ${stW.judged_frames.toLocaleString()} judged frames = `
-          + `${pct(stW.narrow_share)} \u00b7 median ${stW.median_sep} torso`});
+          + `${pct(stW.narrow_share)} · median ${stW.median_sep} torso`});
   if (stD) add('Stance depth', stD.rating, STANCERATE[stD.rating], null, {             // 23
     what: STANCE.depth.what,
-    on: `${stD.n_frames.toLocaleString()} frames \u00b7 ${stD.judged_frames.toLocaleString()} judged, the rest skipped `
+    on: `${stD.n_frames.toLocaleString()} frames · ${stD.judged_frames.toLocaleString()} judged, the rest skipped `
         + `(front-on, or a joint not visible)`,
     th: {event: {label: 'per frame', rule: STANCE.depth.rule,
                  bands: [['\u2265 0.50', 'fine'], ['< 0.50', 'shallow']], pal: {fine: '#34c759', shallow: '#ff3b30'}},
          round: {label: 'per round', rule: STANCE.depth.roundRule, bands: STANCE.depth.bands, pal: STANCERATE}},
     calc: `${stD.shallow_frames.toLocaleString()} of ${stD.judged_frames.toLocaleString()} judged frames = `
-          + `${pct(stD.shallow_share)} \u00b7 median ${stD.median_depth} leg`});
+          + `${pct(stD.shallow_share)} · median ${stD.median_depth} leg`});
   if (sp) add('Same punches', sp.rating, SPCOL[sp.rating], null, {                      // 19
     what: 'does he throw anything beyond his two favourite punches?',
     on: `${sp.n_punches} punches · all judged, grouped by punch type`,
@@ -1489,6 +1533,32 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the worst 10 % of the punch scores, averaged',
                  bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
     calc: `${q.fail} of ${q.pass + q.fail} judged punches loop · the worst 10 % of their scores, averaged`}));
+  const chh = S.layerSum.chin_height;                                                 //  9
+  if (chh) add('Chin height', chh.rating, CHINRATE[chh.rating], null, {
+    what: 'is the chin down behind the lead shoulder, or riding above it?',
+    on: `${chh.n_frames.toLocaleString()} frames · ${chh.judged_frames.toLocaleString()} judged outside punches · `
+        + `${chh.over_short_frames.toLocaleString()} more were chin-up too briefly to count and are left out of the round entirely`,
+    th: {event: {label: 'per frame', rule: 'the chin (nose + 2.25 × nose→mouth, since BlazePose has no jaw) against a '
+                        + 'line at the lead shoulder, in shoulder widths. The two cut-offs are the lens’s, fitted on a coach’s labels',
+                 bands: [['above the line', 'chin up'], ['around it', 'level'], ['below it', 'tucked']],
+                 pal: {'chin up': '#ff3b30', level: '#ff9f0a', tucked: '#34c759'}},
+         round: {label: 'per round', rule: 'the share of judged frames inside a sustained chin-up stretch (bridged over 0.5 s, at least 1 s long)',
+                 bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes'], ['≥ 30 %', 'bad']], pal: CHINRATE}},
+    calc: `${chh.over_frames.toLocaleString()} of ${chh.judged_frames.toLocaleString()} judged frames = `
+          + `${pct(chh.over_share)} · median ${chh.median_height_norm} shoulder widths`});
+  const chd = S.layerSum.chin_depth;                                                  //  8
+  if (chd) add('Chin depth', chd.rating, CHINRATE[chd.rating], null, {
+    what: 'does the chin sit behind the front of the lead shoulder, or stick out past it?',
+    on: `${chd.n_frames.toLocaleString()} frames · ${chd.judged_frames.toLocaleString()} judged (outside punches and side-on only — `
+        + `head-on the depth axis points at the camera) · ${chd.out_short_frames.toLocaleString()} more were out too briefly to count`,
+    th: {event: {label: 'per frame', rule: 'the chin against the shoulder’s front — the lead keypoint pushed forward by '
+                        + '0.101 torso, because the joint centre sits inside the deltoid — in torso lengths',
+                 bands: [['≤ 0.10 torso in front', 'tucked'], ['> 0.10', 'chin out']],
+                 pal: {tucked: '#34c759', 'chin out': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged frames inside a sustained chin-out stretch (bridged over 0.5 s, at least 1 s long)',
+                 bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes'], ['≥ 30 %', 'bad']], pal: CHINRATE}},
+    calc: `${chd.out_frames.toLocaleString()} of ${chd.judged_frames.toLocaleString()} judged frames = `
+          + `${pct(chd.out_share)} · median gap ${chd.median_gap} torso`});
   const gr = S.layerSum.grec;                                                          //  3
   if (gr) add('Guard after combo', gr.rating, GRECCOL[gr.rating], null, {
     what: 'once the combination is over, are the hands back where they started?',
