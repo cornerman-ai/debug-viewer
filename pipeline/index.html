@@ -411,7 +411,7 @@ const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing',
                    low_short: 'a drop too short to count — left out of the round'};
-const DROPRATE = {good: '#34c759', 'sometimes telegraphs': '#ff9f0a', telegraphs: '#ff3b30', 'not rated': '#8e8e93'};
+const DROPRATE = {good: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
@@ -506,7 +506,7 @@ const RULE_LAYERS = [
   {
     // hand drop before the punch (hand_drop/punches.csv): did the punching hand dip below its own guard in the
     // 0.4 s before it went? Per punch, joined by start frame + hand; a white tick marks the lowest frame.
-    key: 'drop', label: 'Hand drop (telegraph)', short: 'Telegraph',
+    key: 'drop', label: 'Hand drop before punch', short: 'Hand drop',
     csv: ['hand_drop', 'punches.csv'], json: ['hand_drop', 'hand_drop.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, dip: num(r.dip), dipF: num(r.dip_frame), base: num(r.baseline)}
       : {verdict: '', skip: r.skip_reason},
@@ -516,15 +516,15 @@ const RULE_LAYERS = [
        `<div class="rows num" style="margin-top:0"><span>Dip below his own guard</span><b>${x.dip.toFixed(2)} torso</b>
         <span>His guard sits at</span><b>${x.base.toFixed(2)} torso below the nose</b>
         <span>Lowest frame</span><b>f ${x.dipF}</b>
-        <span>Verdict</span><b>${x.verdict === 'telegraph' ? 'telegraphed' : 'no dip'}</b></div>`) + '</div>',
+        <span>Verdict</span><b>${x.verdict === 'dip' ? 'dipped first' : 'no dip'}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">no reading in the 0.4 s before this punch</span>` :
-      `<span class="num">${x.verdict === 'telegraph' ? '<b>telegraphed</b>' : 'no dip'} · the hand went ` +
+      `<span class="num">${x.verdict === 'dip' ? '<b>dipped first</b>' : 'no dip'} · the hand went ` +
       `<b>${x.dip.toFixed(2)}</b> torso below its own guard before starting</span><br>` +
-      `<span class="m">telegraph at 0.25 torso, measured in the 0.4 s before the punch</span>`),
+      `<span class="m">a dip of 0.25 torso or more counts, measured in the 0.4 s before the punch</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;                                // nothing readable: draw nothing
       const [bx, w] = span(e);
-      c.fillStyle = x.verdict === 'telegraph' ? '#ff3b30' : '#34c759';
+      c.fillStyle = x.verdict === 'dip' ? '#ff3b30' : '#34c759';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
       tag(bx, w, y, h, `${x.dip.toFixed(2)}`);
       ring(e, 'drop', bx, y, w, h);
@@ -1310,19 +1310,19 @@ function ruleCard() {
     calc: `${shr.n_good} inside the band / ${shr.n_judged} punches = ${pct(shr.good_share)} \u00b7 `
           + `${shr.n_too_little} too little \u00b7 ${shr.n_too_much} too much`});
   const hd = S.handDrop;                                                               // 10
-  if (hd) add('Hand drop (telegraph)', hd.rating, DROPRATE[hd.rating], null, {
-    what: 'does the hand dip before it throws, telling the opponent it is coming?',
+  if (hd) add('Hand drop before punch', hd.rating, DROPRATE[hd.rating], null, {
+    what: 'does the hand dip before it throws, showing the punch is coming?',
     on: `${hd.n_punches} punches \u00b7 ${hd.judged_punches} judged, ${hd.n_punches - hd.judged_punches} skipped `
-        + `(no reading in the 0.4 s before the punch) \u00b7 lead ${hd.by_hand.lead.telegraph}/${hd.by_hand.lead.judged}, `
-        + `rear ${hd.by_hand.rear.telegraph}/${hd.by_hand.rear.judged}`,
+        + `(no reading in the 0.4 s before the punch) \u00b7 lead ${hd.by_hand.lead.dips}/${hd.by_hand.lead.judged}, `
+        + `rear ${hd.by_hand.rear.dips}/${hd.by_hand.rear.judged}`,
     th: {event: {label: 'per punch', rule: 'how far the hand goes below ITS OWN guard (this boxer\u2019s median, '
                         + `lead ${hd.baseline.lead}, rear ${hd.baseline.rear} torso below the nose) in the 0.4 s before the punch`,
-                 bands: [['< 0.25', 'no dip'], ['\u2265 0.25', 'telegraph']],
-                 pal: {'no dip': '#34c759', telegraph: '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches that telegraphed',
-                 bands: [['< 10 %', 'good'], ['10\u201325 %', 'sometimes telegraphs'], ['\u2265 25 %', 'telegraphs']],
+                 bands: [['< 0.25', 'no dip'], ['\u2265 0.25', 'dips']],
+                 pal: {'no dip': '#34c759', dips: '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged punches whose hand dipped first',
+                 bands: [['< 10 %', 'good'], ['10\u201325 %', 'sometimes drops'], ['\u2265 25 %', 'drops']],
                  pal: DROPRATE}},
-    calc: `${hd.telegraph_punches} of ${hd.judged_punches} judged punches = ${pct(hd.telegraph_share)}`});
+    calc: `${hd.dip_punches} of ${hd.judged_punches} judged punches = ${pct(hd.dip_share)}`});
   const gu = S.guard;                                                                  // 9
   if (gu) add('Guard height', gu.rating, GUARDRATE[gu.rating], null, {
     what: 'does a hand drop while it is not punching?',
