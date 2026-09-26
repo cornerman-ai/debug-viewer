@@ -2463,7 +2463,13 @@ function drawLayerRows(c, f, W, text, grid) {
 }
 
 // ════════════════════════════ frame loop ════════════════════════════
-const frameNow = () => Math.max(0, Math.min(S.n - 1, Math.round(video.currentTime * S.fps)));
+// The frame the clock is INSIDE, not the nearest frame boundary. seekFrame aims at the middle of a frame's slot,
+// (f + 0.5) / fps, and Chrome leaves currentTime exactly there — so Math.round read that back as f + 1 whenever the
+// divide-then-multiply landed a hair above the half, which is most frames (1,954 of 2,000 at 29.97 fps). Those
+// frames could not be reached at all: clicking f showed f + 1, and clicking f + 1 showed f + 1 as well. floor is
+// the exact inverse of the midpoint target and matches hit()'s own floor; the epsilon absorbs the same float error
+// the other way, for browsers that snap currentTime back to the frame's own start instead of keeping the seek.
+const frameNow = () => Math.max(0, Math.min(S.n - 1, Math.floor(video.currentTime * S.fps + 1e-6)));
 function draw(force) {
   if (!S.src) return;
   const f = frameNow();
