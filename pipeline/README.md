@@ -48,7 +48,17 @@ The **Timeline layers** card stays below both views: it only turns timeline rows
 that rule's headline verdict.
 
 **Rule layers** (side panel, all off by default, the choice is remembered): each adds a timeline row, a section in
-the punch card and a video overlay for the punch under the playhead. Colors: green = fine, orange = too little,
+the punch card and a video overlay.
+
+Every rule with geometry in the frame now draws it. Rules that judge a punch (arm extension, hit height, hip and
+shoulder rotation, head off center, hand drop, idle hand, balance, hand return path) draw for the punch under the
+playhead. Rules that judge frames (guard height, elbow tuck, chin height and depth, stance width and depth, both
+bladedness axes, slip distance) draw on every frame through `frameOverlay`, which gets the raw BlazePose-33
+channels — they need joints (mouth corners, heels, toes) and channels (world x/z) the punch overlays never touch.
+Punch speed has no overlay on purpose: it measures a duration, and a duration has no geometry to draw.
+
+Turn on one or two at a time. With a dozen layers on, the picture is unreadable — that is a debugging view, not a
+bug. Colors: green = fine, orange = too little,
 red = wrong / too much. A stretch the rule threw out — a joint it needs not visible, a punch in flight, the wrong
 camera angle — is a **dashed gray mid-line carrying the reason**: `joint hidden`, `side-on`, `front-on`,
 `punching` or `hook`, written on the strip when there is room for it and in the tooltip always. The row is
