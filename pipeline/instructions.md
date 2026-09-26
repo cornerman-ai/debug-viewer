@@ -1,6 +1,6 @@
 # Adding a rule to the pipeline viewer
 
-A rule is built in the backend (`cornerman-backend/combined_pipeline/research/run_<rule>.py`, writing
+A rule is built in the backend (`cornerman-backend/combined_pipeline/rules_creation/run_<rule>.py`, writing
 `Ambo/data/pipeline_tests/<video>/<stage>/`). Showing it here is part of implementing it, not a separate task.
 
 ## 1. Decide where it goes

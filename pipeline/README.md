@@ -7,7 +7,7 @@ video: punches (`punch_classification/`) with their impact frame drawn on each p
 moves (`defense_classification/`) and the continuous facing angle (`facing_angle/`). No build, no dependencies; like
 the rule debug viewer, files stay on your machine — the page reads them through the browser, nothing is uploaded.
 
-The stage folders are written by the backend's `combined_pipeline/research/` scripts (`run_punches.py`,
+The stage folders are written by the backend's `combined_pipeline/rules_creation/` scripts (`run_punches.py`,
 `run_impact.py`, `run_defense.py`, `run_facing_angle.py`) into Drive `Ambo/data/pipeline_tests/<video>/`.
 
 ## Opening it
