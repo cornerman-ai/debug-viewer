@@ -205,7 +205,7 @@ change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than
 
 **Hand balance** (`hand_balance/hand_balance.json`, a whole-video rule — no timeline row): the share of punches
 thrown with the rear hand, scored 100 from 25 % to 60 % and falling linearly to 0 at 0 % (all lead) and at 100 % (all
-rear); a plain number, no bands; fewer than 30 punches → not rated. The band is off-centre on purpose: the lead hand should throw more, the jab
+rear); a plain number, no bands; fewer than 10 punches → not rated. The band is off-centre on purpose: the lead hand should throw more, the jab
 being the most thrown punch. Each hand's punch types sit beside it, unjudged.
 
 **Combination length** (`combo_length/combo_length.json`, a whole-video rule — no timeline row): over the offensive

@@ -2196,7 +2196,7 @@ function ruleCard() {
     on: `${hb.n_punches} punches · all judged, grouped by hand`,
     th: {round: {label: 'per round', rule: 'the share of punches thrown with the rear hand, scored: 100 from 25 % to 60 %, '
                         + 'falling linearly to 0 at 0 % (all lead) and at 100 % (all rear) — a plain number, no bands; '
-                        + 'fewer than 30 punches: not rated',
+                        + 'fewer than 10 punches: not rated',
                  bands: [['25–60 %', '100'], ['0 → 25 %', '0 → 100'], ['60 → 100 %', '100 → 0']],
                  pal: {'100': '#34c759', '0 → 100': '#ff9f0a', '100 → 0': '#ff9f0a'}}},
     calc: `${hb.n_rear} rear / ${hb.n_punches} punches = ${pct(hb.rear_share)} → ${hb.score ?? '–'} (${hb.side}) · lead ${hb.n_lead} (`
