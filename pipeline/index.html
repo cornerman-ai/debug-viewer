@@ -867,7 +867,7 @@ const RULE_LAYERS = [
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'balanced' ? '#34c759' : '#ff3b30';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, x.score.toFixed(0));
+      tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'bal', bx, y, w, h);
     },
     overlay(e, x, f, P) {                                  // the base between the ankles, the head over it, the hips
