@@ -80,7 +80,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   share of judged punches failing either check (< 20 % balanced, 20–40 % mixed, ≥ 40 % off balance). Reads
   `punches.csv` + `balance.json`.
 - **Uppercut stop** (`uppercut_stop/`): per head uppercut, read side-on, where the fist is at the turnaround — the
-  frame the impact spotter says it stopped going forward. The line is the chin of a ghost the boxer's own size (the
+  frame the impact spotter says it stopped going forward. The fist is the mean of the wrist, pinky, index and thumb
+  (the wrist alone reads an uppercut low), and the ring is drawn on that point. The line is the chin of a ghost the boxer's own size (the
   same ghost hit height builds), and the overlay draws it solid with the crown dashed above it, so the stricter
   line stays visible. Green at or below the chin, red above it, labelled with the gap in stance heights. Nothing is
   drawn for a body shot (the classifier merges body hooks and body uppercuts), a punch thrown head-on, or a missing

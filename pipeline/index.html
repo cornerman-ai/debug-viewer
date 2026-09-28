@@ -894,12 +894,14 @@ const RULE_LAYERS = [
     key: 'upstop', label: 'Uppercut stop', short: 'Upper stop',
     csv: ['uppercut_stop', 'punches.csv'], json: ['uppercut_stop', 'uppercut_stop.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, over: num(r.over), overCrown: num(r.over_crown),
-      chinNy: num(r.chin_ny), crownNy: num(r.crown_ny)} : {verdict: '', skip: r.skip_reason},
+      chinNy: num(r.chin_ny), crownNy: num(r.crown_ny), handNx: num(r.hand_nx), handNy: num(r.hand_ny)}
+      : {verdict: '', skip: r.skip_reason},
     summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">Uppercut stop</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_side_on' ? 'thrown head-on — the uppercut’s arc runs up and forward, and head-on the forward half points at the camera'
                                                 : x && x.skip === 'body_shot' ? 'a body shot — the classifier cannot tell a body uppercut from a body hook'
                                                 : x && x.skip === 'not_an_uppercut' ? 'not an uppercut'
+                                                : x && x.skip === 'hand_not_visible' ? 'a hand point (pinky, index or thumb) is not visible at the impact frame'
                                                 : 'the wrist or the body is not visible at the impact frame'}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Past the chin</span><b>${x.over > 0 ? '+' : ''}${x.over.toFixed(3)} stance heights</b>
         <span>Past the crown</span><b>${x.overCrown > 0 ? '+' : ''}${x.overCrown.toFixed(3)} — the stricter line</b>
@@ -927,7 +929,8 @@ const RULE_LAYERS = [
       const x0 = Math.min(lsh[0], rsh[0]) - 50, x1 = Math.max(lsh[0], rsh[0]) + 50;
       OV.level(crown[1], x0, x1, '#8e8e93', [3, 4]);       // the top of the head: the line first tried, too high
       OV.level(chin[1], x0, x1, col);                      // the chin: the uppercut's own target
-      const fist = PAT(e.impact, wr) || w;                 // where the fist was when it turned around
+      // the point the rule reads: the fist's centre (wrist + pinky + index + thumb) at the turnaround
+      const fist = PXY(x.handNx, x.handNy) || PAT(e.impact, wr) || w;
       OV.line([fist[0], chin[1]], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
       if (f !== e.impact) OV.dot(w, col, 4);
       overlayLabel(x0, chin[1] - 16,
