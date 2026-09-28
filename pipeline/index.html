@@ -626,8 +626,8 @@ function bladeLayer(kind) {
   };
 }
 const RULE_LAYERS = [
-  comboLayer('offensive', 'Offensive combos', 'O combos', 'punches only'),
-  comboLayer('combined', 'Combined combos', 'C combos', 'punches + defensive moves'),
+  comboLayer('offensive', 'Offensive combos', 'Build purposeful combinations / Vary punch combinations', 'punches only'),
+  comboLayer('combined', 'Combined combos', 'Vary defense after attacking', 'punches + defensive moves'),
   {
     // defense after combo (defense_after_combo/combos.csv): the defensive move that covered an offensive combo, drawn
     // where the move is. Combos nobody covered are a short hollow mark at the combo's end frame.
@@ -753,7 +753,7 @@ const RULE_LAYERS = [
     // keep the guard before punching (hand_drop/punches.csv): how far the punching wrist sits below the nose, in torso
     // lengths, averaged over every readable frame of the 0.25 s before the punch starts. Low above 0.40 — the same
     // absolute line guard height and idle hand use.
-    key: 'drop', label: 'Hand drop before punch', short: 'Keep guard before punching',
+    key: 'drop', label: 'Punching hand drop before punch', short: 'Punching hand drop before punch',
     window: true,                                          // its block, ring and hover cover the 0.25 s BEFORE the punch
     split: 'hand',                                         // lead windows on the top half, rear on the bottom
     csv: ['hand_drop', 'punches.csv'], json: ['hand_drop', 'hand_drop.json'],
@@ -1447,6 +1447,14 @@ const RULE_LAYERS = [
 
 ];
 const LAYERS = RULE_LAYERS.map(r => r.key);
+// Which Notion rules (by number, 2026-09-28) each timeline layer judges — shown beside its switch.
+const LAYER_RULES = {
+  bal: [1], drop: [2], grec: [3], defcov: [4], guard: [5], idle: [7], chin_depth: [8], chin_height: [9], elbow: [10],
+  hoc: [11], stance_depth: [12], stance_width: [13], slipd: [15, 16], hrp: [17], blade_hips: [18], blade_shoulders: [19],
+  hip: [20], shoulder: [21], arm: [22], hit: [23], speed: [24], offensive: [25, 31], combined: [32], hookstop: [33],
+  upstop: [34], rpivot: [35],
+};
+const rulesTag = k => LAYER_RULES[k] ? ` <span class="m">(${LAYER_RULES[k].map(n => 'rule ' + n).join(', ')})</span>` : '';
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
 const RULE = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r]));
 const ARM3 = {lead: [11, 13, 15], rear: [12, 14, 16]};         // BlazePose-33 shoulder / elbow / wrist of the orthodox lead / rear arm
@@ -1764,7 +1772,7 @@ const count = (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (
 function buildLayers() {
   const list = $('layerList');
   if (!list.children.length) {                             // the toggles, once
-    list.innerHTML = RULE_LAYERS.map(L => `<div class="layer"><label class="toggle" data-layer="${L.key}">${L.label}<span class="sw"></span></label>` +
+    list.innerHTML = RULE_LAYERS.map(L => `<div class="layer"><label class="toggle" data-layer="${L.key}"><span>${L.label}${rulesTag(L.key)}</span><span class="sw"></span></label>` +
       `<div class="lsum" id="sum-${L.key}"></div><div id="scope-${L.key}"></div></div>`).join('');
     list.querySelectorAll('.toggle[data-layer]').forEach(t => t.onclick = e => {
       e.preventDefault(); const k = t.dataset.layer; if (!S.has?.[k]) return;
@@ -1842,7 +1850,7 @@ function scoreCounts(key) {
 // The Notion "Production rules" numbering (read 2026-09-28): the round view is one list in this order. Slip distance is
 // one script for two Notion rows — 15 "slip far enough" and 16 "keep slips compact" — so it sits at 15 and says so.
 const NOTION = {
-  'Balance at impact': 1, 'Hand drop before punch': 2, 'Guard after combo': 3, 'Defense after combo': 4,
+  'Balance at impact': 1, 'Punching hand drop before punch': 2, 'Guard after combo': 3, 'Defense after combo': 4,
   'Guard height': 5, 'Hand balance': 6, 'Idle hand at impact': 7, 'Chin depth': 8, 'Chin height': 9,
   'Elbow tuck': 10, 'Head off center line': 11, 'Stance depth': 12, 'Stance width': 13, 'Angle change': 14,
   'Slip distance': 15, 'Hand return path': 17, 'Hips bladed': 18, 'Shoulders bladed': 19, 'Hip rotation': 20,
@@ -1972,7 +1980,7 @@ function ruleCard() {
     calc: `${shr.n_good} inside the band / ${shr.n_judged} punches = ${pct(shr.good_share)} · `
           + `${shr.n_too_little} too little · ${shr.n_too_much} too much`});
   const hd = S.handDrop;
-  if (hd) add('Hand drop before punch', hd.score ?? 'not rated', hd.score == null ? '#8e8e93' : 'var(--text)', null, {
+  if (hd) add('Punching hand drop before punch', hd.score ?? 'not rated', hd.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'is the punching hand up at guard just before it throws?',
     on: `${hd.n_punches} punches · ${hd.judged_punches} judged, ${hd.n_punches - hd.judged_punches} skipped `
         + `(the wrist not visible in the 0.25 s before the punch) · lead ${hd.by_hand.lead.low}/${hd.by_hand.lead.judged}, `
