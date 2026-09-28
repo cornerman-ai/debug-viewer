@@ -426,6 +426,8 @@ const DROPRATE = {good: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30
 const IDLECOL = {holds: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
 const BALCOL = {balanced: '#34c759', mixed: '#ff9f0a', 'off balance': '#ff3b30', 'not rated': '#8e8e93'};
 const SPEEDCOL = {sharp: '#34c759', mixed: '#ff9f0a', slow: '#ff3b30', 'not rated': '#8e8e93'};
+const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
+const HOOKSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'wraps around': '#ff3b30', 'not rated': '#8e8e93'};
 const GRECCOL = {recovers: '#34c759', sometimes: '#ff9f0a', 'hands stay down': '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
@@ -884,6 +886,98 @@ const RULE_LAYERS = [
       OV.line([nose[0], nose[1]], [nose[0], y], headCol, 2.5, [6, 4]); OV.ring(nose, headCol, 13, 3);
       overlayLabel(Math.min(lo[0], nose[0]) - 10, y + 26,
         `head ${x.head.toFixed(2)} · hips ${x.off.toFixed(2)} off centre`, x.verdict === 'balanced' ? '#34c759' : '#ff3b30');
+    },
+  },
+  {
+    // stopping the uppercut (uppercut_stop/punches.csv): the impact frame is the turnaround, so the question is
+    // simply where the fist was when it stopped. The line is the ghost's chin — the uppercut's own target.
+    key: 'upstop', label: 'Uppercut stop', short: 'Upper stop',
+    csv: ['uppercut_stop', 'punches.csv'], json: ['uppercut_stop', 'uppercut_stop.json'],
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, over: num(r.over), overCrown: num(r.over_crown),
+      chinNy: num(r.chin_ny), crownNy: num(r.crown_ny)} : {verdict: '', skip: r.skip_reason},
+    summary: () => '',
+    card: (e, x) => `<div class="sub"><div class="h">Uppercut stop</div>` +
+      (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_side_on' ? 'thrown head-on — the uppercut’s arc runs up and forward, and head-on the forward half points at the camera'
+                                                : x && x.skip === 'body_shot' ? 'a body shot — the classifier cannot tell a body uppercut from a body hook'
+                                                : x && x.skip === 'not_an_uppercut' ? 'not an uppercut'
+                                                : 'the wrist or the body is not visible at the impact frame'}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Past the chin</span><b>${x.over > 0 ? '+' : ''}${x.over.toFixed(2)} stance heights</b>
+        <span>Past the crown</span><b>${x.overCrown > 0 ? '+' : ''}${x.overCrown.toFixed(2)} — the stricter line</b>
+        <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
+      `<span class="num"><b>${x.verdict}</b> · the fist stopped ${Math.abs(x.over).toFixed(2)} stance heights ` +
+      `${x.over > 0 ? 'ABOVE' : 'below'} the chin</span><br>` +
+      `<span class="m">a head uppercut is aimed at the chin — a fist still travelling past it was not stopped</span>`),
+    row(e, x, {c, y, h, span, tag, ring}) {
+      if (!x.verdict) return;
+      const [bx, w] = span(e);
+      c.fillStyle = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
+      rr(bx, y + 3, w, h - 6, 5); c.fill();
+      tag(bx, w, y, h, `${x.over > 0 ? '+' : ''}${x.over.toFixed(2)}`);
+      ring(e, 'upstop', bx, y, w, h);
+    },
+    overlay(e, x, f, P, leadLeft) {                        // the chin it is aimed at, and where the fist stopped
+      if (!x.verdict || x.chinNy == null) return;
+      const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
+      const lsh = P(J.lsh), rsh = P(J.rsh), w = P(wr);
+      if (!(lsh && rsh && w)) return;
+      const chin = PXY(0, x.chinNy), crown = PXY(0, x.crownNy);
+      if (!(chin && crown)) return;
+      const col = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
+      const x0 = Math.min(lsh[0], rsh[0]) - 50, x1 = Math.max(lsh[0], rsh[0]) + 50;
+      OV.level(crown[1], x0, x1, '#8e8e93', [3, 4]);       // the top of the head: the line first tried, too high
+      OV.level(chin[1], x0, x1, col);                      // the chin: the uppercut's own target
+      const fist = PAT(e.impact, wr) || w;                 // where the fist was when it turned around
+      OV.line([fist[0], chin[1]], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
+      if (f !== e.impact) OV.dot(w, col, 4);
+      overlayLabel(x0, chin[1] - 16,
+        `${x.over > 0 ? '+' : ''}${x.over.toFixed(2)} past the chin`, col);
+    },
+  },
+  {
+    // stopping the hook (hook_stop/punches.csv): the same question across the frame. The line is the boxer's own
+    // far shoulder, set from his squared-up width over the clip so a bladed frame cannot shrink it.
+    key: 'hookstop', label: 'Hook stop', short: 'Hook stop',
+    csv: ['hook_stop', 'punches.csv'], json: ['hook_stop', 'hook_stop.json'],
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, cross: num(r.cross), lineNx: num(r.line_nx)}
+      : {verdict: '', skip: r.skip_reason},
+    summary: () => '',
+    card: (e, x) => `<div class="sub"><div class="h">Hook stop</div>` +
+      (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_front_or_back_on' ? 'thrown side-on — the hook travels across the frame, and side-on that axis points at the camera'
+                                                : x && x.skip === 'body_shot' ? 'a body shot — the classifier cannot tell a body hook from a body uppercut'
+                                                : x && x.skip === 'not_a_hook' ? 'not a hook'
+                                                : 'the wrist or the body is not visible at the impact frame'}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Past the far shoulder</span><b>${x.cross > 0 ? '+' : ''}${x.cross.toFixed(2)} torso</b>
+        <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
+      `<span class="num"><b>${x.verdict}</b> · the fist stopped ${Math.abs(x.cross).toFixed(2)} torso ` +
+      `${x.cross > 0 ? 'PAST' : 'short of'} his far shoulder</span><br>` +
+      `<span class="m">the far shoulder is his own squared-up width, not the gap in this frame — seen front-on a ` +
+      `bladed boxer’s shoulders collapse together</span>`),
+    row(e, x, {c, y, h, span, tag, ring}) {
+      if (!x.verdict) return;
+      const [bx, w] = span(e);
+      c.fillStyle = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
+      rr(bx, y + 3, w, h - 6, 5); c.fill();
+      tag(bx, w, y, h, `${x.cross > 0 ? '+' : ''}${x.cross.toFixed(2)}`);
+      ring(e, 'hookstop', bx, y, w, h);
+    },
+    overlay(e, x, f, P, leadLeft) {                        // the far shoulder it should stop at, and where it did
+      if (!x.verdict || x.lineNx == null) return;
+      const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
+      const lsh = P(J.lsh), rsh = P(J.rsh), w = P(wr);
+      if (!(lsh && rsh && w)) return;
+      const line = PXY(x.lineNx, 0); if (!line) return;
+      const col = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
+      const yTop = Math.min(lsh[1], rsh[1]) - 60, yBot = Math.max(lsh[1], rsh[1]) + 90;
+      OV.line([line[0], yTop], [line[0], yBot], col, 3);   // where the fist should stop: his own far shoulder
+      const cx = (lsh[0] + rsh[0]) / 2;
+      OV.line([cx, yTop + 20], [cx, yBot - 20], '#8e8e93', 1.5, [4, 4]);      // and the centre line it crossed from
+      const fist = PAT(e.impact, wr) || w;
+      OV.line([line[0], fist[1]], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
+      if (f !== e.impact) OV.dot(w, col, 4);
+      overlayLabel(Math.min(line[0], fist[0]) - 10, yTop - 8,
+        `${x.cross > 0 ? '+' : ''}${x.cross.toFixed(2)} torso past the far shoulder`, col);
     },
   },
   {
@@ -1645,6 +1739,8 @@ const SCOPE = {
   blade_shoulders: {moves: 'every frame outside a punch',       angles: 'front \u2014 only there does the camera stand in for the opponent'},
   hrp:       {moves: 'jab, cross',                              angles: ALL_ANGLES},
   bal:       {moves: 'every punch at its impact frame',         angles: 'side-on'},
+  upstop:    {moves: 'every head uppercut at its impact frame', angles: 'side-on'},
+  hookstop:  {moves: 'every head hook at its impact frame',     angles: 'front, back'},
   speed:     {moves: 'every punch with an impact frame',        angles: ALL_ANGLES},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
@@ -1950,6 +2046,34 @@ function ruleCard() {
     calc: `${bal.off_balance} of ${bal.judged_punches} judged punches = ${pct(bal.off_share)} · `
           + `head outside the ankles ${bal.head_outside_ankles} (${pct(bal.head_share)}), `
           + `hips off centre ${bal.hips_off_centre} (${pct(bal.hips_share)})`});
+  const us = S.layerSum.upstop;
+  if (us) add('Uppercut stop', us.rating, UPSTOPCOL[us.rating], null, {
+    what: 'does the uppercut finish at the chin, or keep going up past it?',
+    on: `${us.n_uppercuts} head uppercuts · ${us.judged_uppercuts} judged side-on (the arc runs up and forward, and `
+        + `head-on the forward half points at the camera), ${us.n_uppercuts - us.judged_uppercuts} skipped`,
+    th: {event: {label: 'per punch', rule: 'the fist’s height at the turnaround — the frame it stops going forward — '
+                        + 'against the chin of a ghost built from the boxer’s own size. No number: the chin is the line, '
+                        + 'because the chin is what a head uppercut is aimed at',
+                 bands: [['at or below the chin', 'stops'], ['above it', 'flies through']],
+                 pal: {stops: '#34c759', 'flies through': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged uppercuts that went past the chin',
+                 bands: [['< 20 %', 'stops'], ['20–40 %', 'sometimes'], ['≥ 40 %', 'flies through']], pal: UPSTOPCOL}},
+    calc: `${us.flies_through} of ${us.judged_uppercuts} judged uppercuts = ${pct(us.over_share)} · `
+          + `median ${us.median_over} stance heights past the chin`});
+  const hs = S.layerSum.hookstop;
+  if (hs) add('Hook stop', hs.rating, HOOKSTOPCOL[hs.rating], null, {
+    what: 'does the hook finish on the target, or swing on past it?',
+    on: `${hs.n_hooks} head hooks · ${hs.judged_hooks} judged front-on or back-on (the hook travels across the `
+        + `frame, and side-on that axis points at the camera), ${hs.n_hooks - hs.judged_hooks} skipped`,
+    th: {event: {label: 'per punch', rule: 'the fist’s position at the turnaround against the boxer’s own far shoulder — '
+                        + 'half his squared-up width (the 90th percentile of his shoulder separation over the clip, so a '
+                        + 'bladed frame cannot shrink it) out from his centre line',
+                 bands: [['short of the far shoulder', 'stops'], ['past it', 'wraps around']],
+                 pal: {stops: '#34c759', 'wraps around': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged hooks that crossed the far shoulder',
+                 bands: [['< 20 %', 'stops'], ['20–40 %', 'sometimes'], ['≥ 40 %', 'wraps around']], pal: HOOKSTOPCOL}},
+    calc: `${hs.wraps_around} of ${hs.judged_hooks} judged hooks = ${pct(hs.cross_share)} · `
+          + `median ${hs.median_cross} torso past the far shoulder`});
   const gr = S.layerSum.grec;                                                          //  3
   if (gr) add('Guard after combo', gr.rating, GRECCOL[gr.rating], null, {
     what: 'once the combination is over, are the hands back where they started?',

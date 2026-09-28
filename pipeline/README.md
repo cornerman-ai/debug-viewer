@@ -51,8 +51,8 @@ that rule's headline verdict.
 the punch card and a video overlay.
 
 Every rule with geometry in the frame now draws it. Rules that judge a punch (arm extension, hit height, hip and
-shoulder rotation, head off center, hand drop, idle hand, balance, hand return path) draw for the punch under the
-playhead. Rules that judge frames (guard height, elbow tuck, chin height and depth, stance width and depth, both
+shoulder rotation, head off center, hand drop, idle hand, balance, hand return path, uppercut stop, hook stop)
+draw for the punch under the playhead. Rules that judge frames (guard height, elbow tuck, chin height and depth, stance width and depth, both
 bladedness axes, slip distance) draw on every frame through `frameOverlay`, which gets the raw BlazePose-33
 channels — they need joints (mouth corners, heels, toes) and channels (world x/z) the punch overlays never touch.
 Punch speed has no overlay on purpose: it measures a duration, and a duration has no geometry to draw.
@@ -79,6 +79,20 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   position instead. Nothing is drawn for punches thrown head-on or with the feet out of view. Round rating = the
   share of judged punches failing either check (< 20 % balanced, 20–40 % mixed, ≥ 40 % off balance). Reads
   `punches.csv` + `balance.json`.
+- **Uppercut stop** (`uppercut_stop/`): per head uppercut, read side-on, where the fist is at the turnaround — the
+  frame the impact spotter says it stopped going forward. The line is the chin of a ghost the boxer's own size (the
+  same ghost hit height builds), and the overlay draws it solid with the crown dashed above it, so the stricter
+  line stays visible. Green at or below the chin, red above it, labelled with the gap in stance heights. Nothing is
+  drawn for a body shot (the classifier merges body hooks and body uppercuts), a punch thrown head-on, or a missing
+  wrist. Round rating = the share of judged uppercuts past the chin (< 20 % stops, 20–40 % sometimes, ≥ 40 % flies
+  through), from at least 10. Reads `punches.csv` + `uppercut_stop.json`.
+- **Hook stop** (`hook_stop/`): per head hook, read front-on or back-on, the same question across the frame — has
+  the fist crossed the boxer's own far shoulder by the turnaround. The far shoulder is his centre line plus half
+  his squared-up width (the 90th percentile of his shoulder separation over the clip), not the gap in that frame,
+  which collapses when he blades. The overlay draws that line, the centre line it crossed from, and the fist.
+  Round rating = the share of judged hooks past it (< 20 % stops, 20–40 % sometimes, ≥ 40 % wraps around), from at
+  least 5 — most hooks on the current footage are thrown side-on and are not judged at all. Reads `punches.csv` +
+  `hook_stop.json`.
 - **Hand return path** (`hand_return_path/`): per jab / cross, between the landing and the end of the punch, the
   fist's height against its own shoulder must not drop below where it was at the punch's start or where it was at
   impact; the dip is measured from the lower of those two, so a punch that started or landed low is not punished
