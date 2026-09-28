@@ -629,13 +629,15 @@ const RULE_LAYERS = [
   comboLayer('combined', 'Combined combos', 'Vary defense after attacking', 'punches + defensive moves'),
   {
     // defense after combo (defense_after_combo/combos.csv): the defensive move that covered an offensive combo, drawn
-    // where the move is. Combos nobody covered are a short hollow mark at the combo's end frame.
+    // where the move is. A combo nobody covered draws its search window after the combo as a hollow red box: 2 s, or
+    // cut short where the next punch starts.
     key: 'defcov', label: 'Defense after combo', short: 'Defend after combinations', items: true,
     csv: ['defense_after_combo', 'combos.csv'], json: ['defense_after_combo', 'defense_after_combo.json'],
     parseItem: (r, num) => r.covered === '1'
       ? {covered: true, sf: num(r.move_start_frame), ef: num(r.move_end_frame), type: r.move_type, side: r.move_side,
          delay: num(r.delay_s), seq: r.sequence, endF: num(r.end_frame)}
-      : {covered: false, sf: num(r.end_frame), ef: num(r.end_frame), seq: r.sequence, endF: num(r.end_frame)},
+      : {covered: false, sf: num(r.end_frame), ef: Math.max(num(r.end_frame), Math.round(num(r.window_end_time) * S.fps) - 1),
+         seq: r.sequence, endF: num(r.end_frame), cut: r.cut_by_punch === '1'},
     summary: () => '',
     card: () => '',
     tip: (e, x) => x.covered
@@ -644,17 +646,19 @@ const RULE_LAYERS = [
         `<span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span>`
       : `<b>No defense after this combo</b> · ${fmtT(x.endF / S.fps)}<br>` +
         `<span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>` +
-        `<span class="m">nothing started during it or within 1 s of the end</span>`,
+        `<span class="m">nothing started during it or in the ${((x.ef + 1 - x.endF) / S.fps).toFixed(2)} s after it — `
+        + `${x.cut ? 'cut short by the next punch' : 'the full 2 s'}</span>`,
     row(e, x, {c, y, h, tx, fps}) {
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
       if (x.covered) {
         const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
         c.fillStyle = '#34c759'; c.globalAlpha = on ? 1 : 0.85;
         rr(x0, y + 3, Math.max(3, x1 - x0 - 1), h - 6, 5); c.fill(); c.globalAlpha = 1;
-      } else {                                            // an uncovered combo: a hollow tick where it ended
-        const xi = tx((x.endF + 1) / fps); if (xi < L) return;
-        c.strokeStyle = '#ff3b30'; c.lineWidth = 2; c.globalAlpha = on ? 1 : 0.6;
-        c.beginPath(); c.moveTo(xi, y + 4); c.lineTo(xi, y + h - 4); c.stroke(); c.globalAlpha = 1;
+      } else {                                            // an uncovered combo: its empty search window, hollow red
+        const x0 = Math.max(L, tx((x.endF + 1) / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+        c.strokeStyle = '#ff3b30'; c.lineWidth = 1.5; c.globalAlpha = on ? 1 : 0.7;
+        rr(x0, y + 4, Math.max(3, x1 - x0 - 1), h - 8, 4); c.stroke();
+        c.lineWidth = 2; c.beginPath(); c.moveTo(x0, y + 3); c.lineTo(x0, y + h - 3); c.stroke(); c.globalAlpha = 1;
       }
     },
   },
@@ -1718,7 +1722,6 @@ const DECAYCOL = {holds: '#34c759', fades: '#ff9f0a', 'drops off': '#ff3b30', 'n
 const COMBOLENCOL = {builds: '#34c759', short: '#ff9f0a', 'one-twos only': '#ff3b30', 'not rated': '#8e8e93'};
 const HANDBALCOL = {balanced: '#34c759', 'lead-heavy': '#ff9f0a', 'rear-heavy': '#ff9f0a',
                     'lead only': '#ff3b30', 'rear only': '#ff3b30', 'not rated': '#8e8e93'};
-const DACOL = {good: '#34c759', moderate: '#ff9f0a', 'no defense after combos': '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
 function comboStats() {
   const o = S.layerSum.offensive?.offensive, c = S.layerSum.combined?.combined;
@@ -1883,14 +1886,15 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the mean punch score',
                  bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
     calc: `mean punch score over the ${q.pass + q.fail} judged punches`}));
-  if (da) add('Defense after combo', da.rating, DACOL[da.rating], null, {
+  if (da) add('Defense after combo', da.score ?? 'not rated', da.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does he defend right after he throws, or stand there?',
     on: `${da.n_combos} offensive combos (punches only) · all judged`,
-    th: {event: {label: 'per combo', rule: 'a defensive move starting anywhere from the combo’s first frame to 1 s '
-                        + 'after its last one covers it'},
-         round: {label: 'per round', rule: 'the share of combos covered',
-                 bands: [['≥ 60 %', 'good'], ['35–60 %', 'moderate'], ['< 35 %', 'no defense after combos']], pal: DACOL}},
-    calc: `${da.n_covered} covered / ${da.n_combos} combos = ${pct(da.covered_share)}`});
+    th: {event: {label: 'per combo', rule: 'a defensive move starting anywhere from the combo’s first frame to 2 s '
+                        + 'after its last one covers it — or only until the next punch starts, if that comes first'},
+         round: {label: 'per round', rule: 'the share of combos covered, scored 100 at 70 % or more and 0 at none, '
+                        + 'linearly in between — a plain number, no bands; fewer than 10 combos: not rated'}},
+    calc: `${da.n_covered} covered / ${da.n_combos} combos = ${pct(da.covered_share)} → ${da.score ?? '–'} · `
+          + `${da.n_cut_by_punch} windows cut short by the next punch`});
   if (el) add('Elbow tuck', el.rating, ELBOWCOL[el.rating], null, {
     what: 'does the elbow stay in, or flare out to the side?',
     on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook)`,

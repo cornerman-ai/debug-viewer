@@ -196,9 +196,11 @@ mean facing during it against the most different smoothed facing in the 2 s afte
 change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than 5 readable combos → not rated.
 
 - **Defense after combo** (`defense_after_combo/combos.csv` + `.json`): the defensive move that covered an offensive
-  combo, drawn in green where the move is; a combo nobody covered is a red tick at its end frame. Hovering a move says
-  how long after the combo it started and which combo it was. A move counts when it starts anywhere from the combo's first frame to 1 s after its last. The round rating is the share of combos covered
-  (≥ 60 % good, 35–60 % moderate, < 35 % no defense after combos; fewer than 10 combos → not rated).
+  combo, drawn in green where the move is; a combo nobody covered draws its empty search window as a hollow red box
+  after its end. Hovering says how long after the combo the move started, or how long the window was and whether the
+  next punch cut it. A move counts when it starts anywhere from the combo's first frame to 2 s after its last — or
+  only until the next punch starts, if that comes first. Round = 100 at 70 % of combos covered or more, 0 at none,
+  linearly in between; a plain number, no bands (fewer than 10 combos → not rated).
 
 **Hand balance** (`hand_balance/hand_balance.json`, a whole-video rule — no timeline row): the share of punches
 thrown with the rear hand — 30–50 % balanced, 20–30 % lead-heavy, 50–60 % rear-heavy, < 20 % lead only, > 60 % rear
