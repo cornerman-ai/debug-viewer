@@ -427,7 +427,6 @@ const SPEEDCOL = {sharp: '#34c759', mixed: '#ff9f0a', slow: '#ff3b30', 'not rate
 const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
 const HOOKSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'wraps around': '#ff3b30', 'not rated': '#8e8e93'};
 const PIVOTCOL = {pivots: '#34c759', sometimes: '#ff9f0a', 'flat-footed': '#ff3b30', 'not rated': '#8e8e93'};
-const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
 // Which band a frame is in — the same cuts every gated rule reads. null when there is no pose or no angle there.
@@ -1374,20 +1373,32 @@ const RULE_LAYERS = [
     // guard height (guard_height/): per hand, how far the wrist sits below the nose while that hand is not punching.
     // Continuous row like elbow tuck — lead in the top half, rear in the bottom.
     key: 'guard', label: 'Guard height', short: 'Keep hands at guard', items: true, split: 'hand',
-    frameOverlay(f, P, leadLeft, Q, torso) {               // the line a hand is low under, and where each wrist is
+    frameOverlay(f, P, leadLeft, Q, torso) {               // each hand's full-marks line, the zero line, and the wrists
       const t = torso(), nose = P(J.nose), l = P(J.lsh), r = P(J.rsh);
       if (!(t && nose && l && r)) return;
-      const ly = nose[1] + 0.40 * t, x0 = Math.min(l[0], r[0]) - 45, x1 = Math.max(l[0], r[0]) + 45;
-      OV.level(ly, x0, x1, '#8e8e93');
-      const runs = S.items.guard || [];
+      const x0 = Math.min(l[0], r[0]) - 45, x1 = Math.max(l[0], r[0]) + 45;
+      OV.level(nose[1] + GUARD_FULL.rear * t, x0, x1, '#8e8e93');                // rear: full marks up to 0.40
+      OV.level(nose[1] + GUARD_FULL.lead * t, x0, x1, '#8e8e93', [3, 4]);        // lead: full marks up to 0.50
+      OV.level(nose[1] + 0.70 * t, x0, x1, '#8e8e93', [2, 6]);                   // both: 0 from 0.70
+      overlayLabel(x1 + 6, nose[1] + GUARD_FULL.rear * t, 'rear 100', '#8e8e93');
+      overlayLabel(x1 + 6, nose[1] + GUARD_FULL.lead * t, 'lead 100', '#8e8e93');
+      overlayLabel(x1 + 6, nose[1] + 0.70 * t, '0', '#8e8e93');
+      const runs = S.items.guard || [], part = {};
       for (const [hand, j] of [['lead', leadLeft ? J.lwr : J.rwr], ['rear', leadLeft ? J.rwr : J.lwr]]) {
         const w = P(j); if (!w) continue;
         const it = runs.find(q => q.hand === hand && f >= q.sf && f <= q.ef);  // the rule's own verdict for this hand
-        const low = it?.state === 'low';                                      // throwing or unreadable: gray, no verdict
-        OV.dot(w, it?.state === 'ok' ? '#34c759' : low ? '#ff3b30' : '#8e8e93', 5);
-        if (low) OV.line([w[0], ly], w, '#ff3b30', 2, [3, 3]);
+        const judged = it?.state === 'ok' || it?.state === 'low';             // throwing or unreadable: gray, no share
+        const d = (w[1] - nose[1]) / t, full = GUARD_FULL[hand];
+        if (judged) part[hand] = Math.min(1, Math.max(0, (0.70 - d) / (0.70 - full)));
+        const col = !judged ? '#8e8e93' : it.state === 'ok' ? '#34c759' : '#ff3b30';
+        OV.dot(w, col, 5);
+        if (it?.state === 'low') OV.line([w[0], nose[1] + full * t], w, '#ff3b30', 2, [3, 3]);
       }
-      overlayLabel(x0, ly - 16, 'guard line · 0.40 torso under the nose', '#e5e5ea');
+      const hs = Object.keys(part);                        // the frame score: 30 lead / 70 rear, or one hand alone
+      const sc = hs.length === 2 ? 30 * part.lead + 70 * part.rear : hs.length === 1 ? 100 * part[hs[0]] : null;
+      overlayLabel(x0, nose[1] - 16, sc == null ? 'frame not scored — no hand can be judged'
+        : `frame score ${sc.toFixed(1)}` + (hs.length === 2 ? ` · lead ${(30 * part.lead).toFixed(1)}/30 · rear ${(70 * part.rear).toFixed(1)}/70`
+                                                              : ` · ${hs[0]} hand alone`), '#e5e5ea');
     },
     csv: ['guard_height', 'runs.csv'], json: ['guard_height', 'guard_height.json'],
     parseItem: (r, num) => ({hand: r.hand, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
@@ -1405,7 +1416,7 @@ const RULE_LAYERS = [
       };
       const rows = (x.both || [x]).sort(a => a.hand === 'lead' ? -1 : 1);
       return `<b>Guard height</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>') +
-        `<br><span class="m">low below 0.40 torso below the nose, while that hand is not punching</span>`;
+        `<br><span class="m">low below 0.50 torso under the nose for the lead hand, 0.40 for the rear, while that hand is not punching</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
@@ -1424,6 +1435,7 @@ const RULE_LAYERS = [
 
 ];
 const LAYERS = RULE_LAYERS.map(r => r.key);
+const GUARD_FULL = {lead: 0.50, rear: 0.40};                    // guard height: full marks up to here, 0 from 0.70
 // Which Notion rules (by number, 2026-09-28) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [4], guard: [5], idle: [7], chin_depth: [8], chin_height: [9], elbow: [10],
@@ -1989,21 +2001,20 @@ function ruleCard() {
                         + 'fewer than 10 judged punches: not rated'}},
     calc: `mean of ${hd.judged_punches} punch scores · ${hd.low_punches} from a low hand (${pct(hd.low_share)}) · median ${hd.median_drop} torso`});
   const gu = S.guard;
-  if (gu) add('Guard height', gu.rating, GUARDRATE[gu.rating], null, {
+  if (gu) add('Guard height', gu.score ?? 'not rated', gu.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does a hand drop while it is not punching?',
     on: `${gu.n_frames.toLocaleString()} frames · judged lead ${gu.hands.lead.judged_frames.toLocaleString()}, `
         + `rear ${gu.hands.rear.judged_frames.toLocaleString()} · the rest skipped (that hand throwing, or a joint not visible)`,
-    th: {event: {label: 'per frame', rule: 'drop = how far the wrist sits below the nose, in torso lengths — an '
-                        + 'absolute line, the same one the idle-hand rule uses. For scale the shoulder line sits '
-                        + '0.17–0.20 below the nose and a guard belongs at cheekbone height, above it, so this forgives '
-                        + 'about a fifth of a torso under the shoulders',
-                 bands: [['≤ 0.40', 'guard up'], ['> 0.40', 'low']], pal: {'guard up': '#34c759', low: '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged frames with that hand low — every frame counts, however brief; the worse hand decides',
-                 bands: [['< 10 %', 'good'], ['10–25 %', 'sometimes low'], ['≥ 25 %', 'low']], pal: GUARDRATE}},
-    calc: `lead ${gu.hands.lead.low_frames.toLocaleString()} of ${gu.hands.lead.judged_frames.toLocaleString()} = `
-          + `${pct(gu.hands.lead.low_share)} · rear ${gu.hands.rear.low_frames.toLocaleString()} of `
-          + `${gu.hands.rear.judged_frames.toLocaleString()} = ${pct(gu.hands.rear.low_share)} · the worse hand `
-          + `(${gu.worse_hand || '–'}) sets the rating`});
+    th: {event: {label: 'per frame', rule: 'how far each wrist sits below the nose, in torso lengths. Each hand scores '
+                        + 'full marks up to its line — lead 0.50, rear 0.40 — falling linearly to 0 at 0.70. The frame '
+                        + 'score is lead 30 + rear 70; when only one hand can be judged (the other punching or hidden) '
+                        + 'it is the whole 100',
+                 bands: [['lead ≤ 0.50, rear ≤ 0.40', 'full marks'], ['0.70 and lower', '0']],
+                 pal: {'full marks': '#34c759', '0': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean frame score over every scored frame — a plain number, no bands; '
+                        + 'fewer than 150 scored frames: not rated'}},
+    calc: `mean of ${gu.scored_frames.toLocaleString()} frame scores (${gu.both_hands_frames.toLocaleString()} with both hands) · `
+          + `low: lead ${pct(gu.hands.lead.low_share)}, rear ${pct(gu.hands.rear.low_share)}`});
   const stW = S.stanceW, stD = S.stanceD;
   if (stW) add('Stance width', stW.rating, STANCERATE[stW.rating], null, {
     what: STANCE.width.what,

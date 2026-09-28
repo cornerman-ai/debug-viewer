@@ -157,10 +157,11 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   torso lengths, with a white tick at the furthest frame (orange < 0.20 too short, green 0.20–0.70, red > 0.70 too
   far). Rolls and ducks are not measured. Judged front-on / back-on only. Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
-  hand is not punching — low above 0.40, the same absolute line the idle-hand rule uses (the lens says 0.30). Continuous row, lead in the top half, rear in the bottom: green guard up,
-  red low, and a dashed gray line for everything the rule could not look at — that hand throwing, or a joint not
-  visible. Round rating = the share of judged frames low on the worse hand, every frame counting however brief
-  (< 10 % good, 10–25 % sometimes low, ≥ 25 % low). Reads `runs.csv` + `guard_height.json`.
+  hand is not punching — low above 0.50 for the lead hand, 0.40 for the rear. Continuous row, lead in the top half,
+  rear in the bottom: green guard up, red low, and a dashed gray line for everything the rule could not look at —
+  that hand throwing, or a joint not visible. The overlay draws the rear line (0.40, "rear 100"), the lead line
+  (0.50, "lead 100") and the zero line (0.70), and labels the frame score: lead 30 + rear 70, or one hand alone.
+  Round = the mean frame score, a plain number with no bands. Reads `runs.csv` + `guard_height.json`.
 - **Hips bladed** (`bladedness_hips/`) and **Shoulders bladed** (`bladedness_shoulders/`): both per frame outside
   punches, both continuous rows. The angle is that line's turn out of the image plane from the 3D landmarks — 0°
   chest-on, 90° side-on — and the two cuts per axis are a coach's verdicts on 30 frames (hips 18.2 / 27.9,
