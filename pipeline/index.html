@@ -424,7 +424,6 @@ const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
 const DROPRATE = {good: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
 const IDLECOL = {holds: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
-const BALCOL = {balanced: '#34c759', mixed: '#ff9f0a', 'off balance': '#ff3b30', 'not rated': '#8e8e93'};
 const SPEEDCOL = {sharp: '#34c759', mixed: '#ff9f0a', slow: '#ff3b30', 'not rated': '#8e8e93'};
 const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
 const HOOKSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'wraps around': '#ff3b30', 'not rated': '#8e8e93'};
@@ -847,27 +846,28 @@ const RULE_LAYERS = [
     key: 'bal', label: 'Balance at impact', short: 'Balance',
     csv: ['balance', 'punches.csv'], json: ['balance', 'balance.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, head: num(r.head_pos), off: num(r.hip_off),
-      headOk: r.head_ok === 'yes', hipsOk: r.hips_ok === 'yes', why: r.reason} : {verdict: '', skip: r.skip_reason},
+      headOk: r.head_ok === 'yes', hipsOk: r.hips_ok === 'yes', why: r.reason,
+      headScore: num(r.head_score), hipsScore: num(r.hips_score), score: num(r.score)} : {verdict: '', skip: r.skip_reason},
     summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">Balance at impact</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_side_on' ? 'thrown head-on — balance is a fore-aft fault, invisible from there'
                                                 : 'the feet or the body are not visible at the impact frame'}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Head over the base</span><b>${x.headOk ? 'yes' : 'no'} · ${x.head.toFixed(2)} (−0.20 to 1.20)</b>
-        <span>Hips off the midpoint</span><b>${x.hipsOk ? 'within' : 'past'} 0.20 · ${x.off.toFixed(2)}</b>
+       `<div class="rows num" style="margin-top:0"><span>Head</span><b>${x.headScore.toFixed(1)} / 50 · at ${x.head.toFixed(2)} (full −0.20 to 1.20, 0 past 0.75)</b>
+        <span>Hips</span><b>${x.hipsScore.toFixed(1)} / 50 · ${x.off.toFixed(2)} off the midpoint (full ≤ 0.20, 0 at 0.50)</b>
+        <span>Score</span><b>${x.score.toFixed(1)} / 100</b>
         <span>Verdict</span><b>${x.verdict}${x.why ? ' — ' + x.why : ''}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
-      `<span class="num"><b>${x.verdict}</b>${x.why ? ' · ' + x.why : ''}</span><br>` +
+      `<span class="num"><b>${x.score.toFixed(1)} / 100</b> · ${x.verdict}${x.why ? ' · ' + x.why : ''}</span><br>` +
       `<span class="num">head at ${x.head.toFixed(2)} (0 and 1 are the ankles, −0.20 to 1.20 passes) · ` +
       `hips ${x.off.toFixed(2)} off their midpoint</span><br>` +
-      `<span class="m">a punch fails if the head goes more than 0.20 of the ankle distance past an ankle, or the hips sit more than 0.20 of it ` +
-      `distance off centre</span>`),
+      `<span class="m">head 50 inside the green zone (≤ 0.20 of the ankle distance past an ankle), down to 0 at 0.75 past it; ` +
+      `hips 50 within 0.20 of the midpoint, down to 0 at 0.50 (over an ankle)</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'balanced' ? '#34c759' : '#ff3b30';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, x.verdict === 'balanced' ? `${x.head.toFixed(2)}`
-          : !x.headOk && !x.hipsOk ? 'head+hips' : !x.headOk ? 'head' : 'hips');
+      tag(bx, w, y, h, x.score.toFixed(0));
       ring(e, 'bal', bx, y, w, h);
     },
     overlay(e, x, f, P) {                                  // the base between the ankles, the head over it, the hips
@@ -2097,20 +2097,19 @@ function ruleCard() {
     calc: `${psp.slow_punches} of ${psp.judged_punches} judged punches = ${pct(psp.slow_share)} · `
           + Object.entries(psp.by_type).map(([t, v]) => `${PUNCH[t]?.name || t} ${v.slow}/${v.judged}`).join(', ')});
   const bal = S.layerSum.bal;
-  if (bal) add('Balance at impact', bal.rating, BALCOL[bal.rating], null, {
+  if (bal) add('Balance at impact', bal.score ?? 'not rated', bal.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'when the punch lands, is his head still over his own feet?',
     on: `${bal.n_punches} punches · ${bal.judged_punches} judged side-on (fore-aft is the axis this fault lives on), `
         + `${bal.n_punches - bal.judged_punches} skipped (thrown head-on, no impact frame, or the feet not visible)`,
-    th: {event: {label: 'per punch', rule: 'two checks at the impact frame, either one fails it: the head must not go '
-                        + 'more than 0.20 of the ankle distance past either ankle, and the hips must sit within 0.20 of it '
-                        + 'from the ankles’ midpoint '
-                        + '— head over the base at all, and weight shared rather than parked on one leg',
-                 bands: [['both hold', 'balanced'], ['either fails', 'off balance']],
+    th: {event: {label: 'per punch', rule: 'a score 0–100 at the impact frame, head 0–50 + hips 0–50, in ankle distances. '
+                        + 'Head: 50 while the nose is at most 0.20 past an ankle, linearly to 0 at 0.75 past it. '
+                        + 'Hips: 50 while the hip centre is within 0.20 of the ankles’ midpoint, linearly to 0 at 0.50 — over an ankle',
+                 bands: [['both inside the green zone', 'balanced'], ['either outside', 'off balance']],
                  pal: {balanced: '#34c759', 'off balance': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches failing either check',
-                 bands: [['< 20 %', 'balanced'], ['20–40 %', 'mixed'], ['≥ 40 %', 'off balance']], pal: BALCOL}},
-    calc: `${bal.off_balance} of ${bal.judged_punches} judged punches = ${pct(bal.off_share)} · `
-          + `head outside the ankles ${bal.head_outside_ankles} (${pct(bal.head_share)}), `
+         round: {label: 'per round', rule: 'the mean punch score over the judged punches — a plain number, no bands; '
+                        + 'fewer than 10 judged punches: not rated'}},
+    calc: `mean of ${bal.judged_punches} punch scores · ${bal.off_balance} outside the green zone (${pct(bal.off_share)}) · `
+          + `head outside its zone ${bal.head_outside_ankles} (${pct(bal.head_share)}), `
           + `hips off centre ${bal.hips_off_centre} (${pct(bal.hips_share)})`});
   const us = S.layerSum.upstop;
   if (us) add('Uppercut stop', us.rating, UPSTOPCOL[us.rating], null, {

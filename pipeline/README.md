@@ -73,13 +73,13 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   the decoder starts it later). Every angle is judged: a time is not foreshortened. Round rating = the share of
   judged punches above their band (< 10 % sharp, 10–25 % mixed, ≥ 25 % slow). Reads `punches.csv` +
   `punch_speed.json`.
-- **Balance at impact** (`balance/`): per punch at the impact frame, read side-on, two checks — the head must not go
-  more than 0.20 of the ankle distance past either ankle, and the hips must sit within 0.20 of it from their
-  midpoint (the dashed ticks outside the base mark the head's slack). Drawn at the impact frame. Either failing turns the
-  block red, labelled with which one gave way (`head`, `hips`, `head+hips`); a passing punch carries the head's
-  position instead. Nothing is drawn for punches thrown head-on or with the feet out of view. Round rating = the
-  share of judged punches failing either check (< 20 % balanced, 20–40 % mixed, ≥ 40 % off balance). Reads
-  `punches.csv` + `balance.json`.
+- **Balance at impact** (`balance/`): per punch at the impact frame, read side-on, a score 0–100 = head (0–50) +
+  hips (0–50), in ankle distances. Head: 50 while the nose is at most 0.20 past an ankle, linearly to 0 at 0.75
+  past it. Hips: 50 while the hip centre is within 0.20 of the ankles' midpoint, linearly to 0 at 0.50 (over an
+  ankle). The block is green when both are inside their green zone (score 100), red otherwise, and carries the
+  score. The overlay draws the base between the ankles, the head's slack as dashed ticks outside it, the hips'
+  ticks, the head and the hips, at the impact frame. Round = the mean punch score, a plain number with no bands,
+  from at least 10 judged punches. Reads `punches.csv` + `balance.json`.
 - **Uppercut stop** (`uppercut_stop/`): per head uppercut, read side-on, where the fist is at the turnaround — the
   frame the impact spotter says it stopped going forward. The fist is the mean of the wrist, pinky, index and thumb
   (the wrist alone reads an uppercut low), and the ring is drawn on that point. The line is the middle of the head of a
