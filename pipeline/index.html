@@ -901,11 +901,11 @@ const RULE_LAYERS = [
                                                 : x && x.skip === 'body_shot' ? 'a body shot — the classifier cannot tell a body uppercut from a body hook'
                                                 : x && x.skip === 'not_an_uppercut' ? 'not an uppercut'
                                                 : 'the wrist or the body is not visible at the impact frame'}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Past the chin</span><b>${x.over > 0 ? '+' : ''}${x.over.toFixed(2)} stance heights</b>
-        <span>Past the crown</span><b>${x.overCrown > 0 ? '+' : ''}${x.overCrown.toFixed(2)} — the stricter line</b>
+       `<div class="rows num" style="margin-top:0"><span>Past the chin</span><b>${x.over > 0 ? '+' : ''}${x.over.toFixed(3)} stance heights</b>
+        <span>Past the crown</span><b>${x.overCrown > 0 ? '+' : ''}${x.overCrown.toFixed(3)} — the stricter line</b>
         <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
-      `<span class="num"><b>${x.verdict}</b> · the fist stopped ${Math.abs(x.over).toFixed(2)} stance heights ` +
+      `<span class="num"><b>${x.verdict}</b> · the fist stopped ${Math.abs(x.over).toFixed(3)} stance heights ` +
       `${x.over > 0 ? 'ABOVE' : 'below'} the chin</span><br>` +
       `<span class="m">a head uppercut is aimed at the chin — a fist still travelling past it was not stopped</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
@@ -913,7 +913,7 @@ const RULE_LAYERS = [
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, `${x.over > 0 ? '+' : ''}${x.over.toFixed(2)}`);
+      tag(bx, w, y, h, `${x.over > 0 ? '+' : ''}${x.over.toFixed(3)}`);
       ring(e, 'upstop', bx, y, w, h);
     },
     overlay(e, x, f, P, leadLeft) {                        // the chin it is aimed at, and where the fist stopped
@@ -931,7 +931,7 @@ const RULE_LAYERS = [
       OV.line([fist[0], chin[1]], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
       if (f !== e.impact) OV.dot(w, col, 4);
       overlayLabel(x0, chin[1] - 16,
-        `${x.over > 0 ? '+' : ''}${x.over.toFixed(2)} past the chin`, col);
+        `${x.over > 0 ? '+' : ''}${x.over.toFixed(3)} past the chin`, col);
     },
   },
   {
@@ -947,10 +947,10 @@ const RULE_LAYERS = [
                                                 : x && x.skip === 'body_shot' ? 'a body shot — the classifier cannot tell a body hook from a body uppercut'
                                                 : x && x.skip === 'not_a_hook' ? 'not a hook'
                                                 : 'the wrist or the body is not visible at the impact frame'}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Past the far shoulder</span><b>${x.cross > 0 ? '+' : ''}${x.cross.toFixed(2)} torso</b>
+       `<div class="rows num" style="margin-top:0"><span>Past the far shoulder</span><b>${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)} torso</b>
         <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
-      `<span class="num"><b>${x.verdict}</b> · the fist stopped ${Math.abs(x.cross).toFixed(2)} torso ` +
+      `<span class="num"><b>${x.verdict}</b> · the fist stopped ${Math.abs(x.cross).toFixed(3)} torso ` +
       `${x.cross > 0 ? 'PAST' : 'short of'} his far shoulder</span><br>` +
       `<span class="m">the far shoulder is his own squared-up width, not the gap in this frame — seen front-on a ` +
       `bladed boxer’s shoulders collapse together</span>`),
@@ -959,7 +959,7 @@ const RULE_LAYERS = [
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, `${x.cross > 0 ? '+' : ''}${x.cross.toFixed(2)}`);
+      tag(bx, w, y, h, `${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)}`);
       ring(e, 'hookstop', bx, y, w, h);
     },
     overlay(e, x, f, P, leadLeft) {                        // the far shoulder it should stop at, and where it did
@@ -977,7 +977,7 @@ const RULE_LAYERS = [
       OV.line([line[0], fist[1]], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
       if (f !== e.impact) OV.dot(w, col, 4);
       overlayLabel(Math.min(line[0], fist[0]) - 10, yTop - 8,
-        `${x.cross > 0 ? '+' : ''}${x.cross.toFixed(2)} torso past the far shoulder`, col);
+        `${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)} torso past the far shoulder`, col);
     },
   },
   {
