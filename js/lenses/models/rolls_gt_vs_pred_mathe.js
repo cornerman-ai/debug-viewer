@@ -10,7 +10,7 @@
 //
 // Schema:
 //   index.json  { generated, run, labels_sha1, metrics: { pooled, fold_mean_std },
-//                 geometric, videos: { <stem>: { <ri>: { file, gt, tp, fp, fn, fold } } } }
+//                 geometric, videos: { <stem>: { <ri>: { file, gt, tp, fp, fn, fold, dips: [depth per labeled roll] } } } }
 //   <i>.json    { round_id, stem, ri, fold, training_type, stance, src_fps, t0, dt, n,
 //                 decode: { threshold, min_event_s, gap_s, delta },  the fold's LOFO decode
 //                 probs: [n],                                  p(roll) at t0 + i·dt (30 fps)
@@ -422,6 +422,7 @@ export const RollsGtVsPredMatheRule = {
       if (sel && sel.value && sel.value !== "rolls_gt_vs_pred_mathe") return;
       renderRun();
       populateRoundPicker();
+      renderShallow();
       docKey = null;
       refreshScope(latestState);
       renderAll();
@@ -488,6 +489,12 @@ function template() {
       <label class="muted small" style="cursor:pointer"><input type="checkbox" id="rg-base"> geometric baseline</label>
     </div>
 
+    <h3>Shallow rolls across the pool</h3>
+    <p class="hint">Every labeled roll's depth is in the index: with a min dip set, the rounds with the most
+      labeled rolls under it; with none, the rounds holding the shallowest rolls. Click a round to load it —
+      its roll list below then shows each roll's depth, and the bars turn grey under the gate.</p>
+    <div id="rg-shallow" class="small"></div>
+
     <h3>Round stats</h3>
     <div class="metric-grid">
       <div class="metric"><div class="metric-label">Recall</div><div class="metric-val" id="rg-recall">—</div><div class="metric-sub muted">found / GT rolls, IoU ≥ 0.5</div></div>
@@ -536,6 +543,14 @@ function wireControls() {
   bind("rg-min", "rg-min-out", "minEventS", v => v.toFixed(2));
   bind("rg-gap", "rg-gap-out", "gapS", v => v.toFixed(2));
   bind("rg-dip", "rg-dip-out", "minDip", v => v.toFixed(2));
+  host.querySelector("#rg-dip").addEventListener("input", renderShallow);
+  host.querySelector("#rg-shallow").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-file]");
+    const sel = host.querySelector("#rg-round");
+    if (!tr || !sel) return;
+    sel.value = tr.dataset.file;
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   host.querySelector("#rg-reset").addEventListener("click", () => {
     if (!doc) return;
     cfg = { threshold: doc.decode.threshold, minEventS: doc.decode.min_event_s, gapS: doc.decode.gap_s, minDip: 0 };
@@ -642,6 +657,36 @@ function syncSliders() {
   set("rg-dip", "rg-dip-out", cfg.minDip, 2);
 }
 
+function renderShallow() {
+  const el = host?.querySelector("#rg-shallow");
+  if (!el) return;
+  if (!index) { el.innerHTML = ""; return; }
+  const x = cfg.minDip > 0 ? cfg.minDip : null;
+  const rows = [];
+  let nRolls = 0, nUnder = 0;
+  for (const [stem, rounds] of Object.entries(index.videos)) {
+    for (const [ri, e] of Object.entries(rounds)) {
+      const d = e.dips || [];
+      nRolls += d.length;
+      const under = x == null ? 0 : d.filter(v => v < x).length;
+      nUnder += under;
+      if (d.length) rows.push({ stem, ri: Number(ri), file: e.file, n: d.length, under, min: Math.min(...d) });
+    }
+  }
+  rows.sort(x == null ? (a, b) => a.min - b.min : (a, b) => b.under - a.under || a.min - b.min);
+  const top = rows.filter(r => x == null || r.under > 0).slice(0, 20);
+  const c = "padding:1px 7px;white-space:nowrap";
+  el.innerHTML = (x == null
+      ? `<p class="hint">${nRolls} labeled rolls in ${rows.length} rounds · set a min dip to count the rolls under it; the 20 rounds with the shallowest rolls:</p>`
+      : `<p class="hint"><b>${nUnder}</b> of ${nRolls} labeled rolls are under ${x.toFixed(2)} torso, in ${rows.filter(r => r.under > 0).length} rounds; the 20 rounds with the most:</p>`) +
+    `<table style="border-collapse:collapse;font:11px ui-monospace,monospace"><tr style="color:#8a93a3"><th style="${c};text-align:left">round</th><th style="${c}">rolls</th>` +
+    (x == null ? "" : `<th style="${c}">under ${x.toFixed(2)}</th>`) + `<th style="${c}">shallowest</th></tr>` +
+    top.map(r => `<tr data-file="${r.file}" style="cursor:pointer${doc && doc.round_id === r.stem + "_r" + r.ri ? ";background:rgba(255,255,255,0.09)" : ""}">` +
+      `<td style="${c};text-align:left">${r.stem.slice(0, 44)} · r${r.ri}</td><td style="${c};text-align:right">${r.n}</td>` +
+      (x == null ? "" : `<td style="${c};text-align:right">${r.under}</td>`) +
+      `<td style="${c};text-align:right;color:${COLORS.dip}">${r.min.toFixed(2)}</td></tr>`).join("") + `</table>`;
+}
+
 function renderRun() {
   const el = host.querySelector("#rg-run");
   if (!el) return;
@@ -721,6 +766,7 @@ function renderAll() {
   if (!host) return;
   renderStats();
   renderRollList();
+  renderShallow();
   renderRoundHint();
   renderSourceHint();
   const st = latestState;
