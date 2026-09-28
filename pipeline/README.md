@@ -68,15 +68,15 @@ camera angle — is a **dashed gray mid-line carrying the reason**: `joint hidde
 continuous, so a gray stretch never means "nothing happened" — it means the rule could not look, and says why.
 
 - **Hand drop before punch** (`hand_drop/`): per punch, the punching wrist's mean height below the nose over every
-  readable frame of the 0.25 s before the punch started, in torso lengths — green up to 0.40, red above it (the
-  guard-height line), with the reading on the block. The block, its highlight and its tooltip sit on the 0.25 s
+  readable frame of the 0.25 s before the punch started, in torso lengths, scored 100 up to 0.40 and linearly to 0
+  at 0.70 — green at 100, red below it, with the score on the block. The block, its highlight and its tooltip sit on the 0.25 s
   WINDOW before the punch, not on the punch, because that is what the rule measured. With the playhead inside the
   window the overlay draws the nose, the 0.40 line, the window's mean, the wrist's path so far and this frame's own
   reading ("not read" when a joint is below visibility 0.30); nothing is drawn on the punch itself. Windows overlap
   other punches constantly (a cross starting while the jab is out), so the row is split — lead windows on the top
   half, rear on the bottom — and every window holding the playhead draws on its own wrist, its label naming the
-  hand and punch ("Rear cross in 3 f · mean 0.527 · …"). Round rating = the share of punches thrown from a
-  low hand (< 20 % good, 20–40 % sometimes low, ≥ 40 % low). Reads `punches.csv` + `hand_drop.json`.
+  hand and punch ("Rear cross in 3 f · mean 0.527 · …"). Round = the mean punch score, a plain number with no
+  bands, from at least 10 judged punches. Reads `punches.csv` + `hand_drop.json`.
 - **Punch speed** (`punch_speed/`): per punch, the time from its first frame to the impact, with the milliseconds
   on the block — green inside the band for that punch type, red above it. The band is the upper quartile of the
   type across 8,166 labelled punches, shifted onto our own detector (a person marks a punch's start at the windup,

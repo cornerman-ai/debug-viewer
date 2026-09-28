@@ -422,7 +422,6 @@ const SLIPNAME = {short: 'too short', ok: 'good distance', far: 'too far'};
 const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
-const DROPRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 const IDLECOL = {holds: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
 const SPEEDCOL = {sharp: '#34c759', mixed: '#ff9f0a', slow: '#ff3b30', 'not rated': '#8e8e93'};
 const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
@@ -757,25 +756,25 @@ const RULE_LAYERS = [
     key: 'drop', label: 'Hand drop before punch', short: 'Hand drop',
     window: true,                                          // its block, ring and hover cover the 0.25 s BEFORE the punch
     csv: ['hand_drop', 'punches.csv'], json: ['hand_drop', 'hand_drop.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), a: num(r.win_start), b: num(r.win_end), n: num(r.frames_read)}
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), score: num(r.score), a: num(r.win_start), b: num(r.win_end), n: num(r.frames_read)}
       : {verdict: '', skip: r.skip_reason},
     summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">Hand before the punch</div>` +
       (!x || !x.verdict ? `<div class="empty">the punching wrist is not visible in the 0.25 s before this punch</div>` :
        `<div class="rows num" style="margin-top:0"><span>Wrist below the nose</span><b>${x.drop.toFixed(3)} torso, mean of ${x.n} frames</b>
-        <span>Low above</span><b>0.400 torso</b>
+        <span>Score</span><b>${x.score.toFixed(1)} / 100 (100 up to 0.400, 0 from 0.700)</b>
         <span>Verdict</span><b>${x.verdict === 'low' ? 'hand low' : 'hand up'}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">no readable frame in the 0.25 s before this punch</span>` :
-      `<span class="num">${x.verdict === 'low' ? '<b>hand low</b>' : 'hand up'} · the wrist sat ` +
+      `<span class="num"><b>${x.score.toFixed(1)} / 100</b> · ${x.verdict === 'low' ? 'hand low' : 'hand up'} · the wrist sat ` +
       `<b>${x.drop.toFixed(3)}</b> torso below the nose on average before the punch</span><br>` +
-      `<span class="m">measured over the 0.25 s BEFORE this punch (f ${x.a}–${x.b}, ${x.n} frames read); low above 0.40 torso, the guard-height line</span>`),
+      `<span class="m">measured over the 0.25 s BEFORE this punch (f ${x.a}–${x.b}, ${x.n} frames read); 100 up to 0.40 torso, linearly to 0 at 0.70</span>`),
     row(e, x, {c, y, h, tag, ring, tx, fps}) {
       if (!x.verdict) return;                                // nothing readable: draw nothing
       const bx = tx(x.a / fps), w = Math.max(2, tx((x.b + 1) / fps) - bx - 1);   // the window, not the punch
       const hh = h / 2 - 2, yy = e.hand === 'lead' ? y + 2 : y + h / 2;          // lead on top, rear below
       c.fillStyle = x.verdict === 'low' ? '#ff3b30' : '#34c759';
       rr(bx, yy, w, hh, 3); c.fill();
-      tag(bx, w, yy, hh, x.drop.toFixed(3));
+      tag(bx, w, yy, hh, x.score.toFixed(1));
       ring(e, 'drop', bx, yy - 2, w, hh + 3);
     },
     frameOverlay(f, P, leadLeft, Q, torso) {               // inside the 0.25 s before a punch: what the rule reads
@@ -796,7 +795,7 @@ const RULE_LAYERS = [
         const w = P(wr), now = seen && w ? (w[1] - nose[1]) / t : null;
         if (w) OV.ring(w, seen ? col : '#8e8e93', 11, 3);
         overlayLabel(x0, nose[1] - 16,
-          `${name} in ${x.b - f + 1} f · mean ${x.drop.toFixed(3)} · this frame ${now == null ? 'not read' : now.toFixed(3)} · low above 0.400`, col);
+          `${name} in ${x.b - f + 1} f · mean ${x.drop.toFixed(3)} → ${x.score.toFixed(1)} · this frame ${now == null ? 'not read' : now.toFixed(3)}`, col);
       }
     },
   },
@@ -1969,19 +1968,18 @@ function ruleCard() {
     calc: `${shr.n_good} inside the band / ${shr.n_judged} punches = ${pct(shr.good_share)} · `
           + `${shr.n_too_little} too little · ${shr.n_too_much} too much`});
   const hd = S.handDrop;
-  if (hd) add('Hand drop before punch', hd.rating, DROPRATE[hd.rating], null, {
+  if (hd) add('Hand drop before punch', hd.score ?? 'not rated', hd.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'is the punching hand up at guard just before it throws?',
     on: `${hd.n_punches} punches · ${hd.judged_punches} judged, ${hd.n_punches - hd.judged_punches} skipped `
         + `(the wrist not visible in the 0.25 s before the punch) · lead ${hd.by_hand.lead.low}/${hd.by_hand.lead.judged}, `
         + `rear ${hd.by_hand.rear.low}/${hd.by_hand.rear.judged}`,
     th: {event: {label: 'per punch', rule: 'how far the punching wrist sits below the nose, in torso lengths, averaged over '
                         + 'every readable frame of the 0.25 s before the punch — the same absolute line guard height and idle hand use',
-                 bands: [['≤ 0.40', 'hand up'], ['> 0.40', 'hand low']],
-                 pal: {'hand up': '#34c759', 'hand low': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches thrown from a low hand',
-                 bands: [['< 20 %', 'good'], ['20–40 %', 'sometimes low'], ['≥ 40 %', 'low']],
-                 pal: DROPRATE}},
-    calc: `${hd.low_punches} of ${hd.judged_punches} judged punches = ${pct(hd.low_share)} · median ${hd.median_drop} torso`});
+                 bands: [['≤ 0.40', '100'], ['0.40–0.70', 'linear 100 → 0'], ['≥ 0.70', '0']],
+                 pal: {'100': '#34c759', 'linear 100 → 0': '#ff9f0a', '0': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean punch score over the judged punches — a plain number, no bands; '
+                        + 'fewer than 10 judged punches: not rated'}},
+    calc: `mean of ${hd.judged_punches} punch scores · ${hd.low_punches} from a low hand (${pct(hd.low_share)}) · median ${hd.median_drop} torso`});
   const gu = S.guard;
   if (gu) add('Guard height', gu.rating, GUARDRATE[gu.rating], null, {
     what: 'does a hand drop while it is not punching?',
