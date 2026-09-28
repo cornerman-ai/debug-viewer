@@ -64,9 +64,11 @@ camera angle — is a **dashed gray mid-line carrying the reason**: `joint hidde
 `punching` or `hook`, written on the strip when there is room for it and in the tooltip always. The row is
 continuous, so a gray stretch never means "nothing happened" — it means the rule could not look, and says why.
 
-- **Hand drop before punch** (`hand_drop/`): per punch, how far the throwing hand dipped below ITS OWN guard in the
-  0.4 s before the punch started (green no dip, red dips at ≥ 0.25 torso), with the dip on the block. Reads
-  `punches.csv` + `hand_drop.json`.
+- **Hand drop before punch** (`hand_drop/`): per punch, the punching wrist's mean height below the nose over every
+  readable frame of the 0.25 s before the punch started, in torso lengths — green up to 0.40, red above it (the
+  guard-height line), with the reading on the block. The overlay, on the punch's frames, draws the nose, the 0.40
+  line, the wrist's mean height and its path through the window. Round rating = the share of punches thrown from a
+  low hand (< 20 % good, 20–40 % sometimes low, ≥ 40 % low). Reads `punches.csv` + `hand_drop.json`.
 - **Punch speed** (`punch_speed/`): per punch, the time from its first frame to the impact, with the milliseconds
   on the block — green inside the band for that punch type, red above it. The band is the upper quartile of the
   type across 8,166 labelled punches, shifted onto our own detector (a person marks a punch's start at the windup,

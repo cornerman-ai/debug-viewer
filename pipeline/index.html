@@ -422,7 +422,7 @@ const SLIPNAME = {short: 'too short', ok: 'good distance', far: 'too far'};
 const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
-const DROPRATE = {good: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
+const DROPRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 const IDLECOL = {holds: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
 const SPEEDCOL = {sharp: '#34c759', mixed: '#ff9f0a', slow: '#ff3b30', 'not rated': '#8e8e93'};
 const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
@@ -751,46 +751,45 @@ const RULE_LAYERS = [
     },
   },
   {
-    // hand drop before the punch (hand_drop/punches.csv): did the punching hand dip below its own guard in the
-    // 0.4 s before it went? Per punch, joined by start frame + hand; a white tick marks the lowest frame.
+    // keep the guard before punching (hand_drop/punches.csv): how far the punching wrist sits below the nose, in torso
+    // lengths, averaged over every readable frame of the 0.25 s before the punch starts. Low above 0.40 — the same
+    // absolute line guard height and idle hand use.
     key: 'drop', label: 'Hand drop before punch', short: 'Hand drop',
     csv: ['hand_drop', 'punches.csv'], json: ['hand_drop', 'hand_drop.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, dip: num(r.dip), dipF: num(r.dip_frame), base: num(r.baseline)}
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), a: num(r.win_start), b: num(r.win_end), n: num(r.frames_read)}
       : {verdict: '', skip: r.skip_reason},
     summary: () => '',
-    card: (e, x) => `<div class="sub"><div class="h">Hand drop before the punch</div>` +
-      (!x || !x.verdict ? `<div class="empty">no reading before this punch</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Dip below his own guard</span><b>${x.dip.toFixed(2)} torso</b>
-        <span>His guard sits at</span><b>${x.base.toFixed(2)} torso below the nose</b>
-        <span>Lowest frame</span><b>f ${x.dipF}</b>
-        <span>Verdict</span><b>${x.verdict === 'dip' ? 'dipped first' : 'no dip'}</b></div>`) + '</div>',
-    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">no reading in the 0.4 s before this punch</span>` :
-      `<span class="num">${x.verdict === 'dip' ? '<b>dipped first</b>' : 'no dip'} · the hand went ` +
-      `<b>${x.dip.toFixed(2)}</b> torso below its own guard before starting</span><br>` +
-      `<span class="m">a dip of 0.25 torso or more counts, measured in the 0.4 s before the punch</span>`),
+    card: (e, x) => `<div class="sub"><div class="h">Hand before the punch</div>` +
+      (!x || !x.verdict ? `<div class="empty">the punching wrist is not visible in the 0.25 s before this punch</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Wrist below the nose</span><b>${x.drop.toFixed(3)} torso, mean of ${x.n} frames</b>
+        <span>Low above</span><b>0.400 torso</b>
+        <span>Verdict</span><b>${x.verdict === 'low' ? 'hand low' : 'hand up'}</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">no readable frame in the 0.25 s before this punch</span>` :
+      `<span class="num">${x.verdict === 'low' ? '<b>hand low</b>' : 'hand up'} · the wrist sat ` +
+      `<b>${x.drop.toFixed(3)}</b> torso below the nose on average before the punch</span><br>` +
+      `<span class="m">mean over the 0.25 s before the punch starts; low above 0.40 torso, the guard-height line</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;                                // nothing readable: draw nothing
       const [bx, w] = span(e);
-      c.fillStyle = x.verdict === 'dip' ? '#ff3b30' : '#34c759';
+      c.fillStyle = x.verdict === 'low' ? '#ff3b30' : '#34c759';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, `${x.dip.toFixed(2)}`);
+      tag(bx, w, y, h, x.drop.toFixed(3));
       ring(e, 'drop', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                        // the hand's own guard line, and the dip below it
-      if (!x.verdict || x.base == null) return;
+    overlay(e, x, f, P, leadLeft) {                        // the nose, the 0.40 line under it, the wrist's path before the punch
+      if (!x.verdict) return;
       const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
-      const at = j => PAT(x.dipF, j) || P(j);                // the dip was measured in its own frame, not this one
+      const at = j => PAT(x.b, j);                         // the window's last frame, just before the punch starts
       const nose = at(J.nose), sh = at(J.lsh), sh2 = at(J.rsh), hip = at(J.lhip), hip2 = at(J.rhip);
       if (!(nose && sh && sh2 && hip && hip2)) return;
       const torso = Math.hypot((sh[0] + sh2[0]) / 2 - (hip[0] + hip2[0]) / 2, (sh[1] + sh2[1]) / 2 - (hip[1] + hip2[1]) / 2);
-      const col = x.verdict === 'dip' ? '#ff3b30' : '#34c759';
-      const gy = nose[1] + x.base * torso, x0 = Math.min(sh[0], sh2[0]) - 40, x1 = Math.max(sh[0], sh2[0]) + 40;
-      OV.level(gy, x0, x1, '#8e8e93');                      // where this hand normally lives
-      OV.level(gy + 0.25 * torso, x0, x1, col, [3, 4]);     // and the line a dip has to cross
-      const lowp = PAT(x.dipF, wr);
-      if (lowp) { OV.ring(lowp, col, 11, 3); OV.line([lowp[0], gy], lowp, col, 2, [3, 3]); }
-      const now = P(wr); OV.dot(now, col, 4.5);
-      overlayLabel(x0, gy - 16, `guard ${x.base.toFixed(2)} · dipped ${x.dip.toFixed(2)}`, col);
+      const col = x.verdict === 'low' ? '#ff3b30' : '#34c759';
+      const x0 = Math.min(sh[0], sh2[0]) - 40, x1 = Math.max(sh[0], sh2[0]) + 40;
+      OV.level(nose[1], x0, x1, '#8e8e93', [3, 4]);                  // the nose
+      OV.level(nose[1] + 0.40 * torso, x0, x1, '#8e8e93');           // the line: 0.40 torso below it
+      OV.level(nose[1] + x.drop * torso, x0, x1, col);               // where the wrist sat, on average
+      OV.trail(x.a, x.b, wr, col);                                   // the wrist through the window
+      overlayLabel(x0, nose[1] + x.drop * torso - 16, `wrist ${x.drop.toFixed(3)} below the nose (low above 0.400)`, col);
     },
   },
   {
@@ -1963,18 +1962,18 @@ function ruleCard() {
           + `${shr.n_too_little} too little · ${shr.n_too_much} too much`});
   const hd = S.handDrop;
   if (hd) add('Hand drop before punch', hd.rating, DROPRATE[hd.rating], null, {
-    what: 'does the hand dip before it throws, showing the punch is coming?',
+    what: 'is the punching hand up at guard just before it throws?',
     on: `${hd.n_punches} punches · ${hd.judged_punches} judged, ${hd.n_punches - hd.judged_punches} skipped `
-        + `(no reading in the 0.4 s before the punch) · lead ${hd.by_hand.lead.dips}/${hd.by_hand.lead.judged}, `
-        + `rear ${hd.by_hand.rear.dips}/${hd.by_hand.rear.judged}`,
-    th: {event: {label: 'per punch', rule: 'how far the hand goes below ITS OWN guard (this boxer\u2019s median, '
-                        + `lead ${hd.baseline.lead}, rear ${hd.baseline.rear} torso below the nose) in the 0.4 s before the punch`,
-                 bands: [['< 0.25', 'no dip'], ['\u2265 0.25', 'dips']],
-                 pal: {'no dip': '#34c759', dips: '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches whose hand dipped first',
-                 bands: [['< 10 %', 'good'], ['10\u201325 %', 'sometimes drops'], ['\u2265 25 %', 'drops']],
+        + `(the wrist not visible in the 0.25 s before the punch) · lead ${hd.by_hand.lead.low}/${hd.by_hand.lead.judged}, `
+        + `rear ${hd.by_hand.rear.low}/${hd.by_hand.rear.judged}`,
+    th: {event: {label: 'per punch', rule: 'how far the punching wrist sits below the nose, in torso lengths, averaged over '
+                        + 'every readable frame of the 0.25 s before the punch — the same absolute line guard height and idle hand use',
+                 bands: [['≤ 0.40', 'hand up'], ['> 0.40', 'hand low']],
+                 pal: {'hand up': '#34c759', 'hand low': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged punches thrown from a low hand',
+                 bands: [['< 20 %', 'good'], ['20–40 %', 'sometimes low'], ['≥ 40 %', 'low']],
                  pal: DROPRATE}},
-    calc: `${hd.dip_punches} of ${hd.judged_punches} judged punches = ${pct(hd.dip_share)}`});
+    calc: `${hd.low_punches} of ${hd.judged_punches} judged punches = ${pct(hd.low_share)} · median ${hd.median_drop} torso`});
   const gu = S.guard;
   if (gu) add('Guard height', gu.rating, GUARDRATE[gu.rating], null, {
     what: 'does a hand drop while it is not punching?',
