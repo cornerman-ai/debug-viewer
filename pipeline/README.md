@@ -66,8 +66,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 
 - **Hand drop before punch** (`hand_drop/`): per punch, the punching wrist's mean height below the nose over every
   readable frame of the 0.25 s before the punch started, in torso lengths — green up to 0.40, red above it (the
-  guard-height line), with the reading on the block. The overlay, on the punch's frames, draws the nose, the 0.40
-  line, the wrist's mean height and its path through the window. Round rating = the share of punches thrown from a
+  guard-height line), with the reading on the block. The block, its highlight and its tooltip sit on the 0.25 s
+  WINDOW before the punch, not on the punch, because that is what the rule measured. With the playhead inside the
+  window the overlay draws the nose, the 0.40 line, the window's mean, the wrist's path so far and this frame's own
+  reading ("not read" when a joint is below visibility 0.30); nothing is drawn on the punch itself. Round rating = the share of punches thrown from a
   low hand (< 20 % good, 20–40 % sometimes low, ≥ 40 % low). Reads `punches.csv` + `hand_drop.json`.
 - **Punch speed** (`punch_speed/`): per punch, the time from its first frame to the impact, with the milliseconds
   on the block — green inside the band for that punch type, red above it. The band is the upper quartile of the

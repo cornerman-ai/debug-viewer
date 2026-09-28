@@ -755,6 +755,7 @@ const RULE_LAYERS = [
     // lengths, averaged over every readable frame of the 0.25 s before the punch starts. Low above 0.40 — the same
     // absolute line guard height and idle hand use.
     key: 'drop', label: 'Hand drop before punch', short: 'Hand drop',
+    window: true,                                          // its block, ring and hover cover the 0.25 s BEFORE the punch
     csv: ['hand_drop', 'punches.csv'], json: ['hand_drop', 'hand_drop.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), a: num(r.win_start), b: num(r.win_end), n: num(r.frames_read)}
       : {verdict: '', skip: r.skip_reason},
@@ -767,29 +768,32 @@ const RULE_LAYERS = [
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">no readable frame in the 0.25 s before this punch</span>` :
       `<span class="num">${x.verdict === 'low' ? '<b>hand low</b>' : 'hand up'} · the wrist sat ` +
       `<b>${x.drop.toFixed(3)}</b> torso below the nose on average before the punch</span><br>` +
-      `<span class="m">mean over the 0.25 s before the punch starts; low above 0.40 torso, the guard-height line</span>`),
-    row(e, x, {c, y, h, span, tag, ring}) {
+      `<span class="m">measured over the 0.25 s BEFORE this punch (f ${x.a}–${x.b}, ${x.n} frames read); low above 0.40 torso, the guard-height line</span>`),
+    row(e, x, {c, y, h, tag, ring, tx, fps}) {
       if (!x.verdict) return;                                // nothing readable: draw nothing
-      const [bx, w] = span(e);
+      const bx = tx(x.a / fps), w = Math.max(2, tx((x.b + 1) / fps) - bx - 1);   // the window, not the punch
       c.fillStyle = x.verdict === 'low' ? '#ff3b30' : '#34c759';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
       tag(bx, w, y, h, x.drop.toFixed(3));
       ring(e, 'drop', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                        // the nose, the 0.40 line under it, the wrist's path before the punch
-      if (!x.verdict) return;
-      const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
-      const at = j => PAT(x.b, j);                         // the window's last frame, just before the punch starts
-      const nose = at(J.nose), sh = at(J.lsh), sh2 = at(J.rsh), hip = at(J.lhip), hip2 = at(J.rhip);
-      if (!(nose && sh && sh2 && hip && hip2)) return;
-      const torso = Math.hypot((sh[0] + sh2[0]) / 2 - (hip[0] + hip2[0]) / 2, (sh[1] + sh2[1]) / 2 - (hip[1] + hip2[1]) / 2);
+    frameOverlay(f, P, leadLeft, Q, torso) {               // inside the 0.25 s before a punch: what the rule reads
+      const e = S.punches.find(p => p.drop?.verdict && f >= p.drop.a && f <= p.drop.b); if (!e) return;
+      const x = e.drop, wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
+      const nose = P(J.nose), sh = P(J.lsh), sh2 = P(J.rsh), t = torso(); if (!(nose && sh && sh2 && t)) return;
       const col = x.verdict === 'low' ? '#ff3b30' : '#34c759';
-      const x0 = Math.min(sh[0], sh2[0]) - 40, x1 = Math.max(sh[0], sh2[0]) + 40;
+      const x0 = Math.min(sh[0], sh2[0]) - 50, x1 = Math.max(sh[0], sh2[0]) + 50;
       OV.level(nose[1], x0, x1, '#8e8e93', [3, 4]);                  // the nose
-      OV.level(nose[1] + 0.40 * torso, x0, x1, '#8e8e93');           // the line: 0.40 torso below it
-      OV.level(nose[1] + x.drop * torso, x0, x1, col);               // where the wrist sat, on average
-      OV.trail(x.a, x.b, wr, col);                                   // the wrist through the window
-      overlayLabel(x0, nose[1] + x.drop * torso - 16, `wrist ${x.drop.toFixed(3)} below the nose (low above 0.400)`, col);
+      OV.level(nose[1] + 0.40 * t, x0, x1, '#8e8e93');               // the line: 0.40 torso below it
+      OV.level(nose[1] + x.drop * t, x0, x1, col);                   // the window's mean, the number that decides
+      OV.trail(x.a, f, wr, col);                                     // the wrist so far in the window
+      // this frame's own reading, with the rule's gate: nose, shoulders, hips and the wrist at visibility > 0.30
+      const seen = [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, wr].every(j => Q(j, 6) > 0.30);
+      const w = P(wr), now = seen && w ? (w[1] - nose[1]) / t : null;
+      if (w) OV.ring(w, seen ? col : '#8e8e93', 11, 3);
+      overlayLabel(x0, nose[1] - 16, `frame ${f - x.a + 1}/${x.b - x.a + 1} before the ${(PUNCH[e.type]?.name || e.type).toLowerCase()}`, '#8e8e93');
+      overlayLabel(x0, nose[1] + x.drop * t - 16,
+        `mean ${x.drop.toFixed(3)} · this frame ${now == null ? 'not read' : now.toFixed(3)} · low above 0.400`, col);
     },
   },
   {
@@ -2651,7 +2655,9 @@ function drawLayerRows(c, f, W, text, grid) {
   const span = e => { const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps); return [x0, Math.max(2, x1 - x0 - 1)]; };
   const vis = e => !S.hiddenP.has(e.type) && tx((e.ef + 1) / fps) >= L && tx(e.sf / fps) <= L + W;
   const tag = (x, w, y, h, t) => { if (w < (t.length <= 1 ? 14 : 30)) return; c.font = font; c.fillStyle = 'rgba(0,0,0,0.75)'; c.textAlign = 'left'; c.fillText(t, x + 6, y + h / 2 + 0.5); };
-  const ring = (e, k, x, y, w, h) => { if ((e.sf <= f && f <= e.ef) || (V.hover === e && V.hoverLayer === k)) {
+  const ring = (e, k, x, y, w, h) => {
+    const [s0, s1] = RULE[k]?.window && e[k] ? [e[k].a, e[k].b] : [e.sf, e.ef];      // a window layer rings its window
+    if ((s0 <= f && f <= s1) || (V.hover === e && V.hoverLayer === k)) {
     c.strokeStyle = text; c.lineWidth = 1.5; rr(x - 1, y + 1, w + 2, h - 2, 6); c.stroke(); } };
   for (const L of RULE_LAYERS) {
     if (!TR[L.key]) continue;
@@ -2728,6 +2734,8 @@ function hit(x, y) {
       if (e) e = {...e, both: at};                           // the tooltip shows every hand at this frame
     } else if (L_.items) {
       e = (S.items[k] || []).find(it => f >= it.sf && f <= it.ef);
+    } else if (L_.window) {                                  // hovering the window before a punch picks that punch
+      e = S.punches.find(p => p[k]?.verdict && f >= p[k].a && f <= p[k].b);
     } else {
       e = find(S.punches, S.hiddenP, p => !!p[k]);
     }
