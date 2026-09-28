@@ -890,10 +890,10 @@ const RULE_LAYERS = [
   },
   {
     // stopping the uppercut (uppercut_stop/punches.csv): the impact frame is the turnaround, so the question is
-    // simply where the fist was when it stopped. The line is the ghost's chin — the uppercut's own target.
+    // simply where the fist was when it stopped. The line is the middle of the ghost's head, chin to crown.
     key: 'upstop', label: 'Uppercut stop', short: 'Upper stop',
     csv: ['uppercut_stop', 'punches.csv'], json: ['uppercut_stop', 'uppercut_stop.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, over: num(r.over), overCrown: num(r.over_crown),
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, over: num(r.over), overChin: num(r.over_chin), overCrown: num(r.over_crown),
       chinNy: num(r.chin_ny), crownNy: num(r.crown_ny), handNx: num(r.hand_nx), handNy: num(r.hand_ny)}
       : {verdict: '', skip: r.skip_reason},
     summary: () => '',
@@ -903,13 +903,14 @@ const RULE_LAYERS = [
                                                 : x && x.skip === 'not_an_uppercut' ? 'not an uppercut'
                                                 : x && x.skip === 'hand_not_visible' ? 'a hand point (pinky, index or thumb) is not visible at the impact frame'
                                                 : 'the wrist or the body is not visible at the impact frame'}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Past the chin</span><b>${x.over > 0 ? '+' : ''}${x.over.toFixed(3)} stance heights</b>
-        <span>Past the crown</span><b>${x.overCrown > 0 ? '+' : ''}${x.overCrown.toFixed(3)} — the stricter line</b>
+       `<div class="rows num" style="margin-top:0"><span>Past mid-head</span><b>${x.over > 0 ? '+' : ''}${x.over.toFixed(3)} stance heights</b>
+        <span>Past the chin</span><b>${x.overChin > 0 ? '+' : ''}${x.overChin.toFixed(3)} — not judged</b>
+        <span>Past the crown</span><b>${x.overCrown > 0 ? '+' : ''}${x.overCrown.toFixed(3)} — not judged</b>
         <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
       `<span class="num"><b>${x.verdict}</b> · the fist stopped ${Math.abs(x.over).toFixed(3)} stance heights ` +
-      `${x.over > 0 ? 'ABOVE' : 'below'} the chin</span><br>` +
-      `<span class="m">a head uppercut is aimed at the chin — a fist still travelling past it was not stopped</span>`),
+      `${x.over > 0 ? 'ABOVE' : 'below'} the middle of the head</span><br>` +
+      `<span class="m">a fist stopping in the lower half of the head landed; one in the upper half is on its way past</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;
       const [bx, w] = span(e);
@@ -918,7 +919,7 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, `${x.over > 0 ? '+' : ''}${x.over.toFixed(3)}`);
       ring(e, 'upstop', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                        // the chin it is aimed at, and where the fist stopped
+    overlay(e, x, f, P, leadLeft) {                        // the head's middle, its chin and crown, and the fist
       if (!x.verdict || x.chinNy == null) return;
       const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
       const lsh = P(J.lsh), rsh = P(J.rsh), w = P(wr);
@@ -927,14 +928,16 @@ const RULE_LAYERS = [
       if (!(chin && crown)) return;
       const col = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
       const x0 = Math.min(lsh[0], rsh[0]) - 50, x1 = Math.max(lsh[0], rsh[0]) + 50;
-      OV.level(crown[1], x0, x1, '#8e8e93', [3, 4]);       // the top of the head: the line first tried, too high
-      OV.level(chin[1], x0, x1, col);                      // the chin: the uppercut's own target
+      const mid = (chin[1] + crown[1]) / 2;                // the judgment line: halfway from the chin to the crown
+      OV.level(crown[1], x0, x1, '#8e8e93', [3, 4]);       // top of the ghost's head, for reference
+      OV.level(chin[1], x0, x1, '#8e8e93', [3, 4]);        // its chin, for reference
+      OV.level(mid, x0, x1, col);
       // the point the rule reads: the fist's centre (wrist + pinky + index + thumb) at the turnaround
       const fist = PXY(x.handNx, x.handNy) || PAT(e.impact, wr) || w;
-      OV.line([fist[0], chin[1]], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
+      OV.line([fist[0], mid], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
       if (f !== e.impact) OV.dot(w, col, 4);
-      overlayLabel(x0, chin[1] - 16,
-        `${x.over > 0 ? '+' : ''}${x.over.toFixed(3)} past the chin`, col);
+      overlayLabel(x0, crown[1] - 16,
+        `${x.over > 0 ? '+' : ''}${x.over.toFixed(3)} past mid-head`, col);
     },
   },
   {
@@ -2051,18 +2054,18 @@ function ruleCard() {
           + `hips off centre ${bal.hips_off_centre} (${pct(bal.hips_share)})`});
   const us = S.layerSum.upstop;
   if (us) add('Uppercut stop', us.rating, UPSTOPCOL[us.rating], null, {
-    what: 'does the uppercut finish at the chin, or keep going up past it?',
+    what: 'does the uppercut finish on the head, or keep going up past it?',
     on: `${us.n_uppercuts} head uppercuts · ${us.judged_uppercuts} judged side-on (the arc runs up and forward, and `
         + `head-on the forward half points at the camera), ${us.n_uppercuts - us.judged_uppercuts} skipped`,
-    th: {event: {label: 'per punch', rule: 'the fist’s height at the turnaround — the frame it stops going forward — '
-                        + 'against the chin of a ghost built from the boxer’s own size. No number: the chin is the line, '
-                        + 'because the chin is what a head uppercut is aimed at',
-                 bands: [['at or below the chin', 'stops'], ['above it', 'flies through']],
+    th: {event: {label: 'per punch', rule: 'the fist’s centre (wrist, pinky, index, thumb) at the turnaround — the frame '
+                        + 'it stops going forward — against the middle of the head of a ghost built from the boxer’s own '
+                        + 'size, halfway from its chin to its crown. No number: the head is the line',
+                 bands: [['at or below mid-head', 'stops'], ['above it', 'flies through']],
                  pal: {stops: '#34c759', 'flies through': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged uppercuts that went past the chin',
+         round: {label: 'per round', rule: 'the share of judged uppercuts that went past the middle of the head',
                  bands: [['< 20 %', 'stops'], ['20–40 %', 'sometimes'], ['≥ 40 %', 'flies through']], pal: UPSTOPCOL}},
     calc: `${us.flies_through} of ${us.judged_uppercuts} judged uppercuts = ${pct(us.over_share)} · `
-          + `median ${us.median_over} stance heights past the chin`});
+          + `median ${us.median_over} stance heights past mid-head`});
   const hs = S.layerSum.hookstop;
   if (hs) add('Hook stop', hs.rating, HOOKSTOPCOL[hs.rating], null, {
     what: 'does the hook finish on the target, or swing on past it?',

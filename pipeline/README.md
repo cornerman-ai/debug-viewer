@@ -81,11 +81,12 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   `punches.csv` + `balance.json`.
 - **Uppercut stop** (`uppercut_stop/`): per head uppercut, read side-on, where the fist is at the turnaround — the
   frame the impact spotter says it stopped going forward. The fist is the mean of the wrist, pinky, index and thumb
-  (the wrist alone reads an uppercut low), and the ring is drawn on that point. The line is the chin of a ghost the boxer's own size (the
-  same ghost hit height builds), and the overlay draws it solid with the crown dashed above it, so the stricter
-  line stays visible. Green at or below the chin, red above it, labelled with the gap in stance heights. Nothing is
+  (the wrist alone reads an uppercut low), and the ring is drawn on that point. The line is the middle of the head of a
+  ghost the boxer's own size (the same ghost hit height builds), halfway from its chin to its crown: drawn solid,
+  with the chin and the crown dashed grey for reference. Green at or below it, red above it, labelled with the gap
+  in stance heights. Nothing is
   drawn for a body shot (the classifier merges body hooks and body uppercuts), a punch thrown head-on, or a missing
-  wrist. Round rating = the share of judged uppercuts past the chin (< 20 % stops, 20–40 % sometimes, ≥ 40 % flies
+  wrist. Round rating = the share of judged uppercuts past the middle of the head (< 20 % stops, 20–40 % sometimes, ≥ 40 % flies
   through), from at least 10. Reads `punches.csv` + `uppercut_stop.json`.
 - **Hook stop** (`hook_stop/`): per head hook, read front-on or back-on, the same question across the frame — has
   the fist crossed the boxer's own far shoulder by the turnaround. The far shoulder is his centre line plus half
