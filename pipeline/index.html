@@ -790,7 +790,7 @@ const RULE_LAYERS = [
                                                  : 'the idle wrist is not visible at the impact frame'}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Idle hand</span><b>${x.idle}</b>
         <span>Below the nose</span><b>${x.drop.toFixed(2)} torso</b>
-        <span>Low from</span><b>0.40 torso (the shared guard line)</b>
+        <span>Low from</span><b>0.40 torso (the line hand drop uses too)</b>
         <span>Verdict</span><b>${x.verdict === 'drops' ? 'low' : 'up'}</b></div>
        <div class="rows num" style="opacity:.6"><span>For context, not judged:</span><b></b>
         <span>this hand's own guard sits at</span><b>${x.base == null ? '–' : x.base.toFixed(2) + ' torso'}</b>
@@ -1377,7 +1377,7 @@ const RULE_LAYERS = [
       const t = torso(), nose = P(J.nose), l = P(J.lsh), r = P(J.rsh);
       if (!(t && nose && l && r)) return;
       const x0 = Math.min(l[0], r[0]) - 45, x1 = Math.max(l[0], r[0]) + 45;
-      OV.level(nose[1] + GUARD_FULL.rear * t, x0, x1, '#8e8e93');                // rear: full marks up to 0.40
+      OV.level(nose[1] + GUARD_FULL.rear * t, x0, x1, '#8e8e93');                // rear: full marks up to 0.30
       OV.level(nose[1] + GUARD_FULL.lead * t, x0, x1, '#8e8e93', [3, 4]);        // lead: full marks up to 0.50
       OV.level(nose[1] + 0.70 * t, x0, x1, '#8e8e93', [2, 6]);                   // both: 0 from 0.70
       overlayLabel(x1 + 6, nose[1] + GUARD_FULL.rear * t, 'rear 100', '#8e8e93');
@@ -1416,7 +1416,7 @@ const RULE_LAYERS = [
       };
       const rows = (x.both || [x]).sort(a => a.hand === 'lead' ? -1 : 1);
       return `<b>Guard height</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>') +
-        `<br><span class="m">low below 0.50 torso under the nose for the lead hand, 0.40 for the rear, while that hand is not punching</span>`;
+        `<br><span class="m">low below 0.50 torso under the nose for the lead hand, 0.30 for the rear, while that hand is not punching</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
@@ -1435,7 +1435,7 @@ const RULE_LAYERS = [
 
 ];
 const LAYERS = RULE_LAYERS.map(r => r.key);
-const GUARD_FULL = {lead: 0.50, rear: 0.40};                    // guard height: full marks up to here, 0 from 0.70
+const GUARD_FULL = {lead: 0.50, rear: 0.30};                    // guard height: full marks up to here, 0 from 0.70
 // Which Notion rules (by number, 2026-09-28) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [4], guard: [5], idle: [7], chin_depth: [8], chin_height: [9], elbow: [10],
@@ -1994,7 +1994,7 @@ function ruleCard() {
         + `(the wrist not visible in the 0.25 s before the punch) · lead ${hd.by_hand.lead.low}/${hd.by_hand.lead.judged}, `
         + `rear ${hd.by_hand.rear.low}/${hd.by_hand.rear.judged}`,
     th: {event: {label: 'per punch', rule: 'how far the punching wrist sits below the nose, in torso lengths, averaged over '
-                        + 'every readable frame of the 0.25 s before the punch — the same absolute line guard height and idle hand use',
+                        + 'every readable frame of the 0.25 s before the punch — the same absolute line idle hand uses',
                  bands: [['≤ 0.40', '100'], ['0.40–0.70', 'linear 100 → 0'], ['≥ 0.70', '0']],
                  pal: {'100': '#34c759', 'linear 100 → 0': '#ff9f0a', '0': '#ff3b30'}},
          round: {label: 'per round', rule: 'the mean punch score over the judged punches — a plain number, no bands; '
@@ -2006,10 +2006,10 @@ function ruleCard() {
     on: `${gu.n_frames.toLocaleString()} frames · judged lead ${gu.hands.lead.judged_frames.toLocaleString()}, `
         + `rear ${gu.hands.rear.judged_frames.toLocaleString()} · the rest skipped (that hand throwing, or a joint not visible)`,
     th: {event: {label: 'per frame', rule: 'how far each wrist sits below the nose, in torso lengths. Each hand scores '
-                        + 'full marks up to its line — lead 0.50, rear 0.40 — falling linearly to 0 at 0.70. The frame '
+                        + 'full marks up to its line — lead 0.50, rear 0.30 — falling linearly to 0 at 0.70. The frame '
                         + 'score is lead 30 + rear 70; when only one hand can be judged (the other punching or hidden) '
                         + 'it is the whole 100',
-                 bands: [['lead ≤ 0.50, rear ≤ 0.40', 'full marks'], ['0.70 and lower', '0']],
+                 bands: [['lead ≤ 0.50, rear ≤ 0.30', 'full marks'], ['0.70 and lower', '0']],
                  pal: {'full marks': '#34c759', '0': '#ff3b30'}},
          round: {label: 'per round', rule: 'the mean frame score over every scored frame — a plain number, no bands; '
                         + 'fewer than 150 scored frames: not rated'}},

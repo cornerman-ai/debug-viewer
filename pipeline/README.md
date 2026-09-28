@@ -120,7 +120,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   tried first and read 42 % / 58 % — see `combined_pipeline/changes.md`. Reads `punches.csv` +
   `hand_return_path.json`.
 - **Idle hand at impact** (`idle_hand/`): per punch, the hand that is NOT throwing, read at the impact frame —
-  how far it sits below the nose. Green up, red low at ≥ 0.40 torso (the same line guard height uses, an absolute one: a boxer
+  how far it sits below the nose. Green up, red low at ≥ 0.40 torso (the same line hand drop uses, an absolute one: a boxer
   who holds his hands low all round must not pass), nothing drawn where the idle wrist isn't visible. That hand's
   own median guard is shown in the card beside the verdict, unjudged. Round rating = the share of judged punches
   whose idle hand was low (< 10 % holds, 10–25 % sometimes drops, ≥ 25 % drops). One frame and not the punch's
@@ -157,9 +157,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   torso lengths, with a white tick at the furthest frame (orange < 0.20 too short, green 0.20–0.70, red > 0.70 too
   far). Rolls and ducks are not measured. Judged front-on / back-on only. Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
-  hand is not punching — low above 0.50 for the lead hand, 0.40 for the rear. Continuous row, lead in the top half,
+  hand is not punching — low above 0.50 for the lead hand, 0.30 for the rear. Continuous row, lead in the top half,
   rear in the bottom: green guard up, red low, and a dashed gray line for everything the rule could not look at —
-  that hand throwing, or a joint not visible. The overlay draws the rear line (0.40, "rear 100"), the lead line
+  that hand throwing, or a joint not visible. The overlay draws the rear line (0.30, "rear 100"), the lead line
   (0.50, "lead 100") and the zero line (0.70), and labels the frame score: lead 30 + rear 70, or one hand alone.
   Round = the mean frame score, a plain number with no bands. Reads `runs.csv` + `guard_height.json`.
 - **Hips bladed** (`bladedness_hips/`) and **Shoulders bladed** (`bladedness_shoulders/`): both per frame outside
