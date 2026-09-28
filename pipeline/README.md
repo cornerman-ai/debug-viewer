@@ -51,7 +51,7 @@ that rule's headline verdict.
 the punch card and a video overlay.
 
 Every rule with geometry in the frame now draws it. Rules that judge a punch (arm extension, hit height, hip and
-shoulder rotation, head off center, hand drop, idle hand, balance, hand return path, uppercut stop, hook stop)
+shoulder rotation, head off center, hand drop, idle hand, balance, hand return path, uppercut stop, hook stop, rear-foot pivot)
 draw for the punch under the playhead. Rules that judge frames (guard height, elbow tuck, chin height and depth, stance width and depth, both
 bladedness axes, slip distance) draw on every frame through `frameOverlay`, which gets the raw BlazePose-33
 channels — they need joints (mouth corners, heels, toes) and channels (world x/z) the punch overlays never touch.
@@ -88,6 +88,11 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   drawn for a body shot (the classifier merges body hooks and body uppercuts), a punch thrown head-on, or a missing
   wrist. Round rating = the share of judged uppercuts past the middle of the head (< 20 % stops, 20–40 % sometimes, ≥ 40 % flies
   through), from at least 10. Reads `punches.csv` + `uppercut_stop.json`.
+- **Rear-foot pivot** (`rear_pivot/`): per rear-hand punch, at the impact frame, how far the rear heel sits above the
+  rear toe in shin lengths — pivots at 0.27 or more, flat below (the stance already carries the heel about 0.20 up).
+  The overlay draws the toe's height dashed grey, the 0.27 line in the verdict's colour, the foot and the heel. Every
+  angle is judged; lead-hand punches and a hidden rear foot are not drawn. Round rating = the share landed flat
+  (< 30 % pivots, 30–50 % sometimes, ≥ 50 % flat-footed), from at least 10. Reads `punches.csv` + `rear_pivot.json`.
 - **Hook stop** (`hook_stop/`): per head hook, read front-on or back-on, the same question across the frame — has
   the fist crossed the boxer's own far shoulder by the turnaround. The far shoulder is his centre line plus half
   his squared-up width (the 90th percentile of his shoulder separation over the clip), not the gap in that frame,

@@ -428,6 +428,7 @@ const BALCOL = {balanced: '#34c759', mixed: '#ff9f0a', 'off balance': '#ff3b30',
 const SPEEDCOL = {sharp: '#34c759', mixed: '#ff9f0a', slow: '#ff3b30', 'not rated': '#8e8e93'};
 const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
 const HOOKSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'wraps around': '#ff3b30', 'not rated': '#8e8e93'};
+const PIVOTCOL = {pivots: '#34c759', sometimes: '#ff9f0a', 'flat-footed': '#ff3b30', 'not rated': '#8e8e93'};
 const GRECCOL = {recovers: '#34c759', sometimes: '#ff9f0a', 'hands stay down': '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDRATE = {good: '#34c759', 'sometimes low': '#ff9f0a', low: '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
@@ -984,6 +985,47 @@ const RULE_LAYERS = [
       if (f !== e.impact) OV.dot(w, col, 4);
       overlayLabel(Math.min(line[0], fist[0]) - 10, yTop - 8,
         `${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)} torso past the far shoulder`, col);
+    },
+  },
+  {
+    // rear-foot pivot (rear_pivot/punches.csv): at the impact of every rear-hand punch, how far the rear heel sits
+    // above the rear toe, in shin lengths. 0.27 is the line: the stance already carries the heel ~0.20 up.
+    key: 'rpivot', label: 'Rear-foot pivot', short: 'Pivot',
+    csv: ['rear_pivot', 'punches.csv'], json: ['rear_pivot', 'rear_pivot.json'],
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, lift: num(r.lift)} : {verdict: '', skip: r.skip_reason},
+    summary: () => '',
+    card: (e, x) => `<div class="sub"><div class="h">Rear-foot pivot</div>` +
+      (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'lead_hand' ? 'a lead-hand punch — the rule reads rear-hand punches only'
+                                                : x && x.skip === 'no_impact_frame' ? 'no impact frame'
+                                                : 'the rear heel, toe, ankle or knee is not visible at the impact frame'}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Heel above the toe</span><b>${x.lift >= 0 ? '+' : ''}${x.lift.toFixed(3)} shin lengths</b>
+        <span>Needs</span><b>0.270</b>
+        <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
+      `<span class="num"><b>${x.verdict}</b> · at impact the rear heel sits ${x.lift.toFixed(3)} shin lengths above the toe ` +
+      `(needs 0.270)</span><br>` +
+      `<span class="m">the stance already carries the rear heel about 0.20 up, so the line sits above that</span>`),
+    row(e, x, {c, y, h, span, tag, ring}) {
+      if (!x.verdict) return;
+      const [bx, w] = span(e);
+      c.fillStyle = x.verdict === 'pivots' ? '#34c759' : '#ff3b30';
+      rr(bx, y + 3, w, h - 6, 5); c.fill();
+      tag(bx, w, y, h, x.lift.toFixed(3));
+      ring(e, 'rpivot', bx, y, w, h);
+    },
+    overlay(e, x, f) {                                      // the rear foot at impact: toe level, the line, the heel
+      if (!x.verdict) return;
+      // run_rear_pivot.py reads the RIGHT foot (every test video is orthodox, the rule takes no stance)
+      const kn = PAT(e.impact, 26), an = PAT(e.impact, 28), he = PAT(e.impact, 30), to = PAT(e.impact, 32);
+      if (!(kn && an && he && to)) return;
+      const shin = Math.hypot(an[0] - kn[0], an[1] - kn[1]); if (!(shin > 1)) return;
+      const col = x.verdict === 'pivots' ? '#34c759' : '#ff3b30';
+      const x0 = Math.min(he[0], to[0]) - 40, x1 = Math.max(he[0], to[0]) + 40;
+      OV.level(to[1], x0, x1, '#8e8e93', [3, 4]);           // the toe's height
+      OV.level(to[1] - 0.27 * shin, x0, x1, col);            // where the heel has to reach
+      OV.line(to, he, '#ffffff', 2);                         // the foot itself
+      OV.line([he[0], to[1]], he, col, 2.5, [3, 3]); OV.ring(he, col, 9, 3); OV.dot(to, '#8e8e93', 4);
+      overlayLabel(x0, to[1] - 0.27 * shin - 16, `heel +${x.lift.toFixed(3)} shin (needs 0.270)`, col);
     },
   },
   {
@@ -1747,6 +1789,7 @@ const SCOPE = {
   bal:       {moves: 'every punch at its impact frame',         angles: 'side-on'},
   upstop:    {moves: 'every head uppercut at its impact frame', angles: 'side-on'},
   hookstop:  {moves: 'every head hook at its impact frame',     angles: 'front, back'},
+  rpivot:    {moves: 'every rear-hand punch at its impact frame', angles: 'front, back, side-on'},
   speed:     {moves: 'every punch with an impact frame',        angles: ALL_ANGLES},
   arm:       {moves: 'jab, cross',                              angles: 'side-on'},
   hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
@@ -2080,6 +2123,20 @@ function ruleCard() {
                  bands: [['< 20 %', 'stops'], ['20–40 %', 'sometimes'], ['≥ 40 %', 'wraps around']], pal: HOOKSTOPCOL}},
     calc: `${hs.wraps_around} of ${hs.judged_hooks} judged hooks = ${pct(hs.cross_share)} · `
           + `median ${hs.median_cross} torso past the far shoulder`});
+  const rp = S.layerSum.rpivot;
+  if (rp) add('Rear-foot pivot', rp.rating, PIVOTCOL[rp.rating], null, {
+    what: 'when a rear-hand punch lands, is the rear heel up and turning, or flat on the floor?',
+    on: `${rp.n_rear_punches} rear-hand punches · ${rp.judged_punches} judged (every angle — the lift is vertical), `
+        + `${rp.n_rear_punches - rp.judged_punches} skipped (no impact frame, or the rear foot not visible)`,
+    th: {event: {label: 'per punch', rule: 'at the impact frame, how far the rear heel sits above the rear toe, in shin '
+                        + 'lengths. The stance already carries the heel about 0.20 up, so the line is 0.27: where rear-hand '
+                        + 'punches and jabs separate best on the ten test videos, and the jabs’ 75th percentile',
+                 bands: [['≥ 0.27 shin', 'pivots'], ['below', 'flat']],
+                 pal: {pivots: '#34c759', flat: '#ff3b30'}},
+         round: {label: 'per round', rule: 'the share of judged rear-hand punches landed flat',
+                 bands: [['< 30 %', 'pivots'], ['30–50 %', 'sometimes'], ['≥ 50 %', 'flat-footed']], pal: PIVOTCOL}},
+    calc: `${rp.flat} of ${rp.judged_punches} judged rear-hand punches = ${pct(rp.flat_share)} · `
+          + `median heel ${rp.median_lift} shin above the toe`});
   const gr = S.layerSum.grec;                                                          //  3
   if (gr) add('Guard after combo', gr.rating, GRECCOL[gr.rating], null, {
     what: 'once the combination is over, are the hands back where they started?',
