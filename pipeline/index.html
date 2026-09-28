@@ -1829,6 +1829,18 @@ function scoreCounts(key) {
   return {pass: n(x => x.band === 'perfect' || x.band === 'good'),   // head off center: the good half of the bands
           fail: n(x => x.band === 'bad' || x.band === 'critical'), skip: n(x => x.score == null)};
 }
+// The Notion "Production rules" numbering (read 2026-09-28): the round view is one list in this order. Slip distance is
+// one script for two Notion rows — 15 "slip far enough" and 16 "keep slips compact" — so it sits at 15 and says so.
+const NOTION = {
+  'Balance at impact': 1, 'Hand drop before punch': 2, 'Guard after combo': 3, 'Defense after combo': 4,
+  'Guard height': 5, 'Hand balance': 6, 'Idle hand at impact': 7, 'Chin depth': 8, 'Chin height': 9,
+  'Elbow tuck': 10, 'Head off center line': 11, 'Stance depth': 12, 'Stance width': 13, 'Angle change': 14,
+  'Slip distance': 15, 'Hand return path': 17, 'Hips bladed': 18, 'Shoulders bladed': 19, 'Hip rotation': 20,
+  'Shoulder rotation': 21, 'Arm extension': 22, 'Hit height': 23, 'Punch speed': 24, 'Combination length': 25,
+  'Work rate': 26, 'Output through the round': 27, 'Same punches': 28, 'Body shots': 29, 'Same defense': 30,
+  'Same offensive combos': 31, 'Same combined combos': 32, 'Hook stop': 33, 'Uppercut stop': 34, 'Rear-foot pivot': 35,
+};
+const notionNo = name => name === 'Slip distance' ? '15–16' : String(NOTION[name] ?? '?');
 // Round view — every rule we have, one row each, in the Notion order. A row carries its value (the 0-100 score
 // where the rule has one, otherwise its rating) and four lines: what it measures, what it was measured on, the
 // thresholds, and the sum that produced the number.
@@ -1844,7 +1856,7 @@ function ruleCard() {
     add(name, n, c.col, band, info(scoreCounts(key)));
   };
 
-  if (ac) add('Angle change', ac.rating, ACCOL[ac.rating], null, {                     // 1
+  if (ac) add('Angle change', ac.rating, ACCOL[ac.rating], null, {
     what: 'after attacking, does he step off the line he attacked from?',
     on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (no facing angle to read)`,
     th: {event: {label: 'per combo', rule: 'a defensive move — or any turn — of ≥ 45° from the combo’s mean facing, '
@@ -1852,7 +1864,7 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the share of readable combos that changed angle',
                  bands: [['≥ 50 %', 'good'], ['25–50 %', 'some'], ['< 25 %', 'stays square']], pal: ACCOL}},
     calc: `${ac.n_changed} turned / ${ac.n_readable} combos = ${pct(ac.changed_share)}`});
-  scored('arm', 'Arm extension', q => ({                                               // 2
+  scored('arm', 'Arm extension', q => ({
     what: 'does the arm reach full extension on a straight punch?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on to read the arm)`,
     th: {event: {label: 'per punch', rule: 'the elbow angle at the frame of furthest reach',
@@ -1861,7 +1873,7 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the mean punch score',
                  bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
     calc: `mean punch score over the ${q.pass + q.fail} judged punches`}));
-  if (da) add('Defense after combo', da.rating, DACOL[da.rating], null, {               // 7
+  if (da) add('Defense after combo', da.rating, DACOL[da.rating], null, {
     what: 'does he defend right after he throws, or stand there?',
     on: `${da.n_combos} offensive combos (punches only) · all judged`,
     th: {event: {label: 'per combo', rule: 'a defensive move starting anywhere from the combo’s first frame to 1 s '
@@ -1869,7 +1881,7 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the share of combos covered',
                  bands: [['≥ 60 %', 'good'], ['35–60 %', 'moderate'], ['< 35 %', 'no defense after combos']], pal: DACOL}},
     calc: `${da.n_covered} covered / ${da.n_combos} combos = ${pct(da.covered_share)}`});
-  if (el) add('Elbow tuck', el.rating, ELBOWCOL[el.rating], null, {                     // 8
+  if (el) add('Elbow tuck', el.rating, ELBOWCOL[el.rating], null, {
     what: 'does the elbow stay in, or flare out to the side?',
     on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook)`,
     th: {event: {label: 'per frame', rule: 'flare = the sideways shoulder → elbow gap in torso lengths',
@@ -1877,7 +1889,7 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the share of judged frames flared, on the worse arm',
                  bands: [['< 10 %', 'tucked'], ['10–25 %', 'sometimes flared'], ['≥ 25 %', 'flared']], pal: ELBOWCOL}},
     calc: `lead ${el.arms.lead.flared_frames.toLocaleString()} of ${el.arms.lead.judged_frames.toLocaleString()} frames flared = ${pct(el.arms.lead.flared_share)} · rear ${el.arms.rear.flared_frames.toLocaleString()} of ${el.arms.rear.judged_frames.toLocaleString()} = ${pct(el.arms.rear.flared_share)} · the worse arm (${el.worse_arm || '–'}) sets the rating`});
-  scored('hoc', 'Head off center line', q => ({                                         // 11
+  scored('hoc', 'Head off center line', q => ({
     what: 'does the head leave the center line while punching, or stay a still target?',
     on: `${q.pass + q.fail + q.skip} punches · ${q.pass + q.fail} judged, ${q.skip} skipped (thrown side-on, where the camera cannot see the head move sideways)`,
     th: {event: {label: 'per punch', rule: 'offset = 0.75 × at impact + 0.125 × a quarter into the punch + 0.125 × '
@@ -1885,7 +1897,7 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the worst 10 % of the punch scores, averaged',
                  bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
     calc: `the worst 10 % of the ${q.pass + q.fail} punch scores, averaged`}));
-  const hp = S.hipSum;                                                                 // 13
+  const hp = S.hipSum;
   if (hp) add('Hip rotation', hp.rating, HIPCOL[hp.rating], null, {
     what: 'do the hips turn into the punch, or does he arm-punch?',
     on: `${hp.n_punches} punches · ${hp.n_judged} judged from start to impact, ${hp.n_punches - hp.n_judged} skipped (no impact frame or no readable hip line)`,
@@ -1897,26 +1909,26 @@ function ruleCard() {
                  bands: [['≥ 80 %', 'good'], ['65–80 %', 'mixed'], ['< 65 %', 'poor']], pal: HIPCOL}},
     calc: `${hp.n_good} inside the band / ${hp.n_judged} punches = ${pct(hp.good_share)} · `
           + `${hp.n_too_little} too little · ${hp.n_too_much} too much`});
-  if (bs) add('Body shots', bs.rating, BODYCOL[bs.rating], null, {                      // 14
+  if (bs) add('Body shots', bs.rating, BODYCOL[bs.rating], null, {
     what: 'does he go downstairs, or hunt the head only?',
     on: `${bs.n_hooks_uppercuts} hooks and uppercuts · all judged · the ${bs.n_jab_cross_not_counted} jabs and crosses are left out (the model cannot tell a head jab from a body jab)`,
     th: {round: {label: 'per round', rule: 'the share of hooks and uppercuts that land on the body',
                  bands: [['≥ 25 %', 'enough'], ['15–25 %', 'a few'], ['5–15 %', 'too few'], ['< 5 %', 'head only']], pal: BODYCOL}},
     calc: `${bs.n_body} to the body / ${bs.n_hooks_uppercuts} = ${pct(bs.body_share)}`});
-  if (off?.diversity) add('Same offensive combos', off.diversity.rating, DIVCOL[off.diversity.rating], null, {   // 16
+  if (off?.diversity) add('Same offensive combos', off.diversity.rating, DIVCOL[off.diversity.rating], null, {
     what: 'does he keep throwing the same few combinations?',
     on: `${off.n_combinations} offensive combos · all judged · ${off.n_different} different sequences among them`,
     th: {round: {label: 'per round', rule: 'the share of all combos taken by the 3 most-used sequences',
                  bands: [['≥ 70 %', 'repetitive'], ['50–70 %', 'moderate'], ['< 50 %', 'varied']], pal: DIVCOL}},
     calc: `top 3 sequences / ${off.n_combinations} combos = ${pct(off.top3_share)}`});
-  if (cmb?.diversity) add('Same combined combos', cmb.diversity.rating, DIVCOL[cmb.diversity.rating], null, {   // 17
+  if (cmb?.diversity) add('Same combined combos', cmb.diversity.rating, DIVCOL[cmb.diversity.rating], null, {
     what: 'the same question with the defensive moves included',
     on: `${cmb.n_combinations} combined combos · all judged · ${cmb.n_different} different sequences among them`,
     th: {round: {label: 'per round', rule: 'the same top-3 share — but the defense model’s noise inflates how many '
                         + 'different sequences there are, so read it next to the offensive rating, not alone',
                  bands: [['≥ 70 %', 'repetitive'], ['50–70 %', 'moderate'], ['< 50 %', 'varied']], pal: DIVCOL}},
     calc: `top 3 sequences / ${cmb.n_combinations} combos = ${pct(cmb.top3_share)}`});
-  if (sd) add('Same defense', sd.same_move.rating, SDCOL[sd.same_move.rating], null, {  // 18
+  if (sd) add('Same defense', sd.same_move.rating, SDCOL[sd.same_move.rating], null, {
     what: 'does he only ever use one move, or always go to one side?',
     on: `${sd.n_moves} defensive moves · all judged for the move · the side only over the ${sd.n_with_side} that have one (a duck has none)`,
     th: {round: {label: 'per round', rule: 'the share of the most-used move, and separately of the most-used side',
@@ -1936,7 +1948,7 @@ function ruleCard() {
     calc: sl.judged_slips ? `${sl.slip_verdicts.ok || 0} good · ${sl.slip_verdicts.short || 0} too short · `
           + `${sl.slip_verdicts.far || 0} too far of ${sl.judged_slips} judged slips`
           : 'no slip could be read front-on'});
-  const shr = S.shSum;                                                                 // 20
+  const shr = S.shSum;
   if (shr) add('Shoulder rotation', shr.rating, HIPCOL[shr.rating], null, {
     what: 'do the shoulders turn into the punch, or does the arm go alone?',
     on: `${shr.n_punches} punches · ${shr.n_judged} judged from start to impact, ${shr.n_punches - shr.n_judged} `
@@ -1949,7 +1961,7 @@ function ruleCard() {
                  bands: [['\u2265 80 %', 'good'], ['65\u201380 %', 'mixed'], ['< 65 %', 'poor']], pal: HIPCOL}},
     calc: `${shr.n_good} inside the band / ${shr.n_judged} punches = ${pct(shr.good_share)} · `
           + `${shr.n_too_little} too little · ${shr.n_too_much} too much`});
-  const hd = S.handDrop;                                                               // 10
+  const hd = S.handDrop;
   if (hd) add('Hand drop before punch', hd.rating, DROPRATE[hd.rating], null, {
     what: 'does the hand dip before it throws, showing the punch is coming?',
     on: `${hd.n_punches} punches · ${hd.judged_punches} judged, ${hd.n_punches - hd.judged_punches} skipped `
@@ -1963,7 +1975,7 @@ function ruleCard() {
                  bands: [['< 10 %', 'good'], ['10\u201325 %', 'sometimes drops'], ['\u2265 25 %', 'drops']],
                  pal: DROPRATE}},
     calc: `${hd.dip_punches} of ${hd.judged_punches} judged punches = ${pct(hd.dip_share)}`});
-  const gu = S.guard;                                                                  // 9
+  const gu = S.guard;
   if (gu) add('Guard height', gu.rating, GUARDRATE[gu.rating], null, {
     what: 'does a hand drop while it is not punching?',
     on: `${gu.n_frames.toLocaleString()} frames · judged lead ${gu.hands.lead.judged_frames.toLocaleString()}, `
@@ -1980,7 +1992,7 @@ function ruleCard() {
           + `${gu.hands.rear.judged_frames.toLocaleString()} = ${pct(gu.hands.rear.low_share)} · the worse hand `
           + `(${gu.worse_hand || '–'}) sets the rating`});
   const stW = S.stanceW, stD = S.stanceD;
-  if (stW) add('Stance width', stW.rating, STANCERATE[stW.rating], null, {             // 24
+  if (stW) add('Stance width', stW.rating, STANCERATE[stW.rating], null, {
     what: STANCE.width.what,
     on: `${stW.n_frames.toLocaleString()} frames · ${stW.judged_frames.toLocaleString()} judged, the rest skipped `
         + `(side-on, or a joint not visible)`,
@@ -1989,7 +2001,7 @@ function ruleCard() {
          round: {label: 'per round', rule: STANCE.width.roundRule, bands: STANCE.width.bands, pal: STANCERATE}},
     calc: `${stW.narrow_frames.toLocaleString()} of ${stW.judged_frames.toLocaleString()} judged frames = `
           + `${pct(stW.narrow_share)} · median ${stW.median_sep} torso`});
-  if (stD) add('Stance depth', stD.rating, STANCERATE[stD.rating], null, {             // 23
+  if (stD) add('Stance depth', stD.rating, STANCERATE[stD.rating], null, {
     what: STANCE.depth.what,
     on: `${stD.n_frames.toLocaleString()} frames · ${stD.judged_frames.toLocaleString()} judged, the rest skipped `
         + `(front-on, or a joint not visible)`,
@@ -1998,13 +2010,13 @@ function ruleCard() {
          round: {label: 'per round', rule: STANCE.depth.roundRule, bands: STANCE.depth.bands, pal: STANCERATE}},
     calc: `${stD.shallow_frames.toLocaleString()} of ${stD.judged_frames.toLocaleString()} judged frames = `
           + `${pct(stD.shallow_share)} · median ${stD.median_depth} leg`});
-  if (sp) add('Same punches', sp.rating, SPCOL[sp.rating], null, {                      // 19
+  if (sp) add('Same punches', sp.rating, SPCOL[sp.rating], null, {
     what: 'does he throw anything beyond his two favourite punches?',
     on: `${sp.n_punches} punches · all judged, grouped by punch type`,
     th: {round: {label: 'per round', rule: 'the share of all punches taken by the 2 most-used types',
                  bands: [['≥ 85 %', 'same punches'], ['70–85 %', 'moderate'], ['< 70 %', 'varied']], pal: SPCOL}},
     calc: `${sp.top2_types.map(t => PUNCH[t]?.name || t).join(' + ')} / ${sp.n_punches} punches = ${pct(sp.top2_share)}`});
-  const wr = S.workRate;                                                               // 28
+  const wr = S.workRate;
   if (wr) add('Work rate', wr.rating, WORKCOL[wr.rating], null, {
     what: 'does he keep working, or does the round have holes in it?',
     on: `${wr.duration_seconds}s of video · ${wr.n_punches} punches and ${wr.n_moves} defensive moves · all judged`,
@@ -2014,7 +2026,7 @@ function ruleCard() {
                  bands: [['< 20 %', 'working'], ['20–40 %', 'patchy'], ['≥ 40 %', 'stalling']], pal: WORKCOL}},
     calc: `${wr.dead_seconds}s dead in ${wr.n_dead_gaps} gaps / ${wr.duration_seconds}s = ${pct(wr.dead_share)} · `
           + `${wr.punches_per_minute} punches/min, ${wr.actions_per_minute} actions/min · longest gap ${wr.longest_dead_s}s`});
-  scored('hrp', 'Hand return path', q => ({                                            // 17
+  scored('hrp', 'Hand return path', q => ({
     what: 'does the fist come straight back to guard, or loop down and swing up?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged, ${q.skip} not judged (no impact frame, `
         + `the wrist or shoulder out of view, or a tracking jump at the low point) · hooks and uppercuts arc by design and are not judged`,
@@ -2045,7 +2057,7 @@ function ruleCard() {
             + `${pct(bd.squared_share)} · between ${bd.between_frames.toLocaleString()}, `
             + `bladed ${bd.bladed_frames.toLocaleString()}`});
   }
-  const chh = S.layerSum.chin_height;                                                 //  9
+  const chh = S.layerSum.chin_height;
   if (chh) add('Chin height', chh.rating, CHINRATE[chh.rating], null, {
     what: 'is the chin down behind the lead shoulder, or riding above it?',
     on: `${chh.n_frames.toLocaleString()} frames · ${chh.judged_frames.toLocaleString()} judged outside punches · `
@@ -2058,7 +2070,7 @@ function ruleCard() {
                  bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes'], ['≥ 30 %', 'bad']], pal: CHINRATE}},
     calc: `${chh.over_frames.toLocaleString()} of ${chh.judged_frames.toLocaleString()} judged frames = `
           + `${pct(chh.over_share)} · median ${chh.median_height_norm} shoulder widths`});
-  const chd = S.layerSum.chin_depth;                                                  //  8
+  const chd = S.layerSum.chin_depth;
   if (chd) add('Chin depth', chd.rating, CHINRATE[chd.rating], null, {
     what: 'does the chin sit behind the front of the lead shoulder, or stick out past it?',
     on: `${chd.n_frames.toLocaleString()} frames · ${chd.judged_frames.toLocaleString()} judged (outside punches and side-on only — `
@@ -2071,7 +2083,7 @@ function ruleCard() {
                  bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes'], ['≥ 30 %', 'bad']], pal: CHINRATE}},
     calc: `${chd.out_frames.toLocaleString()} of ${chd.judged_frames.toLocaleString()} judged frames = `
           + `${pct(chd.out_share)} · median gap ${chd.median_gap} torso`});
-  const psp = S.layerSum.speed;                                                       // 25
+  const psp = S.layerSum.speed;
   if (psp) add('Punch speed', psp.rating, SPEEDCOL[psp.rating], null, {
     what: 'does the punch get there, or does it travel?',
     on: `${psp.n_punches} punches · ${psp.judged_punches} judged, ${psp.n_punches - psp.judged_punches} skipped (no impact frame)`,
@@ -2084,7 +2096,7 @@ function ruleCard() {
                  bands: [['< 10 %', 'sharp'], ['10–25 %', 'mixed'], ['≥ 25 %', 'slow']], pal: SPEEDCOL}},
     calc: `${psp.slow_punches} of ${psp.judged_punches} judged punches = ${pct(psp.slow_share)} · `
           + Object.entries(psp.by_type).map(([t, v]) => `${PUNCH[t]?.name || t} ${v.slow}/${v.judged}`).join(', ')});
-  const bal = S.layerSum.bal;                                                          //  1
+  const bal = S.layerSum.bal;
   if (bal) add('Balance at impact', bal.rating, BALCOL[bal.rating], null, {
     what: 'when the punch lands, is his head still over his own feet?',
     on: `${bal.n_punches} punches · ${bal.judged_punches} judged side-on (fore-aft is the axis this fault lives on), `
@@ -2142,7 +2154,7 @@ function ruleCard() {
                  bands: [['< 30 %', 'pivots'], ['30–50 %', 'sometimes'], ['≥ 50 %', 'flat-footed']], pal: PIVOTCOL}},
     calc: `${rp.flat} of ${rp.judged_punches} judged rear-hand punches = ${pct(rp.flat_share)} · `
           + `median heel ${rp.median_lift} shin above the toe`});
-  const gr = S.layerSum.grec;                                                          //  3
+  const gr = S.layerSum.grec;
   if (gr) add('Guard after combo', gr.rating, GRECCOL[gr.rating], null, {
     what: 'once the combination is over, are the hands back where they started?',
     on: `${gr.n_combinations} combined combos · ${gr.judged} judged, ${gr.n_combinations - gr.judged} skipped `
@@ -2156,7 +2168,7 @@ function ruleCard() {
     calc: `${gr.not_recovered} of ${gr.judged} judged combos = ${pct(gr.not_recovered_share)} · `
           + `lead ${gr.by_hand.lead.not_recovered}/${gr.by_hand.lead.judged}, `
           + `rear ${gr.by_hand.rear.not_recovered}/${gr.by_hand.rear.judged}`});
-  const ih = S.layerSum.idle;                                                          //  7
+  const ih = S.layerSum.idle;
   if (ih) add('Idle hand at impact', ih.rating, IDLECOL[ih.rating], null, {
     what: 'when one hand lands, is the other one still up where a guard belongs?',
     on: `${ih.n_punches} punches · ${ih.judged_punches} judged at their impact frame, `
@@ -2171,7 +2183,7 @@ function ruleCard() {
     calc: `${ih.drop_punches} of ${ih.judged_punches} judged punches = ${pct(ih.low_share)} · `
           + `lead idle ${ih.by_idle_hand.lead.drops}/${ih.by_idle_hand.lead.judged}, `
           + `rear idle ${ih.by_idle_hand.rear.drops}/${ih.by_idle_hand.rear.judged}`});
-  const hb = S.handBal;                                                                //  6
+  const hb = S.handBal;
   if (hb) add('Hand balance', hb.rating, HANDBALCOL[hb.rating], null, {
     what: 'does he use both hands, or live on one of them?',
     on: `${hb.n_punches} punches · all judged, grouped by hand`,
@@ -2183,7 +2195,7 @@ function ruleCard() {
           + `${Object.entries(hb.by_hand.lead).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${PUNCH[k]?.name || k} ${v}`).join(', ')}`
           + `) · rear ${hb.n_rear} (`
           + `${Object.entries(hb.by_hand.rear).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${PUNCH[k]?.name || k} ${v}`).join(', ')})`});
-  const cl = S.comboLen;                                                               // 26
+  const cl = S.comboLen;
   if (cl) add('Combination length', cl.rating, COMBOLENCOL[cl.rating], null, {
     what: 'does he build anything longer than a one-two?',
     on: `${cl.n_combinations} offensive combos · all judged · ${cl.n_solo_punches} of ${cl.n_punches} punches were thrown solo and are not in any of them`,
@@ -2192,7 +2204,7 @@ function ruleCard() {
     calc: `${cl.n_long} of ${cl.n_combinations} combos are 3+ = ${pct(cl.long_share)} · `
           + `${Object.entries(cl.by_n_elements).map(([k, v]) => `${v} of ${k}`).join(', ')} · `
           + `mean ${cl.mean_elements}, longest ${cl.longest} · ${pct(cl.solo_share)} of punches thrown solo`});
-  const dc = S.decay;                                                                  // 29
+  const dc = S.decay;
   if (dc) add('Output through the round', dc.rating, DECAYCOL[dc.rating], null, {
     what: 'does he still throw at the end what he threw at the start?',
     on: `${dc.duration_seconds}s of video cut into three equal thirds · ${dc.n_punches} punches, all counted`,
@@ -2201,7 +2213,7 @@ function ruleCard() {
     calc: `${dc.per_third.map(t => `${t.n_punches} (${t.punches_per_minute}/min`
              + (t.dead_share === '' ? '' : `, ${pct(t.dead_share)} dead`) + ')').join(' → ')} · `
           + `${dc.first_third} → ${dc.last_third} = ${dc.drop >= 0 ? `${pct(dc.drop)} fewer` : `${pct(-dc.drop)} more`}`});
-  scored('hit', 'Hit height', q => ({                                                   // 25
+  scored('hit', 'Hit height', q => ({
     what: 'would the punch land somewhere useful on an opponent his own size?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on) · hooks and uppercuts are read at their impact frame on the timeline, not here`,
     th: {event: {label: 'per punch', rule: 'the fist’s height on an opponent his own size',
@@ -2212,13 +2224,11 @@ function ruleCard() {
     calc: `the worst 10 % of the ${q.pass + q.fail} punch scores, averaged`}));
 
   $('scoreCard').style.display = rows.length ? '' : 'none';
-  // rules that judge each punch / move / frame first, then the ones that only rate the round
-  const groups = [['per punch · move · frame', rows.filter(r => r.th.event)],
-                  ['round summary only', rows.filter(r => !r.th.event)]];
+  rows.sort((x, y) => (NOTION[x.name] ?? 99) - (NOTION[y.name] ?? 99));             // one list, the Notion order
   const rule = r => {
     const big = /^[\d.]+$/.test(r.value);
     return `<div class="rule">` +
-      `<div class="big"><span class="k">${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${r.color}">${r.value}` +
+      `<div class="big"><span class="k">${notionNo(r.name)} · ${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${r.color}">${r.value}` +
       (r.band ? `<span class="k" style="margin-left:8px">${r.band}</span>` : '') + '</span></div>' +
       `<div class="exp"><span>measures</span><span>${r.what}</span>` +
       `<span>on</span><span>${r.on}</span>` +
@@ -2231,8 +2241,7 @@ function ruleCard() {
       `<span>round</span><span>${r.calc}</span></div></div>`;
   };
   $('scoreCard').innerHTML = '<div class="label">Round score</div>' +
-    groups.filter(([, g]) => g.length).map(([name, g]) =>
-      `<div class="grp">${name}<span class="n">${g.length}</span></div><div class="grpbox">${g.map(rule).join('')}</div>`).join('');
+    `<div class="grpbox">${rows.map(rule).join('')}</div>`;
 }
 const layerOn = k => !!(S.has?.[k] && V.layers[k]);
 
