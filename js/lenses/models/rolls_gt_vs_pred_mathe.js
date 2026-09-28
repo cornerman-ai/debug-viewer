@@ -259,7 +259,7 @@ async function loadDoc(file, key, expect = null) {
         `stale cached data; hard-reload the page (Cmd/Ctrl+Shift+R)`);
     }
     doc = d;
-    cfg = { threshold: d.decode.threshold, minEventS: d.decode.min_event_s, gapS: d.decode.gap_s };
+    cfg = { threshold: d.decode.threshold, minEventS: d.decode.min_event_s, gapS: d.decode.gap_s, minDip: cfg.minDip || 0 };   // the gate survives a round change
     syncSliders();
   } catch (e) { if (docKey === key) docError = String(e); }
   if (docKey !== key) return;
