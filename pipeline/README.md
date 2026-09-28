@@ -73,8 +73,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   the decoder starts it later). Every angle is judged: a time is not foreshortened. Round rating = the share of
   judged punches above their band (< 10 % sharp, 10–25 % mixed, ≥ 25 % slow). Reads `punches.csv` +
   `punch_speed.json`.
-- **Balance at impact** (`balance/`): per punch at the impact frame, read side-on, two checks — the head must stay
-  between the ankles, and the hips within 0.15 of the ankle distance from their midpoint. Either failing turns the
+- **Balance at impact** (`balance/`): per punch at the impact frame, read side-on, two checks — the head must not go
+  more than 0.20 of the ankle distance past either ankle, and the hips must sit within 0.20 of it from their
+  midpoint (the dashed ticks outside the base mark the head's slack). Drawn at the impact frame. Either failing turns the
   block red, labelled with which one gave way (`head`, `hips`, `head+hips`); a passing punch carries the head's
   position instead. Nothing is drawn for punches thrown head-on or with the feet out of view. Round rating = the
   share of judged punches failing either check (< 20 % balanced, 20–40 % mixed, ≥ 40 % off balance). Reads

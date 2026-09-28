@@ -840,9 +840,10 @@ const RULE_LAYERS = [
     },
   },
   {
-    // balance at impact (balance/punches.csv): two checks at the frame the punch lands — the head between the two
-    // ANKLES (head_pos 0 and 1 are the left and the right ankle in the image), and the hip centre within 0.15 of the
-    // ankle span from its midpoint. The whole-foot base, heels and toes included, was measured and rejected.
+    // balance at impact (balance/punches.csv): two checks at the frame the punch lands — the head over the ANKLES
+    // with a slack of 0.20 of their span past either one (head_pos 0 and 1 are the left and the right ankle in the
+    // image, so -0.20..1.20 passes), and the hip centre within 0.20 of the span from its midpoint. The whole-foot
+    // base, heels and toes included, was measured and rejected.
     key: 'bal', label: 'Balance at impact', short: 'Balance',
     csv: ['balance', 'punches.csv'], json: ['balance', 'balance.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, head: num(r.head_pos), off: num(r.hip_off),
@@ -851,14 +852,14 @@ const RULE_LAYERS = [
     card: (e, x) => `<div class="sub"><div class="h">Balance at impact</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_side_on' ? 'thrown head-on — balance is a fore-aft fault, invisible from there'
                                                 : 'the feet or the body are not visible at the impact frame'}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Head between the ankles</span><b>${x.headOk ? 'yes' : 'no'} · ${x.head.toFixed(2)}</b>
-        <span>Hips off the midpoint</span><b>${x.hipsOk ? 'within' : 'past'} 0.15 · ${x.off.toFixed(2)}</b>
+       `<div class="rows num" style="margin-top:0"><span>Head over the base</span><b>${x.headOk ? 'yes' : 'no'} · ${x.head.toFixed(2)} (−0.20 to 1.20)</b>
+        <span>Hips off the midpoint</span><b>${x.hipsOk ? 'within' : 'past'} 0.20 · ${x.off.toFixed(2)}</b>
         <span>Verdict</span><b>${x.verdict}${x.why ? ' — ' + x.why : ''}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
       `<span class="num"><b>${x.verdict}</b>${x.why ? ' · ' + x.why : ''}</span><br>` +
-      `<span class="num">head at ${x.head.toFixed(2)} between the ankles (0 and 1 are the ankles) · ` +
+      `<span class="num">head at ${x.head.toFixed(2)} (0 and 1 are the ankles, −0.20 to 1.20 passes) · ` +
       `hips ${x.off.toFixed(2)} off their midpoint</span><br>` +
-      `<span class="m">a punch fails if the head leaves the ankles or the hips sit more than 0.15 of the ankle ` +
+      `<span class="m">a punch fails if the head goes more than 0.20 of the ankle distance past an ankle, or the hips sit more than 0.20 of it ` +
       `distance off centre</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;
@@ -871,16 +872,19 @@ const RULE_LAYERS = [
     },
     overlay(e, x, f, P) {                                  // the base between the ankles, the head over it, the hips
       if (!x.verdict) return;
-      const la = P(J.lan), ra = P(J.ran), nose = P(J.nose), lh = P(J.lhip), rh = P(J.rhip);
+      const at = j => PAT(e.impact, j);                    // the rule reads the IMPACT frame, not the playhead
+      const la = at(J.lan), ra = at(J.ran), nose = at(J.nose), lh = at(J.lhip), rh = at(J.rhip);
       if (!(la && ra && nose && lh && rh)) return;
       const lo = la[0] < ra[0] ? la : ra, hi = la[0] < ra[0] ? ra : la;
       const y = (la[1] + ra[1]) / 2, span = hi[0] - lo[0], mid = (lo[0] + hi[0]) / 2;
       const hipx = (lh[0] + rh[0]) / 2, hipy = (lh[1] + rh[1]) / 2;
       OV.line([lo[0], y], [hi[0], y], x.headOk ? '#34c759' : '#ff3b30', 4);   // the base itself
       for (const px of [lo[0], hi[0]]) OV.line([px, y - 9], [px, y + 9], x.headOk ? '#34c759' : '#ff3b30', 3);
+      for (const px of [lo[0] - 0.20 * span, hi[0] + 0.20 * span])      // how far past an ankle the head may go
+        OV.line([px, y - 12], [px, y + 12], x.headOk ? '#34c759' : '#ff3b30', 1.5, [3, 3]);
       const hc = x.hipsOk ? '#34c759' : '#ff3b30';         // the middle, with the slack the hips are allowed
-      OV.line([mid - 0.15 * span, y - 5], [mid - 0.15 * span, y + 5], hc, 2);
-      OV.line([mid + 0.15 * span, y - 5], [mid + 0.15 * span, y + 5], hc, 2);
+      OV.line([mid - 0.20 * span, y - 5], [mid - 0.20 * span, y + 5], hc, 2);
+      OV.line([mid + 0.20 * span, y - 5], [mid + 0.20 * span, y + 5], hc, 2);
       OV.line([mid, y - 3], [mid, y + 3], hc, 1.5);
       OV.line([hipx, hipy], [hipx, y], hc, 2, [4, 4]); OV.dot([hipx, hipy], hc, 4.5);
       const headCol = x.headOk ? '#34c759' : '#ff3b30';
@@ -2085,8 +2089,9 @@ function ruleCard() {
     what: 'when the punch lands, is his head still over his own feet?',
     on: `${bal.n_punches} punches · ${bal.judged_punches} judged side-on (fore-aft is the axis this fault lives on), `
         + `${bal.n_punches - bal.judged_punches} skipped (thrown head-on, no impact frame, or the feet not visible)`,
-    th: {event: {label: 'per punch', rule: 'two checks at the impact frame, either one fails it: the head must stay '
-                        + 'between the ankles, and the hips must sit within 0.15 of the ankle distance from their midpoint '
+    th: {event: {label: 'per punch', rule: 'two checks at the impact frame, either one fails it: the head must not go '
+                        + 'more than 0.20 of the ankle distance past either ankle, and the hips must sit within 0.20 of it '
+                        + 'from the ankles’ midpoint '
                         + '— head over the base at all, and weight shared rather than parked on one leg',
                  bands: [['both hold', 'balanced'], ['either fails', 'off balance']],
                  pal: {balanced: '#34c759', 'off balance': '#ff3b30'}},
