@@ -1490,10 +1490,18 @@ const idb = {
 
 // ════════════════════════════ sources ════════════════════════════
 // A source reads a video folder's stage files, plus (optionally) the data root for the video + skeleton.
+// The browser's own NotFoundError says only "a requested file or directory could not be found" — name the file.
 async function fileIn(dir, parts) {
   let d = dir;
-  for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p);
-  return (await d.getFileHandle(parts[parts.length - 1])).getFile();
+  try {
+    for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p);
+    return await (await d.getFileHandle(parts[parts.length - 1])).getFile();
+  } catch (e) {
+    if (e.name !== 'NotFoundError') throw e;
+    const err = new Error(`Missing file: “${dir.name}/${parts.join('/')}”. It is not in the folder you opened — `
+      + `Google Drive may not have finished syncing it, or it is not shared with you.`);
+    err.name = 'MissingFile'; throw err;
+  }
 }
 async function hasEntry(dir, name) { try { await dir.getDirectoryHandle(name); return true; } catch { return false; } }
 async function ensurePerm(h) {
@@ -1623,10 +1631,22 @@ async function pickDir() {
   if (!window.showDirectoryPicker) throw new Error('This browser cannot open folders — use Chrome or Edge.');
   return window.showDirectoryPicker({id: 'cornerman-pipeline', mode: 'read'});
 }
+const NOT_DATA = name => `“${name}” is not the Ambo data folder. Open the folder that contains pipeline_tests, `
+  + `raw_videos and skeleton_data — in Google Drive that is Ambo › data.`;
 async function openHandle(h) {
+  if (!(await hasEntry(h, 'pipeline_tests')) && (await hasEntry(h, 'data'))) {   // picked Ambo itself: step into data
+    const d = await h.getDirectoryHandle('data');
+    if (await hasEntry(d, 'pipeline_tests')) h = d;
+  }
   if (await hasEntry(h, 'pipeline_tests')) {                 // the data root
+    const gone = [];
+    for (const n of ['raw_videos', 'skeleton_data']) if (!(await hasEntry(h, n))) gone.push(n);
+    if (gone.length) throw new Error(`“${h.name}” has pipeline_tests but no ${gone.join(' and no ')} — `
+      + `Google Drive may not have finished syncing, or that folder is not shared with you.`);
     S.dataDir = h; await idb.set('dataDir', h);
     await showVideoList();
+  } else if (!(await hasEntry(h, 'punch_classification'))) { // neither the data root nor one video's folder
+    throw new Error(NOT_DATA(h.name));
   } else {                                                    // a single video folder
     await idb.set('lastVideo', h.name);
     if (!S.dataDir) { const d = await idb.get('dataDir'); if (d && (await d.queryPermission({mode: 'read'})) === 'granted') S.dataDir = d; }
@@ -2960,7 +2980,15 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => draw
   const d = await idb.get('dataDir');
   if (d) {
     const rb = $('reopenBtn'); rb.style.display = ''; rb.textContent = `Continue with “${d.name}”`;
-    rb.onclick = () => guard(async () => { if (!(await ensurePerm(d))) throw new Error('Permission to read the folder was not granted.'); await openHandle(d); });
+    rb.onclick = () => guard(async () => {
+      if (!(await ensurePerm(d))) throw new Error('Permission to read the folder was not granted.');
+      if (!(await hasEntry(d, 'pipeline_tests')) && !(await hasEntry(d, 'punch_classification'))) {
+        await idb.set('dataDir', undefined); rb.style.display = 'none';          // a remembered folder that moved
+        throw new Error(`The folder “${d.name}” used last time is no longer where it was (moved, renamed or removed). `
+          + `Use Open Folder… and pick Ambo › data again.`);
+      }
+      await openHandle(d);
+    });
   }
 })();
 </script>
