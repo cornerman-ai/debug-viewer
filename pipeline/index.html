@@ -772,28 +772,32 @@ const RULE_LAYERS = [
     row(e, x, {c, y, h, tag, ring, tx, fps}) {
       if (!x.verdict) return;                                // nothing readable: draw nothing
       const bx = tx(x.a / fps), w = Math.max(2, tx((x.b + 1) / fps) - bx - 1);   // the window, not the punch
+      const hh = h / 2 - 2, yy = e.hand === 'lead' ? y + 2 : y + h / 2;          // lead on top, rear below
       c.fillStyle = x.verdict === 'low' ? '#ff3b30' : '#34c759';
-      rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, x.drop.toFixed(3));
-      ring(e, 'drop', bx, y, w, h);
+      rr(bx, yy, w, hh, 3); c.fill();
+      tag(bx, w, yy, hh, x.drop.toFixed(3));
+      ring(e, 'drop', bx, yy - 2, w, hh + 3);
     },
     frameOverlay(f, P, leadLeft, Q, torso) {               // inside the 0.25 s before a punch: what the rule reads
-      const e = S.punches.find(p => p.drop?.verdict && f >= p.drop.a && f <= p.drop.b); if (!e) return;
-      const x = e.drop, wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
+      // windows overlap other punches all the time (a cross starting while the jab is out), so every window that
+      // holds this frame draws, each on its own wrist, each label named by hand
+      const es = S.punches.filter(p => p.drop?.verdict && f >= p.drop.a && f <= p.drop.b); if (!es.length) return;
       const nose = P(J.nose), sh = P(J.lsh), sh2 = P(J.rsh), t = torso(); if (!(nose && sh && sh2 && t)) return;
-      const col = x.verdict === 'low' ? '#ff3b30' : '#34c759';
       const x0 = Math.min(sh[0], sh2[0]) - 50, x1 = Math.max(sh[0], sh2[0]) + 50;
       OV.level(nose[1], x0, x1, '#8e8e93', [3, 4]);                  // the nose
       OV.level(nose[1] + 0.40 * t, x0, x1, '#8e8e93');               // the line: 0.40 torso below it
-      OV.level(nose[1] + x.drop * t, x0, x1, col);                   // the window's mean, the number that decides
-      OV.trail(x.a, f, wr, col);                                     // the wrist so far in the window
-      // this frame's own reading, with the rule's gate: nose, shoulders, hips and the wrist at visibility > 0.30
-      const seen = [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, wr].every(j => Q(j, 6) > 0.30);
-      const w = P(wr), now = seen && w ? (w[1] - nose[1]) / t : null;
-      if (w) OV.ring(w, seen ? col : '#8e8e93', 11, 3);
-      overlayLabel(x0, nose[1] - 16, `frame ${f - x.a + 1}/${x.b - x.a + 1} before the ${(PUNCH[e.type]?.name || e.type).toLowerCase()}`, '#8e8e93');
-      overlayLabel(x0, nose[1] + x.drop * t - 16,
-        `mean ${x.drop.toFixed(3)} · this frame ${now == null ? 'not read' : now.toFixed(3)} · low above 0.400`, col);
+      for (const e of es) {
+        const x = e.drop, wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
+        const col = x.verdict === 'low' ? '#ff3b30' : '#34c759', name = `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()}`;
+        OV.level(nose[1] + x.drop * t, x0, x1, col);                 // this window's mean, the number that decides
+        OV.trail(x.a, f, wr, col);                                   // its wrist so far in the window
+        // this frame's own reading, with the rule's gate: nose, shoulders, hips and the wrist at visibility > 0.30
+        const seen = [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, wr].every(j => Q(j, 6) > 0.30);
+        const w = P(wr), now = seen && w ? (w[1] - nose[1]) / t : null;
+        if (w) OV.ring(w, seen ? col : '#8e8e93', 11, 3);
+        overlayLabel(x0, nose[1] - 16,
+          `${name} in ${x.b - f + 1} f · mean ${x.drop.toFixed(3)} · this frame ${now == null ? 'not read' : now.toFixed(3)} · low above 0.400`, col);
+      }
     },
   },
   {
@@ -2309,6 +2313,7 @@ function drawOverlay(f, punchesNow) {
   const dpr = devicePixelRatio || 1, R = videoRect();
   if (ov.width !== Math.round(R.W * dpr) || ov.height !== Math.round(R.H * dpr)) { ov.width = Math.round(R.W * dpr); ov.height = Math.round(R.H * dpr); }
   octx.setTransform(dpr, 0, 0, dpr, 0, 0); octx.clearRect(0, 0, R.W, R.H);
+  LABELS.length = 0;
   if (!S.skel || f >= S.skel.length / (33 * S.skelC)) return;
   const C = S.skelC, base = f * 33 * C;
   const P = j => { const x = S.skel[base + j * C], y = S.skel[base + j * C + 1];
@@ -2326,7 +2331,11 @@ function drawOverlay(f, punchesNow) {
     octx.fillStyle = '#0a84ff';
     for (const j of Object.values(J)) { const p = P(j); if (p) { octx.beginPath(); octx.arc(p[0], p[1], 3.2, 0, 7); octx.fill(); } }
   }
-  for (const e of punchesNow) drawRuleOverlay(e, f, P);
+  for (const e of punchesNow) {                            // every punch under the playhead draws, both hands
+    LABEL_TAG = punchesNow.length > 1 ? `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()} · ` : '';
+    drawRuleOverlay(e, f, P);
+  }
+  LABEL_TAG = '';
   drawFrameOverlays(f, P);                                // per-frame rules: not tied to a punch under the playhead
   // impact: a ring on the punching wrist, strongest on the impact frame, fading over ±3 frames
   for (const e of punchesNow.concat(S.punches.filter(p => p.impact !== null && Math.abs(p.impact - f) <= 3 && !S.hiddenP.has(p.type)))) {
@@ -2341,9 +2350,15 @@ function drawOverlay(f, punchesNow) {
   }
 }
 
+// Labels drawn this frame, so a second one never lands on the first (overlapping punches, both hands' windows).
+// LABEL_TAG names the punch a label belongs to while more than one punch is under the playhead.
+const LABELS = []; let LABEL_TAG = '';
 function overlayLabel(x, y, text, color) {
   octx.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  text = LABEL_TAG + text;
   const w = octx.measureText(text).width + 14;
+  for (let k = 0; k < 12 && LABELS.some(b => x < b.x + b.w && b.x < x + w && Math.abs(y - b.y) < 23); k++) y += 24;
+  LABELS.push({x, y, w});
   octx.fillStyle = 'rgba(0,0,0,0.62)'; octx.beginPath();
   octx.roundRect ? octx.roundRect(x, y - 11, w, 22, 11) : octx.rect(x, y - 11, w, 22); octx.fill();
   octx.fillStyle = color; octx.fillText(text, x + 7, y + 4.5);
@@ -2735,7 +2750,9 @@ function hit(x, y) {
     } else if (L_.items) {
       e = (S.items[k] || []).find(it => f >= it.sf && f <= it.ef);
     } else if (L_.window) {                                  // hovering the window before a punch picks that punch
-      e = S.punches.find(p => p[k]?.verdict && f >= p[k].a && f <= p[k].b);
+      const [ry, rh] = TR[k], side = y < ry + rh / 2 ? 'lead' : 'rear';          // the row's top half is lead
+      const at = S.punches.filter(p => p[k]?.verdict && f >= p[k].a && f <= p[k].b);
+      e = at.find(p => p.hand === side) || at[0];
     } else {
       e = find(S.punches, S.hiddenP, p => !!p[k]);
     }

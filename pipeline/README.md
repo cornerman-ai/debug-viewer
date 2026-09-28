@@ -57,6 +57,9 @@ bladedness axes, slip distance) draw on every frame through `frameOverlay`, whic
 channels — they need joints (mouth corners, heels, toes) and channels (world x/z) the punch overlays never touch.
 Punch speed has no overlay on purpose: it measures a duration, and a duration has no geometry to draw.
 
+When punches overlap, every punch under the playhead draws its own overlay, and each label is prefixed with its
+hand and punch ("Rear cross · …"); labels never land on top of each other — a label that would is moved down.
+
 Turn on one or two at a time. With a dozen layers on, the picture is unreadable — that is a debugging view, not a
 bug. Colors: green = fine, orange = too little,
 red = wrong / too much. A stretch the rule threw out — a joint it needs not visible, a punch in flight, the wrong
@@ -69,7 +72,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   guard-height line), with the reading on the block. The block, its highlight and its tooltip sit on the 0.25 s
   WINDOW before the punch, not on the punch, because that is what the rule measured. With the playhead inside the
   window the overlay draws the nose, the 0.40 line, the window's mean, the wrist's path so far and this frame's own
-  reading ("not read" when a joint is below visibility 0.30); nothing is drawn on the punch itself. Round rating = the share of punches thrown from a
+  reading ("not read" when a joint is below visibility 0.30); nothing is drawn on the punch itself. Windows overlap
+  other punches constantly (a cross starting while the jab is out), so the row is split — lead windows on the top
+  half, rear on the bottom — and every window holding the playhead draws on its own wrist, its label naming the
+  hand and punch ("Rear cross in 3 f · mean 0.527 · …"). Round rating = the share of punches thrown from a
   low hand (< 20 % good, 20–40 % sometimes low, ≥ 40 % low). Reads `punches.csv` + `hand_drop.json`.
 - **Punch speed** (`punch_speed/`): per punch, the time from its first frame to the impact, with the milliseconds
   on the block — green inside the band for that punch type, red above it. The band is the upper quartile of the
