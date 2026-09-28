@@ -784,7 +784,10 @@ const RULE_LAYERS = [
       const nose = P(J.nose), sh = P(J.lsh), sh2 = P(J.rsh), t = torso(); if (!(nose && sh && sh2 && t)) return;
       const x0 = Math.min(sh[0], sh2[0]) - 50, x1 = Math.max(sh[0], sh2[0]) + 50;
       OV.level(nose[1], x0, x1, '#8e8e93', [3, 4]);                  // the nose
-      OV.level(nose[1] + 0.40 * t, x0, x1, '#8e8e93');               // the line: 0.40 torso below it
+      OV.level(nose[1] + 0.40 * t, x0, x1, '#8e8e93');               // 0.40 torso below it: 100 down to here
+      OV.level(nose[1] + 0.70 * t, x0, x1, '#8e8e93', [2, 6]);       // 0.70: the score is 0 from here down
+      overlayLabel(x1 + 6, nose[1] + 0.40 * t, '100', '#8e8e93');
+      overlayLabel(x1 + 6, nose[1] + 0.70 * t, '0', '#8e8e93');
       for (const e of es) {
         const x = e.drop, wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
         const col = x.verdict === 'low' ? '#ff3b30' : '#34c759', name = `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()}`;

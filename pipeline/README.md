@@ -71,7 +71,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   readable frame of the 0.25 s before the punch started, in torso lengths, scored 100 up to 0.40 and linearly to 0
   at 0.70 — green at 100, red below it, with the score on the block. The block, its highlight and its tooltip sit on the 0.25 s
   WINDOW before the punch, not on the punch, because that is what the rule measured. With the playhead inside the
-  window the overlay draws the nose, the 0.40 line, the window's mean, the wrist's path so far and this frame's own
+  window the overlay draws the nose, the 0.40 line (score 100 above it) and the 0.70 line (0 below it), the window's mean, the wrist's path so far and this frame's own
   reading ("not read" when a joint is below visibility 0.30); nothing is drawn on the punch itself. Windows overlap
   other punches constantly (a cross starting while the jab is out), so the row is split — lead windows on the top
   half, rear on the bottom — and every window holding the playhead draws on its own wrist, its label naming the
