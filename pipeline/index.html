@@ -1768,7 +1768,6 @@ const SPCOL = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30'
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
 const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes shallow': '#ff9f0a',
                     narrow: '#ff3b30', shallow: '#ff3b30', 'not rated': '#8e8e93'};
-const DECAYCOL = {holds: '#34c759', fades: '#ff9f0a', 'drops off': '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
 function comboStats() {
   const o = S.layerSum.offensive?.offensive, c = S.layerSum.combined?.combined;
@@ -2260,14 +2259,16 @@ function ruleCard() {
           + `${Object.entries(cl.by_n_elements).map(([k, v]) => `${v} of ${k}`).join(', ')} · `
           + `mean ${cl.mean_elements}, longest ${cl.longest} · ${pct(cl.solo_share)} of punches thrown solo`});
   const dc = S.decay;
-  if (dc) add('Output through the round', dc.rating, DECAYCOL[dc.rating], null, {
+  if (dc) add('Output through the round', dc.score ?? 'not rated', dc.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does he still throw at the end what he threw at the start?',
     on: `${dc.duration_seconds}s of video cut into three equal thirds · ${dc.n_punches} punches, all counted`,
-    th: {round: {label: 'per round', rule: 'punches in the last third against the first third',
-                 bands: [['< 15 % fewer', 'holds'], ['15–35 % fewer', 'fades'], ['≥ 35 % fewer', 'drops off']], pal: DECAYCOL}},
+    th: {round: {label: 'per round', rule: 'punches in the last third against the first third: 100 up to 15 % fewer, '
+                        + 'linearly down to 0 at 40 % fewer — a plain number, no bands; under 90 s or 30 punches: not rated',
+                 bands: [['≤ 15 % fewer', '100'], ['15 → 40 %', '100 → 0'], ['≥ 40 % fewer', '0']],
+                 pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}},
     calc: `${dc.per_third.map(t => `${t.n_punches} (${t.punches_per_minute}/min`
              + (t.dead_share === '' ? '' : `, ${pct(t.dead_share)} dead`) + ')').join(' → ')} · `
-          + `${dc.first_third} → ${dc.last_third} = ${dc.drop >= 0 ? `${pct(dc.drop)} fewer` : `${pct(-dc.drop)} more`}`});
+          + `${dc.first_third} → ${dc.last_third} = ${dc.drop >= 0 ? `${pct(dc.drop)} fewer` : `${pct(-dc.drop)} more`} → ${dc.score ?? '–'}`});
   scored('hit', 'Hit height', q => ({
     what: 'would the punch land somewhere useful on an opponent his own size?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on) · hooks and uppercuts are read at their impact frame on the timeline, not here`,

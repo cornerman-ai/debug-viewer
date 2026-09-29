@@ -221,8 +221,8 @@ from 40 %, linearly between — a plain number, no bands; fewer than 10 combinat
 length and the share of punches thrown outside any combination sit beside it, unjudged.
 
 **Output through the round** (`output_decay/output_decay.json`, a whole-video rule — no timeline row): the video cut
-into three equal thirds, punches counted in each, the last third against the first — < 15 % fewer holds, 15–35 %
-fades, ≥ 35 % drops off; under 90 s or 30 punches → not rated. The per-third counts, rates and dead shares are shown
+into three equal thirds, punches counted in each, the last third against the first — 100 up to 15 % fewer, linearly
+to 0 at 40 % fewer, a plain number; under 90 s or 30 punches → not rated. The per-third counts, rates and dead shares are shown
 beside it, unjudged, to separate a slower rate from more standing. It needs one continuous round to mean anything —
 neither test video is one. `thirds.csv` has the per-third rows.
 
