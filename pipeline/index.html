@@ -401,14 +401,14 @@ const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${v >= 
 // ââ stance width / depth: the same shape, one per axis. Both are per-frame rules whose rows are continuous
 //    stretches (ok / too small / too short to count / not judged), like elbow tuck. ââ
 const STANCE = {
-  width: {label: 'Stance width', short: 'Keep proper stance width', stage: 'stance_width', json: 'stance_width.json',
+  width: {label: 'Stance width', short: 'Stance width', stage: 'stance_width', json: 'stance_width.json',
           bad: 'narrow', metric: 'sep', unit: 'torso',
           what: 'are the feet a proper distance apart, seen from the front?',
           rule: 'sep = the ankle-to-ankle distance in torso lengths; a frame is narrow below 0.50',
           roundRule: 'the share of judged frames that are narrow \u2014 every readable frame counts, however brief',
           bands: [['< 15 %', 'good'], ['15\u201330 %', 'sometimes narrow'], ['\u2265 30 %', 'narrow']],
           scope: {moves: 'every frame', angles: 'front, back'}},
-  depth: {label: 'Stance depth', short: 'Keep proper stance depth', stage: 'stance_depth', json: 'stance_depth.json',
+  depth: {label: 'Stance depth', short: 'Stance depth', stage: 'stance_depth', json: 'stance_depth.json',
           bad: 'shallow', metric: 'depth', unit: 'leg',
           what: 'is one foot properly in front of the other, seen from the side?',
           rule: 'depth = the horizontal ankle gap in leg lengths; a frame is shallow below 0.50',
@@ -502,10 +502,10 @@ function stanceLayer(kind) {
   };
 }
 const CHIN = {
-  height: {stage: 'chin_height', json: 'chin_height.json', label: 'Chin height', short: 'Keep chin below lead shoulder',
+  height: {stage: 'chin_height', json: 'chin_height.json', label: 'Chin height', short: 'Chin below shoulder',
            bad: 'chin up', good: 'tucked', mid: 'level',
            rule: 'the chin against a line at the lead shoulder, in shoulder widths — the lens’s bands, fitted on a coach’s labels'},
-  depth:  {stage: 'chin_depth', json: 'chin_depth.json', label: 'Chin depth', short: 'Keep chin behind lead shoulder',
+  depth:  {stage: 'chin_depth', json: 'chin_depth.json', label: 'Chin depth', short: 'Chin behind shoulder',
            bad: 'chin out', good: 'tucked', mid: null,
            rule: 'the chin against the front of the lead shoulder, in torso lengths, read side-on only'},
 };
@@ -576,8 +576,8 @@ function chinLayer(kind) {
   };
 }
 const BLADE = {
-  hips:      {stage: 'bladedness_hips', label: 'Hips bladed', short: 'Keep hips bladed', cuts: [18.2, 27.9]},
-  shoulders: {stage: 'bladedness_shoulders', label: 'Shoulders bladed', short: 'Keep shoulders bladed', cuts: [12.7, 17.6]},
+  hips:      {stage: 'bladedness_hips', label: 'Hips bladed', short: 'Hips bladed', cuts: [18.2, 27.9]},
+  shoulders: {stage: 'bladedness_shoulders', label: 'Shoulders bladed', short: 'Shoulders bladed', cuts: [12.7, 17.6]},
 };
 const BLADECOL = {squared: '#ff3b30', between: '#ff9f0a', bladed: '#34c759'};
 const BLADESKIP = {no_pose: 'a joint it needs is not visible', punching: 'a punch is in flight'};
@@ -622,13 +622,13 @@ function bladeLayer(kind) {
   };
 }
 const RULE_LAYERS = [
-  comboLayer('offensive', 'Offensive combos', 'Build purposeful combinations / Vary punch combinations', 'punches only'),
-  comboLayer('combined', 'Combined combos', 'Vary defense after attacking', 'punches + defensive moves'),
+  comboLayer('offensive', 'Offensive combos', 'Offensive combos', 'punches only'),
+  comboLayer('combined', 'Combined combos', 'Combined combos', 'punches + defensive moves'),
   {
     // defense after combo (defense_after_combo/combos.csv): the defensive move that covered an offensive combo, drawn
     // where the move is. A combo nobody covered draws its search window after the combo as a hollow red box: 2 s, or
     // cut short where the next punch starts.
-    key: 'defcov', label: 'Defense after combo', short: 'Defend after combinations', items: true,
+    key: 'defcov', label: 'Defense after combo', short: 'Defend after combos', items: true,
     csv: ['defense_after_combo', 'combos.csv'], json: ['defense_after_combo', 'defense_after_combo.json'],
     parseItem: (r, num) => r.covered === '1'
       ? {covered: true, sf: num(r.move_start_frame), ef: num(r.move_end_frame), type: r.move_type, side: r.move_side,
@@ -662,7 +662,7 @@ const RULE_LAYERS = [
   {
     // slip distance (slip_distance/moves.csv): how far the head travelled sideways during a SLIP, from where it
     // started to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose.
-    key: 'slipd', label: 'Slip distance', short: 'Slip far enough / Keep slips compact', items: true,
+    key: 'slipd', label: 'Slip distance', short: 'Slip distance', items: true,
     frameOverlay(f, P) {                                   // the head's path through the slip, and its furthest point
       const it = OV.at('slipd', f); if (!it || !it.verdict) return;
       const col = SLIPCOL[it.verdict] || '#8e8e93';
@@ -727,7 +727,7 @@ const RULE_LAYERS = [
     // keep the guard before punching (hand_drop/punches.csv): how far the punching wrist sits below the nose, in torso
     // lengths, averaged over every readable frame of the 0.25 s before the punch starts. Low above 0.40 — the same
     // absolute line the resting-hand rule uses.
-    key: 'drop', label: 'Punching hand drop before punch', short: 'Punching hand drop before punch',
+    key: 'drop', label: 'Punching hand drop before punch', short: 'Pre-punch hand drop',
     window: true,                                          // its block, ring and hover cover the 0.25 s BEFORE the punch
     split: 'hand',                                         // lead windows on the top half, rear on the bottom
     csv: ['hand_drop', 'punches.csv'], json: ['hand_drop', 'hand_drop.json'],
@@ -780,7 +780,7 @@ const RULE_LAYERS = [
   {
     // dropping the resting hand while punching (resting_hand/punches.csv): the hand NOT throwing, read at the impact
     // frame and 2 frames either side, weighted 0.25 / 0.50 / 0.25; 100 up to 0.40 torso below the nose, 0 at 0.70.
-    key: 'resting', label: 'Dropping resting hand while punching', short: 'Dropping resting hand while punching',
+    key: 'resting', label: 'Dropping resting hand while punching', short: 'Resting hand drop',
     csv: ['resting_hand', 'punches.csv'], json: ['resting_hand', 'resting_hand.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), score: num(r.score), rest: r.resting_hand,
       m2: num(r.drop_m2), d0: num(r.drop_0), p2: num(r.drop_p2), n: num(r.frames_read), slip: num(r.slip), base: num(r.baseline)}
@@ -837,7 +837,7 @@ const RULE_LAYERS = [
     // with a slack of 0.20 of their span past either one (head_pos 0 and 1 are the left and the right ankle in the
     // image, so -0.20..1.20 passes), and the hip centre within 0.20 of the span from its midpoint. The whole-foot
     // base, heels and toes included, was measured and rejected.
-    key: 'bal', label: 'Balance at impact', short: 'Stay balanced on impact',
+    key: 'bal', label: 'Balance at impact', short: 'Balance on impact',
     csv: ['balance', 'punches.csv'], json: ['balance', 'balance.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, head: num(r.head_pos), off: num(r.hip_off),
       headOk: r.head_ok === 'yes', hipsOk: r.hips_ok === 'yes', why: r.reason,
@@ -890,7 +890,7 @@ const RULE_LAYERS = [
   {
     // stopping the uppercut (uppercut_stop/punches.csv): the impact frame is the turnaround, so the question is
     // simply where the fist was when it stopped. The line is the middle of the ghost's head, chin to crown.
-    key: 'upstop', label: 'Uppercut stop', short: 'Stopping uppercuts at the correct time',
+    key: 'upstop', label: 'Uppercut stop', short: 'Uppercut stop',
     csv: ['uppercut_stop', 'punches.csv'], json: ['uppercut_stop', 'uppercut_stop.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, over: num(r.over), overChin: num(r.over_chin), overCrown: num(r.over_crown),
       chinNy: num(r.chin_ny), crownNy: num(r.crown_ny), handNx: num(r.hand_nx), handNy: num(r.hand_ny)}
@@ -942,7 +942,7 @@ const RULE_LAYERS = [
   {
     // stopping the hook (hook_stop/punches.csv): the same question across the frame. The line is the boxer's own
     // far shoulder, set from his squared-up width over the clip so a bladed frame cannot shrink it.
-    key: 'hookstop', label: 'Hook stop', short: 'Stopping hooks at the correct time',
+    key: 'hookstop', label: 'Hook stop', short: 'Hook stop',
     csv: ['hook_stop', 'punches.csv'], json: ['hook_stop', 'hook_stop.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, cross: num(r.cross), lineNx: num(r.line_nx)}
       : {verdict: '', skip: r.skip_reason},
@@ -988,7 +988,7 @@ const RULE_LAYERS = [
   {
     // rear-foot pivot (rear_pivot/punches.csv): at the impact of every rear-hand punch, how far the rear heel sits
     // above the rear toe, in shin lengths. 0.27 is the line: the stance already carries the heel ~0.20 up.
-    key: 'rpivot', label: 'Rear-foot pivot', short: 'Rear-foot pivot during impact',
+    key: 'rpivot', label: 'Rear-foot pivot', short: 'Rear-foot pivot',
     csv: ['rear_pivot', 'punches.csv'], json: ['rear_pivot', 'rear_pivot.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, lift: num(r.lift)} : {verdict: '', skip: r.skip_reason},
     summary: () => '',
@@ -1029,7 +1029,7 @@ const RULE_LAYERS = [
   {
     // punch speed (punch_speed/punches.csv): start → impact, against a band built from 8,166 labelled punches and
     // shifted onto our own detector (see the backend's run_punch_speed.py for why the shift is needed).
-    key: 'speed', label: 'Punch speed', short: 'Punch with speed',
+    key: 'speed', label: 'Punch speed', short: 'Punch speed',
     csv: ['punch_speed', 'punches.csv'], json: ['punch_speed', 'punch_speed.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, dur: num(r.duration), lo: num(r.band_low), hi: num(r.band_high)}
       : {verdict: '', skip: r.skip_reason},
@@ -1053,7 +1053,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    key: 'hrp', label: 'Hand return path', short: 'Return your hand directly to guard',
+    key: 'hrp', label: 'Hand return path', short: 'Hand return path',
     csv: ['hand_return_path', 'punches.csv'], json: ['hand_return_path', 'hand_return_path.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, dip: num(r.dip),
       lowF: num(r.low_frame), oStart: num(r.start_offset), oImp: num(r.impact_offset), ref: num(r.ref_offset),
@@ -1105,7 +1105,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    key: 'arm', label: 'Arm extension', short: 'Fully extend straight punches',
+    key: 'arm', label: 'Arm extension', short: 'Arm extension',
     csv: ['arm_extension', 'arm_extension.csv'], json: ['arm_extension', 'arm_extension.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, peakF: num(r.peak_frame), peak: num(r.peak_bend),
       deg: num(r.bend_deg), elbow: num(r.elbow_deg), score: num(r.punch_score), impDeg: num(r.impact_bend_deg), impElbow: num(r.impact_elbow_deg), impVerdict: r.impact_verdict} : null,
@@ -1148,7 +1148,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    key: 'shoulder', label: 'Shoulder rotation', short: 'Rotate shoulders into punches',
+    key: 'shoulder', label: 'Shoulder rotation', short: 'Shoulder rotation',
     csv: ['shoulder_rotation', 'shoulder_rotation.csv'],
     parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
       vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
@@ -1186,7 +1186,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    key: 'hip', label: 'Hip rotation', short: 'Rotate hips into punches',
+    key: 'hip', label: 'Hip rotation', short: 'Hip rotation',
     csv: ['hip_rotation', 'hip_rotation.csv'],
     parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
       vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
@@ -1224,7 +1224,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    key: 'hit', label: 'Hit height', short: 'Hit the correct target height',
+    key: 'hit', label: 'Hit height', short: 'Target height',
     csv: ['hit_height', 'hit_height.csv'], json: ['hit_height', 'hit_height.json'],
     parse: (r, num) => ({verdict: r.verdict, zone: r.zone, land: num(r.land_frame), hf: num(r.height_frac),
       pen: num(r.penalty), skip: r.skip_reason, impF: num(r.impact_frame), impZone: r.impact_zone, impVerdict: r.impact_verdict,
@@ -1274,7 +1274,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    key: 'hoc', label: 'Head off center line', short: 'Move your head off center line',
+    key: 'hoc', label: 'Head off center line', short: 'Head off center',
     csv: ['head_offcenter', 'head_offcenter.csv'], json: ['head_offcenter', 'head_offcenter.json'],
     parse: (r, num) => ({score: num(r.score), verdict: r.verdict, impF: num(r.impact_frame), usedF: num(r.impact_used_frame),
       off: num(r.impact_offset), q25: num(r.q25_offset), q25F: num(r.q25_frame), q75: num(r.q75_offset), q75F: num(r.q75_frame),
@@ -1326,7 +1326,7 @@ const RULE_LAYERS = [
     // boxer is within 45 deg of facing / backing the camera and that arm isn't throwing a hook. The row shows the
     // judged stretches of >= 0.3 s, coloured by state (tucked / borderline / flared), lead in the top half, rear in
     // the bottom; a hole means the rule could not judge those frames.
-    key: 'elbow', label: 'Elbow tuck', short: 'Keep elbows tucked', items: true, split: 'arm',
+    key: 'elbow', label: 'Elbow tuck', short: 'Elbows tucked', items: true, split: 'arm',
     frameOverlay(f, P, leadLeft, Q, torso) {               // the sideways gap between each shoulder and its elbow
       const t = torso(); if (!t) return;
       const now = (S.items.elbow || []).filter(it => f >= it.sf && f <= it.ef);      // the rule's own state, per arm
@@ -1387,7 +1387,7 @@ const RULE_LAYERS = [
   },  {
     // guard height (guard_height/): per hand, how far the wrist sits below the nose while that hand is not punching.
     // Continuous row like elbow tuck — lead in the top half, rear in the bottom.
-    key: 'guard', label: 'Guard height', short: 'Keep hands at guard', items: true, split: 'hand',
+    key: 'guard', label: 'Guard height', short: 'Hands at guard', items: true, split: 'hand',
     frameOverlay(f, P, leadLeft, Q, torso) {               // each hand's full-marks line, the zero line, and the wrists
       const t = torso(), nose = P(J.nose), l = P(J.lsh), r = P(J.rsh);
       if (!(t && nose && l && r)) return;
