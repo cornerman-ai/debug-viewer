@@ -1199,13 +1199,13 @@ const RULE_LAYERS = [
     card: (e, r) => `<div class="sub"><div class="h">Hip rotation ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
       `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
        <span>Good range</span><b>${iqr(r.bsi || r.qsi)}</b>
-       <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}${r.vsi === 'bad_high' ? ' (above the range — not scored yet)' : ''}</b>
+       <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}${r.vsi === 'bad_high' ? ' (above the range: up to 20 off, all 20 at twice the upper bound)' : ''}</b>
        <span>Study IQR, for reference</span><b>${iqr(r.qsi)}</b></div>`) + '</div>',
     tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">no rotation (${r.status})</span>` :
       head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
       `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi || r.qsi)}</b></span>` +
       iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
-      `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); above it 100 for now · `
+      `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); above it up to 20 off, all 20 at twice the upper bound · `
       + `dark: the study's IQR ${iqr(r.qsi)}</span>`,
     row(e, r, {c, y, h, span, tag, ring}) {                // the start → impact verdict
       if (r.status !== 'ok') return;
@@ -1947,11 +1947,11 @@ function ruleCard() {
     th: {event: {label: 'per punch', rule: 'the hip turn from start to impact against a set range per punch type — lead '
                         + 'jab 0–25°, lead hook 25–60°, lead uppercut 15–50°, lead body shot 25–60°, rear cross 20–60°, '
                         + 'rear hook 25–60°, rear uppercut 20–50°, rear body shot 25–50°. 100 inside; below, linear from 0° '
-                        + '(0) to the lower bound (100); above the range 100 for now',
-                 bands: [['inside or above', '100'], ['below', '0 → 100 (linear)']],
-                 pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30'}},
+                        + '(0) to the lower bound (100); above, up to 20 off — linear from the upper bound to twice it',
+                 bands: [['inside', '100'], ['below', '0 → 100 (linear)'], ['above', '100 → 80 (linear to 2 × upper)']],
+                 pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30', '100 → 80 (linear to 2 × upper)': '#ff9f0a'}},
          round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 10 judged punches: not rated'}},
-    calc: `mean of ${hp.n_judged} punch scores · ${hp.n_good} inside · ${hp.n_too_little} below · ${hp.n_too_much} above (scored 100 for now)`});
+    calc: `mean of ${hp.n_judged} punch scores · ${hp.n_good} inside · ${hp.n_too_little} below · ${hp.n_too_much} above`});
   if (bs) add('Body shots', bs.rating, BODYCOL[bs.rating], null, {
     what: 'does he go downstairs, or hunt the head only?',
     on: `${bs.n_hooks_uppercuts} hooks and uppercuts · all judged · the ${bs.n_jab_cross_not_counted} jabs and crosses are left out (the model cannot tell a head jab from a body jab)`,

@@ -132,8 +132,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   with this frame's elbow bend.
 - **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a set range per punch type (lead
   jab 0–25°, lead hook 25–60°, lead uppercut 15–50°, lead body shot 25–60°, rear cross 20–60°, rear hook 25–60°, rear
-  uppercut 20–50°, rear body shot 25–50°): 100 inside, linear from 0° to the lower bound below it, 100 above it for
-  now. Green at 100, red below, the score on the block; the round is the mean punch score, no bands (from
+  uppercut 20–50°, rear body shot 25–50°): 100 inside, linear from 0° to the lower bound below it, and above it up
+  to 20 off — linear from the upper bound to twice it, capped at 20. Green at 100, red below, the score on the block; the round is the mean punch score, no bands (from
   `hip_rotation.json`); on the video the hip line in the same colour. The impact → end step is in the CSV but not shown.
 - **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
   turn of the punching shoulder against a good band of 2× the study's IQR for that punch type, block coloured by
