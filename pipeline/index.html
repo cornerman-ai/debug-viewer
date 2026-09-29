@@ -659,6 +659,28 @@ const RULE_LAYERS = [
     },
   },
   {
+    // work rate (work_rate/segments.csv): the whole video as runs — work (a punch or a defensive move covers it),
+    // turn (only a change of angle: the 0.5 s-smoothed facing turning ≥ 45° in < 1 s), pause (a gap under 3 s, left
+    // empty) and dead (a gap of 3 s or more, the only thing the round score counts).
+    key: 'work', label: 'Work rate', short: 'Work rate', items: true,
+    csv: ['work_rate', 'segments.csv'], json: ['work_rate', 'work_rate.json'],
+    parseItem: (r, num) => r.kind === 'pause' ? null : {kind: r.kind, sf: num(r.start_frame), ef: num(r.end_frame), s: num(r.n_seconds)},
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => `<b style="color:${WORKKIND[x.kind].c}">●</b> <b>${WORKKIND[x.kind].name}</b> · `
+      + `<span class="num">${fmtT(x.sf / S.fps)} · ${x.s.toFixed(2)} s</span><br><span class="m">${WORKKIND[x.kind].why}</span>`,
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      c.fillStyle = WORKKIND[x.kind].c; c.globalAlpha = on ? 1 : 0.8;
+      rr(x0, y + 3, Math.max(2, x1 - x0), h - 6, 3); c.fill(); c.globalAlpha = 1;
+      if (x.kind === 'dead' && x1 - x0 > 34) {
+        c.fillStyle = '#fff'; c.font = '600 10px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(`${x.s.toFixed(1)}s`, (x0 + x1) / 2, y + h / 2); c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+      }
+    },
+  },
+  {
     // slip distance (slip_distance/moves.csv): how far the head travelled sideways during a SLIP, from where it
     // started to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose.
     key: 'slipd', label: 'Slip distance', short: 'Slip distance', items: true,
@@ -1455,7 +1477,7 @@ const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [4], guard: [5], resting: [7], chin_depth: [8], chin_height: [9], elbow: [10],
   hoc: [11], stance_depth: [12], stance_width: [13], slipd: [15, 16], hrp: [17], blade_hips: [18], blade_shoulders: [19],
   hip: [20], shoulder: [21], arm: [22], hit: [23], speed: [24], offensive: [25, 31], combined: [32], hookstop: [33],
-  upstop: [34], rpivot: [35],
+  upstop: [34], rpivot: [35], work: [26],
 };
 const rulesTag = k => LAYER_RULES[k] ? ` <span class="m">(${LAYER_RULES[k].map(n => 'rule ' + n).join(', ')})</span>` : '';
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
@@ -1737,6 +1759,11 @@ function buildChips() {
 const COMBO_TOP = 3;                       // sequences listed per combo kind before "Show all"
 // the whole-video ratings, one compact row each; the rule itself sits in the row's tooltip
 const BODYCOL = {enough: '#34c759', 'a few': '#ffcc00', 'too few': '#ff9f0a', 'head only': '#ff3b30', 'not rated': '#8e8e93'};
+const WORKKIND = {                    // work rate's timeline row
+  work: {c: '#34c759', name: 'Working', why: 'a punch or a defensive move covers it'},
+  turn: {c: '#5ac8fa', name: 'Changing angle', why: 'no punch or move, but the smoothed facing turns 45° or more in under 1 s — counted as work'},
+  dead: {c: '#ff3b30', name: 'Dead time', why: '3 s or more with no punch, no defensive move and no change of angle'},
+};
 const SPCOL = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30', 'not rated': '#8e8e93'};
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
 const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes shallow': '#ff9f0a',
@@ -1835,6 +1862,7 @@ const SCOPE = {
   hoc:       {moves: 'every punch',                             angles: 'front, back'},
   elbow:     {moves: 'every frame except hooks',                angles: 'front, back'},
   offensive: {moves: 'punches',                                 angles: ALL_ANGLES},
+  work:      {moves: 'every frame',                             angles: ALL_ANGLES},
   combined:  {moves: 'punches, defensive moves',                angles: ALL_ANGLES},
 };
 function scopeTxt(key) {
