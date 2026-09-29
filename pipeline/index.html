@@ -2090,7 +2090,7 @@ function ruleCard() {
     th: {round: {label: 'per round', rule: 'a stretch with no punch, no defensive move and no change of angle lasting 3 s '
                         + 'or more is dead time (a change of angle = the 0.5 s-smoothed facing turning 90° or more in under '
                         + '1 s; only the turn itself counts); the score is 100 × (1 − the share of the round dead): 100 with no dead time, 0 when all of it is — a plain number, '
-                        + 'no bands; under 60 s of video: not rated',
+                        + 'no bands; under 20 s of video: not rated',
                  bands: [['0 % dead', '100'], ['0 → 100 %', '100 → 0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a'}}},
     calc: `${wr.dead_seconds}s dead in ${wr.n_dead_gaps} gaps / ${wr.duration_seconds}s = ${pct(wr.dead_share)} → ${wr.score ?? '–'} · `
           + `${wr.turn_only_seconds}s credited to changes of angle · `
