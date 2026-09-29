@@ -1763,7 +1763,6 @@ const WORKKIND = {                    // work rate's timeline row
   turn: {c: '#5ac8fa', name: 'Changing angle', why: 'no punch or move, but the smoothed facing turns 90° or more in under 1 s — the turn itself counts as work'},
   dead: {c: '#ff3b30', name: 'Dead time', why: '3 s or more with no punch, no defensive move and no change of angle'},
 };
-const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
 const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes shallow': '#ff9f0a',
                     narrow: '#ff3b30', shallow: '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
@@ -1995,13 +1994,17 @@ function ruleCard() {
                         + 'different sequences there are, so read it next to the offensive rating, not alone',
                  bands: [['≥ 70 %', 'repetitive'], ['50–70 %', 'moderate'], ['< 50 %', 'varied']], pal: DIVCOL}},
     calc: `top 3 sequences / ${cmb.n_combinations} combos = ${pct(cmb.top3_share)}`});
-  if (sd) add('Same defense', sd.same_move.rating, SDCOL[sd.same_move.rating], null, {
+  if (sd) add('Same defense', sd.score ?? 'not rated', sd.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does he only ever use one move, or always go to one side?',
     on: `${sd.n_moves} defensive moves · all judged for the move · the side only over the ${sd.n_with_side} that have one (a duck has none)`,
-    th: {round: {label: 'per round', rule: 'the share of the most-used move, and separately of the most-used side',
-                 bands: [['≥ 80 %', 'same defense'], ['60–80 %', 'moderate'], ['< 60 %', 'varied'],
-                         ['side ≥ 80 %', 'one-sided']], pal: SDCOL}},
-    calc: `${sd.same_move.top_type} ${pct(sd.same_move.top_type_share)} of moves · side ${sd.same_side.top_side} ${pct(sd.same_side.top_side_share)} (${sd.same_side.rating})`});
+    th: {round: {label: 'per round', rule: 'two halves of 50: the most-used move — full below 60 % of moves, linearly '
+                        + 'to 0 at 100 % — and the most-used side — full below 70 %, linearly to 0 at 100 %. Each needs 10 '
+                        + 'moves; one alone is the whole score — a plain number, no bands',
+                 bands: [['move < 60 %', '50'], ['60 → 100 %', '50 → 0'], ['side < 70 %', '50'], ['70 → 100 %', '50 → 0']],
+                 pal: {'50': '#34c759', '50 → 0': '#ff9f0a'}}},
+    calc: `move: ${sd.same_move.top_type ?? '–'} ${pct(sd.same_move.top_type_share)} → ${sd.same_move.score ?? '–'} · `
+          + `side: ${sd.same_side.top_side ?? '–'} ${pct(sd.same_side.top_side_share)} → ${sd.same_side.score ?? '–'} · `
+          + `score ${sd.score ?? '–'}`});
   const sl = S.slipD;                                                                  // 21 + 22
   if (sl) add('Slip distance', sl.rating, SLIPRATE[sl.rating], null, {
     what: 'when he slips, does the head move far enough — and not too far?',

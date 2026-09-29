@@ -244,8 +244,9 @@ number; fewer than 20 punches → not rated). The top 2 because jab and cross ar
 none and 100 from 25 %, linearly between (a plain number); fewer than 10 hooks + uppercuts → not rated. The cut-offs are ours.
 
 **Same defense** (`same_defense/same_defense.json`, a whole-video rule — no timeline row): under the defense
-distributions, the most-used move type (≥ 80 % same defense, 60–80 % moderate, < 60 % varied) and the most-used side
-among moves that have one (≥ 80 % one-sided); fewer than 10 moves → not rated. The defense model finds rolls far
+distributions, a score of two halves: 50 for the move — full below 60 % of the most-used type, linearly to 0 at 100 % —
+and 50 for the side among moves that have one — full below 70 %, linearly to 0 at 100 %; each half needs 10 moves,
+one alone is the whole score. The defense model finds rolls far
 better than slips, so a high roll share is partly the model.
 
 **Adding a rule**: see [instructions.md](instructions.md). In short — a rule that judges punches, frames, defensive
