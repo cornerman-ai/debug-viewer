@@ -1758,7 +1758,6 @@ function buildChips() {
 }
 const COMBO_TOP = 3;                       // sequences listed per combo kind before "Show all"
 // the whole-video ratings, one compact row each; the rule itself sits in the row's tooltip
-const BODYCOL = {enough: '#34c759', 'a few': '#ffcc00', 'too few': '#ff9f0a', 'head only': '#ff3b30', 'not rated': '#8e8e93'};
 const WORKKIND = {                    // work rate's timeline row
   work: {c: '#34c759', name: 'Working', why: 'a punch or a defensive move covers it'},
   turn: {c: '#5ac8fa', name: 'Changing angle', why: 'no punch or move, but the smoothed facing turns 90° or more in under 1 s — the turn itself counts as work'},
@@ -1976,12 +1975,13 @@ function ruleCard() {
                  pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30', '100 → 80 (linear to 2 × upper)': '#ff9f0a'}},
          round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 10 judged punches: not rated'}},
     calc: `mean of ${hp.n_judged} punch scores · ${hp.n_good} inside · ${hp.n_too_little} below · ${hp.n_too_much} above`});
-  if (bs) add('Body shots', bs.rating, BODYCOL[bs.rating], null, {
+  if (bs) add('Body shots', bs.score ?? 'not rated', bs.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does he go downstairs, or hunt the head only?',
     on: `${bs.n_hooks_uppercuts} hooks and uppercuts · all judged · the ${bs.n_jab_cross_not_counted} jabs and crosses are left out (the model cannot tell a head jab from a body jab)`,
-    th: {round: {label: 'per round', rule: 'the share of hooks and uppercuts that land on the body',
-                 bands: [['≥ 25 %', 'enough'], ['15–25 %', 'a few'], ['5–15 %', 'too few'], ['< 5 %', 'head only']], pal: BODYCOL}},
-    calc: `${bs.n_body} to the body / ${bs.n_hooks_uppercuts} = ${pct(bs.body_share)}`});
+    th: {round: {label: 'per round', rule: 'the share of hooks and uppercuts that land on the body: 0 at none, 100 from '
+                        + '25 %, linearly between — a plain number, no bands; under 10 hooks + uppercuts: not rated',
+                 bands: [['≥ 25 %', '100'], ['0 → 25 %', '0 → 100']], pal: {'100': '#34c759', '0 → 100': '#ff9f0a'}}},
+    calc: `${bs.n_body} to the body / ${bs.n_hooks_uppercuts} = ${pct(bs.body_share)} → ${bs.score ?? '–'}`});
   if (off?.diversity) add('Same offensive combos', off.diversity.rating, DIVCOL[off.diversity.rating], null, {
     what: 'does he keep throwing the same few combinations?',
     on: `${off.n_combinations} offensive combos · all judged · ${off.n_different} different sequences among them`,
