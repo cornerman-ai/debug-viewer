@@ -1274,37 +1274,36 @@ const RULE_LAYERS = [
   {
     key: 'hoc', label: 'Head off center line', short: 'Move your head off center line',
     csv: ['head_offcenter', 'head_offcenter.csv'], json: ['head_offcenter', 'head_offcenter.json'],
-    parse: (r, num) => ({score: num(r.score), band: r.band, impF: num(r.impact_frame), usedF: num(r.impact_used_frame),
+    parse: (r, num) => ({score: num(r.score), verdict: r.verdict, impF: num(r.impact_frame), usedF: num(r.impact_used_frame),
       off: num(r.impact_offset), q25: num(r.q25_offset), q25F: num(r.q25_frame), q75: num(r.q75_offset), q75F: num(r.q75_frame),
       comb: num(r.combined_offset),
       max: num(r.max_offset), maxF: num(r.max_frame),
       skip: r.skip_reason, facing: num(r.facing_mean)}),
     summary(P, js, {dot, count}) {
-      const b = count(P, p => p.hoc?.band || null);
-      return dot(VERD.perfect, `${b.perfect || 0} perfect`) + dot(VERD.good, `${b.good || 0} good`) +
-        dot(VERD.bad, `${b.bad || 0} bad`) + dot(VERD.critical, `${b.critical || 0} critical`);
+      const b = count(P, p => p.hoc?.verdict || null);
+      return dot('#34c759', `${b.off || 0} off the line`) + dot('#ff3b30', `${b.on || 0} on it`);
     },
-    card: (e, x) => `<div class="sub"><div class="h">Head off center line ${x?.band ? pillV(x.band) : ''}</div>` +
+    card: (e, x) => `<div class="sub"><div class="h">Head off center line</div>` +
       (!x ? '<div class="empty">no reading</div>' :
        x.score == null ? `<div class="empty">not judged${x.skip === 'side_on' ? ' — side-on: the head moves in depth, the camera can\'t see it' : x.skip ? ' (' + x.skip + ')' : ''}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Judged: 0.75·impact + 0.125·(25 %) + 0.125·(75 %)</span><b>${x.comb == null ? '–' : x.comb.toFixed(2) + ' torso'}</b>
         <span>at impact (0.75)</span><b>${offTxt(x.off)} · f ${x.usedF}</b>
         <span>25 % into the punch (0.125)</span><b>${offTxt(x.q25)}${x.q25F != null ? ' · f ' + x.q25F : ''}</b>
         <span>75 % into the punch (0.125)</span><b>${offTxt(x.q75)}${x.q75F != null ? ' · f ' + x.q75F : ''}</b>
-        <span>Score</span><b>${x.score.toFixed(0)} (full at ≥ 0.25 torso off)</b></div>
+        <span>Score</span><b>${x.score.toFixed(1)} (linear, 100 at ≥ 0.25 torso off) · ${x.verdict === 'off' ? 'off the line' : 'on the line'}</b></div>
         <div class="rows num" style="opacity:.6"><span>For reference, not judged:</span><b></b>
         <span>furthest in the punch</span><b>${offTxt(x.max)}${x.maxF != null ? ' · f ' + x.maxF : ''}</b></div>`) + '</div>',
     tip: (e, x, {head, v}) => x.score == null
       ? head + `<span class="m">head off center: not judged${x.skip === 'side_on' ? ' (side-on)' : x.skip ? ' (' + x.skip + ')' : ''}</span>`
-      : head + `<span class="num">head off the center line: <b>${x.comb == null ? '–' : x.comb.toFixed(2)} torso</b> · ${v(x.band)} · score ${x.score.toFixed(0)}</span><br>` +
+      : head + `<span class="num">head off the center line: <b>${x.comb == null ? '–' : x.comb.toFixed(2)} torso</b> · score <b>${x.score.toFixed(1)}</b></span><br>` +
         `<span class="num">0.75 · impact ${offTxt(x.off)} · 0.125 · at 25 % ${offTxt(x.q25)} · 0.125 · at 75 % ${offTxt(x.q75)}</span><br>` +
-        `<span class="m">0 = head on the line, 100 = ≥ 0.25 torso off · for reference: furthest ${offTxt(x.max)}</span>`,
-    row(e, x, {c, y, h, span, tag, ring, tx, fps}) {       // judged punches only: band color, a tick at the impact frame
+        `<span class="m">linear: 0 = head on the line, 100 = ≥ 0.25 torso off (green only at 100) · for reference: furthest ${offTxt(x.max)}</span>`,
+    row(e, x, {c, y, h, span, tag, ring, tx, fps}) {       // judged punches only: green at 100, red below, a tick at the impact frame
       if (x.score == null) return;
       const [bx, w] = span(e);
-      c.fillStyle = VERD[x.band] || '#8e8e93'; rr(bx, y + 3, w, h - 6, 5); c.fill();
+      c.fillStyle = x.verdict === 'off' ? '#34c759' : '#ff3b30'; rr(bx, y + 3, w, h - 6, 5); c.fill();
       if (x.usedF != null) { const xi = tx((x.usedF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      tag(bx, w, y, h, x.comb == null ? `${x.score.toFixed(0)}` : `${x.comb.toFixed(2)} torso`);
+      tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'hoc', bx, y, w, h);
     },
     overlay(e, x, f, P) {                                  // the vertical hip line and the head's distance from it (label = the impact reading)
@@ -1312,12 +1311,12 @@ const RULE_LAYERS = [
       const l = P(23), rt = P(24); if (!(l && rt)) return;
       const hd = [...Array(11).keys()].map(P).filter(Boolean); if (!hd.length) return;
       const hx = (Math.min(...hd.map(q => q[0])) + Math.max(...hd.map(q => q[0]))) / 2, hy = hd.reduce((a, q) => a + q[1], 0) / hd.length;
-      const cx = (l[0] + rt[0]) / 2, cy = (l[1] + rt[1]) / 2, col = VERD[x.band] || '#8e8e93', atImpact = Math.abs(f - x.usedF) <= 1;
+      const cx = (l[0] + rt[0]) / 2, cy = (l[1] + rt[1]) / 2, col = x.verdict === 'off' ? '#34c759' : '#ff3b30', atImpact = Math.abs(f - x.usedF) <= 1;
       octx.strokeStyle = col; octx.lineWidth = 2; octx.setLineDash([6, 5]);
       octx.beginPath(); octx.moveTo(cx, cy); octx.lineTo(cx, hy - 40); octx.stroke(); octx.setLineDash([]);
       octx.lineWidth = atImpact ? 4 : 2.5; octx.beginPath(); octx.moveTo(cx, hy); octx.lineTo(hx, hy); octx.stroke();
       octx.fillStyle = col; octx.beginPath(); octx.arc(hx, hy, atImpact ? 7 : 5, 0, 7); octx.fill();
-      overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line · ${x.comb?.toFixed(2)} torso (0.75 impact + 0.125 · 25 % + 0.125 · 75 %) · ${VNAME[x.band]}${atImpact ? ' · IMPACT' : ''}`, col);
+      overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line · ${x.comb?.toFixed(2)} torso (0.75 impact + 0.125 · 25 % + 0.125 · 75 %) → ${x.score.toFixed(1)}${atImpact ? ' · IMPACT' : ''}`, col);
     },
   },
   {
@@ -1863,8 +1862,8 @@ function scoreCounts(key) {
                              skip: n(x => x.verdict === 'skip')};
   if (key === 'hrp') return {pass: n(x => x.verdict === 'pass'), fail: n(x => x.verdict === 'fail'),
                              skip: n(x => x.verdict === 'skip' || x.verdict === 'unclear')};
-  return {pass: n(x => x.band === 'perfect' || x.band === 'good'),   // head off center: the good half of the bands
-          fail: n(x => x.band === 'bad' || x.band === 'critical'), skip: n(x => x.score == null)};
+  return {pass: n(x => x.verdict === 'off'),                          // head off center: green only at 100
+          fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
 // The Notion "Production rules" numbering (read 2026-09-28): the round view is one list in this order. Slip distance is
 // one script for two Notion rows — 15 "slip far enough" and 16 "keep slips compact" — so it sits at 15 and says so.
@@ -1934,7 +1933,10 @@ function ruleCard() {
     what: 'does the head leave the center line while punching, or stay a still target?',
     on: `${q.pass + q.fail + q.skip} punches · ${q.pass + q.fail} judged, ${q.skip} skipped (thrown side-on, where the camera cannot see the head move sideways)`,
     th: {event: {label: 'per punch', rule: 'offset = 0.75 × at impact + 0.125 × a quarter into the punch + 0.125 × '
-                        + 'three quarters in; the punch scores 100 at 0.25 torso off the line and 0 when the head never leaves it'},
+                        + 'three quarters in; the punch scores 0 when the head stays on the line, rising linearly to 100 at '
+                        + '0.25 torso off it — green only at 100, red below',
+                 bands: [['≥ 0.25 torso off', '100'], ['0 → 0.25', '0 → 100 (linear)']],
+                 pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30'}},
          round: {label: 'per round', rule: 'the worst 10 % of the punch scores, averaged',
                  bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
     calc: `the worst 10 % of the ${q.pass + q.fail} punch scores, averaged`}));

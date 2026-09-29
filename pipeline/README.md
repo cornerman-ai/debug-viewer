@@ -141,8 +141,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   and uppercuts get the same zones read at their impact frame (lighter, dashed). On the video a ring on the fist at the
   judged frame with its zone.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head is
-  off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), colored by band (perfect / good / bad /
-  critical) with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
+  off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
+  green at 100, red below, the score on the block — with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
 - **Offensive combos** and **Combined combos** (`combinations/`, not rules): the same rule for both — no pause longer
   than 0.3 s between elements, however long each lasts. Offensive = punches only; combined = punches and all
   defensive moves in time order (a move may start or end one). Each combination is one plain line from its first
