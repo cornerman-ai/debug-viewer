@@ -2571,7 +2571,7 @@ function drawTimeline(f) {
   for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) {
     const x = tx(t);
     c.strokeStyle = grid; c.lineWidth = 1; c.beginPath(); c.moveTo(x, TR.angle[0]); c.lineTo(x, TR.bottom); c.stroke();
-    c.fillStyle = text3; c.fillText(step < 1 ? t.toFixed(1) + ' s' : fmtT(t).replace(/\.\d+$/, ''), x, 12);
+    c.fillStyle = text3; c.fillText(step < 1 ? t.toFixed(2) + ' s' : fmtT(t).replace(/\.\d+$/, ''), x, 12);
   }
   c.save(); c.beginPath(); c.rect(L, 0, W, TR.over[0] - 4); c.clip();
   // angle track
