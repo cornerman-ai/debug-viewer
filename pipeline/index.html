@@ -1764,7 +1764,6 @@ const WORKKIND = {                    // work rate's timeline row
   turn: {c: '#5ac8fa', name: 'Changing angle', why: 'no punch or move, but the smoothed facing turns 90° or more in under 1 s — the turn itself counts as work'},
   dead: {c: '#ff3b30', name: 'Dead time', why: '3 s or more with no punch, no defensive move and no change of angle'},
 };
-const SPCOL = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30', 'not rated': '#8e8e93'};
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
 const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes shallow': '#ff9f0a',
                     narrow: '#ff3b30', shallow: '#ff3b30', 'not rated': '#8e8e93'};
@@ -2076,12 +2075,13 @@ function ruleCard() {
          round: {label: 'per round', rule: STANCE.depth.roundRule, bands: STANCE.depth.bands, pal: STANCERATE}},
     calc: `${stD.shallow_frames.toLocaleString()} of ${stD.judged_frames.toLocaleString()} judged frames = `
           + `${pct(stD.shallow_share)} · median ${stD.median_depth} leg`});
-  if (sp) add('Same punches', sp.rating, SPCOL[sp.rating], null, {
+  if (sp) add('Same punches', sp.score ?? 'not rated', sp.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does he throw anything beyond his two favourite punches?',
     on: `${sp.n_punches} punches · all judged, grouped by punch type`,
-    th: {round: {label: 'per round', rule: 'the share of all punches taken by the 2 most-used types',
-                 bands: [['≥ 85 %', 'same punches'], ['70–85 %', 'moderate'], ['< 70 %', 'varied']], pal: SPCOL}},
-    calc: `${sp.top2_types.map(t => PUNCH[t]?.name || t).join(' + ')} / ${sp.n_punches} punches = ${pct(sp.top2_share)}`});
+    th: {round: {label: 'per round', rule: 'the share of all punches taken by the 2 most-used types: 100 at 66 % or '
+                        + 'less, linearly down to 0 at 100 % — a plain number, no bands; under 20 punches: not rated',
+                 bands: [['≤ 66 %', '100'], ['66 → 100 %', '100 → 0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a'}}},
+    calc: `${sp.top2_types.map(t => PUNCH[t]?.name || t).join(' + ')} / ${sp.n_punches} punches = ${pct(sp.top2_share)} → ${sp.score ?? '–'}`});
   const wr = S.workRate;
   if (wr) add('Work rate', wr.score ?? 'not rated', wr.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does he keep working, or does the round have holes in it?',
