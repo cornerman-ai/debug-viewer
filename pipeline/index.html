@@ -1847,7 +1847,7 @@ function scopeTxt(key) {
 function layerChip(key, js) {
   if (!js) return null;
   if (key === 'arm' || key === 'hit' || key === 'hrp') return js.score == null ? null : {txt: `${js.score} · ${js.band}`, col: VERD[js.band] || '#8e8e93'};
-  if (key === 'hoc') return js.round_score == null ? null : {txt: `${js.round_score} · ${js.round_band}`, col: VERD[js.round_band] || '#8e8e93'};
+  if (key === 'hoc') return js.round_score == null ? null : {txt: `${js.round_score}`, col: 'var(--text)'};
   if (key === 'offensive') return js.offensive?.diversity ? {txt: js.offensive.diversity.rating, col: DIVCOL[js.offensive.diversity.rating]} : null;
   if (key === 'combined') return js.combined ? {txt: `${js.combined.n_combinations} combos`, col: COMBO.combined} : null;
   if (key === 'elbow') return {txt: js.score == null ? 'not rated' : String(js.score), col: js.score == null ? '#8e8e93' : 'var(--text)'};
@@ -1937,9 +1937,8 @@ function ruleCard() {
                         + '0.25 torso off it — green only at 100, red below',
                  bands: [['≥ 0.25 torso off', '100'], ['0 → 0.25', '0 → 100 (linear)']],
                  pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the worst 10 % of the punch scores, averaged',
-                 bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
-    calc: `the worst 10 % of the ${q.pass + q.fail} punch scores, averaged`}));
+         round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands'}},
+    calc: `mean of the ${q.pass + q.fail} punch scores · ${q.pass} at 100, ${q.fail} below`}));
   const hp = S.hipSum;
   if (hp) add('Hip rotation', hp.rating, HIPCOL[hp.rating], null, {
     what: 'do the hips turn into the punch, or does he arm-punch?',
