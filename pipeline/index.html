@@ -1153,35 +1153,36 @@ const RULE_LAYERS = [
     parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
       vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
       bsi: r.ref_start_impact_lo !== undefined ? [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)] : null,
-      qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact)}),
+      qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact), score: num(r.score)}),
     summary(P, js, {dot, count}) {
-      const h = count(P, p => p.hip?.status === 'ok' ? p.hip.vsi : null);
+      const h = count(P, p => p.shoulder?.status === 'ok' ? p.shoulder.vsi : null);   // was counting the HIP verdicts
       return dot(VERD.good, `${h.good || 0} good`) + dot(VERD.bad_low, `${h.bad_low || 0} too little`) +
         dot(VERD.bad_high, `${h.bad_high || 0} too much`);
     },
     card: (e, r) => `<div class="sub"><div class="h">Shoulder rotation ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
       `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
-       <span>Good range${r.bsi ? ' (2× IQR)' : ' (IQR)'}</span><b>${iqr(r.bsi || r.qsi)}</b>
-       ${r.bsi ? `<span>IQR</span><b>${iqr(r.qsi)}</b>` : ''}</div>`) + '</div>',
+       <span>Good range</span><b>${iqr(r.bsi || r.qsi)}</b>
+       <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}${r.vsi === 'bad_high' ? ' (above the range: up to 20 off, all 20 at twice the upper bound)' : ''}</b>
+       <span>Study IQR, for reference</span><b>${iqr(r.qsi)}</b></div>`) + '</div>',
     tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">no rotation (${r.status})</span>` :
-      head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)}</span><br>` +
+      head + `<span class="num">shoulder rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
       `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi || r.qsi)}</b></span>` +
       iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
-      `<span class="m">${r.bsi ? `good = 2× the IQR around it (dark: the IQR ${iqr(r.qsi)}, the middle 50% of this punch type in the study)`
-                                 : 'range = the middle 50% (IQR) of this punch type in the study'}</span>`,
+      `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); above it up to 20 off, all 20 at twice the upper bound · `
+      + `dark: the study's IQR ${iqr(r.qsi)}</span>`,
     row(e, r, {c, y, h, span, tag, ring}) {                // the start → impact verdict
       if (r.status !== 'ok') return;
       const [x, w] = span(e);
-      c.fillStyle = VERD[r.vsi]; rr(x, y + 3, w, h - 6, 5); c.fill();
-      tag(x, w, y, h, `${r.si.toFixed(0)}°`);
+      c.fillStyle = r.score >= 100 ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
+      tag(x, w, y, h, r.score == null ? `${r.si.toFixed(0)}°` : r.score.toFixed(1));
       ring(e, 'shoulder', x, y, w, h);
     },
     overlay(e, r, f, P) {                                  // the shoulder line, colored by the start → impact verdict
       if (r.status !== 'ok') return;
       const l = P(11), rt = P(12); if (!(l && rt)) return;
-      const col = VERD[r.vsi]; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
+      const col = r.score >= 100 ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
       octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
-      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `shoulders ${r.si.toFixed(0)}° · ${VNAME[r.vsi]}`, col);
+      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `shoulders ${r.si.toFixed(1)}° (range ${iqr(r.bsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
     },
   },
   {
@@ -1741,7 +1742,6 @@ const SPCOL = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30'
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
 const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes shallow': '#ff9f0a',
                     narrow: '#ff3b30', shallow: '#ff3b30', 'not rated': '#8e8e93'};
-const HIPCOL = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const WORKCOL = {working: '#34c759', patchy: '#ff9f0a', stalling: '#ff3b30', 'not rated': '#8e8e93'};
 const DECAYCOL = {holds: '#34c759', fades: '#ff9f0a', 'drops off': '#ff3b30', 'not rated': '#8e8e93'};
 const COMBOLENCOL = {builds: '#34c759', short: '#ff9f0a', 'one-twos only': '#ff3b30', 'not rated': '#8e8e93'};
@@ -1992,18 +1992,18 @@ function ruleCard() {
           + `${sl.slip_verdicts.far || 0} too far of ${sl.judged_slips} judged slips`
           : 'no slip could be read front-on'});
   const shr = S.shSum;
-  if (shr) add('Shoulder rotation', shr.rating, HIPCOL[shr.rating], null, {
+  if (shr) add('Shoulder rotation', shr.score ?? 'not rated', shr.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'do the shoulders turn into the punch, or does the arm go alone?',
     on: `${shr.n_punches} punches · ${shr.n_judged} judged from start to impact, ${shr.n_punches - shr.n_judged} `
         + `skipped (no impact frame or no readable shoulder line)`,
-    th: {event: {label: 'per punch', rule: 'each punch type has its own good band: twice the middle half of what the '
-                        + 'study\u2019s boxers\u2019 shoulders did (lead jab 0\u201340\u00b0, rear cross 11\u201373\u00b0, rear hook 22\u201382\u00b0, \u2026)',
-                 bands: [['inside', 'good'], ['below', 'too little'], ['above', 'too much']],
-                 pal: {good: '#34c759', 'too little': '#ff9f0a', 'too much': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches inside the band',
-                 bands: [['\u2265 80 %', 'good'], ['65\u201380 %', 'mixed'], ['< 65 %', 'poor']], pal: HIPCOL}},
-    calc: `${shr.n_good} inside the band / ${shr.n_judged} punches = ${pct(shr.good_share)} · `
-          + `${shr.n_too_little} too little · ${shr.n_too_much} too much`});
+    th: {event: {label: 'per punch', rule: 'the shoulder turn from start to impact against a set range per punch type — '
+                        + 'lead jab 5–30°, lead hook 35–70°, lead uppercut 25–60°, lead body shot 40–75°, rear cross '
+                        + '30–60°, rear hook 40–75°, rear uppercut 30–75°, rear body shot 50–75°. 100 inside; below, linear '
+                        + 'from 0° (0) to the lower bound (100); above, up to 20 off — linear from the upper bound to twice it',
+                 bands: [['inside', '100'], ['below', '0 → 100 (linear)'], ['above', '100 → 80 (linear to 2 × upper)']],
+                 pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30', '100 → 80 (linear to 2 × upper)': '#ff9f0a'}},
+         round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 10 judged punches: not rated'}},
+    calc: `mean of ${shr.n_judged} punch scores · ${shr.n_good} inside · ${shr.n_too_little} below · ${shr.n_too_much} above`});
   const hd = S.handDrop;
   if (hd) add('Punching hand drop before punch', hd.score ?? 'not rated', hd.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'is the punching hand up at guard just before it throws?',

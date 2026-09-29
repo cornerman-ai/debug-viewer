@@ -136,8 +136,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   to 20 off — linear from the upper bound to twice it, capped at 20. Green at 100, red below, the score on the block; the round is the mean punch score, no bands (from
   `hip_rotation.json`); on the video the hip line in the same colour. The impact → end step is in the CSV but not shown.
 - **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
-  turn of the punching shoulder against a good band of 2× the study's IQR for that punch type, block coloured by
-  verdict with the degrees on it; on the video the shoulder line in the verdict colour. The CSV also carries
+  turn of the punching shoulder against a set range per punch type (lead jab 5–30°, lead hook 35–70°, lead uppercut
+  25–60°, lead body shot 40–75°, rear cross 30–60°, rear hook 40–75°, rear uppercut 30–75°, rear body shot 50–75°),
+  scored like hip rotation — green at 100, red below, the score on the block; on the video the shoulder line in the
+  same colour. The round is the mean punch score, no bands. The CSV also carries
   `shoulder_minus_hip`, the separation the biomechanics papers measure, unjudged for now.
 - **Hit height** (`hit_height/`): per jab / cross the production rule's zone (head / shoulder / body / over the head /
   below the belt; on target = green, off = red, skipped = dashed gray) with a white tick at the frame it judged; hooks
