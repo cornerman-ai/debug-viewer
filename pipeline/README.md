@@ -216,8 +216,8 @@ rear); a plain number, no bands; fewer than 10 punches → not rated. The band i
 being the most thrown punch. Each hand's punch types sit beside it, unjudged.
 
 **Combination length** (`combo_length/combo_length.json`, a whole-video rule — no timeline row): over the offensive
-combinations `run_combinations.py` already wrote, the share that are 3 punches or more — ≥ 40 % builds, 20–40 %
-short, < 20 % one-twos only; fewer than 10 combinations → not rated. The mean length, the longest, the spread by
+combinations `run_combinations.py` already wrote, the share that are 3 punches or more, scored 0 at none and 100
+from 40 %, linearly between — a plain number, no bands; fewer than 10 combinations → not rated. The mean length, the longest, the spread by
 length and the share of punches thrown outside any combination sit beside it, unjudged.
 
 **Output through the round** (`output_decay/output_decay.json`, a whole-video rule — no timeline row): the video cut
