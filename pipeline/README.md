@@ -51,7 +51,7 @@ that rule's headline verdict.
 the punch card and a video overlay.
 
 Every rule with geometry in the frame now draws it. Rules that judge a punch (arm extension, hit height, hip and
-shoulder rotation, head off center, hand drop, idle hand, balance, hand return path, uppercut stop, hook stop, rear-foot pivot)
+shoulder rotation, head off center, hand drop, resting hand, balance, hand return path, uppercut stop, hook stop, rear-foot pivot)
 draw for the punch under the playhead. Rules that judge frames (guard height, elbow tuck, chin height and depth, stance width and depth, both
 bladedness axes, slip distance) draw on every frame through `frameOverlay`, which gets the raw BlazePose-33
 channels — they need joints (mouth corners, heels, toes) and channels (world x/z) the punch overlays never touch.
@@ -119,13 +119,14 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   = the worst 10 % of punch scores, banded 95/80/55. The lens's own 1.5 s window and descent/recovery pair were
   tried first and read 42 % / 58 % — see `combined_pipeline/changes.md`. Reads `punches.csv` +
   `hand_return_path.json`.
-- **Idle hand at impact** (`idle_hand/`): per punch, the hand that is NOT throwing, read at the impact frame —
-  how far it sits below the nose. Green up, red low at ≥ 0.40 torso (the same line hand drop uses, an absolute one: a boxer
-  who holds his hands low all round must not pass), nothing drawn where the idle wrist isn't visible. That hand's
-  own median guard is shown in the card beside the verdict, unjudged. Round rating = the share of judged punches
-  whose idle hand was low (< 10 % holds, 10–25 % sometimes drops, ≥ 25 % drops). One frame and not the punch's
-  window because punches overlap inside a combination, which would leave most punches unjudgeable.
-  Reads `punches.csv` + `idle_hand.json`.
+- **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the hand
+  that is NOT throwing, read at impact −2, impact and impact +2 frames and weighted ¼ · ½ · ¼ — how far it sits below
+  the nose. Scored 100 up to 0.40 torso (the line hand drop uses, an absolute one: a boxer who holds his hands low
+  all round must not pass), linearly to 0 at 0.70; green at 100, red below, with the score on the block. The overlay
+  rings the resting wrist at all three frames and draws the 100 / 0 lines and the weighted reading. That hand's own
+  median guard is shown in the card, unjudged. Round = the mean punch score, a plain number with no bands. Frames
+  around the impact and not the punch's window, because punches overlap inside a combination, which would leave most
+  punches unjudgeable. Reads `punches.csv` + `resting_hand.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the production rule's verdict (pass / fail; skipped = dashed),
   its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
   with this frame's elbow bend.

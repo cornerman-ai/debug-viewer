@@ -422,7 +422,6 @@ const SLIPNAME = {short: 'too short', ok: 'good distance', far: 'too far'};
 const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
-const IDLECOL = {holds: '#34c759', 'sometimes drops': '#ff9f0a', drops: '#ff3b30', 'not rated': '#8e8e93'};
 const SPEEDCOL = {sharp: '#34c759', mixed: '#ff9f0a', slow: '#ff3b30', 'not rated': '#8e8e93'};
 const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
 const HOOKSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'wraps around': '#ff3b30', 'not rated': '#8e8e93'};
@@ -728,7 +727,7 @@ const RULE_LAYERS = [
   {
     // keep the guard before punching (hand_drop/punches.csv): how far the punching wrist sits below the nose, in torso
     // lengths, averaged over every readable frame of the 0.25 s before the punch starts. Low above 0.40 — the same
-    // absolute line guard height and idle hand use.
+    // absolute line the resting-hand rule uses.
     key: 'drop', label: 'Punching hand drop before punch', short: 'Punching hand drop before punch',
     window: true,                                          // its block, ring and hover cover the 0.25 s BEFORE the punch
     split: 'hand',                                         // lead windows on the top half, rear on the bottom
@@ -780,48 +779,58 @@ const RULE_LAYERS = [
     },
   },
   {
-    key: 'idle', label: 'Idle hand at impact', short: 'Keep the idle hand at guard',
-    csv: ['idle_hand', 'punches.csv'], json: ['idle_hand', 'idle_hand.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), slip: num(r.slip), idle: r.idle_hand, base: num(r.baseline)}
-      : {verdict: '', skip: r.skip_reason, idle: r.idle_hand},
+    // dropping the resting hand while punching (resting_hand/punches.csv): the hand NOT throwing, read at the impact
+    // frame and 2 frames either side, weighted 0.25 / 0.50 / 0.25; 100 up to 0.40 torso below the nose, 0 at 0.70.
+    key: 'resting', label: 'Dropping resting hand while punching', short: 'Dropping resting hand while punching',
+    csv: ['resting_hand', 'punches.csv'], json: ['resting_hand', 'resting_hand.json'],
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), score: num(r.score), rest: r.resting_hand,
+      m2: num(r.drop_m2), d0: num(r.drop_0), p2: num(r.drop_p2), n: num(r.frames_read), slip: num(r.slip), base: num(r.baseline)}
+      : {verdict: '', skip: r.skip_reason, rest: r.resting_hand},
     summary: () => '',
-    card: (e, x) => `<div class="sub"><div class="h">The idle hand at this impact</div>` +
+    card: (e, x) => `<div class="sub"><div class="h">The resting hand at this impact</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'no_impact_frame' ? 'no impact frame for this punch'
-                                                 : 'the idle wrist is not visible at the impact frame'}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Idle hand</span><b>${x.idle}</b>
-        <span>Below the nose</span><b>${x.drop.toFixed(2)} torso</b>
-        <span>Low from</span><b>0.40 torso (the line hand drop uses too)</b>
+                                                 : 'the resting wrist is not visible around the impact frame'}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Resting hand</span><b>${x.rest}</b>
+        <span>Below the nose</span><b>impact −2: ${x.m2 == null ? '–' : x.m2.toFixed(3)} · impact: ${x.d0 == null ? '–' : x.d0.toFixed(3)} · +2: ${x.p2 == null ? '–' : x.p2.toFixed(3)}</b>
+        <span>Weighted (¼ · ½ · ¼)</span><b>${x.drop.toFixed(3)} torso</b>
+        <span>Score</span><b>${x.score.toFixed(1)} / 100 (100 up to 0.400, 0 from 0.700)</b>
         <span>Verdict</span><b>${x.verdict === 'drops' ? 'low' : 'up'}</b></div>
        <div class="rows num" style="opacity:.6"><span>For context, not judged:</span><b></b>
         <span>this hand's own guard sits at</span><b>${x.base == null ? '–' : x.base.toFixed(2) + ' torso'}</b>
         <span>so this punch is</span><b>${x.slip == null ? '–' : (x.slip >= 0 ? '+' : '') + x.slip.toFixed(2) + ' torso vs his own habit'}</b></div>`) + '</div>',
-    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">the idle wrist is not readable at the impact frame</span>` :
-      `<span class="num">the ${x.idle} hand was ${x.verdict === 'drops' ? '<b>low</b>' : 'up'} · ` +
-      `<b>${x.drop.toFixed(2)}</b> torso below the nose</span><br>` +
-      `<span class="m">read at the impact frame; 0.40 torso or lower is low — an absolute line, not this boxer's habit` +
-      `${x.slip == null ? '' : ` (his own guard sits at ${x.base.toFixed(2)})`}</span>`),
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">the resting wrist is not readable around the impact frame</span>` :
+      `<span class="num"><b>${x.score.toFixed(1)} / 100</b> · the ${x.rest} hand was ${x.verdict === 'drops' ? '<b>low</b>' : 'up'} · ` +
+      `<b>${x.drop.toFixed(3)}</b> torso below the nose</span><br>` +
+      `<span class="m">impact −2, impact and +2 weighted ¼ · ½ · ¼; 100 up to 0.40 torso, linearly to 0 at 0.70 — ` +
+      `an absolute line, not this boxer's habit${x.base == null ? '' : ` (his own guard sits at ${x.base.toFixed(2)})`}</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;                                // nothing readable: draw nothing
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'drops' ? '#ff3b30' : '#34c759';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, `${x.drop.toFixed(2)}`);
-      ring(e, 'idle', bx, y, w, h);
+      tag(bx, w, y, h, x.score.toFixed(1));
+      ring(e, 'resting', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                        // the idle hand against the 0.40 line under the nose
-      if (!x.verdict) return;
-      const idleLead = x.idle === 'lead';
-      const wr = idleLead === leadLeft ? J.lwr : J.rwr;
-      const at = j => (e.impact != null ? PAT(e.impact, j) : null) || P(j);   // the rule reads the impact frame
-      const nose = at(J.nose), sh = at(J.lsh), sh2 = at(J.rsh), hip = at(J.lhip), hip2 = at(J.rhip), w = at(wr);
-      if (!(nose && sh && sh2 && hip && hip2 && w)) return;
+    overlay(e, x, f, P, leadLeft) {                        // the resting hand at impact −2 / impact / +2, and the scale
+      if (!x.verdict || e.impact == null) return;
+      const wr = (x.rest === 'lead') === leadLeft ? J.lwr : J.rwr;
+      const at = j => PAT(e.impact, j);                    // the scale is drawn at the impact frame
+      const nose = at(J.nose), sh = at(J.lsh), sh2 = at(J.rsh), hip = at(J.lhip), hip2 = at(J.rhip);
+      if (!(nose && sh && sh2 && hip && hip2)) return;
       const torso = Math.hypot((sh[0] + sh2[0]) / 2 - (hip[0] + hip2[0]) / 2, (sh[1] + sh2[1]) / 2 - (hip[1] + hip2[1]) / 2);
       const col = x.verdict === 'drops' ? '#ff3b30' : '#34c759';
-      const ly = nose[1] + 0.40 * torso, x0 = Math.min(sh[0], sh2[0]) - 40, x1 = Math.max(sh[0], sh2[0]) + 40;
-      OV.level(ly, x0, x1, col);
-      OV.line([w[0], ly], w, col, 2, [3, 3]); OV.ring(w, col, 12, 3);
-      const now = P(wr); if (now && f !== e.impact) OV.dot(now, col, 4);      // and where that hand is right now
-      overlayLabel(x0, ly - 16, `${x.idle} hand ${x.drop.toFixed(2)} below the nose`, col);
+      const x0 = Math.min(sh[0], sh2[0]) - 40, x1 = Math.max(sh[0], sh2[0]) + 40;
+      OV.level(nose[1] + 0.40 * torso, x0, x1, '#8e8e93');                 // 100 down to here
+      OV.level(nose[1] + 0.70 * torso, x0, x1, '#8e8e93', [2, 6]);         // 0 from here
+      overlayLabel(x1 + 6, nose[1] + 0.40 * torso, '100', '#8e8e93');
+      overlayLabel(x1 + 6, nose[1] + 0.70 * torso, '0', '#8e8e93');
+      OV.level(nose[1] + x.drop * torso, x0, x1, col);                     // the weighted reading
+      for (const [off, r] of [[-2, 7], [0, 12], [2, 7]]) {                 // the three frames it is read at
+        const q = PAT(e.impact + off, wr); if (q) OV.ring(q, col, r, off ? 2 : 3);
+      }
+      const now = P(wr); if (now && Math.abs(f - e.impact) > 2) OV.dot(now, col, 4);
+      overlayLabel(x0, nose[1] + x.drop * torso - 16,
+        `${x.rest} hand resting · ${x.drop.toFixed(3)} below the nose → ${x.score.toFixed(1)}`, col);
     },
   },
   {
@@ -1438,7 +1447,7 @@ const LAYERS = RULE_LAYERS.map(r => r.key);
 const GUARD_FULL = {lead: 0.50, rear: 0.30};                    // guard height: full marks up to here, 0 from 0.70
 // Which Notion rules (by number, 2026-09-28) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
-  bal: [1], drop: [2], defcov: [4], guard: [5], idle: [7], chin_depth: [8], chin_height: [9], elbow: [10],
+  bal: [1], drop: [2], defcov: [4], guard: [5], resting: [7], chin_depth: [8], chin_height: [9], elbow: [10],
   hoc: [11], stance_depth: [12], stance_width: [13], slipd: [15, 16], hrp: [17], blade_hips: [18], blade_shoulders: [19],
   hip: [20], shoulder: [21], arm: [22], hit: [23], speed: [24], offensive: [25, 31], combined: [32], hookstop: [33],
   upstop: [34], rpivot: [35],
@@ -1807,7 +1816,7 @@ const SCOPE = {
   stance_width: {moves: 'every frame',                          angles: 'front, back'},
   stance_depth: {moves: 'every frame',                          angles: 'side-on'},
   drop:      {moves: 'every punch, the hand that throws',       angles: ALL_ANGLES},
-  idle:      {moves: 'every punch at its impact frame, the hand that does not throw', angles: ALL_ANGLES},
+  resting:   {moves: 'every punch at impact ±2 frames, the hand that does not throw', angles: ALL_ANGLES},
   chin_height: {moves: 'every frame outside a punch',           angles: ALL_ANGLES},
   chin_depth:  {moves: 'every frame outside a punch',           angles: 'side-on'},
   blade_hips:      {moves: 'every frame outside a punch',       angles: 'front \u2014 only there does the camera stand in for the opponent'},
@@ -1856,7 +1865,7 @@ function scoreCounts(key) {
 // one script for two Notion rows — 15 "slip far enough" and 16 "keep slips compact" — so it sits at 15 and says so.
 const NOTION = {
   'Balance at impact': 1, 'Punching hand drop before punch': 2, 'Defense after combo': 4,
-  'Guard height': 5, 'Hand balance': 6, 'Idle hand at impact': 7, 'Chin depth': 8, 'Chin height': 9,
+  'Guard height': 5, 'Hand balance': 6, 'Dropping resting hand while punching': 7, 'Chin depth': 8, 'Chin height': 9,
   'Elbow tuck': 10, 'Head off center line': 11, 'Stance depth': 12, 'Stance width': 13, 'Angle change': 14,
   'Slip distance': 15, 'Hand return path': 17, 'Hips bladed': 18, 'Shoulders bladed': 19, 'Hip rotation': 20,
   'Shoulder rotation': 21, 'Arm extension': 22, 'Hit height': 23, 'Punch speed': 24, 'Combination length': 25,
@@ -1992,7 +2001,7 @@ function ruleCard() {
         + `(the wrist not visible in the 0.25 s before the punch) · lead ${hd.by_hand.lead.low}/${hd.by_hand.lead.judged}, `
         + `rear ${hd.by_hand.rear.low}/${hd.by_hand.rear.judged}`,
     th: {event: {label: 'per punch', rule: 'how far the punching wrist sits below the nose, in torso lengths, averaged over '
-                        + 'every readable frame of the 0.25 s before the punch — the same absolute line idle hand uses',
+                        + 'every readable frame of the 0.25 s before the punch — the same absolute line the resting-hand rule uses',
                  bands: [['≤ 0.40', '100'], ['0.40–0.70', 'linear 100 → 0'], ['≥ 0.70', '0']],
                  pal: {'100': '#34c759', 'linear 100 → 0': '#ff9f0a', '0': '#ff3b30'}},
          round: {label: 'per round', rule: 'the mean punch score over the judged punches — a plain number, no bands; '
@@ -2175,21 +2184,20 @@ function ruleCard() {
                  bands: [['< 30 %', 'pivots'], ['30–50 %', 'sometimes'], ['≥ 50 %', 'flat-footed']], pal: PIVOTCOL}},
     calc: `${rp.flat} of ${rp.judged_punches} judged rear-hand punches = ${pct(rp.flat_share)} · `
           + `median heel ${rp.median_lift} shin above the toe`});
-  const ih = S.layerSum.idle;
-  if (ih) add('Idle hand at impact', ih.rating, IDLECOL[ih.rating], null, {
+  const ih = S.layerSum.resting;
+  if (ih) add('Dropping resting hand while punching', ih.score ?? 'not rated', ih.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'when one hand lands, is the other one still up where a guard belongs?',
-    on: `${ih.n_punches} punches · ${ih.judged_punches} judged at their impact frame, `
-        + `${ih.n_punches - ih.judged_punches} skipped (no impact frame, or the idle wrist not visible)`,
-    th: {event: {label: 'per punch', rule: 'how far the idle hand sits below the nose at the impact frame — an '
-                       + 'absolute line, not this boxer’s own habit, because holding the hands low all round is not a '
-                       + 'reason to pass. For scale, the shoulder line sits 0.17–0.20 torso below the nose',
-                 bands: [['< 0.40 torso', 'up'], ['≥ 0.40', 'low']],
-                 pal: {up: '#34c759', low: '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches whose idle hand was low',
-                 bands: [['< 10 %', 'holds'], ['10–25 %', 'sometimes drops'], ['≥ 25 %', 'drops']], pal: IDLECOL}},
-    calc: `${ih.drop_punches} of ${ih.judged_punches} judged punches = ${pct(ih.low_share)} · `
-          + `lead idle ${ih.by_idle_hand.lead.drops}/${ih.by_idle_hand.lead.judged}, `
-          + `rear idle ${ih.by_idle_hand.rear.drops}/${ih.by_idle_hand.rear.judged}`});
+    on: `${ih.n_punches} punches · ${ih.judged_punches} judged around their impact frame, `
+        + `${ih.n_punches - ih.judged_punches} skipped (no impact frame, or the resting wrist not visible)`,
+    th: {event: {label: 'per punch', rule: 'how far the resting hand sits below the nose at impact −2, impact and +2 frames, '
+                       + 'weighted ¼ · ½ · ¼ — an absolute line, not this boxer’s own habit. 100 up to 0.40 torso, '
+                       + 'linearly to 0 at 0.70; red above 0.40',
+                 bands: [['≤ 0.40', '100'], ['0.40–0.70', 'linear 100 → 0'], ['≥ 0.70', '0']],
+                 pal: {'100': '#34c759', 'linear 100 → 0': '#ff9f0a', '0': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 20 judged punches: not rated'}},
+    calc: `mean of ${ih.judged_punches} punch scores · ${ih.drop_punches} with the resting hand low (${pct(ih.low_share)}) · `
+          + `lead resting ${ih.by_resting_hand.lead.drops}/${ih.by_resting_hand.lead.judged}, `
+          + `rear resting ${ih.by_resting_hand.rear.drops}/${ih.by_resting_hand.rear.judged}`});
   const hb = S.handBal;
   if (hb) add('Hand balance', hb.score ?? 'not rated', hb.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does he use both hands, or live on one of them?',
