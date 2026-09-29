@@ -1344,7 +1344,7 @@ const RULE_LAYERS = [
         OV.dot(el, col, 4);
         overlayLabel(el[0] + (el[0] > sh[0] ? 10 : -84), el[1] - 14,
           skip ? arm : `${arm} ${flare.toFixed(2)}`, col);
-        if (!skip) part[arm] = Math.min(1, Math.max(0, (0.50 - flare) / 0.30));      // full to 0.20, 0 at 0.50
+        if (!skip) part[arm] = Math.min(1, Math.max(0, (0.50 - flare) / 0.35));      // full to 0.15, 0 at 0.50
       }
       const hs = Object.keys(part), n = P(J.nose);          // the frame score: 50 / 50, or one arm alone
       const sc = hs.length === 2 ? 50 * part.lead + 50 * part.rear : hs.length === 1 ? 100 * part[hs[0]] : null;
@@ -1923,7 +1923,7 @@ function ruleCard() {
     what: 'does the elbow stay in, or flare out to the side?',
     on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook)`,
     th: {event: {label: 'per frame', rule: 'flare = the sideways shoulder → elbow gap in torso lengths',
-                 note: 'frame score: each arm 50 — full up to 0.20 flare, linearly to 0 at 0.50; one arm alone '
+                 note: 'frame score: each arm 50 — full up to 0.15 flare, linearly to 0 at 0.50; one arm alone '
                      + '(the other hidden or throwing a hook) is the whole 100. The colours keep the lens’s cut-offs',
                  bands: [['< 0.20', 'tucked'], ['0.20–0.30', 'borderline'], ['≥ 0.30', 'flared']], pal: ELBOWSTATE},
          round: {label: 'per round', rule: 'the mean frame score over every scored frame — a plain number, no bands; '

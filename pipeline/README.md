@@ -190,7 +190,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   is continuous — every frame belongs to a stretch: green tucked (< 0.20), yellow borderline (0.20–0.30), red flared
   (≥ 0.30), and a thin gray strip where the rule cannot judge, with the reason in its tooltip (the boxer is side-on,
   a joint it needs is not visible, or that arm is throwing a hook). Lead in the top half, rear in the bottom. Each
-  frame scores 0–100: each arm 50, full up to 0.20 flare and 0 at 0.50, or 100 when only one arm can be judged; the
+  frame scores 0–100: each arm 50, full up to 0.15 flare and 0 at 0.50, or 100 when only one arm can be judged; the
   overlay labels it ("frame score 65.8 · lead 15.8/50 · rear 50.0/50"). Round = the mean frame score, no bands.
   Reads `runs.csv` + `elbow_tuck.json`.
 
