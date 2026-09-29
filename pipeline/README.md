@@ -153,10 +153,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   frame to its last (blue = offensive, purple = combined; 2 elements minimum — a lone punch or move is not a combination); hovering it lists its elements in
   order with their times; the punch card shows the combination holding that punch and how often its sequence repeats.
   Reads `offensive.csv` / `combined.csv` + `combinations.json`; the distributions card counts both (how many, how many
-  different, each sequence with its count) and scores offensive combo diversity by the top-3 share (the share of
-  combos that are one of the 3 most-used sequences: 100 below 40 %, linearly to 0 at 100 %, < 10 combos not rated) —
-  combined combos keep a banded rating on theirs (≥ 70 % repetitive, 50–70 % moderate, < 50 % varied), with the
-  caveat that the defense model's noise inflates it. These are "items" layers (`items: true`): their rows are the combinations,
+  different, each sequence with its count) and scores combo diversity by the top-3 share, each kind on its own
+  combos (the share of combos that are one of the 3 most-used sequences: 100 below 40 %, linearly to 0 at 100 %,
+  < 10 combos not rated) — the combined one with the caveat that the defense model's noise inflates its variety. These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
 - **Slip distance** (`slip_distance/`): per slip, how far the head travelled sideways from where it started, in
