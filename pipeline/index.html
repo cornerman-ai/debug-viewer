@@ -1190,7 +1190,7 @@ const RULE_LAYERS = [
     parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
       vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
       bsi: r.ref_start_impact_lo !== undefined ? [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)] : null,
-      qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact)}),
+      qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact), score: num(r.score)}),
     summary(P, js, {dot, count}) {
       const h = count(P, p => p.hip?.status === 'ok' ? p.hip.vsi : null);
       return dot(VERD.good, `${h.good || 0} good`) + dot(VERD.bad_low, `${h.bad_low || 0} too little`) +
@@ -1198,27 +1198,28 @@ const RULE_LAYERS = [
     },
     card: (e, r) => `<div class="sub"><div class="h">Hip rotation ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
       `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
-       <span>Good range${r.bsi ? ' (2× IQR)' : ' (IQR)'}</span><b>${iqr(r.bsi || r.qsi)}</b>
-       ${r.bsi ? `<span>IQR</span><b>${iqr(r.qsi)}</b>` : ''}</div>`) + '</div>',
+       <span>Good range</span><b>${iqr(r.bsi || r.qsi)}</b>
+       <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}${r.vsi === 'bad_high' ? ' (above the range — not scored yet)' : ''}</b>
+       <span>Study IQR, for reference</span><b>${iqr(r.qsi)}</b></div>`) + '</div>',
     tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">no rotation (${r.status})</span>` :
-      head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)}</span><br>` +
+      head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
       `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi || r.qsi)}</b></span>` +
       iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
-      `<span class="m">${r.bsi ? `good = 2× the IQR around it (dark: the IQR ${iqr(r.qsi)}, the middle 50% of this punch type in the study)`
-                                 : 'range = the middle 50% (IQR) of this punch type in the study'}</span>`,
+      `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); above it 100 for now · `
+      + `dark: the study's IQR ${iqr(r.qsi)}</span>`,
     row(e, r, {c, y, h, span, tag, ring}) {                // the start → impact verdict
       if (r.status !== 'ok') return;
       const [x, w] = span(e);
-      c.fillStyle = VERD[r.vsi]; rr(x, y + 3, w, h - 6, 5); c.fill();
-      tag(x, w, y, h, `${r.si.toFixed(0)}°`);
+      c.fillStyle = r.score >= 100 ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
+      tag(x, w, y, h, r.score == null ? `${r.si.toFixed(0)}°` : r.score.toFixed(1));
       ring(e, 'hip', x, y, w, h);
     },
     overlay(e, r, f, P) {                                  // the hip line, colored by the start → impact verdict
       if (r.status !== 'ok') return;
       const l = P(23), rt = P(24); if (!(l && rt)) return;
-      const col = VERD[r.vsi]; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
+      const col = r.score >= 100 ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
       octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
-      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `hips ${r.si.toFixed(0)}° · ${VNAME[r.vsi]}`, col);
+      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `hips ${r.si.toFixed(1)}° (range ${iqr(r.bsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
     },
   },
   {
@@ -1940,17 +1941,17 @@ function ruleCard() {
          round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands'}},
     calc: `mean of the ${q.pass + q.fail} punch scores · ${q.pass} at 100, ${q.fail} below`}));
   const hp = S.hipSum;
-  if (hp) add('Hip rotation', hp.rating, HIPCOL[hp.rating], null, {
+  if (hp) add('Hip rotation', hp.score ?? 'not rated', hp.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'do the hips turn into the punch, or does he arm-punch?',
     on: `${hp.n_punches} punches · ${hp.n_judged} judged from start to impact, ${hp.n_punches - hp.n_judged} skipped (no impact frame or no readable hip line)`,
-    th: {event: {label: 'per punch', rule: 'each punch type has its own good band: twice the middle half of what the '
-                        + 'study’s boxers did (lead jab 0–25°, rear cross 4–51°, lead hook 6–61°, …)',
-                 bands: [['inside', 'good'], ['below', 'too little'], ['above', 'too much']],
-                 pal: {good: '#34c759', 'too little': '#ff9f0a', 'too much': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches inside the band',
-                 bands: [['≥ 80 %', 'good'], ['65–80 %', 'mixed'], ['< 65 %', 'poor']], pal: HIPCOL}},
-    calc: `${hp.n_good} inside the band / ${hp.n_judged} punches = ${pct(hp.good_share)} · `
-          + `${hp.n_too_little} too little · ${hp.n_too_much} too much`});
+    th: {event: {label: 'per punch', rule: 'the hip turn from start to impact against a set range per punch type — lead '
+                        + 'jab 0–25°, lead hook 25–60°, lead uppercut 15–50°, lead body shot 25–60°, rear cross 20–60°, '
+                        + 'rear hook 25–60°, rear uppercut 20–50°, rear body shot 25–50°. 100 inside; below, linear from 0° '
+                        + '(0) to the lower bound (100); above the range 100 for now',
+                 bands: [['inside or above', '100'], ['below', '0 → 100 (linear)']],
+                 pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 10 judged punches: not rated'}},
+    calc: `mean of ${hp.n_judged} punch scores · ${hp.n_good} inside · ${hp.n_too_little} below · ${hp.n_too_much} above (scored 100 for now)`});
   if (bs) add('Body shots', bs.rating, BODYCOL[bs.rating], null, {
     what: 'does he go downstairs, or hunt the head only?',
     on: `${bs.n_hooks_uppercuts} hooks and uppercuts · all judged · the ${bs.n_jab_cross_not_counted} jabs and crosses are left out (the model cannot tell a head jab from a body jab)`,

@@ -130,8 +130,11 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Arm extension** (`arm_extension/`): per jab / cross the production rule's verdict (pass / fail; skipped = dashed),
   its elbow bend and a white tick at the frame the rule measured; on the video the punching arm in the verdict color
   with this frame's elbow bend.
-- **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a good band of 2× the study's IQR (block color and
-  degrees); the round rating is the share of judged punches inside the band (≥ 80 % good, 65–80 % mixed, < 65 % poor, from `hip_rotation.json`); on the video the hip line in the verdict color. The impact → end step is in the CSV but not shown.
+- **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a set range per punch type (lead
+  jab 0–25°, lead hook 25–60°, lead uppercut 15–50°, lead body shot 25–60°, rear cross 20–60°, rear hook 25–60°, rear
+  uppercut 20–50°, rear body shot 25–50°): 100 inside, linear from 0° to the lower bound below it, 100 above it for
+  now. Green at 100, red below, the score on the block; the round is the mean punch score, no bands (from
+  `hip_rotation.json`); on the video the hip line in the same colour. The impact → end step is in the CSV but not shown.
 - **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
   turn of the punching shoulder against a good band of 2× the study's IQR for that punch type, block coloured by
   verdict with the degrees on it; on the video the shoulder line in the verdict colour. The CSV also carries
