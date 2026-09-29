@@ -220,11 +220,12 @@ combinations `run_combinations.py` already wrote, the share that are 3 punches o
 from 40 %, linearly between — a plain number, no bands; fewer than 10 combinations → not rated. The mean length, the longest, the spread by
 length and the share of punches thrown outside any combination sit beside it, unjudged.
 
-**Output through the round** (`output_decay/output_decay.json`, a whole-video rule — no timeline row): the video cut
-into three equal thirds, punches counted in each, the last third against the first — 100 up to 15 % fewer, linearly
-to 0 at 40 % fewer, a plain number; under 90 s or 30 punches → not rated. The per-third counts, rates and dead shares are shown
-beside it, unjudged, to separate a slower rate from more standing. It needs one continuous round to mean anything —
-neither test video is one. `thirds.csv` has the per-third rows.
+**Output through the round** (`output_decay/output_decay.json` + `windows.csv`, a whole-video rule — no timeline
+row): measured from the first punch to the last. Under 90 s of that span, the span is cut in three equal thirds and
+the last third compared with the first; 90 s or more, the first 30 s from the first punch against the last 30 s up
+to the last punch. 100 up to 15 % fewer punches at the end, linearly to 0 at 40 % fewer, a plain number; under 30
+punches → not rated. The per-window counts, rates and dead shares are shown beside it, unjudged, to separate a
+slower rate from more standing. It needs one continuous round to mean anything.
 
 **Work rate** (`work_rate/work_rate.json` + `segments.csv`): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
