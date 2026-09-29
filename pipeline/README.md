@@ -231,7 +231,7 @@ where a punch or a defensive move covers it, blue where only a change of angle d
 their length, empty for the short pauses in between. A frame counts as work when a
 punch or a defensive move covers it, or when he is changing angle — the 0.5 s-smoothed facing turning 90° or more in
 under 1 s, only the frames of the turn itself. A stretch with none of these lasting ≥ 3 s is dead time. Score = 100 at no dead time, linearly
-to 0 at 100 % dead — a plain number, no bands; under 20 s of video → not rated. Punches and actions per minute and the
+to 0 at 50 % dead — a plain number, no bands; under 20 s of video → not rated. Punches and actions per minute and the
 seconds credited to turns are shown beside it, unjudged — punch rate is a style, standing still is not.
 
 **Same punches** (`same_punches/same_punches.json`, a whole-video rule — no timeline row): under the target
