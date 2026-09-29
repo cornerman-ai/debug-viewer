@@ -227,13 +227,10 @@ beside it, unjudged, to separate a slower rate from more standing. It needs one 
 neither test video is one. `thirds.csv` has the per-third rows.
 
 **Work rate** (`work_rate/work_rate.json`, a whole-video rule — no timeline row): a frame counts as work when a
-punch or a defensive move covers it; a stretch with neither lasting ≥ 3 s is dead time (shorter gaps are the normal
-breathing between combos, or a step or two around the bag). The rating is the share of the video inside those
-stretches: < 20 % working, 20–40 % patchy, ≥ 40 % stalling; under 60 s of video → not rated. Punches and actions per
-minute are shown beside it, unjudged — punch rate is a style, standing still is not. Footwork between punches is not
-credited: crediting a 45° facing change within 1–2 s as work was measured and drove dead time to 0–2 % on both test
-videos, because the unsmoothed facing model flips front/back and its turn signal does not separate moving from
-standing. `gaps.csv` lists every dead stretch.
+punch or a defensive move covers it, or when he is changing angle — the 0.5 s-smoothed facing turning 45° or more in
+under 1 s. A stretch with none of these lasting ≥ 3 s is dead time. Score = 100 at ≤ 20 % of the video dead, linearly
+to 0 at 100 % dead — a plain number, no bands; under 60 s of video → not rated. Punches and actions per minute and the
+seconds credited to turns are shown beside it, unjudged — punch rate is a style, standing still is not.
 
 **Same punches** (`same_punches/same_punches.json`, a whole-video rule — no timeline row): under the target
 distribution, the share of the 2 most-used punch types (≥ 85 % same punches, 70–85 % moderate, < 70 % varied; fewer
