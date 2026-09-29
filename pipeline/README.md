@@ -229,8 +229,8 @@ neither test video is one. `thirds.csv` has the per-third rows.
 **Work rate** (`work_rate/work_rate.json` + `segments.csv`): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
 their length, empty for the short pauses in between. A frame counts as work when a
-punch or a defensive move covers it, or when he is changing angle — the 0.5 s-smoothed facing turning 45° or more in
-under 1 s. A stretch with none of these lasting ≥ 3 s is dead time. Score = 100 at ≤ 20 % of the video dead, linearly
+punch or a defensive move covers it, or when he is changing angle — the 0.5 s-smoothed facing turning 90° or more in
+under 1 s, only the frames of the turn itself. A stretch with none of these lasting ≥ 3 s is dead time. Score = 100 at ≤ 20 % of the video dead, linearly
 to 0 at 100 % dead — a plain number, no bands; under 60 s of video → not rated. Punches and actions per minute and the
 seconds credited to turns are shown beside it, unjudged — punch rate is a style, standing still is not.
 

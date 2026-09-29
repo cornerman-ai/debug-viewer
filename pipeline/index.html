@@ -660,7 +660,7 @@ const RULE_LAYERS = [
   },
   {
     // work rate (work_rate/segments.csv): the whole video as runs — work (a punch or a defensive move covers it),
-    // turn (only a change of angle: the 0.5 s-smoothed facing turning ≥ 45° in < 1 s), pause (a gap under 3 s, left
+    // turn (only a change of angle: the 0.5 s-smoothed facing turning ≥ 90° in < 1 s, the turn itself only), pause (a gap under 3 s, left
     // empty) and dead (a gap of 3 s or more, the only thing the round score counts).
     key: 'work', label: 'Work rate', short: 'Work rate', items: true,
     csv: ['work_rate', 'segments.csv'], json: ['work_rate', 'work_rate.json'],
@@ -1761,7 +1761,7 @@ const COMBO_TOP = 3;                       // sequences listed per combo kind be
 const BODYCOL = {enough: '#34c759', 'a few': '#ffcc00', 'too few': '#ff9f0a', 'head only': '#ff3b30', 'not rated': '#8e8e93'};
 const WORKKIND = {                    // work rate's timeline row
   work: {c: '#34c759', name: 'Working', why: 'a punch or a defensive move covers it'},
-  turn: {c: '#5ac8fa', name: 'Changing angle', why: 'no punch or move, but the smoothed facing turns 45° or more in under 1 s — counted as work'},
+  turn: {c: '#5ac8fa', name: 'Changing angle', why: 'no punch or move, but the smoothed facing turns 90° or more in under 1 s — the turn itself counts as work'},
   dead: {c: '#ff3b30', name: 'Dead time', why: '3 s or more with no punch, no defensive move and no change of angle'},
 };
 const SPCOL = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30', 'not rated': '#8e8e93'};
@@ -2088,8 +2088,8 @@ function ruleCard() {
     what: 'does he keep working, or does the round have holes in it?',
     on: `${wr.duration_seconds}s of video · ${wr.n_punches} punches and ${wr.n_moves} defensive moves · all judged`,
     th: {round: {label: 'per round', rule: 'a stretch with no punch, no defensive move and no change of angle lasting 3 s '
-                        + 'or more is dead time (a change of angle = the 0.5 s-smoothed facing turning 45° or more in under '
-                        + '1 s); the score is 100 at 20 % dead or less, falling linearly to 0 at 100 % dead — a plain number, '
+                        + 'or more is dead time (a change of angle = the 0.5 s-smoothed facing turning 90° or more in under '
+                        + '1 s; only the turn itself counts); the score is 100 at 20 % dead or less, falling linearly to 0 at 100 % dead — a plain number, '
                         + 'no bands; under 60 s of video: not rated',
                  bands: [['≤ 20 % dead', '100'], ['20 → 100 %', '100 → 0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a'}}},
     calc: `${wr.dead_seconds}s dead in ${wr.n_dead_gaps} gaps / ${wr.duration_seconds}s = ${pct(wr.dead_share)} → ${wr.score ?? '–'} · `
