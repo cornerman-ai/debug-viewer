@@ -1108,28 +1108,28 @@ const RULE_LAYERS = [
     key: 'arm', label: 'Arm extension', short: 'Fully extend straight punches',
     csv: ['arm_extension', 'arm_extension.csv'], json: ['arm_extension', 'arm_extension.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, peakF: num(r.peak_frame), peak: num(r.peak_bend),
-      deg: num(r.bend_deg), score: num(r.punch_score), impDeg: num(r.impact_bend_deg), impVerdict: r.impact_verdict} : null,
+      deg: num(r.bend_deg), elbow: num(r.elbow_deg), score: num(r.punch_score), impDeg: num(r.impact_bend_deg), impElbow: num(r.impact_elbow_deg), impVerdict: r.impact_verdict} : null,
     summary(P, js, {dot, count}) {
       const m = count(P, p => p.arm?.verdict);
       return dot(VERD.pass, `${m.pass || 0} pass`) + dot(VERD.fail, `${m.fail || 0} fail`) +
         dot(VERD.skip, `${(m.skip || 0) + (m.unclear || 0)} skipped`);
     },
     card: (e, a) => `<div class="sub"><div class="h">Arm extension ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
-      `<div class="rows num" style="margin-top:0"><span>Elbow bend, rule frame</span><b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
-       ${(t => t ? `<span>Passes at bend ≤</span><b>${(2 * Math.acos(t) * 180 / Math.PI).toFixed(1)}° (r ≥ ${t})</b>` : "")(S.layerSum.arm?.config?.params?.bend_threshold)}${a.skip ? `<span>Skipped</span><b>${a.skip}</b>` : ''}
+      `<div class="rows num" style="margin-top:0"><span>Elbow angle at the furthest reach</span><b>${a.elbow == null ? '–' : a.elbow.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
+       <span>Scale</span><b>100 at ≥ 160°, 0 at ≤ 100°, linear</b>${a.skip ? `<span>Skipped</span><b>${a.skip}</b>` : ''}
        ${a.score != null ? `<span>Punch score</span><b>${a.score.toFixed(1)}</b>` : ''}</div>
        <div class="rows num" style="opacity:.6"><span>For comparison, not judged:</span><b></b>
-       <span>bend at the impact frame</span><b>${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>',
+       <span>elbow at the impact frame</span><b>${a.impElbow == null ? '–' : a.impElbow.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>',
     tip: (e, a, {head, v}) => head + `arm extension ${v(a.verdict)}${a.skip ? ` <span class="m">(${a.skip})</span>` : ''}<br>` +
-      `<span class="num">elbow bend <b>${a.deg == null ? '–' : a.deg.toFixed(1) + '°'}</b> at the rule frame f ${a.peakF ?? '–'} · passes at ≤ ${(t => t ? (2 * Math.acos(t) * 180 / Math.PI).toFixed(1) : '23.1')(S.layerSum.arm?.config?.params?.bend_threshold)}°${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span><br>` +
-      `<span class="m num">for comparison, not judged: ${a.impDeg == null ? '–' : a.impDeg.toFixed(1) + '°'} at the impact frame${a.impVerdict && a.impVerdict !== 'skip' ? ' (would ' + a.impVerdict + ')' : ''}</span>`,
+      `<span class="num">elbow <b>${a.elbow == null ? '–' : a.elbow.toFixed(1) + '°'}</b> at the furthest reach (f ${a.peakF ?? '–'})${a.score != null ? ' · score <b>' + a.score.toFixed(1) + '</b>' : ''}</span><br>` +
+      `<span class="m num">100 at ≥ 160°, 0 at ≤ 100°, linear · for comparison, not judged: ${a.impElbow == null ? '–' : a.impElbow.toFixed(1) + '°'} at the impact frame</span>`,
     row(e, a, {c, y, h, span, tag, ring, tx, fps}) {       // verdict block, the rule's frame as a white tick
       const judged = a.verdict === 'pass' || a.verdict === 'fail';
       if (!judged) return;                                 // skipped punches are not drawn
       const [x, w] = span(e), col = VERD[a.verdict] || '#8e8e93';
       c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill();
       if (a.peakF != null) { const xi = tx((a.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      if (a.deg != null) tag(x, w, y, h, `${(180 - a.deg).toFixed(0)}°`);   // the angle at the elbow: 180° = straight
+      if (a.score != null) tag(x, w, y, h, a.score.toFixed(1));
       ring(e, 'arm', x, y, w, h);
     },
     overlay(e, a, f, P, leadLeft) {                        // the punching arm, colored by the rule's verdict
@@ -1144,7 +1144,7 @@ const RULE_LAYERS = [
       const bend = 180 - ang * 180 / Math.PI, a0 = Math.atan2(u[1], u[0]), a1 = Math.atan2(v[1], v[0]);
       const ccw = ((a1 - a0 + 2 * Math.PI) % (2 * Math.PI)) > Math.PI;
       octx.lineWidth = 2.5; octx.beginPath(); octx.arc(pb[0], pb[1], 18, a0, a1, ccw); octx.stroke();
-      overlayLabel(pb[0] + 14, pb[1] + 28, `elbow ${(180 - bend).toFixed(0)}°${peak ? ' · rule frame · ' + VNAME[a.verdict] : ''}`, col);
+      overlayLabel(pb[0] + 14, pb[1] + 28, `elbow ${(180 - bend).toFixed(0)}°${peak && a.score != null ? ` · furthest reach → ${a.score.toFixed(1)}` : ''}`, col);
     },
   },
   {
@@ -1904,9 +1904,10 @@ function ruleCard() {
   scored('arm', 'Arm extension', q => ({
     what: 'does the arm reach full extension on a straight punch?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on to read the arm)`,
-    th: {event: {label: 'per punch', rule: 'the elbow angle at the frame of furthest reach',
-                 bands: [['≥ 157°', 'pass'], ['< 157°', 'fail']], pal: VERD,
-                 note: 'the punch score falls from 100 at a 23° bend to 0 at 60°'},
+    th: {event: {label: 'per punch', rule: 'the elbow angle at the frame of furthest reach, scored linearly: 100 at 160° '
+                        + 'or straighter, 0 at 100° or more bent — green at 100, red below',
+                 bands: [['≥ 160°', '100'], ['100° → 160°', '0 → 100 (linear)'], ['≤ 100°', '0']],
+                 pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a', '0': '#ff3b30'}},
          round: {label: 'per round', rule: 'the mean punch score',
                  bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
     calc: `mean punch score over the ${q.pass + q.fail} judged punches`}));
