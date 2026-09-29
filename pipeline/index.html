@@ -2609,7 +2609,7 @@ function drawTimeline(f) {
     const r = (f1 - f0) / W > 1 ? 1.2 : 1.8;
     for (let i = f0; i <= f1; i += every) {
       if (!S.pose[i]) continue;
-      const a = S.angle[i], x = tx(i / fps);
+      const a = S.angle[i], x = tx((i + 0.5) / fps);   // frame i's centre — where the playhead sits on frame i
       c.fillStyle = FACECOL[Math.abs(a) <= 45 ? 'front' : Math.abs(a) >= 135 ? 'back' : 'side-on'];
       c.fillRect(x - r, ymap(a) - r, 2 * r, 2 * r);          // the dot says which bucket this frame is in
     }
@@ -2729,7 +2729,21 @@ function drawLayerRows(c, f, W, text, grid) {
 // frames could not be reached at all: clicking f showed f + 1, and clicking f + 1 showed f + 1 as well. floor is
 // the exact inverse of the midpoint target and matches hit()'s own floor; the epsilon absorbs the same float error
 // the other way, for browsers that snap currentTime back to the frame's own start instead of keeping the seek.
-const frameNow = () => Math.max(0, Math.min(S.n - 1, Math.floor(video.currentTime * S.fps + 1e-6)));
+// While playing, currentTime runs on its own clock and can be a frame or two off the picture actually on screen
+// (worst at 60 fps), so the overlay and the timeline trailed the video. requestVideoFrameCallback reports the
+// presentation time of the frame being shown; use it while playing. Paused, currentTime is exact (seekFrame puts it
+// in the middle of the frame), and that is what the frame is read from.
+V.shown = null;
+if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+  const onFrame = (now, md) => { V.shown = md.mediaTime; draw(false); video.requestVideoFrameCallback(onFrame); };
+  video.requestVideoFrameCallback(onFrame);
+  video.addEventListener('seeking', () => { V.shown = null; });
+  video.addEventListener('emptied', () => { V.shown = null; });
+}
+const frameNow = () => {
+  const t = !video.paused && V.shown != null ? V.shown : video.currentTime;
+  return Math.max(0, Math.min(S.n - 1, Math.floor(t * S.fps + 1e-6)));
+};
 function draw(force) {
   if (!S.src) return;
   const f = frameNow();
