@@ -359,7 +359,6 @@ const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 
                   punching: 'punching', hook: 'hook'};
 const ELBOWSKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
                    hook: 'this arm is throwing a hook'};
-const ELBOWCOL = {tucked: '#34c759', 'sometimes flared': '#ff9f0a', flared: '#ff3b30', 'not rated': '#8e8e93'};
 const DIVCOL = {varied: '#34c759', moderate: '#ff9f0a', repetitive: '#ff3b30', 'not rated': '#8e8e93'};
 function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order
   return r.elements.split(' ; ').map(t => { const [kind, hand, type, sf] = t.split('|'); return {kind, hand, type, sf: +sf}; });
@@ -1330,6 +1329,7 @@ const RULE_LAYERS = [
     frameOverlay(f, P, leadLeft, Q, torso) {               // the sideways gap between each shoulder and its elbow
       const t = torso(); if (!t) return;
       const now = (S.items.elbow || []).filter(it => f >= it.sf && f <= it.ef);      // the rule's own state, per arm
+      const part = {};
       // run_elbow_tuck.py hardcodes lead = the LEFT arm (it takes no stance), so the overlay follows it or the label
       // and the row it sits under would name opposite arms. Switch to leadLeft once the rule takes the stance.
       for (const [arm, sj, ej] of [['lead', J.lsh, J.lel], ['rear', J.rsh, J.rel]]) {
@@ -1344,7 +1344,12 @@ const RULE_LAYERS = [
         OV.dot(el, col, 4);
         overlayLabel(el[0] + (el[0] > sh[0] ? 10 : -84), el[1] - 14,
           skip ? arm : `${arm} ${flare.toFixed(2)}`, col);
+        if (!skip) part[arm] = Math.min(1, Math.max(0, (0.50 - flare) / 0.30));      // full to 0.20, 0 at 0.50
       }
+      const hs = Object.keys(part), n = P(J.nose);          // the frame score: 50 / 50, or one arm alone
+      const sc = hs.length === 2 ? 50 * part.lead + 50 * part.rear : hs.length === 1 ? 100 * part[hs[0]] : null;
+      if (n && sc != null) overlayLabel(n[0] - 60, n[1] - 30, `frame score ${sc.toFixed(1)}`
+        + (hs.length === 2 ? ` · lead ${(50 * part.lead).toFixed(1)}/50 · rear ${(50 * part.rear).toFixed(1)}/50` : ` · ${hs[0]} arm alone`), '#e5e5ea');
     },
     csv: ['elbow_tuck', 'runs.csv'], json: ['elbow_tuck', 'elbow_tuck.json'],
     parseItem: (r, num) => ({arm: r.arm, state: r.state || 'flared', sf: num(r.start_frame), ef: num(r.end_frame),
@@ -1846,7 +1851,7 @@ function layerChip(key, js) {
   if (key === 'hoc') return js.round_score == null ? null : {txt: `${js.round_score} · ${js.round_band}`, col: VERD[js.round_band] || '#8e8e93'};
   if (key === 'offensive') return js.offensive?.diversity ? {txt: js.offensive.diversity.rating, col: DIVCOL[js.offensive.diversity.rating]} : null;
   if (key === 'combined') return js.combined ? {txt: `${js.combined.n_combinations} combos`, col: COMBO.combined} : null;
-  if (key === 'elbow') return {txt: js.rating, col: ELBOWCOL[js.rating] || '#8e8e93'};
+  if (key === 'elbow') return {txt: js.score == null ? 'not rated' : String(js.score), col: js.score == null ? '#8e8e93' : 'var(--text)'};
   return null;
 }
 // how many punches each scored rule passed / failed / could not judge
@@ -1914,14 +1919,17 @@ function ruleCard() {
                         + 'linearly in between — a plain number, no bands; fewer than 10 combos: not rated'}},
     calc: `${da.n_covered} covered / ${da.n_combos} combos = ${pct(da.covered_share)} → ${da.score ?? '–'} · `
           + `${da.n_cut_by_punch} windows cut short by the next punch`});
-  if (el) add('Elbow tuck', el.rating, ELBOWCOL[el.rating], null, {
+  if (el) add('Elbow tuck', el.score ?? 'not rated', el.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does the elbow stay in, or flare out to the side?',
     on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook)`,
     th: {event: {label: 'per frame', rule: 'flare = the sideways shoulder → elbow gap in torso lengths',
+                 note: 'frame score: each arm 50 — full up to 0.20 flare, linearly to 0 at 0.50; one arm alone '
+                     + '(the other hidden or throwing a hook) is the whole 100. The colours keep the lens’s cut-offs',
                  bands: [['< 0.20', 'tucked'], ['0.20–0.30', 'borderline'], ['≥ 0.30', 'flared']], pal: ELBOWSTATE},
-         round: {label: 'per round', rule: 'the share of judged frames flared, on the worse arm',
-                 bands: [['< 10 %', 'tucked'], ['10–25 %', 'sometimes flared'], ['≥ 25 %', 'flared']], pal: ELBOWCOL}},
-    calc: `lead ${el.arms.lead.flared_frames.toLocaleString()} of ${el.arms.lead.judged_frames.toLocaleString()} frames flared = ${pct(el.arms.lead.flared_share)} · rear ${el.arms.rear.flared_frames.toLocaleString()} of ${el.arms.rear.judged_frames.toLocaleString()} = ${pct(el.arms.rear.flared_share)} · the worse arm (${el.worse_arm || '–'}) sets the rating`});
+         round: {label: 'per round', rule: 'the mean frame score over every scored frame — a plain number, no bands; '
+                        + 'fewer than 150 scored frames: not rated'}},
+    calc: `mean of ${el.scored_frames.toLocaleString()} frame scores (${el.both_arms_frames.toLocaleString()} with both arms) · `
+          + `flared: lead ${pct(el.arms.lead.flared_share)}, rear ${pct(el.arms.rear.flared_share)}`});
   scored('hoc', 'Head off center line', q => ({
     what: 'does the head leave the center line while punching, or stay a still target?',
     on: `${q.pass + q.fail + q.skip} punches · ${q.pass + q.fail} judged, ${q.skip} skipped (thrown side-on, where the camera cannot see the head move sideways)`,

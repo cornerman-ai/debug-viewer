@@ -189,9 +189,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   judged only while the boxer is within 45° of facing or backing the camera and that arm isn't throwing a hook. The row
   is continuous — every frame belongs to a stretch: green tucked (< 0.20), yellow borderline (0.20–0.30), red flared
   (≥ 0.30), and a thin gray strip where the rule cannot judge, with the reason in its tooltip (the boxer is side-on,
-  a joint it needs is not visible, or that arm is throwing a hook). Lead in the top half, rear in the bottom; the toggle's summary
-  has the per-arm share of judged frames flared and the video's rating (< 10 % tucked, 10–25 % sometimes flared,
-  ≥ 25 % flared, worse arm decides). Reads `runs.csv` + `elbow_tuck.json`.
+  a joint it needs is not visible, or that arm is throwing a hook). Lead in the top half, rear in the bottom. Each
+  frame scores 0–100: each arm 50, full up to 0.20 flare and 0 at 0.50, or 100 when only one arm can be judged; the
+  overlay labels it ("frame score 65.8 · lead 15.8/50 · rear 50.0/50"). Round = the mean frame score, no bands.
+  Reads `runs.csv` + `elbow_tuck.json`.
 
 **Angle change** (`angle_change/angle_change.json`, a whole-video rule — no timeline row): per combined combo, the
 mean facing during it against the most different smoothed facing in the 2 s after it; a turn of ≥ 45° counts as a
