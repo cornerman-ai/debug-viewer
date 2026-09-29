@@ -1738,7 +1738,6 @@ const COMBO_TOP = 3;                       // sequences listed per combo kind be
 const BODYCOL = {enough: '#34c759', 'a few': '#ffcc00', 'too few': '#ff9f0a', 'head only': '#ff3b30', 'not rated': '#8e8e93'};
 const SPCOL = {varied: '#34c759', moderate: '#ff9f0a', 'same punches': '#ff3b30', 'not rated': '#8e8e93'};
 const SDCOL = {varied: '#34c759', balanced: '#34c759', moderate: '#ff9f0a', 'same defense': '#ff3b30', 'one-sided': '#ff3b30', 'not rated': '#8e8e93'};
-const ACCOL = {good: '#34c759', some: '#ff9f0a', 'stays square': '#ff3b30', 'not rated': '#8e8e93'};
 const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes shallow': '#ff9f0a',
                     narrow: '#ff3b30', shallow: '#ff3b30', 'not rated': '#8e8e93'};
 const HIPCOL = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
@@ -1892,14 +1891,15 @@ function ruleCard() {
     add(name, n, c.col, band, info(scoreCounts(key)));
   };
 
-  if (ac) add('Angle change', ac.rating, ACCOL[ac.rating], null, {
+  if (ac) add('Angle change', ac.score ?? 'not rated', ac.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'after attacking, does he step off the line he attacked from?',
     on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (no facing angle to read)`,
     th: {event: {label: 'per combo', rule: 'a turn of ≥ 45° from the combo’s mean facing (smoothed over 0.5 s), '
                         + 'reached within 2 s of its last frame, counts as a change'},
-         round: {label: 'per round', rule: 'the share of readable combos that changed angle',
-                 bands: [['≥ 50 %', 'good'], ['25–50 %', 'some'], ['< 25 %', 'stays square']], pal: ACCOL}},
-    calc: `${ac.n_changed} turned / ${ac.n_readable} combos = ${pct(ac.changed_share)}`});
+         round: {label: 'per round', rule: 'the share of readable combos that changed angle, scored 0 at none and 100 '
+                        + 'from half of them, linearly between — a plain number, no bands; fewer than 5 readable combos: not rated',
+                 bands: [['≥ 50 %', '100'], ['0 → 50 %', '0 → 100']], pal: {'100': '#34c759', '0 → 100': '#ff9f0a'}}},
+    calc: `${ac.n_changed} turned / ${ac.n_readable} combos = ${pct(ac.changed_share)} → ${ac.score ?? '–'}`});
   scored('arm', 'Arm extension', q => ({
     what: 'does the arm reach full extension on a straight punch?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on to read the arm)`,

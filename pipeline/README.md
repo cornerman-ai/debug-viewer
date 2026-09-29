@@ -196,7 +196,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 
 **Angle change** (`angle_change/angle_change.json`, a whole-video rule — no timeline row): per combined combo, the
 mean facing during it against the most different smoothed facing in the 2 s after it; a turn of ≥ 45° counts as a
-change. ≥ 50 % of combos good, 25–50 % some, < 25 % stays square; fewer than 5 readable combos → not rated.
+change. Round = 100 at half the combos changed or more, 0 at none, linear between — a plain number, no bands;
+fewer than 5 readable combos → not rated.
 
 - **Defense after combo** (`defense_after_combo/combos.csv` + `.json`): the defensive move that covered an offensive
   combo, drawn in green where the move is; a combo nobody covered draws its empty search window as a hollow red box
