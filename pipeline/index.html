@@ -421,7 +421,6 @@ const SLIPNAME = {short: 'too short', ok: 'good distance', far: 'too far'};
 const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
-const SPEEDCOL = {sharp: '#34c759', mixed: '#ff9f0a', slow: '#ff3b30', 'not rated': '#8e8e93'};
 const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
 const HOOKSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'wraps around': '#ff3b30', 'not rated': '#8e8e93'};
 const PIVOTCOL = {pivots: '#34c759', sometimes: '#ff9f0a', 'flat-footed': '#ff3b30', 'not rated': '#8e8e93'};
@@ -1027,28 +1026,28 @@ const RULE_LAYERS = [
     },
   },
   {
-    // punch speed (punch_speed/punches.csv): start → impact, against a band built from 8,166 labelled punches and
-    // shifted onto our own detector (see the backend's run_punch_speed.py for why the shift is needed).
+    // punch speed (punch_speed/punches.csv): start → impact, 100 up to the labelled 60th percentile of its punch type
+    // (8,166 labelled punches), linearly down to 0 at 1 s.
     key: 'speed', label: 'Punch speed', short: 'Punch speed',
     csv: ['punch_speed', 'punches.csv'], json: ['punch_speed', 'punch_speed.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, dur: num(r.duration), lo: num(r.band_low), hi: num(r.band_high)}
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, dur: num(r.duration), full: num(r.full_up_to), score: num(r.score)}
       : {verdict: '', skip: r.skip_reason},
     summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">Punch speed</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip ? x.skip.replace(/_/g, ' ') : 'not judged'}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${(x.dur * 1000).toFixed(0)} ms</b>
-        <span>Good up to</span><b>${(x.hi * 1000).toFixed(0)} ms for this punch type</b>
-        <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
+        <span>Scale</span><b>100 up to ${(x.full * 1000).toFixed(0)} ms, 0 at 1 s, linear</b>
+        <span>Punch score</span><b>${x.score.toFixed(1)}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
-      `<span class="num">${(x.dur * 1000).toFixed(0)} ms from the first frame to the impact · ${x.verdict}</span><br>` +
-      `<span class="m">slow above ${(x.hi * 1000).toFixed(0)} ms — the upper quartile of this punch type across 8,166 ` +
-      `labelled punches, shifted onto our own detector</span>`),
+      `<span class="num">${(x.dur * 1000).toFixed(0)} ms from the first frame to the impact · score <b>${x.score.toFixed(1)}</b></span><br>` +
+      `<span class="m">100 up to ${(x.full * 1000).toFixed(0)} ms — the 60th percentile of this punch type across 8,166 ` +
+      `labelled punches — then linearly to 0 at 1 s</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'slow' ? '#ff3b30' : '#34c759';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, `${(x.dur * 1000).toFixed(0)}ms`);
+      tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'speed', bx, y, w, h);
     },
   },
@@ -2126,18 +2125,17 @@ function ruleCard() {
     calc: `${chd.out_frames.toLocaleString()} of ${chd.judged_frames.toLocaleString()} judged frames = `
           + `${pct(chd.out_share)} · median gap ${chd.median_gap} torso`});
   const psp = S.layerSum.speed;
-  if (psp) add('Punch speed', psp.rating, SPEEDCOL[psp.rating], null, {
+  if (psp) add('Punch speed', psp.score ?? 'not rated', psp.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does the punch get there, or does it travel?',
     on: `${psp.n_punches} punches · ${psp.judged_punches} judged, ${psp.n_punches - psp.judged_punches} skipped (no impact frame)`,
-    th: {event: {label: 'per punch', rule: 'the time from the punch’s first frame to the impact, against the upper '
-                        + 'quartile for its own type across 8,166 labelled punches — shifted onto our detector, which '
-                        + 'starts a punch later than a person marking it does',
-                 bands: [['within the band', 'sharp'], ['above it', 'slow']],
-                 pal: {sharp: '#34c759', slow: '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches above their type’s band',
-                 bands: [['< 10 %', 'sharp'], ['10–25 %', 'mixed'], ['≥ 25 %', 'slow']], pal: SPEEDCOL}},
-    calc: `${psp.slow_punches} of ${psp.judged_punches} judged punches = ${pct(psp.slow_share)} · `
-          + Object.entries(psp.by_type).map(([t, v]) => `${PUNCH[t]?.name || t} ${v.slow}/${v.judged}`).join(', ')});
+    th: {event: {label: 'per punch', rule: 'the time from the punch’s first frame to the impact: 100 up to the 60th '
+                        + 'percentile of its own type across 8,166 labelled punches (jab 199 ms, cross 182, hook 295, '
+                        + 'uppercut 327, body shot 299), linearly down to 0 at 1 s — green at 100, red below',
+                 bands: [['≤ 60th percentile', '100'], ['→ 1 s', '100 → 0 (linear)'], ['≥ 1 s', '0']],
+                 pal: {'100': '#34c759', '100 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 20 judged punches: not rated'}},
+    calc: `mean of ${psp.judged_punches} punch scores, ${psp.sharp_punches} at 100 · `
+          + Object.entries(psp.by_type).map(([t, v]) => `${PUNCH[t]?.name || t} ${v.mean_score}`).join(', ')});
   const bal = S.layerSum.bal;
   if (bal) add('Balance at impact', bal.score ?? 'not rated', bal.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'when the punch lands, is his head still over his own feet?',

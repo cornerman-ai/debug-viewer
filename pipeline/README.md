@@ -77,12 +77,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   half, rear on the bottom — and every window holding the playhead draws on its own wrist, its label naming the
   hand and punch ("Rear cross in 3 f · mean 0.527 · …"). Round = the mean punch score, a plain number with no
   bands, from at least 10 judged punches. Reads `punches.csv` + `hand_drop.json`.
-- **Punch speed** (`punch_speed/`): per punch, the time from its first frame to the impact, with the milliseconds
-  on the block — green inside the band for that punch type, red above it. The band is the upper quartile of the
-  type across 8,166 labelled punches, shifted onto our own detector (a person marks a punch's start at the windup,
-  the decoder starts it later). Every angle is judged: a time is not foreshortened. Round rating = the share of
-  judged punches above their band (< 10 % sharp, 10–25 % mixed, ≥ 25 % slow). Reads `punches.csv` +
-  `punch_speed.json`.
+- **Punch speed** (`punch_speed/`): per punch, the time from its first frame to the impact, scored 100 up to the
+  60th percentile of that punch type across 8,166 labelled punches and linearly down to 0 at 1 s; the score on the
+  block, green at 100 and red below. Every angle is judged: a time is not foreshortened. Round = the mean punch
+  score, a plain number, from at least 20 judged punches. Reads `punches.csv` + `punch_speed.json`.
 - **Balance at impact** (`balance/`): per punch at the impact frame, read side-on, a score 0–100 = head (0–50) +
   hips (0–50), in ankle distances. Head: 50 while the nose is at most 0.20 past an ankle, linearly to 0 at 0.75
   past it. Hips: 50 while the hip centre is within 0.20 of the ankles' midpoint, linearly to 0 at 0.50 (over an
