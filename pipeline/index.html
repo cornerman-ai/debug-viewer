@@ -1895,7 +1895,7 @@ function ruleCard() {
   if (ac) add('Angle change', ac.rating, ACCOL[ac.rating], null, {
     what: 'after attacking, does he step off the line he attacked from?',
     on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (no facing angle to read)`,
-    th: {event: {label: 'per combo', rule: 'a defensive move — or any turn — of ≥ 45° from the combo’s mean facing, '
+    th: {event: {label: 'per combo', rule: 'a turn of ≥ 45° from the combo’s mean facing (smoothed over 0.5 s), '
                         + 'reached within 2 s of its last frame, counts as a change'},
          round: {label: 'per round', rule: 'the share of readable combos that changed angle',
                  bands: [['≥ 50 %', 'good'], ['25–50 %', 'some'], ['< 25 %', 'stays square']], pal: ACCOL}},
