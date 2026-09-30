@@ -510,7 +510,6 @@ const CHINCOL = {over: '#ff3b30', over_short: '#8e8e93', level: '#ff9f0a', under
 const CHINSKIP = {no_reading: 'a joint the chin needs is not visible',
                   punching: 'a punch is in flight — the chin is judged between punches',
                   front_on: 'not side-on — the depth axis points at the camera'};
-const CHINRATE = {good: '#34c759', sometimes: '#ff9f0a', bad: '#ff3b30', 'not rated': '#8e8e93'};
 function chinLayer(kind) {
   const C = CHIN[kind];
   return {
@@ -538,9 +537,11 @@ function chinLayer(kind) {
         const qx = j => Q(j, 0), qy = j => Q(j, 1);                          // raw normalised: the lens's own geometry
         const chinNy = qy(J.nose) + 2.25 * ((qy(9) + qy(10)) / 2 - qy(J.nose));
         const ruler = Math.hypot(qx(J.lsh) - qx(J.rsh), qy(J.lsh) - qy(J.rsh));
-        if (judged && ruler > 1e-6)
-          overlayLabel(chin[0] + 14, chin[1],
-            `${((chinNy - qy(leadLeft ? J.lsh : J.rsh)) / ruler).toFixed(2)} sh`, col);
+        if (judged && ruler > 1e-6) {
+          const hv = (chinNy - qy(leadLeft ? J.lsh : J.rsh)) / ruler;
+          const sc = 100 * Math.min(1, Math.max(0, (hv + 1.5) / (1.5 - 0.075)));    // run_chin_tuck.py HEIGHT_FULL / ZERO
+          overlayLabel(chin[0] + 14, chin[1], `${hv.toFixed(2)} sh → ${sc.toFixed(0)}`, col);
+        }
       } else {
         const t = torso(); if (!t) return;
         const a = S.hasAngle && S.pose?.[f] ? S.angle[f] : NaN;               // the rule's facing sign, not chin-vs-shoulder
@@ -2080,18 +2081,18 @@ function ruleCard() {
             + `bladed ${bd.bladed_frames.toLocaleString()}`});
   }
   const chh = S.layerSum.chin_height;
-  if (chh) add('Chin height', chh.rating, CHINRATE[chh.rating], null, {
-    what: 'is the chin down behind the lead shoulder, or riding above it?',
-    on: `${chh.n_frames.toLocaleString()} frames · ${chh.judged_frames.toLocaleString()} judged outside punches · `
-        + `the rest skipped (a punch in flight, or a joint the chin needs not visible)`,
-    th: {event: {label: 'per frame', rule: 'the chin (nose + 2.25 × nose→mouth, since BlazePose has no jaw) against a '
-                        + 'line at the lead shoulder, in shoulder widths. The two cut-offs are the lens’s, fitted on a coach’s labels',
-                 bands: [['above the line', 'chin up'], ['around it', 'level'], ['below it', 'tucked']],
-                 pal: {'chin up': '#ff3b30', level: '#ff9f0a', tucked: '#34c759'}},
-         round: {label: 'per round', rule: 'the share of judged frames with the chin up — every frame counts, however brief',
-                 bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes'], ['≥ 30 %', 'bad']], pal: CHINRATE}},
-    calc: `${chh.over_frames.toLocaleString()} of ${chh.judged_frames.toLocaleString()} judged frames = `
-          + `${pct(chh.over_share)} · median ${chh.median_height_norm} shoulder widths`});
+  if (chh) add('Chin height', chh.score ?? 'not rated', chh.score == null ? '#8e8e93' : 'var(--text)', null, {
+    what: 'does the chin stay below the lead shoulder, or come up above it?',
+    on: `${chh.n_frames.toLocaleString()} frames · ${chh.judged_frames.toLocaleString()} judged (outside punches, every angle)`,
+    th: {event: {label: 'per frame', rule: 'the chin against the lead shoulder’s height, in shoulder widths (the gap between '
+                        + 'the two shoulders, in the image’s normalised coordinates — the lens’s ruler): 100 with the chin at '
+                        + 'most 0.075 above the shoulder, linearly down to 0 at 1.5 above — green at 100, red below',
+                 bands: [['≤ 0.075 above', '100'], ['0.075 → 1.5 above', '100 → 0 (linear)'], ['≥ 1.5 above', '0']],
+                 pal: {'100': '#34c759', '100 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean frame score over every judged frame — a plain number, no bands; '
+                        + 'fewer than 150 judged frames: not rated'}},
+    calc: `mean of ${chh.judged_frames.toLocaleString()} frame scores = ${chh.score ?? '–'} · `
+          + `${chh.over_frames.toLocaleString()} below 100 · median ${chh.median_height_norm} sh`});
   const chd = S.layerSum.chin_depth;
   if (chd) add('Chin depth', chd.score ?? 'not rated', chd.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does the chin sit behind the front of the lead shoulder, or stick out past it?',
