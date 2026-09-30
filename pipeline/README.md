@@ -175,8 +175,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   orange level, green tucked) — those two cut-offs were fitted on a coach's labels. Depth is the chin against the
   shoulder's front (the lead keypoint pushed forward 0.101 torso) in torso lengths, red past 0.10, read side-on
   only. A dashed gray line is everything the rule could not look at: a joint not visible, a punch in flight, or the
-  wrong camera angle. Round rating = the share of judged frames that are bad, every frame counting however
-  brief: < 15 % good, 15–30 % sometimes, ≥ 30 % bad. Read `runs.csv` + the stage's `.json`.
+  wrong camera angle. Round = the share of judged frames that are bad, every frame counting however brief:
+  height rated < 15 % good, 15–30 % sometimes, ≥ 30 % bad; depth scored 100 at none, linearly to 0 at 40 %, a plain
+  number. Read `runs.csv` + the stage's `.json`.
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
   — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of
   the camera, or a joint not visible. Width = ankle-to-ankle distance in torso lengths,

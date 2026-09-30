@@ -2092,7 +2092,7 @@ function ruleCard() {
     calc: `${chh.over_frames.toLocaleString()} of ${chh.judged_frames.toLocaleString()} judged frames = `
           + `${pct(chh.over_share)} · median ${chh.median_height_norm} shoulder widths`});
   const chd = S.layerSum.chin_depth;
-  if (chd) add('Chin depth', chd.rating, CHINRATE[chd.rating], null, {
+  if (chd) add('Chin depth', chd.score ?? 'not rated', chd.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does the chin sit behind the front of the lead shoulder, or stick out past it?',
     on: `${chd.n_frames.toLocaleString()} frames · ${chd.judged_frames.toLocaleString()} judged (outside punches and side-on only — `
         + `head-on the depth axis points at the camera)`,
@@ -2100,10 +2100,13 @@ function ruleCard() {
                         + '0.101 torso, because the joint centre sits inside the deltoid — in torso lengths',
                  bands: [['≤ 0.10 torso in front', 'tucked'], ['> 0.10', 'chin out']],
                  pal: {tucked: '#34c759', 'chin out': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged frames with the chin out — every frame counts, however brief',
-                 bands: [['< 15 %', 'good'], ['15–30 %', 'sometimes'], ['≥ 30 %', 'bad']], pal: CHINRATE}},
+         round: {label: 'per round', rule: 'the share of judged frames with the chin out — every frame counts, however '
+                        + 'brief — scored 100 at none and 0 at 40 %, linearly between; a plain number, no bands; '
+                        + 'fewer than 150 judged frames: not rated',
+                 bands: [['0 %', '100'], ['0 → 40 %', '100 → 0'], ['≥ 40 %', '0']],
+                 pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}},
     calc: `${chd.out_frames.toLocaleString()} of ${chd.judged_frames.toLocaleString()} judged frames = `
-          + `${pct(chd.out_share)} · median gap ${chd.median_gap} torso`});
+          + `${pct(chd.out_share)} → ${chd.score ?? '–'} · median gap ${chd.median_gap} torso`});
   const psp = S.layerSum.speed;
   if (psp) add('Punch speed', psp.score ?? 'not rated', psp.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does the punch get there, or does it travel?',
