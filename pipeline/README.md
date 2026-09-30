@@ -89,9 +89,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   ticks, the head and the hips, at the impact frame. Round = the mean punch score, a plain number with no bands,
   from at least 10 judged punches. Reads `punches.csv` + `balance.json`.
 - **Rear-foot pivot** (`rear_pivot/`): per rear-hand punch, at the impact frame, how far the rear heel sits above the
-  rear toe in shin lengths, scored 0 with the heel level with the toe and 100 from 0.30, linearly between — green at
-  100, red below, the score on the block (the stance already carries the heel about 0.20 up, so a planted foot scores
-  about 67). The overlay draws the toe's height dashed grey, the 0.30 line in the verdict's colour, the foot and the
+  rear toe in torso lengths, scored 0 with the heel level with the toe and 100 from 0.20, linearly between — green at
+  100, red below, the score on the block (the stance already carries the heel about 0.14 up, so a planted foot scores
+  about 67). The overlay draws the toe's height dashed grey, the 0.20 line in the verdict's colour, the foot and the
   heel. Every angle is judged; lead-hand punches and a hidden rear foot are not drawn. Round = the mean punch score,
   a plain number, from at least 10. Reads `punches.csv` + `rear_pivot.json`.
 - **Hook stop** (`hook_stop/`): per head hook, read front-on or back-on, where the fist is at the turnaround — the

@@ -958,7 +958,7 @@ const RULE_LAYERS = [
   },
   {
     // rear-foot pivot (rear_pivot/punches.csv): at the impact of every rear-hand punch, how far the rear heel sits
-    // above the rear toe, in shin lengths. 0 with the heel level with the toe, 100 from 0.30, linear between.
+    // above the rear toe, in torso lengths. 0 with the heel level with the toe, 100 from 0.20, linear between.
     key: 'rpivot', label: 'Rear-foot pivot', short: 'Rear-foot pivot',
     csv: ['rear_pivot', 'punches.csv'], json: ['rear_pivot', 'rear_pivot.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, lift: num(r.lift), score: num(r.score)} : {verdict: '', skip: r.skip_reason},
@@ -967,12 +967,12 @@ const RULE_LAYERS = [
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'lead_hand' ? 'a lead-hand punch — the rule reads rear-hand punches only'
                                                 : x && x.skip === 'no_impact_frame' ? 'no impact frame'
                                                 : 'the rear heel, toe, ankle or knee is not visible at the impact frame'}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Heel above the toe</span><b>${x.lift >= 0 ? '+' : ''}${x.lift.toFixed(3)} shin lengths</b>
-        <span>Scale</span><b>0 at level with the toe, 100 from 0.300, linear</b>
+       `<div class="rows num" style="margin-top:0"><span>Heel above the toe</span><b>${x.lift >= 0 ? '+' : ''}${x.lift.toFixed(3)} torso lengths</b>
+        <span>Scale</span><b>0 at level with the toe, 100 from 0.200, linear</b>
         <span>Punch score</span><b>${x.score.toFixed(1)}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
-      `<span class="num">score <b>${x.score.toFixed(1)}</b> · at impact the rear heel sits ${x.lift.toFixed(3)} shin lengths above the toe</span><br>` +
-      `<span class="m">0 with the heel level with the toe, 100 from 0.300 shin lengths, linear between</span>`),
+      `<span class="num">score <b>${x.score.toFixed(1)}</b> · at impact the rear heel sits ${x.lift.toFixed(3)} torso lengths above the toe</span><br>` +
+      `<span class="m">0 with the heel level with the toe, 100 from 0.200 torso lengths, linear between</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;
       const [bx, w] = span(e);
@@ -984,16 +984,18 @@ const RULE_LAYERS = [
     overlay(e, x, f) {                                      // the rear foot at impact: toe level, the line, the heel
       if (!x.verdict) return;
       // run_rear_pivot.py reads the RIGHT foot (every test video is orthodox, the rule takes no stance)
-      const kn = PAT(e.impact, 26), an = PAT(e.impact, 28), he = PAT(e.impact, 30), to = PAT(e.impact, 32);
-      if (!(kn && an && he && to)) return;
-      const shin = Math.hypot(an[0] - kn[0], an[1] - kn[1]); if (!(shin > 1)) return;
+      const he = PAT(e.impact, 30), to = PAT(e.impact, 32);
+      const ls = PAT(e.impact, 11), rs = PAT(e.impact, 12), lh = PAT(e.impact, 23), rh = PAT(e.impact, 24);
+      if (!(he && to && ls && rs && lh && rh)) return;
+      const torso = Math.hypot((ls[0] + rs[0]) / 2 - (lh[0] + rh[0]) / 2, (ls[1] + rs[1]) / 2 - (lh[1] + rh[1]) / 2);
+      if (!(torso > 1)) return;
       const col = x.verdict === 'pivots' ? '#34c759' : '#ff3b30';
       const x0 = Math.min(he[0], to[0]) - 40, x1 = Math.max(he[0], to[0]) + 40;
       OV.level(to[1], x0, x1, '#8e8e93', [3, 4]);           // the toe's height
-      OV.level(to[1] - 0.30 * shin, x0, x1, col);            // where the heel has to reach for 100
+      OV.level(to[1] - 0.20 * torso, x0, x1, col);           // where the heel has to reach for 100
       OV.line(to, he, '#ffffff', 2);                         // the foot itself
       OV.line([he[0], to[1]], he, col, 2.5, [3, 3]); OV.ring(he, col, 9, 3); OV.dot(to, '#8e8e93', 4);
-      overlayLabel(x0, to[1] - 0.30 * shin - 16, `score ${x.score.toFixed(1)} · heel ${x.lift >= 0 ? '+' : ''}${x.lift.toFixed(3)} shin (100 at 0.300)`, col);
+      overlayLabel(x0, to[1] - 0.20 * torso - 16, `score ${x.score.toFixed(1)} · heel ${x.lift >= 0 ? '+' : ''}${x.lift.toFixed(3)} torso (100 at 0.200)`, col);
     },
   },
   {
@@ -2143,15 +2145,15 @@ function ruleCard() {
   if (rp) add('Rear-foot pivot', rp.score ?? 'not rated', rp.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'when a rear-hand punch lands, is the rear heel up and turning, or flat on the floor?',
     on: `${rp.n_rear_punches} rear-hand punches · ${rp.judged_punches} judged (every angle — the lift is vertical), `
-        + `${rp.n_rear_punches - rp.judged_punches} skipped (no impact frame, or the rear foot not visible)`,
-    th: {event: {label: 'per punch', rule: 'at the impact frame, how far the rear heel sits above the rear toe, in shin '
-                        + 'lengths: 0 with the heel level with the toe, 100 from 0.30, linear between — green at 100, red '
-                        + 'below. The stance already carries the heel about 0.20 up, so a planted foot scores about 67, not 0',
-                 bands: [['≥ 0.30 shin', '100'], ['0 → 0.30', '0 → 100 (linear)'], ['≤ 0', '0']],
+        + `${rp.n_rear_punches - rp.judged_punches} skipped (no impact frame, or the rear foot or the torso not visible)`,
+    th: {event: {label: 'per punch', rule: 'at the impact frame, how far the rear heel sits above the rear toe, in torso '
+                        + 'lengths: 0 with the heel level with the toe, 100 from 0.20, linear between — green at 100, red '
+                        + 'below. The stance already carries the heel about 0.14 up, so a planted foot scores about 67, not 0',
+                 bands: [['≥ 0.20 torso', '100'], ['0 → 0.20', '0 → 100 (linear)'], ['≤ 0', '0']],
                  pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a', '0': '#ff3b30'}},
          round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 10 judged punches: not rated'}},
     calc: `mean of ${rp.judged_punches} punch scores = ${rp.mean_score ?? '–'} · ${rp.at_100} at 100 · `
-          + `median heel ${rp.median_lift} shin above the toe`});
+          + `median heel ${rp.median_lift} torso above the toe`});
   const ih = S.layerSum.resting;
   if (ih) add('Dropping resting hand while punching', ih.score ?? 'not rated', ih.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'when one hand lands, is the other one still up where a guard belongs?',
