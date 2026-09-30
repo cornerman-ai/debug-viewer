@@ -525,8 +525,8 @@ function chinLayer(kind) {
       const nose = P(J.nose), lsh = P(J.lsh), rsh = P(J.rsh);
       if (!(nose && lsh && rsh)) return;
       const mL = P(9), mR = P(10); if (!(mL && mR)) return;                  // BlazePose mouth corners
-      for (const j of [J.nose, 9, 10, J.lsh, J.rsh])                         // run_chin_tuck.py MIN_VIS 0.30:
-        if (!(Q(j, 6) >= 0.30)) return;                                      // a joint it cannot read, so neither do we
+      for (const j of [J.nose, 9, 10, J.lsh, J.rsh])                         // run_chin_tuck.py MIN_VIS 0.5:
+        if (!(Q(j, 6) >= 0.5)) return;                                       // a joint it cannot read, so neither do we
       const chin = [nose[0] + 2.25 * ((mL[0] + mR[0]) / 2 - nose[0]),
                     nose[1] + 2.25 * ((mL[1] + mR[1]) / 2 - nose[1])];
       const lead = leadLeft ? lsh : rsh;
@@ -546,10 +546,11 @@ function chinLayer(kind) {
         const a = S.hasAngle && S.pose?.[f] ? S.angle[f] : NaN;               // the rule's facing sign, not chin-vs-shoulder
         const d = Number.isFinite(a) ? Math.sign(Math.sin(a * Math.PI / 180)) : 0;
         if (!d) return;                                                      // run_chin_tuck.py gates on dsign != 0
-        const front = lead[0] + d * 0.101 * t;
+        const front = lead[0] + d * 0.10 * t;
         OV.line([front, lead[1] - 30], [front, lead[1] + 60], col, 2.5);      // the shoulder's front, not its joint
         OV.line([front, chin[1]], chin, col, 2, [3, 3]);
-        if (judged) overlayLabel(chin[0] + 14, chin[1], `${(d * (chin[0] - front) / t).toFixed(2)} torso`, col);
+        const g = d * (chin[0] - front) / t, sc = 100 * Math.min(1, Math.max(0, 1 - Math.max(g, 0) / 0.40));
+        if (judged) overlayLabel(chin[0] + 14, chin[1], `${g.toFixed(2)} torso → ${sc.toFixed(0)}`, col);
       }
     },
     tip: (e, x) => {
@@ -2097,16 +2098,14 @@ function ruleCard() {
     on: `${chd.n_frames.toLocaleString()} frames · ${chd.judged_frames.toLocaleString()} judged (outside punches and side-on only — `
         + `head-on the depth axis points at the camera)`,
     th: {event: {label: 'per frame', rule: 'the chin against the shoulder’s front — the lead keypoint pushed forward by '
-                        + '0.101 torso, because the joint centre sits inside the deltoid — in torso lengths',
-                 bands: [['≤ 0.10 torso in front', 'tucked'], ['> 0.10', 'chin out']],
-                 pal: {tucked: '#34c759', 'chin out': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged frames with the chin out — every frame counts, however '
-                        + 'brief — scored 100 at none and 0 at 40 %, linearly between; a plain number, no bands; '
-                        + 'fewer than 150 judged frames: not rated',
-                 bands: [['0 %', '100'], ['0 → 40 %', '100 → 0'], ['≥ 40 %', '0']],
-                 pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}},
-    calc: `${chd.out_frames.toLocaleString()} of ${chd.judged_frames.toLocaleString()} judged frames = `
-          + `${pct(chd.out_share)} → ${chd.score ?? '–'} · median gap ${chd.median_gap} torso`});
+                        + '0.10 torso, because the joint centre sits inside the deltoid — in torso lengths: 100 at or '
+                        + 'behind it, linearly down to 0 at 0.40 torso in front — green at 100, red below',
+                 bands: [['at or behind', '100'], ['0 → 0.40 torso in front', '100 → 0 (linear)'], ['≥ 0.40', '0']],
+                 pal: {'100': '#34c759', '100 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean frame score over every judged frame — a plain number, no bands; '
+                        + 'fewer than 150 judged frames: not rated'}},
+    calc: `mean of ${chd.judged_frames.toLocaleString()} frame scores = ${chd.score ?? '–'} · `
+          + `${chd.out_frames.toLocaleString()} in front of the shoulder (below 100) · median gap ${chd.median_gap} torso`});
   const psp = S.layerSum.speed;
   if (psp) add('Punch speed', psp.score ?? 'not rated', psp.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does the punch get there, or does it travel?',
