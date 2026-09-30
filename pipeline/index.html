@@ -2234,7 +2234,7 @@ function ruleCard() {
         (g.bands?.length ? `<div class="bands">` + g.bands.map(([when, verdict]) =>
           `<span class="num">${when}</span><span style="color:${g.pal?.[verdict] || 'var(--text2)'}">${verdict}</span>`).join('') + '</div>' : '') +
         `</span></div>`).join('')}</span>` +
-      `<span>round</span><span>${r.calc}</span></div></div>`;
+      `<span>round</span><span>${r.value === 'not rated' ? 'None' : r.calc}</span></div></div>`;   // not rated: no sum to show
   };
   $('scoreCard').innerHTML = '<div class="label">Round score</div>' +
     `<div class="grpbox">${rows.map(rule).join('')}</div>`;
