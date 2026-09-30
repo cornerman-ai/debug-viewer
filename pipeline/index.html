@@ -421,7 +421,6 @@ const SLIPNAME = {short: 'too short', ok: 'good distance', far: 'too far'};
 const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
-const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
 const PIVOTCOL = {pivots: '#34c759', sometimes: '#ff9f0a', 'flat-footed': '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
@@ -908,59 +907,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    // stopping the uppercut (uppercut_stop/punches.csv): the impact frame is the turnaround, so the question is
-    // simply where the fist was when it stopped. The line is the middle of the ghost's head, chin to crown.
-    key: 'upstop', label: 'Uppercut stop', short: 'Uppercut stop',
-    csv: ['uppercut_stop', 'punches.csv'], json: ['uppercut_stop', 'uppercut_stop.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, over: num(r.over), overChin: num(r.over_chin), overCrown: num(r.over_crown),
-      chinNy: num(r.chin_ny), crownNy: num(r.crown_ny), handNx: num(r.hand_nx), handNy: num(r.hand_ny)}
-      : {verdict: '', skip: r.skip_reason},
-    summary: () => '',
-    card: (e, x) => `<div class="sub"><div class="h">Uppercut stop</div>` +
-      (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_side_on' ? 'thrown head-on — the uppercut’s arc runs up and forward, and head-on the forward half points at the camera'
-                                                : x && x.skip === 'body_shot' ? 'a body shot — the classifier cannot tell a body uppercut from a body hook'
-                                                : x && x.skip === 'not_an_uppercut' ? 'not an uppercut'
-                                                : x && x.skip === 'hand_not_visible' ? 'a hand point (pinky, index or thumb) is not visible at the impact frame'
-                                                : 'the wrist or the body is not visible at the impact frame'}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Past mid-head</span><b>${x.over > 0 ? '+' : ''}${x.over.toFixed(3)} stance heights</b>
-        <span>Past the chin</span><b>${x.overChin > 0 ? '+' : ''}${x.overChin.toFixed(3)} — not judged</b>
-        <span>Past the crown</span><b>${x.overCrown > 0 ? '+' : ''}${x.overCrown.toFixed(3)} — not judged</b>
-        <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
-    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
-      `<span class="num"><b>${x.verdict}</b> · the fist stopped ${Math.abs(x.over).toFixed(3)} stance heights ` +
-      `${x.over > 0 ? 'ABOVE' : 'below'} the middle of the head</span><br>` +
-      `<span class="m">a fist stopping in the lower half of the head landed; one in the upper half is on its way past</span>`),
-    row(e, x, {c, y, h, span, tag, ring}) {
-      if (!x.verdict) return;
-      const [bx, w] = span(e);
-      c.fillStyle = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
-      rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, `${x.over > 0 ? '+' : ''}${x.over.toFixed(3)}`);
-      ring(e, 'upstop', bx, y, w, h);
-    },
-    overlay(e, x, f, P, leadLeft) {                        // the head's middle, its chin and crown, and the fist
-      if (!x.verdict || x.chinNy == null) return;
-      const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
-      const lsh = P(J.lsh), rsh = P(J.rsh), w = P(wr);
-      if (!(lsh && rsh && w)) return;
-      const chin = PXY(0, x.chinNy), crown = PXY(0, x.crownNy);
-      if (!(chin && crown)) return;
-      const col = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
-      const x0 = Math.min(lsh[0], rsh[0]) - 50, x1 = Math.max(lsh[0], rsh[0]) + 50;
-      const mid = (chin[1] + crown[1]) / 2;                // the judgment line: halfway from the chin to the crown
-      OV.level(crown[1], x0, x1, '#8e8e93', [3, 4]);       // top of the ghost's head, for reference
-      OV.level(chin[1], x0, x1, '#8e8e93', [3, 4]);        // its chin, for reference
-      OV.level(mid, x0, x1, col);
-      // the point the rule reads: the fist's centre (wrist + pinky + index + thumb) at the turnaround
-      const fist = PXY(x.handNx, x.handNy) || PAT(e.impact, wr) || w;
-      OV.line([fist[0], mid], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
-      if (f !== e.impact) OV.dot(w, col, 4);
-      overlayLabel(x0, crown[1] - 16,
-        `${x.over > 0 ? '+' : ''}${x.over.toFixed(3)} past mid-head`, col);
-    },
-  },
-  {
-    // stopping the hook (hook_stop/punches.csv): the same question across the frame. 100 with the fist at the boxer's
+    // stopping the hook (hook_stop/punches.csv): where the fist is when it stops. 100 with the fist at the boxer's
     // centre line or short of it, linearly to 0 at a third of a torso past his own far shoulder (set from his
     // squared-up width over the clip so a bladed frame cannot shrink it).
     key: 'hookstop', label: 'Hook stop', short: 'Hook stop',
@@ -1251,9 +1198,9 @@ const RULE_LAYERS = [
   {
     key: 'hit', label: 'Hit height', short: 'Target height',
     csv: ['hit_height', 'hit_height.csv'], json: ['hit_height', 'hit_height.json'],
+    // hit height (hit_height/hit_height.csv): every punch type, read at its impact frame against the ghost's zones
     parse: (r, num) => ({verdict: r.verdict, zone: r.zone, land: num(r.land_frame), hf: num(r.height_frac),
-      pen: num(r.penalty), skip: r.skip_reason, impF: num(r.impact_frame), impZone: r.impact_zone, impVerdict: r.impact_verdict,
-      impHf: num(r.impact_height_frac), match: r.impact_matches_target}),
+      pen: num(r.penalty), skip: r.skip_reason, match: r.matches_target}),
     summary(P, js, {dot, count}) {
       const hr = count(P, p => p.hit?.verdict || null);
       return dot(VERD.on_target, `${hr.on_target || 0} on target`) + dot(VERD.off_target, `${hr.off_target || 0} off`) +
@@ -1261,41 +1208,34 @@ const RULE_LAYERS = [
     },
     card(e, x) {
       const zn = z => z ? (ZONE[z]?.[1] || z) : '–', pct = v => v == null ? '–' : `${(v * 100).toFixed(0)}% of stance height`;
-      return `<div class="sub"><div class="h">Hit height ${x?.verdict ? pillV(x.verdict) : x?.impVerdict ? pillV(x.impVerdict) : ''}</div>` + (!x ? '<div class="empty">no reading</div>' :
+      return `<div class="sub"><div class="h">Hit height ${x?.verdict ? pillV(x.verdict) : ''}</div>` + (!x || !x.verdict ? '<div class="empty">no reading</div>' :
         `<div class="rows num" style="margin-top:0">` +
-        (x.verdict ? `<span>Rule zone</span><b>${x.skip ? 'skipped (' + x.skip + ')' : zn(x.zone)}</b>` +
-                     (x.skip ? '' : `<span>Fist height</span><b>${pct(x.hf)}${x.land != null ? ' · f ' + x.land : ''}</b>`)
-                   : `<span>Rule</span><b>jabs and crosses only</b>`) +
-        `<span>${x.verdict ? 'At impact (comparison, not judged)' : 'At impact (our reading)'}</span><b>${x.impVerdict === 'skip' || !x.impVerdict ? 'skipped' : zn(x.impZone) + ' ' + pillV(x.impVerdict)}</b>` +
+        `<span>Zone at impact</span><b>${x.skip ? 'skipped (' + x.skip.replace(/_/g, ' ') + ')' : zn(x.zone)}</b>` +
+        (x.skip ? '' : `<span>Fist height</span><b>${pct(x.hf)}${x.land != null ? ' · f ' + x.land : ''}</b>`) +
         (x.match ? `<span>Model's target</span><b>${e.target} · ${x.match === 'yes' ? 'matches' : 'does not match'}</b>` : '') + '</div>') + '</div>';
     },
     tip(e, x, {head, v}) {
       const zn = z => ZONE[z]?.[1] || z;
-      return head + (x.verdict
-        ? (x.skip ? `hit height ${v('skip')} <span class="m">(${x.skip})</span>` :
-           `<span class="num">hit height: <b>${zn(x.zone)}</b> ${v(x.verdict)}</span><br><span class="m num">fist at ${(x.hf * 100).toFixed(0)}% of stance height · f ${x.land} (the rule's frame)</span>`)
-        : `<span class="m">the rule judges jabs and crosses only</span>`) +
-        (x.impVerdict && x.impVerdict !== 'skip' ? `<br><span class="${x.verdict ? 'm ' : ''}num">${x.verdict ? 'for comparison, not judged — at the impact frame' : 'our reading at the impact frame'}: ${zn(x.impZone)} ${v(x.impVerdict)}</span>` +
-          (x.match ? ` <span class="m">· model's target ${e.target}: ${x.match === 'yes' ? 'matches' : 'no match'}</span>` : '') : '');
+      return head + (!x.verdict ? `<span class="m">hit height: no reading</span>` :
+        x.skip ? `hit height ${v('skip')} <span class="m">(${x.skip.replace(/_/g, ' ')})</span>` :
+        `<span class="num">hit height: <b>${zn(x.zone)}</b> ${v(x.verdict)}</span><br><span class="m num">fist at ${(x.hf * 100).toFixed(0)}% of stance height · f ${x.land} (the impact frame)</span>` +
+        (x.match ? `<br><span class="m">model's target ${e.target}: ${x.match === 'yes' ? 'matches' : 'no match'}</span>` : ''));
     },
-    row(e, x, {c, y, h, span, tag, ring, tx, fps}) {       // the rule's verdict on straights, the impact reading (dashed) on the rest
-      const rule = !!x.verdict && x.verdict !== 'skip', v = rule ? x.verdict : x.impVerdict, z = rule ? x.zone : x.impZone, fj = rule ? x.land : x.impF;
-      if (!v || v === 'skip') return;                      // skipped punches are not drawn
-      const [bx, w] = span(e), col = VERD[v] || '#8e8e93', judged = true;
-      c.globalAlpha = rule ? 1 : 0.45; c.fillStyle = col; rr(bx, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
-      if (!rule) { c.strokeStyle = col; c.lineWidth = 1; c.setLineDash([3, 2]); rr(bx + 0.5, y + 3.5, w - 1, h - 7, 5); c.stroke(); c.setLineDash([]); }
-      if (fj != null) { const xi = tx((fj + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      const hf = rule ? x.hf : x.impHf, zn = w > 70 ? ZONE[z]?.[1] || z : ZONE[z]?.[0] || '?';
-      if (judged && z) tag(bx, w, y, h, hf == null ? zn : `${hf.toFixed(2)} · ${zn}`);
+    row(e, x, {c, y, h, span, tag, ring, tx, fps}) {       // the zone at the impact frame, every punch type
+      if (!x.verdict || x.verdict === 'skip') return;      // skipped punches are not drawn
+      const [bx, w] = span(e), col = VERD[x.verdict] || '#8e8e93';
+      c.fillStyle = col; rr(bx, y + 3, w, h - 6, 5); c.fill();
+      if (x.land != null) { const xi = tx((x.land + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      const zn = w > 70 ? ZONE[x.zone]?.[1] || x.zone : ZONE[x.zone]?.[0] || '?';
+      if (x.zone) tag(bx, w, y, h, x.hf == null ? zn : `${x.hf.toFixed(2)} · ${zn}`);
       ring(e, 'hit', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                        // the fist at the judged frame, with its zone
-      const rule = !!x.verdict && !x.skip, fj = rule ? x.land : x.impF, v = rule ? x.verdict : x.impVerdict, z = rule ? x.zone : x.impZone;
-      if (fj == null || Math.abs(f - fj) > 2 || !v || v === 'skip') return;
+    overlay(e, x, f, P, leadLeft) {                        // the fist at the impact frame, with its zone
+      if (x.land == null || Math.abs(f - x.land) > 2 || !x.verdict || x.verdict === 'skip') return;
       const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2], q = P(wr); if (!q) return;
-      const col = VERD[v]; octx.strokeStyle = col; octx.lineWidth = 3; octx.setLineDash([5, 4]);
+      const col = VERD[x.verdict]; octx.strokeStyle = col; octx.lineWidth = 3; octx.setLineDash([5, 4]);
       octx.beginPath(); octx.arc(q[0], q[1], 22, 0, 7); octx.stroke(); octx.setLineDash([]);
-      overlayLabel(q[0] + 26, q[1] - 18, `${(rule ? x.hf : x.impHf) != null ? (rule ? x.hf : x.impHf).toFixed(2) + ' · ' : ''}${ZONE[z]?.[1] || z} · ${VNAME[v]}${rule ? '' : ' (at impact)'}`, col);
+      overlayLabel(q[0] + 26, q[1] - 18, `${x.hf != null ? x.hf.toFixed(2) + ' · ' : ''}${ZONE[x.zone]?.[1] || x.zone} · ${VNAME[x.verdict]}`, col);
     },
   },
   {
@@ -1481,7 +1421,7 @@ const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [4], guard: [5], resting: [7], chin_depth: [8], chin_height: [9], elbow: [10],
   hoc: [11], stance_depth: [12], stance_width: [13], slipd: [15, 16], hrp: [17], blade_hips: [18], blade_shoulders: [19],
   hip: [20], shoulder: [21], arm: [22], hit: [23], speed: [24], offensive: [25, 31], combined: [32], hookstop: [33],
-  upstop: [34], rpivot: [35], work: [26],
+  rpivot: [35], work: [26],
 };
 const rulesTag = k => LAYER_RULES[k] ? ` <span class="m">(${LAYER_RULES[k].map(n => 'rule ' + n).join(', ')})</span>` : '';
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
@@ -1851,7 +1791,6 @@ const SCOPE = {
   blade_shoulders: {moves: 'every frame outside a punch',       angles: 'front \u2014 only there does the camera stand in for the opponent'},
   hrp:       {moves: 'jab, cross',                              angles: ALL_ANGLES},
   bal:       {moves: 'every punch at its impact frame',         angles: 'side-on'},
-  upstop:    {moves: 'every head uppercut at its impact frame', angles: 'side-on'},
   hookstop:  {moves: 'every head hook at its impact frame',     angles: 'front, back'},
   rpivot:    {moves: 'every rear-hand punch at its impact frame', angles: 'front, back, side-on'},
   speed:     {moves: 'every punch with an impact frame',        angles: ALL_ANGLES},
@@ -1899,7 +1838,7 @@ const NOTION = {
   'Slip distance': 15, 'Hand return path': 17, 'Hips bladed': 18, 'Shoulders bladed': 19, 'Hip rotation': 20,
   'Shoulder rotation': 21, 'Arm extension': 22, 'Hit height': 23, 'Punch speed': 24, 'Combination length': 25,
   'Work rate': 26, 'Output through the round': 27, 'Same punches': 28, 'Body shots': 29, 'Same defense': 30,
-  'Same offensive combos': 31, 'Same combined combos': 32, 'Hook stop': 33, 'Uppercut stop': 34, 'Rear-foot pivot': 35,
+  'Same offensive combos': 31, 'Same combined combos': 32, 'Hook stop': 33, 'Rear-foot pivot': 35,
 };
 const notionNo = name => name === 'Slip distance' ? '15–16' : String(NOTION[name] ?? '?');
 // Round view — every rule we have, one row each, in the Notion order. A row carries its value (the 0-100 score
@@ -2188,20 +2127,6 @@ function ruleCard() {
     calc: `mean of ${bal.judged_punches} punch scores · ${bal.off_balance} outside the green zone (${pct(bal.off_share)}) · `
           + `head outside its zone ${bal.head_outside_ankles} (${pct(bal.head_share)}), `
           + `hips off centre ${bal.hips_off_centre} (${pct(bal.hips_share)})`});
-  const us = S.layerSum.upstop;
-  if (us) add('Uppercut stop', us.rating, UPSTOPCOL[us.rating], null, {
-    what: 'does the uppercut finish on the head, or keep going up past it?',
-    on: `${us.n_uppercuts} head uppercuts · ${us.judged_uppercuts} judged side-on (the arc runs up and forward, and `
-        + `head-on the forward half points at the camera), ${us.n_uppercuts - us.judged_uppercuts} skipped`,
-    th: {event: {label: 'per punch', rule: 'the fist’s centre (wrist, pinky, index, thumb) at the turnaround — the frame '
-                        + 'it stops going forward — against the middle of the head of a ghost built from the boxer’s own '
-                        + 'size, halfway from its chin to its crown. No number: the head is the line',
-                 bands: [['at or below mid-head', 'stops'], ['above it', 'flies through']],
-                 pal: {stops: '#34c759', 'flies through': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged uppercuts that went past the middle of the head',
-                 bands: [['< 20 %', 'stops'], ['20–40 %', 'sometimes'], ['≥ 40 %', 'flies through']], pal: UPSTOPCOL}},
-    calc: `${us.flies_through} of ${us.judged_uppercuts} judged uppercuts = ${pct(us.over_share)} · `
-          + `median ${us.median_over} stance heights past mid-head`});
   const hs = S.layerSum.hookstop;
   if (hs) add('Hook stop', hs.score ?? 'not rated', hs.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does the hook finish on the target, or swing on past it?',
@@ -2282,8 +2207,8 @@ function ruleCard() {
           + `${dc.first_window} → ${dc.last_window} = ${dc.drop >= 0 ? `${pct(dc.drop)} fewer` : `${pct(-dc.drop)} more`} → ${dc.score ?? '–'}`});
   scored('hit', 'Hit height', q => ({
     what: 'would the punch land somewhere useful on an opponent his own size?',
-    on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on) · hooks and uppercuts are read at their impact frame on the timeline, not here`,
-    th: {event: {label: 'per punch', rule: 'the fist’s height on an opponent his own size',
+    on: `${q.pass + q.fail + q.skip} punches of every type · ${q.pass + q.fail} judged at their impact frame, ${q.skip} skipped (thrown too head-on, no impact frame, or the wrist or the ankles not visible)`,
+    th: {event: {label: 'per punch', rule: 'the fist’s height at the impact frame on an opponent his own size — jabs, crosses, hooks, uppercuts and body shots alike',
                  bands: [['head, body', 'on target'], ['shoulder, over the head, below the belt', 'off target']],
                  pal: {'on target': '#34c759', 'off target': '#ff3b30'}},
          round: {label: 'per round', rule: 'the worst 10 % of the punch scores, averaged',

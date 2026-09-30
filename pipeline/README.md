@@ -51,7 +51,7 @@ that rule's headline verdict.
 the punch card and a video overlay.
 
 Every rule with geometry in the frame now draws it. Rules that judge a punch (arm extension, hit height, hip and
-shoulder rotation, head off center, hand drop, resting hand, balance, hand return path, uppercut stop, hook stop, rear-foot pivot)
+shoulder rotation, head off center, hand drop, resting hand, balance, hand return path, hook stop, rear-foot pivot)
 draw for the punch under the playhead. Rules that judge frames (guard height, elbow tuck, chin height and depth, stance width and depth, both
 bladedness axes, slip distance) draw on every frame through `frameOverlay`, which gets the raw BlazePose-33
 channels — they need joints (mouth corners, heels, toes) and channels (world x/z) the punch overlays never touch.
@@ -88,22 +88,13 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   score. The overlay draws the base between the ankles, the head's slack as dashed ticks outside it, the hips'
   ticks, the head and the hips, at the impact frame. Round = the mean punch score, a plain number with no bands,
   from at least 10 judged punches. Reads `punches.csv` + `balance.json`.
-- **Uppercut stop** (`uppercut_stop/`): per head uppercut, read side-on, where the fist is at the turnaround — the
-  frame the impact spotter says it stopped going forward. The fist is the mean of the wrist, pinky, index and thumb
-  (the wrist alone reads an uppercut low), and the ring is drawn on that point. The line is the middle of the head of a
-  ghost the boxer's own size (the same ghost hit height builds), halfway from its chin to its crown: drawn solid,
-  with the chin and the crown dashed grey for reference. Green at or below it, red above it, labelled with the gap
-  in stance heights. Nothing is
-  drawn for a body shot (the classifier merges body hooks and body uppercuts), a punch thrown head-on, or a missing
-  wrist. Round rating = the share of judged uppercuts past the middle of the head (< 20 % stops, 20–40 % sometimes, ≥ 40 % flies
-  through), from at least 10. Reads `punches.csv` + `uppercut_stop.json`.
 - **Rear-foot pivot** (`rear_pivot/`): per rear-hand punch, at the impact frame, how far the rear heel sits above the
   rear toe in shin lengths — pivots at 0.27 or more, flat below (the stance already carries the heel about 0.20 up).
   The overlay draws the toe's height dashed grey, the 0.27 line in the verdict's colour, the foot and the heel. Every
   angle is judged; lead-hand punches and a hidden rear foot are not drawn. Round rating = the share landed flat
   (< 30 % pivots, 30–50 % sometimes, ≥ 50 % flat-footed), from at least 10. Reads `punches.csv` + `rear_pivot.json`.
-- **Hook stop** (`hook_stop/`): per head hook, read front-on or back-on, the same question across the frame — where
-  the fist is at the turnaround. Score 100 at the boxer's centre line or short of it, linearly to 0 at a third of a
+- **Hook stop** (`hook_stop/`): per head hook, read front-on or back-on, where the fist is at the turnaround — the
+  frame the impact spotter says it stopped going forward. Score 100 at the boxer's centre line or short of it, linearly to 0 at a third of a
   torso past his own far shoulder; green at 100, red below, the score on the block. The far shoulder is his centre
   line plus half his squared-up width (the 90th percentile of his shoulder separation over the clip), not the gap in
   that frame, which collapses when he blades. The overlay draws the centre line (green, 100), the far shoulder
@@ -141,10 +132,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   scored like hip rotation — green at 100, red below, the score on the block; on the video the shoulder line in the
   same colour. The round is the mean punch score, no bands. The CSV also carries
   `shoulder_minus_hip`, the separation the biomechanics papers measure, unjudged for now.
-- **Hit height** (`hit_height/`): per jab / cross the production rule's zone (head / shoulder / body / over the head /
-  below the belt; on target = green, off = red, skipped = dashed gray) with a white tick at the frame it judged; hooks
-  and uppercuts get the same zones read at their impact frame (lighter, dashed). On the video a ring on the fist at the
-  judged frame with its zone.
+- **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — the zone the fist
+  is in at its impact frame on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt;
+  on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
+  fist at that frame with its zone. Until 2026-09-30 it judged jabs and crosses only, at the most-extended frame.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head is
   off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
   green at 100, red below, the score on the block — with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
