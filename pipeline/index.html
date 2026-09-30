@@ -1089,7 +1089,7 @@ const RULE_LAYERS = [
     card: (e, a) => `<div class="sub"><div class="h">Arm extension ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elbow angle at the furthest reach</span><b>${a.elbow == null ? '–' : a.elbow.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
        <span>Scale</span><b>${a.full == null ? '–' : `100 at ≥ ${a.full}°, 0 at ≤ 100°, linear`}</b>
-       <span>Torso / frame height</span><b>${a.torsoFrac == null ? '–' : a.torsoFrac.toFixed(3)} <span class="m">(≥ 0.250: 160° · ≥ 0.167: 150° · below: not judged)</span></b>${a.skip ? `<span>Skipped</span><b>${a.skip.replace(/_/g, ' ')}</b>` : ''}
+       <span>Torso / frame height</span><b>${a.torsoFrac == null ? '–' : a.torsoFrac.toFixed(3)} <span class="m">(≥ 0.250: 160° · ≥ 0.100: 150° · below: not judged)</span></b>${a.skip ? `<span>Skipped</span><b>${a.skip.replace(/_/g, ' ')}</b>` : ''}
        ${a.score != null ? `<span>Punch score</span><b>${a.score.toFixed(1)}</b>` : ''}</div>
        <div class="rows num" style="opacity:.6"><span>For comparison, not judged:</span><b></b>
        <span>elbow at the impact frame</span><b>${a.impElbow == null ? '–' : a.impElbow.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>',
@@ -1872,7 +1872,7 @@ function ruleCard() {
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on to read the arm, or the boxer too far from the camera)`,
     th: {event: {label: 'per punch', rule: 'the elbow angle at the frame of furthest reach, scored linearly: 100 at 160° '
                         + 'or straighter, 0 at 100° or more bent — green at 100, red below. Far from the camera the line '
-                        + 'eases: with the torso under ¼ of the frame height full marks start at 150°, and under ⅙ the '
+                        + 'eases: with the torso under ¼ of the frame height full marks start at 150°, and under ⅒ the '
                         + 'punch is not judged',
                  bands: [['≥ 160° (150° far)', '100'], ['100° → 160° (150°)', '0 → 100 (linear)'], ['≤ 100°', '0']],
                  pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a', '0': '#ff3b30'}},
