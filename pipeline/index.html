@@ -2203,7 +2203,7 @@ function ruleCard() {
         + (dc.mode === 'thirds' ? 'under 90 s, so the span in three equal thirds' : 'the first 30 s against the last 30 s'),
     th: {round: {label: 'per round', rule: 'from the first punch to the last: under 90 s, the first third against the last '
                         + 'third; 90 s or more, the first 30 s against the last 30 s. 100 up to 15 % fewer punches at the end, '
-                        + 'linearly down to 0 at 40 % fewer — a plain number, no bands; under 10 punches: not rated',
+                        + 'linearly down to 0 at 40 % fewer — a plain number, no bands; under 30 punches: not rated',
                  bands: [['≤ 15 % fewer', '100'], ['15 → 40 %', '100 → 0'], ['≥ 40 % fewer', '0']],
                  pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}},
     calc: `${dc.windows.map(w => `${w.window} ${w.start_time}–${w.end_time}s: ${w.n_punches}`

@@ -217,7 +217,7 @@ length and the share of punches thrown outside any combination sit beside it, un
 **Output through the round** (`output_decay/output_decay.json` + `windows.csv`, a whole-video rule — no timeline
 row): measured from the first punch to the last. Under 90 s of that span, the span is cut in three equal thirds and
 the last third compared with the first; 90 s or more, the first 30 s from the first punch against the last 30 s up
-to the last punch. 100 up to 15 % fewer punches at the end, linearly to 0 at 40 % fewer, a plain number; under 10
+to the last punch. 100 up to 15 % fewer punches at the end, linearly to 0 at 40 % fewer, a plain number; under 30
 punches → not rated. The per-window counts, rates and dead shares are shown beside it, unjudged, to separate a
 slower rate from more standing. It needs one continuous round to mean anything.
 
