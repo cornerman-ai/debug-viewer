@@ -525,8 +525,8 @@ function chinLayer(kind) {
       const nose = P(J.nose), lsh = P(J.lsh), rsh = P(J.rsh);
       if (!(nose && lsh && rsh)) return;
       const mL = P(9), mR = P(10); if (!(mL && mR)) return;                  // BlazePose mouth corners
-      for (const j of [J.nose, 9, 10, J.lsh, J.rsh])                         // run_chin_tuck.py MIN_VIS 0.5:
-        if (!(Q(j, 6) >= 0.5)) return;                                       // a joint it cannot read, so neither do we
+      for (const j of [J.nose, 9, 10, J.lsh, J.rsh])                         // run_chin_tuck.py MIN_VIS 0.30:
+        if (!(Q(j, 6) >= 0.30)) return;                                      // a joint it cannot read, so neither do we
       const chin = [nose[0] + 2.25 * ((mL[0] + mR[0]) / 2 - nose[0]),
                     nose[1] + 2.25 * ((mL[1] + mR[1]) / 2 - nose[1])];
       const lead = leadLeft ? lsh : rsh;
