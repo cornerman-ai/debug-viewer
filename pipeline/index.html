@@ -1810,7 +1810,8 @@ function scopeTxt(key) {
 }
 function layerChip(key, js) {
   if (!js) return null;
-  if (key === 'arm' || key === 'hit' || key === 'hrp') return js.score == null ? null : {txt: `${js.score} · ${js.band}`, col: VERD[js.band] || '#8e8e93'};
+  if (key === 'hit' || key === 'hrp') return js.score == null ? null : {txt: `${js.score} · ${js.band}`, col: VERD[js.band] || '#8e8e93'};
+  if (key === 'arm') return js.score == null ? null : {txt: `${js.score}`, col: 'var(--text)'};
   if (key === 'hoc') return js.round_score == null ? null : {txt: `${js.round_score}`, col: 'var(--text)'};
   if (key === 'offensive') return js.offensive?.diversity ? {txt: js.offensive.diversity.score == null ? 'not rated' : String(js.offensive.diversity.score), col: js.offensive.diversity.score == null ? '#8e8e93' : 'var(--text)'} : null;
   if (key === 'combined') return js.combined ? {txt: `${js.combined.n_combinations} combos`, col: COMBO.combined} : null;
@@ -1872,8 +1873,7 @@ function ruleCard() {
                         + 'or straighter, 0 at 100° or more bent — green at 100, red below',
                  bands: [['≥ 160°', '100'], ['100° → 160°', '0 → 100 (linear)'], ['≤ 100°', '0']],
                  pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a', '0': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the mean punch score',
-                 bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
+         round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 5 judged punches: not rated'}},
     calc: `mean punch score over the ${q.pass + q.fail} judged punches`}));
   if (da) add('Defense after combo', da.score ?? 'not rated', da.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does he defend right after he throws, or stand there?',

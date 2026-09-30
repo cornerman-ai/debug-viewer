@@ -121,7 +121,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Arm extension** (`arm_extension/`): per jab / cross the elbow angle at the frame of furthest reach, scored
   linearly — 100 at 160° or straighter, 0 at 100° — green at 100 and red below, the score on the block and a white
   tick at the frame measured; on the video the punching arm in the same colour with this frame's elbow angle. The
-  round is the mean punch score with the quality bands.
+  round is the mean punch score, a plain number with no bands.
 - **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a set range per punch type (lead
   jab 0–25°, lead hook 25–60°, lead uppercut 15–50°, lead body shot 25–60°, rear cross 20–60°, rear hook 25–60°, rear
   uppercut 20–50°, rear body shot 25–50°): 100 inside, linear from 0° to the lower bound below it, and above it up
