@@ -538,7 +538,7 @@ function chinLayer(kind) {
         OV.line([chin[0], top], chin, col, 2, [3, 3]);
         if (judged) {
           const hv = (chin[1] - top) / t;                                     // canvas pixels are isotropic
-          const sc = 100 * Math.min(1, Math.max(0, (hv + 0.25) / 0.25));   // run_chin_tuck.py HEIGHT_FULL / ZERO
+          const sc = 100 * Math.min(1, Math.max(0, (hv + 0.20) / 0.20));   // run_chin_tuck.py HEIGHT_FULL / ZERO
           overlayLabel(chin[0] + 14, chin[1], `${hv.toFixed(2)} torso → ${sc.toFixed(0)}`, col);
         }
       } else {
@@ -2084,8 +2084,8 @@ function ruleCard() {
     what: 'does the chin stay below the lead shoulder, or come up above it?',
     on: `${chh.n_frames.toLocaleString()} frames · ${chh.judged_frames.toLocaleString()} judged (outside punches, every angle)`,
     th: {event: {label: 'per frame', rule: 'the chin against the top of the lead shoulder (its keypoint raised 0.06 torso), in torso lengths: 100 with the chin '
-                        + 'at or below the shoulder top, linearly down to 0 at 0.25 above — green at 100, red below',
-                 bands: [['at or below', '100'], ['0 → 0.25 above', '100 → 0 (linear)'], ['≥ 0.25 above', '0']],
+                        + 'at or below the shoulder top, linearly down to 0 at 0.20 above — green at 100, red below',
+                 bands: [['at or below', '100'], ['0 → 0.20 above', '100 → 0 (linear)'], ['≥ 0.20 above', '0']],
                  pal: {'100': '#34c759', '100 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}},
          round: {label: 'per round', rule: 'the mean frame score over every judged frame — a plain number, no bands; '
                         + 'fewer than 150 judged frames: not rated'}},

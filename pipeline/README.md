@@ -172,7 +172,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Chin height** (`chin_height/`) and **Chin depth** (`chin_depth/`): both per frame outside punches, both
   continuous rows, both reading the skeleton chin (`nose + 2.25 × nose→mouth` — BlazePose has no jaw landmark).
   Height is the chin against the top of the lead shoulder (the keypoint raised 0.06 torso) in torso lengths, scored 100 with the chin at or below
-  the shoulder top and linearly to 0 at 0.25 above — green at 100, red below. Depth is the chin against the
+  the shoulder top and linearly to 0 at 0.20 above — green at 100, red below. Depth is the chin against the
   shoulder's front (the lead keypoint pushed forward 0.10 torso) in torso lengths, scored 100 at or behind it and
   linearly to 0 at 0.40 in front — green at 100, red below — read side-on
   only. A dashed gray line is everything the rule could not look at: a joint not visible, a punch in flight, or the
