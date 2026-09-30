@@ -421,7 +421,6 @@ const SLIPNAME = {short: 'too short', ok: 'good distance', far: 'too far'};
 const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated': '#8e8e93'};
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
-const PIVOTCOL = {pivots: '#34c759', sometimes: '#ff9f0a', 'flat-footed': '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
 // Which band a frame is in — the same cuts every gated rule reads. null when there is no pose or no angle there.
@@ -959,28 +958,27 @@ const RULE_LAYERS = [
   },
   {
     // rear-foot pivot (rear_pivot/punches.csv): at the impact of every rear-hand punch, how far the rear heel sits
-    // above the rear toe, in shin lengths. 0.27 is the line: the stance already carries the heel ~0.20 up.
+    // above the rear toe, in shin lengths. 0 with the heel level with the toe, 100 from 0.30, linear between.
     key: 'rpivot', label: 'Rear-foot pivot', short: 'Rear-foot pivot',
     csv: ['rear_pivot', 'punches.csv'], json: ['rear_pivot', 'rear_pivot.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, lift: num(r.lift)} : {verdict: '', skip: r.skip_reason},
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, lift: num(r.lift), score: num(r.score)} : {verdict: '', skip: r.skip_reason},
     summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">Rear-foot pivot</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'lead_hand' ? 'a lead-hand punch — the rule reads rear-hand punches only'
                                                 : x && x.skip === 'no_impact_frame' ? 'no impact frame'
                                                 : 'the rear heel, toe, ankle or knee is not visible at the impact frame'}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Heel above the toe</span><b>${x.lift >= 0 ? '+' : ''}${x.lift.toFixed(3)} shin lengths</b>
-        <span>Needs</span><b>0.270</b>
-        <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
+        <span>Scale</span><b>0 at level with the toe, 100 from 0.300, linear</b>
+        <span>Punch score</span><b>${x.score.toFixed(1)}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
-      `<span class="num"><b>${x.verdict}</b> · at impact the rear heel sits ${x.lift.toFixed(3)} shin lengths above the toe ` +
-      `(needs 0.270)</span><br>` +
-      `<span class="m">the stance already carries the rear heel about 0.20 up, so the line sits above that</span>`),
+      `<span class="num">score <b>${x.score.toFixed(1)}</b> · at impact the rear heel sits ${x.lift.toFixed(3)} shin lengths above the toe</span><br>` +
+      `<span class="m">0 with the heel level with the toe, 100 from 0.300 shin lengths, linear between</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'pivots' ? '#34c759' : '#ff3b30';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, x.lift.toFixed(3));
+      tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'rpivot', bx, y, w, h);
     },
     overlay(e, x, f) {                                      // the rear foot at impact: toe level, the line, the heel
@@ -992,10 +990,10 @@ const RULE_LAYERS = [
       const col = x.verdict === 'pivots' ? '#34c759' : '#ff3b30';
       const x0 = Math.min(he[0], to[0]) - 40, x1 = Math.max(he[0], to[0]) + 40;
       OV.level(to[1], x0, x1, '#8e8e93', [3, 4]);           // the toe's height
-      OV.level(to[1] - 0.27 * shin, x0, x1, col);            // where the heel has to reach
+      OV.level(to[1] - 0.30 * shin, x0, x1, col);            // where the heel has to reach for 100
       OV.line(to, he, '#ffffff', 2);                         // the foot itself
       OV.line([he[0], to[1]], he, col, 2.5, [3, 3]); OV.ring(he, col, 9, 3); OV.dot(to, '#8e8e93', 4);
-      overlayLabel(x0, to[1] - 0.27 * shin - 16, `heel +${x.lift.toFixed(3)} shin (needs 0.270)`, col);
+      overlayLabel(x0, to[1] - 0.30 * shin - 16, `score ${x.score.toFixed(1)} · heel ${x.lift >= 0 ? '+' : ''}${x.lift.toFixed(3)} shin (100 at 0.300)`, col);
     },
   },
   {
@@ -2142,18 +2140,17 @@ function ruleCard() {
     calc: `mean of ${hs.judged_hooks} punch scores = ${hs.mean_score ?? '–'} · ${hs.at_100} at 100, ${hs.past_far_shoulder} past the far shoulder · `
           + `median ${hs.median_cross} torso past the far shoulder`});
   const rp = S.layerSum.rpivot;
-  if (rp) add('Rear-foot pivot', rp.rating, PIVOTCOL[rp.rating], null, {
+  if (rp) add('Rear-foot pivot', rp.score ?? 'not rated', rp.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'when a rear-hand punch lands, is the rear heel up and turning, or flat on the floor?',
     on: `${rp.n_rear_punches} rear-hand punches · ${rp.judged_punches} judged (every angle — the lift is vertical), `
         + `${rp.n_rear_punches - rp.judged_punches} skipped (no impact frame, or the rear foot not visible)`,
     th: {event: {label: 'per punch', rule: 'at the impact frame, how far the rear heel sits above the rear toe, in shin '
-                        + 'lengths. The stance already carries the heel about 0.20 up, so the line is 0.27: where rear-hand '
-                        + 'punches and jabs separate best on the ten test videos, and the jabs’ 75th percentile',
-                 bands: [['≥ 0.27 shin', 'pivots'], ['below', 'flat']],
-                 pal: {pivots: '#34c759', flat: '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged rear-hand punches landed flat',
-                 bands: [['< 30 %', 'pivots'], ['30–50 %', 'sometimes'], ['≥ 50 %', 'flat-footed']], pal: PIVOTCOL}},
-    calc: `${rp.flat} of ${rp.judged_punches} judged rear-hand punches = ${pct(rp.flat_share)} · `
+                        + 'lengths: 0 with the heel level with the toe, 100 from 0.30, linear between — green at 100, red '
+                        + 'below. The stance already carries the heel about 0.20 up, so a planted foot scores about 67, not 0',
+                 bands: [['≥ 0.30 shin', '100'], ['0 → 0.30', '0 → 100 (linear)'], ['≤ 0', '0']],
+                 pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a', '0': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 10 judged punches: not rated'}},
+    calc: `mean of ${rp.judged_punches} punch scores = ${rp.mean_score ?? '–'} · ${rp.at_100} at 100 · `
           + `median heel ${rp.median_lift} shin above the toe`});
   const ih = S.layerSum.resting;
   if (ih) add('Dropping resting hand while punching', ih.score ?? 'not rated', ih.score == null ? '#8e8e93' : 'var(--text)', null, {
