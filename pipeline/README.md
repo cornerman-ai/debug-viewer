@@ -80,7 +80,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Punch speed** (`punch_speed/`): per punch, the time from its first frame to the impact, scored 100 up to the
   30th percentile of that punch type across 8,166 labelled punches and linearly down to 0 at its 80th; the score on the
   block, green at 100 and red below. Every angle is judged: a time is not foreshortened. Round = the mean punch
-  score, a plain number, from at least 20 judged punches. Reads `punches.csv` + `punch_speed.json`.
+  score, a plain number, from at least 10 judged punches. Reads `punches.csv` + `punch_speed.json`.
 - **Balance at impact** (`balance/`): per punch at the impact frame, read side-on, a score 0–100 = head (0–50) +
   hips (0–50), in ankle distances. Head: 50 while the nose is at most 0.20 past an ankle, linearly to 0 at 0.75
   past it. Hips: 50 while the hip centre is within 0.20 of the ankles' midpoint, linearly to 0 at 0.50 (over an
@@ -100,7 +100,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   line plus half his squared-up width (the 90th percentile of his shoulder separation over the clip), not the gap in
   that frame, which collapses when he blades. The overlay draws the centre line (green, 100), the far shoulder
   (dashed grey), the zero line (red) and the fist. Round = the mean punch score, a plain number, from at
-  least 5 — most hooks on the current footage are thrown side-on and are not judged at all. Reads `punches.csv` +
+  least 10 — most hooks on the current footage are thrown side-on and are not judged at all. Reads `punches.csv` +
   `hook_stop.json`.
 - **Hand return path** (`hand_return_path/`): per jab / cross, between the landing and the end of the punch, the
   fist's height against its own shoulder must not drop below where it was at the punch's start or where it was at
@@ -195,7 +195,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 **Angle change** (`angle_change/angle_change.json`, a whole-video rule — no timeline row): per combined combo, the
 mean facing during it against the most different smoothed facing in the 2 s after it; a turn of ≥ 45° counts as a
 change. Round = 100 at half the combos changed or more, 0 at none, linear between — a plain number, no bands;
-fewer than 5 readable combos → not rated.
+fewer than 10 readable combos → not rated.
 
 - **Defense after combo** (`defense_after_combo/combos.csv` + `.json`): the defensive move that covered an offensive
   combo, drawn in green where the move is; a combo nobody covered draws its empty search window as a hollow red box
@@ -217,7 +217,7 @@ length and the share of punches thrown outside any combination sit beside it, un
 **Output through the round** (`output_decay/output_decay.json` + `windows.csv`, a whole-video rule — no timeline
 row): measured from the first punch to the last. Under 90 s of that span, the span is cut in three equal thirds and
 the last third compared with the first; 90 s or more, the first 30 s from the first punch against the last 30 s up
-to the last punch. 100 up to 15 % fewer punches at the end, linearly to 0 at 40 % fewer, a plain number; under 30
+to the last punch. 100 up to 15 % fewer punches at the end, linearly to 0 at 40 % fewer, a plain number; under 10
 punches → not rated. The per-window counts, rates and dead shares are shown beside it, unjudged, to separate a
 slower rate from more standing. It needs one continuous round to mean anything.
 
@@ -231,7 +231,7 @@ seconds credited to turns are shown beside it, unjudged — punch rate is a styl
 
 **Same punches** (`same_punches/same_punches.json`, a whole-video rule — no timeline row): under the target
 distribution, the share of the 2 most-used punch types, scored 100 at 66 % or less and linearly to 0 at 100 % (a plain
-number; fewer than 20 punches → not rated). The top 2 because jab and cross are normally the most common anyway.
+number; fewer than 10 punches → not rated). The top 2 because jab and cross are normally the most common anyway.
 
 **Body shots** (`bodyshots/bodyshots.json`, a whole-video rule — no timeline row): under same punches, body shots /
 (body + head) over hooks and uppercuts only (the classifier can't split jab / cross into head / body): scored 0 at
