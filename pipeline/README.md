@@ -120,7 +120,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   punches unjudgeable. Reads `punches.csv` + `resting_hand.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the elbow angle at the frame of furthest reach, scored
   linearly — 100 at 160° or straighter, 0 at 100° — and eased far from the camera: with the torso under ¼ of the
-  frame height full marks start at 150°, under ⅒ the punch is not judged. Green at 100 and red below, the score on the block and a white
+  frame height full marks start at 150°, under ⅛ the punch is not judged. Green at 100 and red below, the score on the block and a white
   tick at the frame measured; on the video the punching arm in the same colour with this frame's elbow angle. The
   round is the mean punch score, a plain number with no bands.
 - **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a set range per punch type (lead
