@@ -102,11 +102,12 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   The overlay draws the toe's height dashed grey, the 0.27 line in the verdict's colour, the foot and the heel. Every
   angle is judged; lead-hand punches and a hidden rear foot are not drawn. Round rating = the share landed flat
   (< 30 % pivots, 30–50 % sometimes, ≥ 50 % flat-footed), from at least 10. Reads `punches.csv` + `rear_pivot.json`.
-- **Hook stop** (`hook_stop/`): per head hook, read front-on or back-on, the same question across the frame — has
-  the fist crossed the boxer's own far shoulder by the turnaround. The far shoulder is his centre line plus half
-  his squared-up width (the 90th percentile of his shoulder separation over the clip), not the gap in that frame,
-  which collapses when he blades. The overlay draws that line, the centre line it crossed from, and the fist.
-  Round rating = the share of judged hooks past it (< 20 % stops, 20–40 % sometimes, ≥ 40 % wraps around), from at
+- **Hook stop** (`hook_stop/`): per head hook, read front-on or back-on, the same question across the frame — where
+  the fist is at the turnaround. Score 100 at the boxer's centre line or short of it, linearly to 0 at a third of a
+  torso past his own far shoulder; green at 100, red below, the score on the block. The far shoulder is his centre
+  line plus half his squared-up width (the 90th percentile of his shoulder separation over the clip), not the gap in
+  that frame, which collapses when he blades. The overlay draws the centre line (green, 100), the far shoulder
+  (dashed grey), the zero line (red) and the fist. Round = the mean punch score, a plain number, from at
   least 5 — most hooks on the current footage are thrown side-on and are not judged at all. Reads `punches.csv` +
   `hook_stop.json`.
 - **Hand return path** (`hand_return_path/`): per jab / cross, between the landing and the end of the punch, the

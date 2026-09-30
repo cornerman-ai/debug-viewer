@@ -422,7 +422,6 @@ const SLIPRATE = {good: '#34c759', mixed: '#ff9f0a', poor: '#ff3b30', 'not rated
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
 const UPSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'flies through': '#ff3b30', 'not rated': '#8e8e93'};
-const HOOKSTOPCOL = {stops: '#34c759', sometimes: '#ff9f0a', 'wraps around': '#ff3b30', 'not rated': '#8e8e93'};
 const PIVOTCOL = {pivots: '#34c759', sometimes: '#ff9f0a', 'flat-footed': '#ff3b30', 'not rated': '#8e8e93'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
@@ -961,11 +960,13 @@ const RULE_LAYERS = [
     },
   },
   {
-    // stopping the hook (hook_stop/punches.csv): the same question across the frame. The line is the boxer's own
-    // far shoulder, set from his squared-up width over the clip so a bladed frame cannot shrink it.
+    // stopping the hook (hook_stop/punches.csv): the same question across the frame. 100 with the fist at the boxer's
+    // centre line or short of it, linearly to 0 at a third of a torso past his own far shoulder (set from his
+    // squared-up width over the clip so a bladed frame cannot shrink it).
     key: 'hookstop', label: 'Hook stop', short: 'Hook stop',
     csv: ['hook_stop', 'punches.csv'], json: ['hook_stop', 'hook_stop.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, cross: num(r.cross), lineNx: num(r.line_nx)}
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, cross: num(r.cross), score: num(r.score), lineNx: num(r.line_nx),
+                                    centreNx: num(r.centre_nx), zeroNx: num(r.zero_nx)}
       : {verdict: '', skip: r.skip_reason},
     summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">Hook stop</div>` +
@@ -974,18 +975,19 @@ const RULE_LAYERS = [
                                                 : x && x.skip === 'not_a_hook' ? 'not a hook'
                                                 : 'the wrist or the body is not visible at the impact frame'}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Past the far shoulder</span><b>${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)} torso</b>
-        <span>Verdict</span><b>${x.verdict}</b></div>`) + '</div>',
+        <span>Scale</span><b>100 at the centre line, 0 at +0.333 torso past the far shoulder</b>
+        <span>Punch score</span><b>${x.score.toFixed(1)}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
-      `<span class="num"><b>${x.verdict}</b> · the fist stopped ${Math.abs(x.cross).toFixed(3)} torso ` +
+      `<span class="num">score <b>${x.score.toFixed(1)}</b> · the fist stopped ${Math.abs(x.cross).toFixed(3)} torso ` +
       `${x.cross > 0 ? 'PAST' : 'short of'} his far shoulder</span><br>` +
-      `<span class="m">the far shoulder is his own squared-up width, not the gap in this frame — seen front-on a ` +
-      `bladed boxer’s shoulders collapse together</span>`),
+      `<span class="m">100 with the fist at his centre line or short of it, linearly to 0 at a third of a torso past ` +
+      `the far shoulder — his own squared-up width, not the gap in this frame</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
-      tag(bx, w, y, h, `${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)}`);
+      tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'hookstop', bx, y, w, h);
     },
     overlay(e, x, f, P, leadLeft) {                        // the far shoulder it should stop at, and where it did
@@ -996,14 +998,16 @@ const RULE_LAYERS = [
       const line = PXY(x.lineNx, 0); if (!line) return;
       const col = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
       const yTop = Math.min(lsh[1], rsh[1]) - 60, yBot = Math.max(lsh[1], rsh[1]) + 90;
-      OV.line([line[0], yTop], [line[0], yBot], col, 3);   // where the fist should stop: his own far shoulder
-      const cx = (lsh[0] + rsh[0]) / 2;
-      OV.line([cx, yTop + 20], [cx, yBot - 20], '#8e8e93', 1.5, [4, 4]);      // and the centre line it crossed from
+      const centre = PXY(x.centreNx, 0), zero = PXY(x.zeroNx, 0);
+      const cx = centre ? centre[0] : (lsh[0] + rsh[0]) / 2;
+      OV.line([cx, yTop], [cx, yBot], '#34c759', 3);                          // the centre line: 100 up to here
+      OV.line([line[0], yTop + 20], [line[0], yBot - 20], '#8e8e93', 1.5, [4, 4]);   // his far shoulder, for reference
+      if (zero) OV.line([zero[0], yTop], [zero[0], yBot], '#ff3b30', 3);      // a third of a torso past it: 0
       const fist = PAT(e.impact, wr) || w;
-      OV.line([line[0], fist[1]], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
+      OV.line([cx, fist[1]], fist, col, 2, [3, 3]); OV.ring(fist, col, 12, 3);
       if (f !== e.impact) OV.dot(w, col, 4);
-      overlayLabel(Math.min(line[0], fist[0]) - 10, yTop - 8,
-        `${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)} torso past the far shoulder`, col);
+      overlayLabel(Math.min(cx, fist[0], zero ? zero[0] : cx) - 10, yTop - 8,
+        `score ${x.score.toFixed(1)} · ${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)} torso past the far shoulder`, col);
     },
   },
   {
@@ -2199,18 +2203,18 @@ function ruleCard() {
     calc: `${us.flies_through} of ${us.judged_uppercuts} judged uppercuts = ${pct(us.over_share)} · `
           + `median ${us.median_over} stance heights past mid-head`});
   const hs = S.layerSum.hookstop;
-  if (hs) add('Hook stop', hs.rating, HOOKSTOPCOL[hs.rating], null, {
+  if (hs) add('Hook stop', hs.score ?? 'not rated', hs.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does the hook finish on the target, or swing on past it?',
     on: `${hs.n_hooks} head hooks · ${hs.judged_hooks} judged front-on or back-on (the hook travels across the `
         + `frame, and side-on that axis points at the camera), ${hs.n_hooks - hs.judged_hooks} skipped`,
-    th: {event: {label: 'per punch', rule: 'the fist’s position at the turnaround against the boxer’s own far shoulder — '
-                        + 'half his squared-up width (the 90th percentile of his shoulder separation over the clip, so a '
-                        + 'bladed frame cannot shrink it) out from his centre line',
-                 bands: [['short of the far shoulder', 'stops'], ['past it', 'wraps around']],
-                 pal: {stops: '#34c759', 'wraps around': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged hooks that crossed the far shoulder',
-                 bands: [['< 20 %', 'stops'], ['20–40 %', 'sometimes'], ['≥ 40 %', 'wraps around']], pal: HOOKSTOPCOL}},
-    calc: `${hs.wraps_around} of ${hs.judged_hooks} judged hooks = ${pct(hs.cross_share)} · `
+    th: {event: {label: 'per punch', rule: 'where the fist is at the turnaround: 100 at the boxer’s centre line or short '
+                        + 'of it, linearly down to 0 at a third of a torso past his own far shoulder — half his squared-up '
+                        + 'width (the 90th percentile of his shoulder separation over the clip, so a bladed frame cannot '
+                        + 'shrink it) out from the centre line. Green at 100, red below',
+                 bands: [['at the centre line', '100'], ['→', '100 → 0 (linear)'], ['⅓ torso past the far shoulder', '0']],
+                 pal: {'100': '#34c759', '100 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 5 judged hooks: not rated'}},
+    calc: `mean of ${hs.judged_hooks} punch scores = ${hs.mean_score ?? '–'} · ${hs.at_100} at 100, ${hs.past_far_shoulder} past the far shoulder · `
           + `median ${hs.median_cross} torso past the far shoulder`});
   const rp = S.layerSum.rpivot;
   if (rp) add('Rear-foot pivot', rp.rating, PIVOTCOL[rp.rating], null, {
