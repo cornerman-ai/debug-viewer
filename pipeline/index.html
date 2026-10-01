@@ -1034,6 +1034,8 @@ const RULE_LAYERS = [
     // two ends (2-frame means). NOT OKAY (a U) when every frame between the ends sits under the chord; okay otherwise.
     key: 'hrp', label: 'Hand return path', short: 'Hand return path',
     window: true,                                          // its block, ring, hover and drawing cover impact → end + 0.15 s
+    split: 'hand',                                         // lead windows on the top half, rear on the bottom: a cross's
+                                                           // window runs into the next jab's all the time
     csv: ['hand_return_path', 'punches.csv'], json: ['hand_return_path', 'hand_return_path.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, ws: num(r.win_start), we: num(r.win_end),
       a: num(r.win_start), b: num(r.win_end), startH: num(r.start_h), endH: num(r.end_h),
@@ -1054,13 +1056,15 @@ const RULE_LAYERS = [
       ? `<span class="m">hand return path: not judged (${(a.skip || '').replace(/_/g, ' ')})</span>`
       : `<span class="num">hand return path: <b>${a.verdict === 'fail' ? 'not okay (a U)' : 'okay'}</b> · ${a.below} of ${a.between} frames under the chord</span><br>` +
         `<span class="m">not okay when every frame between the two ends sits under the straight line joining them</span>`),
-    row(e, a, {c, y, h, tag, ring, tx, fps}) {             // the measured window as the block
+    row(e, a, {c, y, h, tag, ring, tx, fps}) {             // the measured window as the block, lead on top, rear below
       if (a.verdict !== 'pass' && a.verdict !== 'fail') return;
       const x0 = Math.max(L, tx(a.ws / fps)), x1 = tx((a.we + 1) / fps); if (x1 <= L) return;
-      const x = x0, w = Math.max(3, x1 - x0 - 1), col = VERD[a.verdict] || '#8e8e93';
-      c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill();
-      tag(x, w, y, h, `${a.below}/${a.between}`);
-      ring(e, 'hrp', x, y, w, h);
+      const w = Math.max(3, x1 - x0 - 1), hh = h / 2 - 2, yy = e.hand === 'lead' ? y + 2 : y + h / 2;
+      c.fillStyle = VERD[a.verdict] || '#8e8e93'; rr(x0, yy, w, hh, 3); c.fill();
+      // a same-hand window that starts inside the previous one (7 of 565 on the shelf) still shows where it begins
+      c.strokeStyle = '#fff'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x0 + 0.75, yy); c.lineTo(x0 + 0.75, yy + hh); c.stroke();
+      tag(x0, w, yy, hh, `${a.below}/${a.between}`);
+      ring(e, 'hrp', x0, yy - 2, w, hh + 3);
     },
     frameOverlay(f, P, leadLeft) {                         // every window holding this frame: impact → end + 0.15 s
       const es = S.punches.filter(p => (p.hrp?.verdict === 'pass' || p.hrp?.verdict === 'fail') && f >= p.hrp.ws && f <= p.hrp.we
@@ -1823,7 +1827,7 @@ function layerChip(key, js) {
   if (!js) return null;
   // a rule that ran but has too few judged punches still gets its row: "not rated"
   if (key === 'hit') return js.score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.score} · ${js.band}`, col: VERD[js.band] || '#8e8e93'};
-  if (key === 'hrp') return js.not_ok_share == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${Math.round(js.not_ok_share * 100)}% not okay`, col: 'var(--text)'};
+  if (key === 'hrp') return js.score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.score}`, col: 'var(--text)'};
   if (key === 'arm') return js.score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.score}`, col: 'var(--text)'};
   if (key === 'hoc') return js.round_score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.round_score}`, col: 'var(--text)'};
   if (key === 'offensive') return js.offensive?.diversity ? {txt: js.offensive.diversity.score == null ? 'not rated' : String(js.offensive.diversity.score), col: js.offensive.diversity.score == null ? '#8e8e93' : 'var(--text)'} : null;
@@ -2077,8 +2081,11 @@ function ruleCard() {
                         + 'every frame between the ends sits under that line; okay otherwise. No grade per punch',
                  bands: [['some frame on or over the line', 'okay'], ['every frame under it', 'not okay']],
                  pal: {okay: '#34c759', 'not okay': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged punches that are not okay; fewer than 10 judged punches: not rated'}},
-    calc: `${q.fail} of ${q.pass + q.fail} judged punches not okay = ${pct(S.layerSum.hrp?.not_ok_share)}`}));
+         round: {label: 'per round', rule: '100 × (1 − the share of judged punches not okay): 100 with none, 0 with all, '
+                        + 'linear — a plain number, no bands; fewer than 10 judged punches: not rated',
+                 bands: [['0 % not okay', '100'], ['0 → 100 %', '100 → 0'], ['100 %', '0']],
+                 pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}},
+    calc: `${q.fail} of ${q.pass + q.fail} judged punches not okay = ${pct(S.layerSum.hrp?.not_ok_share)} → ${S.layerSum.hrp?.score ?? '–'}`}));
   for (const kind of ['hips', 'shoulders']) {                                        // 18, 19
     const bd = S.layerSum[`blade_${kind}`], C = BLADE[kind];
     if (!bd) continue;
