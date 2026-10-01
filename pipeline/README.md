@@ -107,8 +107,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   least 10 — most hooks on the current footage are thrown side-on and are not judged at all. Reads `punches.csv` +
   `hook_stop.json`.
 - **Hand return path** (`hand_return_path/`): per side-on jab / cross, the wrist's height above its own shoulder
-  from the impact to the punch's end + 0.15 s, against the straight line (chord) between its two ends (2-frame
-  means). Not okay — a U — when every frame between the ends sits under the chord; okay otherwise; no grade per
+  from the impact to the punch's end + 0.15 s — the tail cut at the next punch of the same hand when that starts
+  sooner — against the straight line (chord) between its first and last frame. Not okay — a U — when every frame between the ends sits under the chord; okay otherwise; no grade per
   punch. The block covers the measured window itself (impact → end + 0.15 s), lead windows on the top half of the row
   and rear on the bottom (a cross's window runs into the next jab's all the time), a white edge where each window
   starts, green okay, red not okay, labelled with the frames under the chord. Overlapping windows each draw on the
