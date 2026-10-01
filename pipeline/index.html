@@ -123,6 +123,13 @@
   .big .n { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
   .big .n.small { font-size: 14px; }
   .big .n .tier { font-size: 13px; font-weight: 600; margin-left: 8px; letter-spacing: 0; }
+  .rsort { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 8px; font-size: 12px; }
+  .rsort span { color: var(--text2); margin-right: 4px; }
+  .rsort button { border: 0; border-radius: 6px; padding: 3px 8px; font: inherit; background: var(--fill); color: var(--text); cursor: pointer; }
+  .rsort button.on { background: var(--accent); color: #fff; }
+  .rgroup { font-size: 12px; font-weight: 600; color: var(--text2); margin: 10px 2px 4px; }
+  .rmeta { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 0 6px; }
+  .rmeta span { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--fill); color: var(--text2); }
   .tiers { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; font-weight: 600; margin: 2px 0 8px; }
   .grp { display: flex; align-items: center; gap: 8px; margin: 16px 0 6px; font-size: 10.5px; font-weight: 700;
     color: var(--text2); text-transform: uppercase; letter-spacing: 0.07em; }
@@ -1814,7 +1821,7 @@ const SCOPE = {
   chin_depth:  {moves: 'every frame outside a punch',           angles: 'side-on'},
   blade_hips:      {moves: 'every frame outside a punch',       angles: 'front, back, side-on \u2014 meaningful only where the camera stands in for the opponent'},
   blade_shoulders: {moves: 'every frame outside a punch',       angles: 'front, back, side-on \u2014 meaningful only where the camera stands in for the opponent'},
-  hrp:       {moves: 'jab, cross',                              angles: ALL_ANGLES},
+  hrp:       {moves: 'jab, cross',                              angles: 'side-on'},
   bal:       {moves: 'every punch at its impact frame',         angles: 'side-on'},
   hookstop:  {moves: 'every head hook at its impact frame',     angles: 'front, back'},
   rpivot:    {moves: 'every rear-hand punch at its impact frame', angles: 'front, back, side-on'},
@@ -1872,6 +1879,33 @@ const NOTION = {
 const notionNo = name => String(NOTION[name] ?? '?');
 // One colour scale for every rule's round score (the user's call, 2026-10-01) — display only, the score stays the
 // number the rule computed. Lower bound inclusive: 85 is great, 70 good, 60 mid, 40 bad.
+// Per rule (by number): its analysis group and what it is analysed on — the Notion columns "Analysis Group" and
+// "Analyzed on", taken from what the pipeline measures. A rule judged per punch / frame / combo / slip is a separate
+// move; one that only exists as a whole-round statistic is the overall round.
+const RULE_META = (() => {
+  const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
+  const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
+              13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P]};
+  const layerOf = {};
+  for (const [k, ns] of Object.entries(LAYER_RULES)) for (const n of ns) layerOf[n] ??= k;
+  // the angle gate from the layer's scope: side-on / front, back / every angle (a rule with no layer judges every angle)
+  const gate = n => {
+    const a = (SCOPE[layerOf[n]]?.angles || ALL_ANGLES).split(' \u2014')[0];
+    return a === 'side-on' ? 'Side-on' : a === 'front, back' ? 'Front, back' : 'Every angle';
+  };
+  return Object.fromEntries(Object.entries(on).map(([n, o]) =>
+    [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o, angle: gate(+n)}]));
+})();
+const ON_ORDER = ['On a punch', 'On a combo', 'On a defensive move', 'On a frame', 'Whole round only'];
+const SORTS = {
+  rule:  {label: 'rule number'},
+  score: {label: 'score'},
+  group: {label: 'analysis group', key: m => m.group, order: ['Separate move', 'Overall round']},
+  on:    {label: 'analyzed on', key: m => m.on[0], order: ON_ORDER},
+  angle: {label: 'angle gate', key: m => m.angle, order: ['Side-on', 'Front, back', 'Every angle']},
+};
+V.ruleSort = (() => { try { return SORTS[localStorage.getItem('pipelineViewerRuleSort')] ? localStorage.getItem('pipelineViewerRuleSort') : 'rule'; } catch { return 'rule'; } })();
 const TIER = [[85, 'great', '#22C55E'], [70, 'good', '#84CC16'], [60, 'mid', '#EAB308'], [40, 'bad', '#F97316'],
               [0, 'critical', '#EF4444']];
 const tierOf = v => TIER.find(([lo]) => v >= lo);
@@ -2267,11 +2301,22 @@ function ruleCard() {
 
   $('scoreCard').style.display = rows.length ? '' : 'none';
   rows.sort((x, y) => (NOTION[x.name] ?? 99) - (NOTION[y.name] ?? 99));             // one list, the Notion order
+  S.ruleRows = rows;
+  renderRules();
+}
+function renderRules() {
+  const rows = S.ruleRows || [], no = r => NOTION[r.name] ?? 99, meta = r => RULE_META[no(r)] || {group: '–', on: ['–'], angle: '–'};
+  const val = r => /^[\d.]+$/.test(r.value) ? +r.value : Infinity;                 // not rated: after every score
+  const srt = SORTS[V.ruleSort] || SORTS.rule;
+  let list = [...rows];
+  if (V.ruleSort === 'score') list.sort((x, y) => val(x) - val(y) || no(x) - no(y));   // the weakest first
+  else if (srt.key) list.sort((x, y) => srt.order.indexOf(srt.key(meta(x))) - srt.order.indexOf(srt.key(meta(y))) || no(x) - no(y));
   const rule = r => {
     const big = /^[\d.]+$/.test(r.value), t = big ? tierOf(+r.value) : null;
     return `<div class="rule">` +
       `<div class="big"><span class="k">${notionNo(r.name)} · ${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${t ? t[2] : r.color}">${r.value}` +
       (t ? `<span class="tier" style="color:${t[2]}">${t[1]}</span>` : '') + '</span></div>' +
+      `<div class="rmeta">${[meta(r).group, ...meta(r).on, meta(r).angle].map(x => `<span>${x}</span>`).join('')}</div>` +
       `<div class="exp"><span>measures</span><span>${r.what}</span>` +
       `<span>on</span><span>${r.on}</span>` +
       `<span>thresholds</span><span>${[r.th.event, r.th.round].filter(Boolean).map(g =>
@@ -2282,9 +2327,23 @@ function ruleCard() {
         `</span></div>`).join('')}</span>` +
       `<span>round</span><span>${r.value === 'not rated' ? 'None' : r.calc}</span></div></div>`;   // not rated: no sum to show
   };
+  // grouped sorts get a heading per group, so the boundaries show
+  let body = '';
+  if (srt.key) {
+    for (const g of srt.order) {
+      const inG = list.filter(r => srt.key(meta(r)) === g);
+      if (inG.length) body += `<div class="rgroup">${g} · ${inG.length}</div><div class="grpbox">${inG.map(rule).join('')}</div>`;
+    }
+  } else body = `<div class="grpbox">${list.map(rule).join('')}</div>`;
   $('scoreCard').innerHTML = '<div class="label">Round score</div>' +
     `<div class="tiers">${TIER.map(([lo, name, col], i) => `<span style="color:${col}">${lo}–${i ? TIER[i - 1][0] : 100} ${name}</span>`).join('')}</div>` +
-    `<div class="grpbox">${rows.map(rule).join('')}</div>`;
+    `<div class="rsort"><span>Sort by</span>${Object.entries(SORTS).map(([k, s]) =>
+      `<button data-sort="${k}" class="${k === V.ruleSort ? 'on' : ''}">${s.label}</button>`).join('')}</div>` + body;
+  $('scoreCard').querySelectorAll('.rsort button').forEach(b => b.onclick = () => {
+    V.ruleSort = b.dataset.sort;
+    try { localStorage.setItem('pipelineViewerRuleSort', V.ruleSort); } catch {}
+    renderRules();
+  });
 }
 const layerOn = k => !!(S.has?.[k] && V.layers[k]);
 
