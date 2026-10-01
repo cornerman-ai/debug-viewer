@@ -123,6 +123,10 @@
   .big .n { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
   .big .n.small { font-size: 14px; }
   .big .n .tier { font-size: 13px; font-weight: 600; margin-left: 8px; letter-spacing: 0; }
+  .brief { padding: 6px 0; border-top: 1px solid var(--sep); }
+  .label + .brief { border-top: 0; padding-top: 0; }
+  .brief .bh { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; }
+  .brief .bl { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.45; }
   .rsort { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 8px; font-size: 12px; }
   .rsort span { color: var(--text2); margin-right: 4px; }
   .rsort button { border: 0; border-radius: 6px; padding: 3px 8px; font: inherit; background: var(--fill); color: var(--text); cursor: pointer; }
@@ -276,6 +280,7 @@
     </div>
 
     <div id="rulesView" style="display:none">
+      <div class="card" id="briefCard"></div>
       <div class="card" id="scoreCard"></div>
     </div>
 
@@ -2302,7 +2307,21 @@ function ruleCard() {
   $('scoreCard').style.display = rows.length ? '' : 'none';
   rows.sort((x, y) => (NOTION[x.name] ?? 99) - (NOTION[y.name] ?? 99));             // one list, the Notion order
   S.ruleRows = rows;
+  renderBrief();
   renderRules();
+}
+// The brief: every rule under its tier on the shared colour scale, names only, with the count per tier.
+function renderBrief() {
+  const rows = S.ruleRows || [];
+  const groups = [...TIER.map(([, name, col]) => ({name, col, rs: []})), {name: 'not rated', col: '#8e8e93', rs: []}];
+  for (const r of rows) {
+    const t = /^[\d.]+$/.test(r.value) ? tierOf(+r.value) : null;
+    groups[t ? TIER.indexOf(t) : TIER.length].rs.push(r);
+  }
+  $('briefCard').style.display = rows.length ? '' : 'none';
+  $('briefCard').innerHTML = `<div class="label">Brief · ${rows.length} rules</div>` + groups.map(g =>
+    `<div class="brief"><div class="bh"><span style="color:${g.col}">${cap(g.name)}</span><span class="num">${g.rs.length}</span></div>` +
+    `<div class="bl">${g.rs.length ? g.rs.map(r => r.name).join(', ') : '<span class="m">none</span>'}</div></div>`).join('');
 }
 function renderRules() {
   const rows = S.ruleRows || [], no = r => NOTION[r.name] ?? 99, meta = r => RULE_META[no(r)] || {group: '–', on: ['–'], angle: '–'};
