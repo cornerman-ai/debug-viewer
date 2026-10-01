@@ -173,8 +173,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   chest-on, 90° side-on — and the two cuts per axis are a coach's verdicts on 30 frames (hips 18.2 / 27.9,
   shoulders 12.7 / 17.6). Frame score: 0 at the squared cut or below, 100 at the fine cut or above, linear between
   (red / orange / green on the row; the overlay labels the angle and the score). There is no upper edge; he never
-  called anyone too bladed. Front and back frames only — side-on the line points at the camera and would read as a
-  free "fine" (grey). Round = the mean frame score, a plain number. **The angle is measured against the camera**,
+  called anyone too bladed. Every facing angle is judged. Round = the mean frame score, a plain number. **The angle is measured against the camera**,
   which stands in for the opponent only on the curated frontal set — none of the test videos is in it, so read
   these two as a demonstration of the rule rather than a verdict on the boxer. Read `runs.csv` + the stage's `.json`.
 - **Chin height** (`chin_height/`) and **Chin depth** (`chin_depth/`): both per frame outside punches, both

@@ -650,8 +650,7 @@ const BLADE = {
   shoulders: {stage: 'bladedness_shoulders', label: 'Shoulders bladed', short: 'Shoulders bladed', cuts: [12.7, 17.6]},
 };
 const BLADECOL = {squared: '#ff3b30', between: '#ff9f0a', bladed: '#34c759'};
-const BLADESKIP = {no_pose: 'a joint it needs is not visible', punching: 'a punch is in flight',
-                   side_on: 'the boxer is side-on — the line points at the camera and would read as a free "fine"'};
+const BLADESKIP = {no_pose: 'a joint it needs is not visible', punching: 'a punch is in flight'};
 // the frame score: 100 at or past the fine cut, linearly down to 0 at the squared cut, 0 below it
 const bladeScore = (deg, [c0, c1]) => 100 * Math.min(1, Math.max(0, (deg - c0) / (c1 - c0)));
 function bladeLayer(kind) {
@@ -681,7 +680,7 @@ function bladeLayer(kind) {
       const name = x.state === 'squared' ? 'Squared up' : x.state === 'between' ? 'In between' : 'Bladed enough';
       return `<b>${name}</b> ${t}${x.score == null ? '' : ` \u00b7 mean frame score <b>${x.score.toFixed(0)}</b>`}<br>` +
         `<span class="m">the ${kind} line against the camera: 0 at ${C.cuts[0]}\u00b0 or less, 100 at ${C.cuts[1]}\u00b0 or more, ` +
-        `linear between \u2014 a coach's cuts; front and back frames only</span>`;
+        `linear between \u2014 a coach's cuts, and only meaningful where the camera stands in for the opponent</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
@@ -1813,8 +1812,8 @@ const SCOPE = {
   resting:   {moves: 'every punch at impact ±2 frames, the hand that does not throw', angles: ALL_ANGLES},
   chin_height: {moves: 'every frame outside a punch',           angles: ALL_ANGLES},
   chin_depth:  {moves: 'every frame outside a punch',           angles: 'side-on'},
-  blade_hips:      {moves: 'every frame outside a punch',       angles: 'front, back'},
-  blade_shoulders: {moves: 'every frame outside a punch',       angles: 'front, back'},
+  blade_hips:      {moves: 'every frame outside a punch',       angles: 'front, back, side-on \u2014 meaningful only where the camera stands in for the opponent'},
+  blade_shoulders: {moves: 'every frame outside a punch',       angles: 'front, back, side-on \u2014 meaningful only where the camera stands in for the opponent'},
   hrp:       {moves: 'jab, cross',                              angles: ALL_ANGLES},
   bal:       {moves: 'every punch at its impact frame',         angles: 'side-on'},
   hookstop:  {moves: 'every head hook at its impact frame',     angles: 'front, back'},
@@ -2107,9 +2106,9 @@ function ruleCard() {
     if (!bd) continue;
     add(C.label, bd.score ?? 'not rated', bd.score == null ? '#8e8e93' : 'var(--text)', null, {
       what: `is he standing square to the opponent, seen at the ${kind}?`,
-      on: `${bd.n_frames.toLocaleString()} frames · ${bd.judged_frames.toLocaleString()} judged outside punches, front `
-          + `or back · ${(bd.side_on_frames ?? 0).toLocaleString()} side-on skipped · median ${bd.median_deg ?? '–'}° — `
-          + `the angle is measured against the CAMERA, which only stands in for the opponent on the curated frontal set`,
+      on: `${bd.n_frames.toLocaleString()} frames · ${bd.judged_frames.toLocaleString()} judged outside punches · `
+          + `median ${bd.median_deg ?? '–'}° — the angle is measured against the CAMERA, which only stands in for the `
+          + `opponent on the curated frontal set`,
       th: {event: {label: 'per frame', rule: `the ${kind} line's angle out of the image plane, from the 3D landmarks `
                           + `— 0° is chest-on, 90° side-on. The two cuts are a coach's verdicts on 30 frames, the only `
                           + `bladedness thresholds that exist; there is no upper edge, because he never called anyone too bladed`,
