@@ -49,7 +49,9 @@ The side panel has two views, switched at its top:
   order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 70–85 good,
   60–70 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 150 frames), and under it four lines — what the
-  rule measures, what it was measured on, its thresholds, and the sum that produced the number. Each row carries three
+  rule measures, what it was measured on, its thresholds, and the sum that produced the number. Under the score a
+  game-style bar shows it on 0–100, filled in its tier's colour, with a tick at each tier line (40, 60, 70, 85);
+  a not-rated rule gets an empty striped bar. Each row carries three
   tags — its analysis group (separate move / overall round), what it is analysed on (a punch, a combo, a defensive
   move, a frame, or the whole round only) and its angle gate (side-on / front, back / every angle; from the layer's
   scope) — and the card sorts by rule number, score (not rated always last), or any of the three tags, grouped under
