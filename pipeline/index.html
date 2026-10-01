@@ -1872,8 +1872,8 @@ const NOTION = {
 const notionNo = name => String(NOTION[name] ?? '?');
 // One colour scale for every rule's round score (the user's call, 2026-10-01) — display only, the score stays the
 // number the rule computed. Lower bound inclusive: 85 is great, 70 good, 60 mid, 40 bad.
-const TIER = [[85, 'great', '#34c759'], [70, 'good', '#8fd14f'], [60, 'mid', '#e6b800'], [40, 'bad', '#ff9500'],
-              [0, 'critical', '#ff3b30']];
+const TIER = [[85, 'great', '#22C55E'], [70, 'good', '#84CC16'], [60, 'mid', '#EAB308'], [40, 'bad', '#F97316'],
+              [0, 'critical', '#EF4444']];
 const tierOf = v => TIER.find(([lo]) => v >= lo);
 // Round view — every rule we have, one row each, in the Notion order. A row carries its value (the 0-100 score
 // where the rule has one, otherwise "not rated") and four lines: what it measures, what it was measured on, the
