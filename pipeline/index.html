@@ -1418,12 +1418,12 @@ const RULE_LAYERS = [
 ];
 const LAYERS = RULE_LAYERS.map(r => r.key);
 const GUARD_FULL = {lead: 0.50, rear: 0.30};                    // guard height: full marks up to here, 0 from 0.70
-// Which Notion rules (by number, 2026-09-28) each timeline layer judges — shown beside its switch.
+// Which Notion rules (by number, renumbered 2026-10-01) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
-  bal: [1], drop: [2], defcov: [4], guard: [5], resting: [7], chin_depth: [8], chin_height: [9], elbow: [10],
-  hoc: [11], stance_depth: [12], stance_width: [13], slipd: [15, 16], hrp: [17], blade_hips: [18], blade_shoulders: [19],
-  hip: [20], shoulder: [21], arm: [22], hit: [23], speed: [24], offensive: [25, 31], combined: [32], hookstop: [33],
-  rpivot: [35], work: [26],
+  bal: [1], drop: [2], defcov: [3], guard: [4], resting: [6], chin_depth: [7], chin_height: [8], elbow: [9],
+  hoc: [10], stance_depth: [11], stance_width: [12], slipd: [14, 15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
+  hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
+  rpivot: [33], work: [25],
 };
 const rulesTag = k => LAYER_RULES[k] ? ` <span class="m">(${LAYER_RULES[k].map(n => 'rule ' + n).join(', ')})</span>` : '';
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
@@ -1833,18 +1833,19 @@ function scoreCounts(key) {
   return {pass: n(x => x.verdict === 'off'),                          // head off center: green only at 100
           fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
-// The Notion "Production rules" numbering (read 2026-09-28): the round view is one list in this order. Slip distance is
-// one script for two Notion rows — 15 "slip far enough" and 16 "keep slips compact" — so it sits at 15 and says so.
+// The Notion "Production rules" numbering (renumbered 2026-10-01: rules 3 and 34 were removed, the rest closed up to
+// 1-33): the round view is one list in this order. Slip distance is one script for two Notion rows — 14 "slip far
+// enough" and 15 "keep slips compact" — so it sits at 14 and says so.
 const NOTION = {
-  'Balance at impact': 1, 'Punching hand drop before punch': 2, 'Defense after combo': 4,
-  'Guard height': 5, 'Hand balance': 6, 'Dropping resting hand while punching': 7, 'Chin depth': 8, 'Chin height': 9,
-  'Elbow tuck': 10, 'Head off center line': 11, 'Stance depth': 12, 'Stance width': 13, 'Angle change': 14,
-  'Slip distance': 15, 'Hand return path': 17, 'Hips bladed': 18, 'Shoulders bladed': 19, 'Hip rotation': 20,
-  'Shoulder rotation': 21, 'Arm extension': 22, 'Hit height': 23, 'Punch speed': 24, 'Combination length': 25,
-  'Work rate': 26, 'Output through the round': 27, 'Same punches': 28, 'Body shots': 29, 'Same defense': 30,
-  'Same offensive combos': 31, 'Same combined combos': 32, 'Hook stop': 33, 'Rear-foot pivot': 35,
+  'Balance at impact': 1, 'Punching hand drop before punch': 2, 'Defense after combo': 3,
+  'Guard height': 4, 'Hand balance': 5, 'Dropping resting hand while punching': 6, 'Chin depth': 7, 'Chin height': 8,
+  'Elbow tuck': 9, 'Head off center line': 10, 'Stance depth': 11, 'Stance width': 12, 'Angle change': 13,
+  'Slip distance': 14, 'Hand return path': 16, 'Hips bladed': 17, 'Shoulders bladed': 18, 'Hip rotation': 19,
+  'Shoulder rotation': 20, 'Arm extension': 21, 'Hit height': 22, 'Punch speed': 23, 'Combination length': 24,
+  'Work rate': 25, 'Output through the round': 26, 'Same punches': 27, 'Body shots': 28, 'Same defense': 29,
+  'Same offensive combos': 30, 'Same combined combos': 31, 'Hook stop': 32, 'Rear-foot pivot': 33,
 };
-const notionNo = name => name === 'Slip distance' ? '15–16' : String(NOTION[name] ?? '?');
+const notionNo = name => name === 'Slip distance' ? '14–15' : String(NOTION[name] ?? '?');
 // Round view — every rule we have, one row each, in the Notion order. A row carries its value (the 0-100 score
 // where the rule has one, otherwise its rating) and four lines: what it measures, what it was measured on, the
 // thresholds, and the sum that produced the number.
