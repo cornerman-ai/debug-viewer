@@ -46,11 +46,11 @@ The side panel has two views, switched at its top:
   bad 1, mid 2, good 3, great 4), and the sum over 4 × the rated rules is put on 0–100 (not-rated rules count in
   neither), coloured and labelled on the same tier scale as the rules, with the same bar — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count
   per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–33 in the Notion
-  order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 70–85 good,
-  60–70 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under
+  order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 75–85 good,
+  60–75 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 150 frames), and under it four lines — what the
   rule measures, what it was measured on, its thresholds, and the sum that produced the number. Under the score a
-  game-style bar shows it on 0–100, filled in its tier's colour, with a tick at each tier line (40, 60, 70, 85);
+  game-style bar shows it on 0–100, filled in its tier's colour, with a tick at each tier line (40, 60, 75, 85);
   a not-rated rule gets an empty striped bar. Each row carries three
   tags — its analysis group (separate move / overall round), what it is analysed on (a punch, a combo, a defensive
   move, a frame, or the whole round only) and its angle gate (side-on / front, back / every angle; from the layer's

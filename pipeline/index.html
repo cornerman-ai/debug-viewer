@@ -1899,7 +1899,7 @@ const NOTION = {
 };
 const notionNo = name => String(NOTION[name] ?? '?');
 // One colour scale for every rule's round score (the user's call, 2026-10-01) — display only, the score stays the
-// number the rule computed. Lower bound inclusive: 85 is great, 70 good, 60 mid, 40 bad.
+// number the rule computed. Lower bound inclusive: 85 is great, 75 good, 60 mid, 40 bad.
 // Per rule (by number): its analysis group and what it is analysed on — the Notion columns "Analysis Group" and
 // "Analyzed on", taken from what the pipeline measures. A rule judged per punch / frame / combo / slip is a separate
 // move; one that only exists as a whole-round statistic is the overall round.
@@ -1929,7 +1929,7 @@ const SORTS = {
 };
 for (const s of Object.values(SORTS)) s.dir ??= [`${s.order[0]} first`, `${s.order[s.order.length - 1]} first`];
 V.ruleSort = 'rule'; V.ruleDesc = false;            // every load opens on rule number, 1 -> 33 (not remembered)
-const TIER = [[85, 'great', '#22C55E'], [70, 'good', '#84CC16'], [60, 'mid', '#EAB308'], [40, 'bad', '#F97316'],
+const TIER = [[85, 'great', '#22C55E'], [75, 'good', '#84CC16'], [60, 'mid', '#EAB308'], [40, 'bad', '#F97316'],
               [0, 'critical', '#EF4444']];
 const tierOf = v => TIER.find(([lo]) => v >= lo);
 // Round view — every rule we have, one row each, in the Notion order. A row carries its value (the 0-100 score
