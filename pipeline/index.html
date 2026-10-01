@@ -1754,10 +1754,15 @@ function srow(name, rating, color, value, rule) {
 }
 
 const count = (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
+// The Timeline layers card's order: the two combo layers first, then by the lowest rule number each layer judges.
+const CARD_ORDER = [...RULE_LAYERS].sort((x, y) => {
+  const combo = L => ['offensive', 'combined'].includes(L.key) ? 0 : 1, no = L => Math.min(...(LAYER_RULES[L.key] || [99]));
+  return combo(x) - combo(y) || no(x) - no(y);
+});
 function buildLayers() {
   const list = $('layerList');
   if (!list.children.length) {                             // the toggles, once
-    list.innerHTML = RULE_LAYERS.map(L => `<div class="layer"><label class="toggle" data-layer="${L.key}"><span>${L.label}${rulesTag(L.key)}</span><span class="sw"></span></label>` +
+    list.innerHTML = CARD_ORDER.map(L => `<div class="layer"><label class="toggle" data-layer="${L.key}"><span>${L.label}${rulesTag(L.key)}</span><span class="sw"></span></label>` +
       `<div class="lsum" id="sum-${L.key}"></div><div id="scope-${L.key}"></div></div>`).join('');
     list.querySelectorAll('.toggle[data-layer]').forEach(t => t.onclick = e => {
       e.preventDefault(); const k = t.dataset.layer; if (!S.has?.[k]) return;
