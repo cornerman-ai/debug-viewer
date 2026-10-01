@@ -43,7 +43,7 @@ The side panel has two views, switched at its top:
 - **Round** — the whole video's counts: the punch and defense distributions and the combos (counts and the most-used
   sequences).
 - **Rules** — the whole video's **Round score**, the only card on the tab: every rule we have, one row each, numbered 1–33 in the Notion
-  order: its 0–100 score — a plain number for most rules; hit height adds a quality band; slip
+  order: its 0–100 score — a plain number for most rules; hit height adds a quality band; hand return path shows the share of punches not okay; slip
   distance and the two bladedness axes still give a rating word instead — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 150 frames), and under it four lines — what the
   rule measures, what it was measured on, its thresholds, and the sum that produced the number.
@@ -107,14 +107,13 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   least 10 — most hooks on the current footage are thrown side-on and are not judged at all. Reads `punches.csv` +
   `hook_stop.json`.
 - **Hand return path** (`hand_return_path/`): per side-on jab / cross, the wrist's height above its own shoulder
-  from the impact to the punch's end + 0.15 s. dip = the lower of the two ends (2-frame means) minus the lowest
-  point (3-frame mean) when that point is inside the window; scored 100 with no dip, linearly to 0 at 0.20 torso —
-  green at 100, red below. The block covers the measured window itself (impact → end + 0.15 s, not the punch), with
-  the score on it and a white tick at the lowest frame. On the video, for every frame of that window: the wrist's
-  whole measured line, its two ends (grey dots), the lowest point (ring) and where the wrist is now. Punches not
-  side-on, with no impact frame, a lost wrist or a tracker teleport are not drawn. Round = the mean punch score, a
-  plain number. Rebuilt 2026-10-01 — the earlier versions are in `combined_pipeline/changes.md`. Reads `punches.csv`
-  + `hand_return_path.json`.
+  from the impact to the punch's end + 0.15 s, against the straight line (chord) between its two ends (2-frame
+  means). Not okay — a U — when every frame between the ends sits under the chord; okay otherwise; no grade per
+  punch. The block covers the measured window itself (impact → end + 0.15 s), green okay, red not okay, labelled with
+  the frames under the chord. On the video, for every frame of that window: the wrist's whole line, the chord
+  (dashed white) between the two ends (grey dots), each frame between them as a red (under) or green dot, and where
+  the wrist is now. Round = the share of judged punches not okay. Rebuilt 2026-10-01 — the earlier versions are in
+  `combined_pipeline/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
 - **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the hand
   that is NOT throwing, read at impact −2, impact and impact +2 frames and weighted ¼ · ½ · ¼ — how far it sits below
   the nose. Scored 100 up to 0.40 torso (the line hand drop uses, an absolute one: a boxer who holds his hands low
