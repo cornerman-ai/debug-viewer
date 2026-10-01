@@ -1837,18 +1837,18 @@ function scoreCounts(key) {
           fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
 // The Notion "Production rules" numbering (renumbered 2026-10-01: rules 3 and 34 were removed, the rest closed up to
-// 1-33): the round view is one list in this order. Slip distance is one script for two Notion rows — 14 "slip far
-// enough" and 15 "keep slips compact" — so it sits at 14 and says so.
+// 1-33): the round view is one list in this order. Slip distance is one script and one timeline layer for two Notion
+// rules — 14 "slip far enough" and 15 "keep slips compact" — each with its own round row.
 const NOTION = {
   'Balance at impact': 1, 'Punching hand drop before punch': 2, 'Defense after combo': 3,
   'Guard height': 4, 'Hand balance': 5, 'Dropping resting hand while punching': 6, 'Chin depth': 7, 'Chin height': 8,
   'Elbow tuck': 9, 'Head off center line': 10, 'Stance depth': 11, 'Stance width': 12, 'Angle change': 13,
-  'Slip distance': 14, 'Hand return path': 16, 'Hips bladed': 17, 'Shoulders bladed': 18, 'Hip rotation': 19,
+  'Slip far enough': 14, 'Slips compact': 15, 'Hand return path': 16, 'Hips bladed': 17, 'Shoulders bladed': 18, 'Hip rotation': 19,
   'Shoulder rotation': 20, 'Arm extension': 21, 'Hit height': 22, 'Punch speed': 23, 'Combination length': 24,
   'Work rate': 25, 'Output through the round': 26, 'Same punches': 27, 'Body shots': 28, 'Same defense': 29,
   'Same offensive combos': 30, 'Same combined combos': 31, 'Hook stop': 32, 'Rear-foot pivot': 33,
 };
-const notionNo = name => name === 'Slip distance' ? '14–15' : String(NOTION[name] ?? '?');
+const notionNo = name => String(NOTION[name] ?? '?');
 // Round view — every rule we have, one row each, in the Notion order. A row carries its value (the 0-100 score
 // where the rule has one, otherwise its rating) and four lines: what it measures, what it was measured on, the
 // thresholds, and the sum that produced the number.
@@ -1962,19 +1962,24 @@ function ruleCard() {
     calc: `move: ${sd.same_move.top_type ?? '–'} ${pct(sd.same_move.top_type_share)} → ${sd.same_move.score ?? '–'} · `
           + `side: ${sd.same_side.top_side ?? '–'} ${pct(sd.same_side.top_side_share)} → ${sd.same_side.score ?? '–'} · `
           + `score ${sd.score ?? '–'}`});
-  const sl = S.slipD;                                                                  // 21 + 22
-  if (sl) add('Slip distance', sl.rating, SLIPRATE[sl.rating], null, {
-    what: 'when he slips, does the head move far enough — and not too far?',
-    on: `${sl.n_slips} slips · ${sl.judged_slips} judged, the rest skipped (side-on, where the camera cannot see `
-        + `the head move sideways) · rolls and ducks are not measured`,
-    th: {event: {label: 'per slip', rule: 'travel = how far the head got from where it started, in torso lengths',
-                 bands: [['< 0.20', 'too short'], ['0.20–0.70', 'good distance'], ['> 0.70', 'too far']],
-                 pal: {'too short': '#ff9f0a', 'good distance': '#34c759', 'too far': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the share of judged slips at a good distance (10 judged slips minimum)',
-                 bands: [['≥ 60 %', 'good'], ['40–60 %', 'mixed'], ['< 40 %', 'poor']], pal: SLIPRATE}},
-    calc: sl.judged_slips ? `${sl.slip_verdicts.ok || 0} good · ${sl.slip_verdicts.short || 0} too short · `
-          + `${sl.slip_verdicts.far || 0} too far of ${sl.judged_slips} judged slips`
-          : 'no slip could be read front-on'});
+  const sl = S.slipD;                                                                  // rules 14 + 15
+  const slipOn = `${sl?.n_slips} slips · ${sl?.judged_slips} judged, the rest skipped (side-on, where the camera cannot `
+               + `see the head move sideways) · rolls and ducks are not measured`;
+  const slipEvent = {label: 'per slip', rule: 'travel = how far the head got from where it started, in torso lengths',
+                     bands: [['< 0.20', 'too short'], ['0.20–0.70', 'good distance'], ['> 0.70', 'too far']],
+                     pal: {'too short': '#ff9f0a', 'good distance': '#34c759', 'too far': '#ff3b30'}};
+  const slipRound = what => ({label: 'per round', rule: `the share of judged slips that are not ${what} (10 judged slips minimum)`,
+                              bands: [['≥ 60 %', 'good'], ['40–60 %', 'mixed'], ['< 40 %', 'poor']], pal: SLIPRATE});
+  for (const [name, part, fault, word] of [['Slip far enough', sl?.far_enough, 'short', 'too short'],
+                                           ['Slips compact', sl?.compact, 'far', 'too far']]) {
+    if (!part) continue;
+    add(name, part.rating, SLIPRATE[part.rating], null, {
+      what: fault === 'short' ? 'when he slips, does the head move far enough to make the punch miss?'
+                              : 'when he slips, does the head stay over the base instead of travelling too far?',
+      on: slipOn, th: {event: slipEvent, round: slipRound(word)},
+      calc: sl.judged_slips ? `${part.without_fault} of ${sl.judged_slips} judged slips not ${word} = ${pct(part.share)}`
+                            : 'no slip could be read front-on'});
+  }
   const shr = S.shSum;
   if (shr) add('Shoulder rotation', shr.score ?? 'not rated', shr.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'do the shoulders turn into the punch, or does the arm go alone?',
