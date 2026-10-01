@@ -134,6 +134,8 @@
   .rsort span { color: var(--text2); margin-right: 4px; }
   .rsort button { border: 0; border-radius: 6px; padding: 3px 8px; font: inherit; background: var(--fill); color: var(--text); cursor: pointer; }
   .rsort button.on { background: var(--accent); color: #fff; }
+  .rsort button i { font-style: normal; margin-left: 4px; }
+  .rsort-dir { font-size: 11px; color: var(--text2); margin: -4px 0 8px; }
   .rgroup { font-size: 12px; font-weight: 600; color: var(--text2); margin: 10px 2px 4px; }
   .rmeta { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 0 6px; }
   .rmeta span { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--fill); color: var(--text2); }
@@ -1908,14 +1910,17 @@ const RULE_META = (() => {
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o, angle: gate(+n)}]));
 })();
 const ON_ORDER = ['On a punch', 'On a combo', 'On a defensive move', 'On a frame', 'Whole round only'];
+// Each sort runs both ways: click the active button again to flip it. `dir` names the two directions in words.
 const SORTS = {
-  rule:  {label: 'rule number'},
-  score: {label: 'score'},
+  rule:  {label: 'rule number', dir: ['1 → 33', '33 → 1']},
+  score: {label: 'score', dir: ['worst → best', 'best → worst']},
   group: {label: 'analysis group', key: m => m.group, order: ['Separate move', 'Overall round']},
   on:    {label: 'analyzed on', key: m => m.on[0], order: ON_ORDER},
   angle: {label: 'angle gate', key: m => m.angle, order: ['Side-on', 'Front, back', 'Every angle']},
 };
+for (const s of Object.values(SORTS)) s.dir ??= [`${s.order[0]} first`, `${s.order[s.order.length - 1]} first`];
 V.ruleSort = (() => { try { return SORTS[localStorage.getItem('pipelineViewerRuleSort')] ? localStorage.getItem('pipelineViewerRuleSort') : 'rule'; } catch { return 'rule'; } })();
+V.ruleDesc = (() => { try { return localStorage.getItem('pipelineViewerRuleDesc') === '1'; } catch { return false; } })();
 const TIER = [[85, 'great', '#22C55E'], [70, 'good', '#84CC16'], [60, 'mid', '#EAB308'], [40, 'bad', '#F97316'],
               [0, 'critical', '#EF4444']];
 const tierOf = v => TIER.find(([lo]) => v >= lo);
@@ -2342,9 +2347,14 @@ function renderRules() {
   const rows = S.ruleRows || [], no = r => NOTION[r.name] ?? 99, meta = r => RULE_META[no(r)] || {group: '–', on: ['–'], angle: '–'};
   const val = r => /^[\d.]+$/.test(r.value) ? +r.value : Infinity;                 // not rated: after every score
   const srt = SORTS[V.ruleSort] || SORTS.rule;
+  const d = V.ruleDesc ? -1 : 1;
   let list = [...rows];
-  if (V.ruleSort === 'score') list.sort((x, y) => val(x) - val(y) || no(x) - no(y));   // the weakest first
-  else if (srt.key) list.sort((x, y) => srt.order.indexOf(srt.key(meta(x))) - srt.order.indexOf(srt.key(meta(y))) || no(x) - no(y));
+  if (V.ruleSort === 'rule') list.sort((x, y) => d * (no(x) - no(y)));
+  else if (V.ruleSort === 'score') list.sort((x, y) => {                              // not rated stays last either way
+    const a = val(x), b = val(y);
+    return (a === Infinity) - (b === Infinity) || d * (a - b) || no(x) - no(y);
+  });
+  else if (srt.key) list.sort((x, y) => d * (srt.order.indexOf(srt.key(meta(x))) - srt.order.indexOf(srt.key(meta(y)))) || no(x) - no(y));
   const rule = r => {
     const big = /^[\d.]+$/.test(r.value), t = big ? tierOf(+r.value) : null;
     return `<div class="rule">` +
@@ -2364,18 +2374,23 @@ function renderRules() {
   // grouped sorts get a heading per group, so the boundaries show
   let body = '';
   if (srt.key) {
-    for (const g of srt.order) {
+    for (const g of V.ruleDesc ? [...srt.order].reverse() : srt.order) {
       const inG = list.filter(r => srt.key(meta(r)) === g);
       if (inG.length) body += `<div class="rgroup">${g} · ${inG.length}</div><div class="grpbox">${inG.map(rule).join('')}</div>`;
     }
   } else body = `<div class="grpbox">${list.map(rule).join('')}</div>`;
   $('scoreCard').innerHTML = '<div class="label">Round score</div>' +
     `<div class="tiers">${TIER.map(([lo, name, col], i) => `<span style="color:${col}">${lo}–${i ? TIER[i - 1][0] : 100} ${name}</span>`).join('')}</div>` +
-    `<div class="rsort"><span>Sort by</span>${Object.entries(SORTS).map(([k, s]) =>
-      `<button data-sort="${k}" class="${k === V.ruleSort ? 'on' : ''}">${s.label}</button>`).join('')}</div>` + body;
+    `<div class="rsort"><span>Sort by</span>${Object.entries(SORTS).map(([k, s]) => {
+      const on = k === V.ruleSort;
+      return `<button data-sort="${k}" class="${on ? 'on' : ''}" title="${on ? `${s.dir[+V.ruleDesc]} · click to flip` : s.dir[0]}">` +
+        `${s.label}${on ? `<i>${V.ruleDesc ? '↓' : '↑'}</i>` : ''}</button>`;
+    }).join('')}</div>` +
+    `<div class="rsort-dir">${srt.dir[+V.ruleDesc]}${V.ruleSort === 'score' ? ' · not rated last' : ''}</div>` + body;
   $('scoreCard').querySelectorAll('.rsort button').forEach(b => b.onclick = () => {
-    V.ruleSort = b.dataset.sort;
-    try { localStorage.setItem('pipelineViewerRuleSort', V.ruleSort); } catch {}
+    if (b.dataset.sort === V.ruleSort) V.ruleDesc = !V.ruleDesc;                    // the active button flips direction
+    else { V.ruleSort = b.dataset.sort; V.ruleDesc = false; }
+    try { localStorage.setItem('pipelineViewerRuleSort', V.ruleSort); localStorage.setItem('pipelineViewerRuleDesc', V.ruleDesc ? '1' : '0'); } catch {}
     renderRules();
   });
 }
