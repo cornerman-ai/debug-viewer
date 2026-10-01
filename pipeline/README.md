@@ -56,7 +56,7 @@ The side panel has two views, switched at its top:
   move, a frame, or the whole round only) and its angle gate (side-on / front, back / every angle; from the layer's
   scope) — and the card sorts by rule number, score (not rated always last), or any of the three tags, grouped under
   a heading. Every sort runs both ways: click the active button again to flip it (the arrow and the line under the
-  buttons say which way, e.g. worst → best). The choice is remembered in the browser.
+  buttons say which way, e.g. worst → best). The card always opens on rule number, 1 → 33.
 
 The **Timeline layers** card stays below both views: it only turns timeline rows on and off, and each toggle shows
 that rule's headline verdict.

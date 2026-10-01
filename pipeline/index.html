@@ -1927,8 +1927,7 @@ const SORTS = {
   angle: {label: 'angle gate', key: m => m.angle, order: ['Side-on', 'Front, back', 'Every angle']},
 };
 for (const s of Object.values(SORTS)) s.dir ??= [`${s.order[0]} first`, `${s.order[s.order.length - 1]} first`];
-V.ruleSort = (() => { try { return SORTS[localStorage.getItem('pipelineViewerRuleSort')] ? localStorage.getItem('pipelineViewerRuleSort') : 'rule'; } catch { return 'rule'; } })();
-V.ruleDesc = (() => { try { return localStorage.getItem('pipelineViewerRuleDesc') === '1'; } catch { return false; } })();
+V.ruleSort = 'rule'; V.ruleDesc = false;            // every load opens on rule number, 1 -> 33 (not remembered)
 const TIER = [[85, 'great', '#22C55E'], [70, 'good', '#84CC16'], [60, 'mid', '#EAB308'], [40, 'bad', '#F97316'],
               [0, 'critical', '#EF4444']];
 const tierOf = v => TIER.find(([lo]) => v >= lo);
@@ -2405,7 +2404,6 @@ function renderRules() {
   $('scoreCard').querySelectorAll('.rsort button').forEach(b => b.onclick = () => {
     if (b.dataset.sort === V.ruleSort) V.ruleDesc = !V.ruleDesc;                    // the active button flips direction
     else { V.ruleSort = b.dataset.sort; V.ruleDesc = false; }
-    try { localStorage.setItem('pipelineViewerRuleSort', V.ruleSort); localStorage.setItem('pipelineViewerRuleDesc', V.ruleDesc ? '1' : '0'); } catch {}
     renderRules();
   });
 }
