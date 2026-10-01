@@ -1856,7 +1856,9 @@ function ruleCard() {
   const P = S.punches, sp = S.samePunch, bs = S.bodyShots, sd = S.sameDef, da = S.defAfter, el = S.layerSum.elbow;
   const off = S.layerSum.offensive?.offensive, cmb = S.layerSum.combined?.combined, ac = S.angleChg;
   const rows = [];
-  const add = (name, value, color, band, info) => { if (value != null) rows.push({name, value, color, band, ...info}); };
+  // a rule whose output loaded always gets its row: a value the data does not carry reads "not rated", never vanishes
+  const add = (name, value, color, band, info) => rows.push(value == null
+    ? {name, value: 'not rated', color: '#8e8e93', band: null, ...info} : {name, value, color, band, ...info});
   const cnt = (key, f) => P.filter(p => p[key] && f(p[key])).length;
   const scored = (key, name, info) => {
     const c = layerChip(key, S.layerSum[key]); if (!c) return;
