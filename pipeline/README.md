@@ -43,8 +43,7 @@ The side panel has two views, switched at its top:
 - **Round** — the whole video's counts: the punch and defense distributions and the combos (counts and the most-used
   sequences).
 - **Rules** — the whole video's **Round score**, the only card on the tab: every rule we have, one row each, numbered 1–33 in the Notion
-  order: its 0–100 score — a plain number for most rules; hit height adds a quality band;  slip
-  distance and the two bladedness axes still give a rating word instead — or "not rated" under
+  order: its 0–100 score — a plain number for most rules; hit height adds a quality band — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 150 frames), and under it four lines — what the
   rule measures, what it was measured on, its thresholds, and the sum that produced the number.
 
@@ -172,11 +171,12 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Hips bladed** (`bladedness_hips/`) and **Shoulders bladed** (`bladedness_shoulders/`): both per frame outside
   punches, both continuous rows. The angle is that line's turn out of the image plane from the 3D landmarks — 0°
   chest-on, 90° side-on — and the two cuts per axis are a coach's verdicts on 30 frames (hips 18.2 / 27.9,
-  shoulders 12.7 / 17.6): red squared, orange between, green fine. There is no upper edge; he never called anyone
-  too bladed. Round rating = the share of judged frames below the squared cut (< 15 % good, 15–30 % sometimes
-  squared, ≥ 30 % squared). **The angle is measured against the camera**, which stands in for the opponent only on
-  the curated frontal set — neither test video is in it, so read these two as a demonstration of the rule rather
-  than a verdict on the boxer. Read `runs.csv` + the stage's `.json`.
+  shoulders 12.7 / 17.6). Frame score: 0 at the squared cut or below, 100 at the fine cut or above, linear between
+  (red / orange / green on the row; the overlay labels the angle and the score). There is no upper edge; he never
+  called anyone too bladed. Front and back frames only — side-on the line points at the camera and would read as a
+  free "fine" (grey). Round = the mean frame score, a plain number. **The angle is measured against the camera**,
+  which stands in for the opponent only on the curated frontal set — none of the test videos is in it, so read
+  these two as a demonstration of the rule rather than a verdict on the boxer. Read `runs.csv` + the stage's `.json`.
 - **Chin height** (`chin_height/`) and **Chin depth** (`chin_depth/`): both per frame outside punches, both
   continuous rows, both reading the skeleton chin (`nose + 2.25 × nose→mouth` — BlazePose has no jaw landmark).
   Height is the chin against the top of the lead shoulder (the keypoint raised 0.06 torso) in torso lengths, scored 100 with the chin at or below
