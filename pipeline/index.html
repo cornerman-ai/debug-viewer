@@ -404,16 +404,16 @@ const STANCE = {
   width: {label: 'Stance width', short: 'Stance width', stage: 'stance_width', json: 'stance_width.json',
           bad: 'narrow', metric: 'sep', unit: 'torso',
           what: 'are the feet a proper distance apart, seen from the front?',
-          rule: 'sep = the ankle-to-ankle distance in torso lengths; a frame is narrow below 0.50',
-          roundRule: 'the share of judged frames that are narrow \u2014 every readable frame counts, however brief',
-          bands: [['< 15 %', 'good'], ['15\u201330 %', 'sometimes narrow'], ['\u2265 30 %', 'narrow']],
+          rule: 'sep = the ankle-to-ankle distance in torso lengths, scored 100 at 0.50 and wider, 0 with the feet '
+              + 'together, linearly between \u2014 green at 100, red (narrow) below',
+          roundRule: 'the mean frame score over every judged frame \u2014 a plain number, no bands; fewer than 150 judged frames: not rated',
           scope: {moves: 'every frame', angles: 'front, back'}},
   depth: {label: 'Stance depth', short: 'Stance depth', stage: 'stance_depth', json: 'stance_depth.json',
           bad: 'shallow', metric: 'depth', unit: 'leg',
           what: 'is one foot properly in front of the other, seen from the side?',
-          rule: 'depth = the horizontal ankle gap in leg lengths; a frame is shallow below 0.50',
-          roundRule: 'the share of judged frames that are shallow \u2014 every readable frame counts, however brief',
-          bands: [['< 15 %', 'good'], ['15\u201330 %', 'sometimes shallow'], ['\u2265 30 %', 'shallow']],
+          rule: 'depth = the horizontal ankle gap in leg lengths, scored 100 at 0.50 and deeper, 0 with the feet '
+              + 'level, linearly between \u2014 green at 100, red (shallow) below',
+          roundRule: 'the mean frame score over every judged frame \u2014 a plain number, no bands; fewer than 150 judged frames: not rated',
           scope: {moves: 'every frame', angles: 'side-on'}},
 };
 const SLIPCOL = {short: '#ff9f0a', ok: '#34c759', far: '#ff3b30'};
@@ -1714,8 +1714,6 @@ const WORKKIND = {                    // work rate's timeline row
   turn: {c: '#5ac8fa', name: 'Changing angle', why: 'no punch or move, but the smoothed facing turns 90° or more in under 1 s — the turn itself counts as work'},
   dead: {c: '#ff3b30', name: 'Dead time', why: '3 s or more with no punch, no defensive move and no change of angle'},
 };
-const STANCERATE = {good: '#34c759', 'sometimes narrow': '#ff9f0a', 'sometimes shallow': '#ff9f0a',
-                    narrow: '#ff3b30', shallow: '#ff3b30', 'not rated': '#8e8e93'};
 const pct = v => v == null ? '' : `${Math.round(v * 100)}%`;
 function comboStats() {
   const o = S.layerSum.offensive?.offensive, c = S.layerSum.combined?.combined;
@@ -2017,24 +2015,26 @@ function ruleCard() {
     calc: `mean of ${gu.scored_frames.toLocaleString()} frame scores (${gu.both_hands_frames.toLocaleString()} with both hands) · `
           + `low: lead ${pct(gu.hands.lead.low_share)}, rear ${pct(gu.hands.rear.low_share)}`});
   const stW = S.stanceW, stD = S.stanceD;
-  if (stW) add('Stance width', stW.rating, STANCERATE[stW.rating], null, {
+  if (stW) add('Stance width', stW.score ?? 'not rated', stW.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: STANCE.width.what,
     on: `${stW.n_frames.toLocaleString()} frames · ${stW.judged_frames.toLocaleString()} judged, the rest skipped `
         + `(side-on, or a joint not visible)`,
     th: {event: {label: 'per frame', rule: STANCE.width.rule,
-                 bands: [['\u2265 0.50', 'fine'], ['< 0.50', 'narrow']], pal: {fine: '#34c759', narrow: '#ff3b30'}},
-         round: {label: 'per round', rule: STANCE.width.roundRule, bands: STANCE.width.bands, pal: STANCERATE}},
-    calc: `${stW.narrow_frames.toLocaleString()} of ${stW.judged_frames.toLocaleString()} judged frames = `
-          + `${pct(stW.narrow_share)} · median ${stW.median_sep} torso`});
-  if (stD) add('Stance depth', stD.rating, STANCERATE[stD.rating], null, {
+                 bands: [['\u2265 0.50', '100'], ['0 \u2192 0.50', '0 \u2192 100 (linear)']],
+                 pal: {'100': '#34c759', '0 \u2192 100 (linear)': '#ff9f0a'}},
+         round: {label: 'per round', rule: STANCE.width.roundRule}},
+    calc: `mean of ${stW.judged_frames.toLocaleString()} frame scores = ${stW.score ?? '–'} · `
+          + `${stW.narrow_frames.toLocaleString()} below 100 (${pct(stW.narrow_share)}) · median ${stW.median_sep} torso`});
+  if (stD) add('Stance depth', stD.score ?? 'not rated', stD.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: STANCE.depth.what,
     on: `${stD.n_frames.toLocaleString()} frames · ${stD.judged_frames.toLocaleString()} judged, the rest skipped `
         + `(front-on, or a joint not visible)`,
     th: {event: {label: 'per frame', rule: STANCE.depth.rule,
-                 bands: [['\u2265 0.50', 'fine'], ['< 0.50', 'shallow']], pal: {fine: '#34c759', shallow: '#ff3b30'}},
-         round: {label: 'per round', rule: STANCE.depth.roundRule, bands: STANCE.depth.bands, pal: STANCERATE}},
-    calc: `${stD.shallow_frames.toLocaleString()} of ${stD.judged_frames.toLocaleString()} judged frames = `
-          + `${pct(stD.shallow_share)} · median ${stD.median_depth} leg`});
+                 bands: [['\u2265 0.50', '100'], ['0 \u2192 0.50', '0 \u2192 100 (linear)']],
+                 pal: {'100': '#34c759', '0 \u2192 100 (linear)': '#ff9f0a'}},
+         round: {label: 'per round', rule: STANCE.depth.roundRule}},
+    calc: `mean of ${stD.judged_frames.toLocaleString()} frame scores = ${stD.score ?? '–'} · `
+          + `${stD.shallow_frames.toLocaleString()} below 100 (${pct(stD.shallow_share)}) · median ${stD.median_depth} leg`});
   if (sp) add('Same punches', sp.score ?? 'not rated', sp.score == null ? '#8e8e93' : 'var(--text)', null, {
     what: 'does he throw anything beyond his two favourite punches?',
     on: `${sp.n_punches} punches · all judged, grouped by punch type`,

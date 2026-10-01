@@ -41,8 +41,8 @@ The side panel has two views, switched at its top:
 - **Now** — what is under the playhead: the facing angle, the current punch and the current defensive move, each with
   the sections of the rule layers that are on.
 - **Round** — the whole video. **Round score** lists every rule we have, one row each, numbered 1–33 in the Notion
-  order: its 0–100 score — a plain number for most rules; hit height and hand return path add a quality band; stance
-  depth and width, slip distance and the two bladedness axes still give a rating word instead — or "not rated" under
+  order: its 0–100 score — a plain number for most rules; hit height and hand return path add a quality band; slip
+  distance and the two bladedness axes still give a rating word instead — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 150 frames), and under it four lines — what the
   rule measures, what it was measured on, its thresholds, and the sum that produced the number. Then the punch and defense distributions and the combos (counts and the most-used sequences).
 
@@ -183,9 +183,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
   — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of
   the camera, or a joint not visible. Width = ankle-to-ankle distance in torso lengths,
-  read front-on, narrow below 0.50; depth = the horizontal ankle gap in leg lengths, read side-on, shallow below
-  0.50. The round rating is the share of judged frames that are bad, every frame counting however brief:
-  < 15 % good, 15–30 % sometimes, ≥ 30 % bad. Read `runs.csv` + the stage's `.json`.
+  read front-on; depth = the horizontal ankle gap in leg lengths, read side-on. Each frame scores 100 at 0.50 and
+  above, 0 with the feet together (or level), linearly between — green at 100, red below. Round = the mean frame
+  score, a plain number; under 150 judged frames → not rated. Read `runs.csv` + the stage's `.json`.
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = |x shoulder − x elbow| / torso per arm,
   judged only while the boxer is within 45° of facing or backing the camera and that arm isn't throwing a hook. The row
   is continuous — every frame belongs to a stretch: green tucked (< 0.20), yellow borderline (0.20–0.30), red flared
