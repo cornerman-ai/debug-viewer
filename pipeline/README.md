@@ -142,7 +142,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — the zone the fist
   is in at its impact frame on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt;
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
-  fist at that frame with its zone. Until 2026-09-30 it judged jabs and crosses only, at the most-extended frame.
+  fist at that frame with its zone. Round = 100 × the on-target share of the judged punches, a plain number. Until
+  2026-09-30 it judged jabs and crosses only, at the most-extended frame.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head is
   off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
   green at 100, red below, the score on the block — with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.

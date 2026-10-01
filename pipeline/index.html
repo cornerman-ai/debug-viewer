@@ -2256,10 +2256,10 @@ function ruleCard() {
     th: {event: {label: 'per punch', rule: 'the fist’s height at the impact frame on an opponent his own size — jabs, crosses, hooks, uppercuts and body shots alike',
                  bands: [['head, body', 'on target'], ['shoulder, over the head, below the belt', 'off target']],
                  pal: {'on target': '#34c759', 'off target': '#ff3b30'}},
-         round: {label: 'per round', rule: 'the worst 10 % of the punch scores, averaged — a plain number, no bands; '
-                        + 'fewer than 10 judged punches: not rated'}},
-    calc: `the worst 10 % of the ${q.pass + q.fail} punch scores, averaged · ${q.pass} of ${q.pass + q.fail} on target `
-          + `(${pct(S.layerSum.hit?.on_target_share)})`}));
+         round: {label: 'per round', rule: '100 × the share of judged punches on target: 0 with none, 100 with all, '
+                        + 'linear — a plain number, no bands; fewer than 10 judged punches: not rated'}},
+    calc: `${q.pass} of ${q.pass + q.fail} judged punches on target = ${pct(S.layerSum.hit?.on_target_share)} → `
+          + `${S.layerSum.hit?.score ?? '–'}`}));
 
   $('scoreCard').style.display = rows.length ? '' : 'none';
   rows.sort((x, y) => (NOTION[x.name] ?? 99) - (NOTION[y.name] ?? 99));             // one list, the Notion order
