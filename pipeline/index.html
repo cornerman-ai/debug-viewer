@@ -1416,7 +1416,6 @@ const RULE_LAYERS = [
   bladeLayer('hips'), bladeLayer('shoulders'),
 
 ];
-const LAYERS = RULE_LAYERS.map(r => r.key);
 const GUARD_FULL = {lead: 0.50, rear: 0.30};                    // guard height: full marks up to here, 0 from 0.70
 // Which Notion rules (by number, renumbered 2026-10-01) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
@@ -1425,6 +1424,12 @@ const LAYER_RULES = {
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
   rpivot: [33], work: [25],
 };
+// The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
+// the two combo layers first, then by the lowest rule number each layer judges.
+const LAYERS = RULE_LAYERS.map(r => r.key).sort((x, y) => {
+  const combo = k => ['offensive', 'combined'].includes(k) ? 0 : 1, no = k => Math.min(...(LAYER_RULES[k] || [99]));
+  return combo(x) - combo(y) || no(x) - no(y);
+});
 const rulesTag = k => LAYER_RULES[k] ? ` <span class="m">(${LAYER_RULES[k].map(n => 'rule ' + n).join(', ')})</span>` : '';
 const LNAME = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r.short]));
 const RULE = Object.fromEntries(RULE_LAYERS.map(r => [r.key, r]));
@@ -1754,15 +1759,10 @@ function srow(name, rating, color, value, rule) {
 }
 
 const count = (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
-// The Timeline layers card's order: the two combo layers first, then by the lowest rule number each layer judges.
-const CARD_ORDER = [...RULE_LAYERS].sort((x, y) => {
-  const combo = L => ['offensive', 'combined'].includes(L.key) ? 0 : 1, no = L => Math.min(...(LAYER_RULES[L.key] || [99]));
-  return combo(x) - combo(y) || no(x) - no(y);
-});
 function buildLayers() {
   const list = $('layerList');
   if (!list.children.length) {                             // the toggles, once
-    list.innerHTML = CARD_ORDER.map(L => `<div class="layer"><label class="toggle" data-layer="${L.key}"><span>${L.label}${rulesTag(L.key)}</span><span class="sw"></span></label>` +
+    list.innerHTML = LAYERS.map(k => RULE[k]).map(L => `<div class="layer"><label class="toggle" data-layer="${L.key}"><span>${L.label}${rulesTag(L.key)}</span><span class="sw"></span></label>` +
       `<div class="lsum" id="sum-${L.key}"></div><div id="scope-${L.key}"></div></div>`).join('');
     list.querySelectorAll('.toggle[data-layer]').forEach(t => t.onclick = e => {
       e.preventDefault(); const k = t.dataset.layer; if (!S.has?.[k]) return;
@@ -2292,7 +2292,7 @@ function iqrBar(val, q, col, good) {
 }
 const pillV = v => `<span class="verdict" style="background:${VERD[v] || '#8e8e93'}">${VNAME[v] || v}</span>`;
 function layerSections(e) {
-  return RULE_LAYERS.filter(L => layerOn(L.key)).map(L => L.card(e, L.items
+  return LAYERS.map(k => RULE[k]).filter(L => layerOn(L.key)).map(L => L.card(e, L.items
     ? (S.items[L.key] || []).find(it => it.els?.some(m => m.kind === 'punch' && m.sf === e.sf)) : e[L.key])).join('');
 }
 const at = (arr, f, hidden) => arr.filter(e => e.sf <= f && f <= e.ef && !hidden.has(e.type));
