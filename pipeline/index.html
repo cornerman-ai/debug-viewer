@@ -1029,55 +1029,50 @@ const RULE_LAYERS = [
     },
   },
   {
+    // hand return path (hand_return_path/punches.csv), rebuilt 2026-10-01: per side-on jab / cross, the wrist's height
+    // above its own shoulder from the impact to the punch's end + 0.15 s. dip = the lower of the two ends minus the
+    // lowest point (3-frame mean) when that point is inside the window; 100 with no dip, 0 at 0.20 torso.
     key: 'hrp', label: 'Hand return path', short: 'Hand return path',
     csv: ['hand_return_path', 'punches.csv'], json: ['hand_return_path', 'hand_return_path.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, dip: num(r.dip),
-      lowF: num(r.low_frame), oStart: num(r.start_offset), oImp: num(r.impact_offset), ref: num(r.ref_offset),
-      score: num(r.punch_score)} : null,
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, dip: num(r.dip), score: num(r.score),
+      ws: num(r.win_start), we: num(r.win_end), lowF: num(r.low_frame), startH: num(r.start_h), endH: num(r.end_h),
+      lowH: num(r.low_h)} : null,
     summary(P, js, {dot, count}) {
       const m = count(P, p => p.hrp?.verdict);
-      return dot(VERD.pass, `${m.pass || 0} pass`) + dot(VERD.fail, `${m.fail || 0} fail`) +
-        dot(VERD.skip, `${(m.skip || 0) + (m.unclear || 0)} skipped`);
+      return dot(VERD.pass, `${m.pass || 0} at 100`) + dot(VERD.fail, `${m.fail || 0} below`) +
+        dot(VERD.skip, `${m.skip || 0} skipped`);
     },
-    card: (e, a) => `<div class="sub"><div class="h">Hand return path ${a ? pillV(a.verdict) : ''}</div>` +
-      (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
-       a.dip == null ? `<div class="empty">not judged: ${a.skip}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Dip below both of its own anchors</span><b>${a.dip.toFixed(2)} torso</b>
-        <span>Hand at the punch’s start</span><b>${a.oStart.toFixed(2)}</b>
-        <span>Hand at impact</span><b>${a.oImp.toFixed(2)}</b>
-        <span>So the line it must not cross</span><b>${a.ref.toFixed(2)}</b>
-        <span>Lowest frame</span><b>${a.lowF == null ? '–' : 'f ' + a.lowF}</b>
-        <span>Fails at</span><b>0.10 torso below it</b>
-        ${a.score != null ? `<span>Punch score</span><b>${a.score.toFixed(1)}</b>` : ''}</div>`) + '</div>',
-    tip: (e, a, {head, v}) => head + `hand return path ${v(a.verdict)}${a.skip ? ` <span class="m">(${a.skip})</span>` : ''}<br>` +
-      `<span class="num">the fist sank <b>${a.dip == null ? '–' : a.dip.toFixed(2)}</b> torso below both of its own anchors` +
-      `${a.score != null ? ' · score ' + a.score.toFixed(0) : ''}</span><br>` +
-      `<span class="m">between landing and the end of the punch it must not drop below where it was at the start ` +
-      `(${a.oStart == null ? '–' : a.oStart.toFixed(2)}) or at impact (${a.oImp == null ? '–' : a.oImp.toFixed(2)}); 0.10 below the lower of them fails</span>`,
-    row(e, a, {c, y, h, span, tag, ring, tx, fps}) {       // verdict block, the lowest frame as a white tick
-      const judged = a.verdict === 'pass' || a.verdict === 'fail';
-      if (!judged) return;
+    card: (e, a) => `<div class="sub"><div class="h">Hand return path ${a && a.verdict !== 'skip' ? pillV(a.verdict) : ''}</div>` +
+      (!a ? '<div class="empty">not judged (jabs and crosses only)</div>' :
+       a.verdict === 'skip' ? `<div class="empty">not judged: ${(a.skip || '').replace(/_/g, ' ')}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Window</span><b>f ${a.ws}–${a.we} (impact → end + 0.15 s)</b>
+        <span>Wrist above its shoulder: start · lowest · end</span><b>${a.startH.toFixed(2)} · ${a.lowH.toFixed(2)} · ${a.endH.toFixed(2)} torso</b>
+        <span>Dip below the lower end</span><b>${a.dip.toFixed(2)} torso${a.lowF != null ? ' · lowest f ' + a.lowF : ''}</b>
+        <span>Scale</span><b>100 with no dip, 0 at 0.20 torso, linear</b>
+        <span>Punch score</span><b>${a.score.toFixed(1)}</b></div>`) + '</div>',
+    tip: (e, a, {head, v}) => head + (a.verdict === 'skip'
+      ? `<span class="m">hand return path: not judged (${(a.skip || '').replace(/_/g, ' ')})</span>`
+      : `<span class="num">hand return path: dip <b>${a.dip.toFixed(2)}</b> torso → score <b>${a.score.toFixed(1)}</b></span><br>` +
+        `<span class="m">the wrist from impact to the end + 0.15 s: start ${a.startH.toFixed(2)}, lowest ${a.lowH.toFixed(2)}, ` +
+        `end ${a.endH.toFixed(2)} torso above its shoulder — a U when the lowest point sits inside and below both ends</span>`),
+    row(e, a, {c, y, h, span, tag, ring, tx, fps}) {       // score block, the lowest frame as a white tick
+      if (a.verdict !== 'pass' && a.verdict !== 'fail') return;
       const [x, w] = span(e), col = VERD[a.verdict] || '#8e8e93';
       c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill();
-      if (a.lowF != null) { const xi = tx((a.lowF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      if (a.dip != null) tag(x, w, y, h, `${a.dip.toFixed(2)}`);
+      if (a.lowF != null && a.dip > 0) { const xi = tx((a.lowF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      tag(x, w, y, h, a.score.toFixed(1));
       ring(e, 'hrp', x, y, w, h);
     },
-    overlay(e, a, f, P, leadLeft) {                        // the path home, and the line it must not sink below
-      if (!a.verdict || a.dip == null) return;
+    overlay(e, a, f, P, leadLeft) {                        // the wrist's path home, its two ends and its lowest point
+      if (a.verdict !== 'pass' && a.verdict !== 'fail') return;
       const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
-      const shJ = (e.hand === 'lead') === leadLeft ? J.lsh : J.rsh;
-      const sh = P(shJ), l = P(J.lsh), r = P(J.rsh), lh = P(J.lhip), rh = P(J.rhip);
-      if (!(sh && l && r && lh && rh)) return;
-      const torso = Math.hypot((l[0] + r[0]) / 2 - (lh[0] + rh[0]) / 2, (l[1] + r[1]) / 2 - (lh[1] + rh[1]) / 2);
       const col = a.verdict === 'fail' ? '#ff3b30' : '#34c759';
-      const x0 = sh[0] - 70, x1 = sh[0] + 70;
-      OV.level(sh[1] + a.ref * torso, x0, x1, '#8e8e93');                    // the lower of the punch's own two heights
-      OV.level(sh[1] + (a.ref + 0.10) * torso, x0, x1, col, [3, 4]);         // and 0.10 torso under it: the U line
-      OV.trail(e.impact ?? e.sf, e.ef, wr, col);                             // where the fist actually went
-      const low = PAT(a.lowF, wr); if (low) OV.ring(low, col, 10, 3);
-      OV.dot(P(wr), col, 4.5);
-      overlayLabel(x0, sh[1] + a.ref * torso - 16, `dipped ${a.dip.toFixed(2)} below its own anchors`, col);
+      OV.trail(a.ws, a.we, wr, col);                                         // the measured line
+      const st = PAT(a.ws, wr), en = PAT(a.we, wr), low = a.lowF != null ? PAT(a.lowF, wr) : null;
+      if (st) OV.dot(st, '#8e8e93', 5);
+      if (en) OV.dot(en, '#8e8e93', 5);
+      if (low && a.dip > 0) OV.ring(low, col, 10, 3);
+      const at = low || st; if (at) overlayLabel(at[0] + 14, at[1] + 18, `dip ${a.dip.toFixed(2)} torso → ${a.score.toFixed(0)}`, col);
     },
   },
   {
@@ -1820,7 +1815,8 @@ function scopeTxt(key) {
 function layerChip(key, js) {
   if (!js) return null;
   // a rule that ran but has too few judged punches still gets its row: "not rated"
-  if (key === 'hit' || key === 'hrp') return js.score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.score} · ${js.band}`, col: VERD[js.band] || '#8e8e93'};
+  if (key === 'hit') return js.score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.score} · ${js.band}`, col: VERD[js.band] || '#8e8e93'};
+  if (key === 'hrp') return js.score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.score}`, col: 'var(--text)'};
   if (key === 'arm') return js.score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.score}`, col: 'var(--text)'};
   if (key === 'hoc') return js.round_score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.round_score}`, col: 'var(--text)'};
   if (key === 'offensive') return js.offensive?.diversity ? {txt: js.offensive.diversity.score == null ? 'not rated' : String(js.offensive.diversity.score), col: js.offensive.diversity.score == null ? '#8e8e93' : 'var(--text)'} : null;
@@ -2066,17 +2062,16 @@ function ruleCard() {
           + `${wr.turn_only_seconds}s credited to changes of angle · `
           + `${wr.punches_per_minute} punches/min, ${wr.actions_per_minute} actions/min · longest gap ${wr.longest_dead_s}s`});
   scored('hrp', 'Hand return path', q => ({
-    what: 'does the fist come straight back to guard, or loop down and swing up?',
-    on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged, ${q.skip} not judged (no impact frame, `
-        + `the wrist or shoulder out of view, or a tracking jump at the low point) · hooks and uppercuts arc by design and are not judged`,
-    th: {event: {label: 'per punch', rule: 'between the landing and the end of the punch, the fist’s height against its own '
-                        + 'shoulder must not drop below where it was at the punch’s start or where it was at impact — the dip is '
-                        + 'measured from the lower of those two, so a punch that started or landed low is not punished for it',
-                 bands: [['< 0.10 torso below', 'straight back'], ['≥ 0.10', 'loops']],
-                 pal: {'straight back': '#34c759', loops: '#ff3b30'}},
-         round: {label: 'per round', rule: 'the worst 10 % of the punch scores, averaged',
-                 bands: [['95–100', 'perfect'], ['80–95', 'good'], ['55–80', 'bad'], ['< 55', 'critical']], pal: VERD}},
-    calc: `${q.fail} of ${q.pass + q.fail} judged punches loop · the worst 10 % of their scores, averaged`}));
+    what: 'after a straight lands, does the fist come straight back, or sink into a U on the way home?',
+    on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged side-on, ${q.skip} skipped (not side-on, `
+        + `no impact frame, the wrist or shoulder out of view, or a tracker teleport) · hooks and uppercuts arc by design`,
+    th: {event: {label: 'per punch', rule: 'the wrist’s height above its own shoulder from the impact to the punch’s end + '
+                        + '0.15 s; dip = the lower of the two ends (2-frame means) minus the lowest point (3-frame mean) when '
+                        + 'that point is inside the window. 100 with no dip, linearly to 0 at 0.20 torso — green at 100',
+                 bands: [['no dip', '100'], ['0 → 0.20 torso', '100 → 0 (linear)'], ['≥ 0.20', '0']],
+                 pal: {'100': '#34c759', '100 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}},
+         round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 10 judged punches: not rated'}},
+    calc: `mean of ${q.pass + q.fail} punch scores · ${q.pass} at 100, ${q.fail} below · median dip ${S.layerSum.hrp?.median_dip ?? '–'} torso`}));
   for (const kind of ['hips', 'shoulders']) {                                        // 18, 19
     const bd = S.layerSum[`blade_${kind}`], C = BLADE[kind];
     if (!bd) continue;
