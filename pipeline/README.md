@@ -23,8 +23,8 @@ Chrome or Edge (it reads folders with the File System Access API) and Google Dri
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
 (fps, stance, video name), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
 `*_blazepose_full.npy` skeleton for the stick figure. A missing stage is named in the timeline header; the rest still works.
-The rule layers read `arm_extension/arm_extension.{csv,json}`, `hip_rotation/hip_rotation.csv`, `hit_height/hit_height.{csv,json}` and `head_offcenter/head_offcenter.{csv,json}`
-when present, joined to the punches by start frame and hand.
+Each rule layer reads its own stage folder (`<stage>/*.csv` + `<stage>.json`, listed per layer below) when present;
+the per-punch ones are joined to the punches by start frame and hand.
 
 Over HTTP (a static server with Range support rooted at the data folder, serving this page from the same origin):
 `index.html?data=<url of data/>&video=<folder name>` — used for testing.
@@ -170,8 +170,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   not the punches.
 
 - **Slip distance** (`slip_distance/`): per slip, how far the head travelled sideways from where it started, in
-  torso lengths, with a white tick at the furthest frame (orange < 0.20 too short, green 0.20–0.70, red > 0.70 too
-  far). Rolls and ducks are not measured. Judged front-on / back-on only. Two timeline rows, one per rule, each slip coloured by that
+  torso lengths, with a white tick at the furthest frame. Rolls and ducks are not measured. Judged front-on / back-on only. Two timeline rows, one per rule, each slip coloured by that
   rule's slip score (green 100, orange between, red 0), and two round rows, each the mean of its slip scores: rule 14 "slip far enough" (100 at 0.20 torso of travel or more, 0 with none) and 15 "slips compact" (100
   up to 0.70, 0 at 1.00). Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
@@ -234,7 +233,7 @@ combinations `run_combinations.py` already wrote, the share that are 3 punches o
 from 40 %, linearly between — a plain number, no bands; fewer than 10 combinations → not rated. The mean length, the longest, the spread by
 length and the share of punches thrown outside any combination sit beside it, unjudged.
 
-**Output through the round** (`output_decay/output_decay.json` + `windows.csv`, a whole-video rule — no timeline
+**Output through the round** (`output_decay/output_decay.json`, a whole-video rule — no timeline
 row): measured from the first punch to the last. Under 90 s of that span, the span is cut in three equal thirds and
 the last third compared with the first; 90 s or more, the first 30 s from the first punch against the last 30 s up
 to the last punch. 100 up to 15 % fewer punches at the end, linearly to 0 at 40 % fewer, a plain number; under 30
