@@ -109,8 +109,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Hand return path** (`hand_return_path/`): per side-on jab / cross, the wrist's height above its own shoulder
   from the impact to the punch's end + 0.15 s. dip = the lower of the two ends (2-frame means) minus the lowest
   point (3-frame mean) when that point is inside the window; scored 100 with no dip, linearly to 0 at 0.20 torso —
-  green at 100, red below, the score on the block and a white tick at the lowest frame. On the video, while the punch
-  is under the playhead: the wrist's measured line, its two ends (grey dots) and the lowest point (ring). Punches not
+  green at 100, red below. The block covers the measured window itself (impact → end + 0.15 s, not the punch), with
+  the score on it and a white tick at the lowest frame. On the video, for every frame of that window: the wrist's
+  whole measured line, its two ends (grey dots), the lowest point (ring) and where the wrist is now. Punches not
   side-on, with no impact frame, a lost wrist or a tracker teleport are not drawn. Round = the mean punch score, a
   plain number. Rebuilt 2026-10-01 — the earlier versions are in `combined_pipeline/changes.md`. Reads `punches.csv`
   + `hand_return_path.json`.

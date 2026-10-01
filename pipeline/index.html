@@ -1033,10 +1033,11 @@ const RULE_LAYERS = [
     // above its own shoulder from the impact to the punch's end + 0.15 s. dip = the lower of the two ends minus the
     // lowest point (3-frame mean) when that point is inside the window; 100 with no dip, 0 at 0.20 torso.
     key: 'hrp', label: 'Hand return path', short: 'Hand return path',
+    window: true,                                          // its block, ring, hover and drawing cover impact → end + 0.15 s
     csv: ['hand_return_path', 'punches.csv'], json: ['hand_return_path', 'hand_return_path.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, dip: num(r.dip), score: num(r.score),
-      ws: num(r.win_start), we: num(r.win_end), lowF: num(r.low_frame), startH: num(r.start_h), endH: num(r.end_h),
-      lowH: num(r.low_h)} : null,
+      ws: num(r.win_start), we: num(r.win_end), a: num(r.win_start), b: num(r.win_end), lowF: num(r.low_frame),
+      startH: num(r.start_h), endH: num(r.end_h), lowH: num(r.low_h)} : null,
     summary(P, js, {dot, count}) {
       const m = count(P, p => p.hrp?.verdict);
       return dot(VERD.pass, `${m.pass || 0} at 100`) + dot(VERD.fail, `${m.fail || 0} below`) +
@@ -1055,24 +1056,30 @@ const RULE_LAYERS = [
       : `<span class="num">hand return path: dip <b>${a.dip.toFixed(2)}</b> torso → score <b>${a.score.toFixed(1)}</b></span><br>` +
         `<span class="m">the wrist from impact to the end + 0.15 s: start ${a.startH.toFixed(2)}, lowest ${a.lowH.toFixed(2)}, ` +
         `end ${a.endH.toFixed(2)} torso above its shoulder — a U when the lowest point sits inside and below both ends</span>`),
-    row(e, a, {c, y, h, span, tag, ring, tx, fps}) {       // score block, the lowest frame as a white tick
+    row(e, a, {c, y, h, tag, ring, tx, fps}) {             // the measured window as the block, its lowest frame a white tick
       if (a.verdict !== 'pass' && a.verdict !== 'fail') return;
-      const [x, w] = span(e), col = VERD[a.verdict] || '#8e8e93';
+      const x0 = Math.max(L, tx(a.ws / fps)), x1 = tx((a.we + 1) / fps); if (x1 <= L) return;
+      const x = x0, w = Math.max(3, x1 - x0 - 1), col = VERD[a.verdict] || '#8e8e93';
       c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill();
       if (a.lowF != null && a.dip > 0) { const xi = tx((a.lowF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       tag(x, w, y, h, a.score.toFixed(1));
       ring(e, 'hrp', x, y, w, h);
     },
-    overlay(e, a, f, P, leadLeft) {                        // the wrist's path home, its two ends and its lowest point
-      if (a.verdict !== 'pass' && a.verdict !== 'fail') return;
-      const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
-      const col = a.verdict === 'fail' ? '#ff3b30' : '#34c759';
-      OV.trail(a.ws, a.we, wr, col);                                         // the measured line
-      const st = PAT(a.ws, wr), en = PAT(a.we, wr), low = a.lowF != null ? PAT(a.lowF, wr) : null;
-      if (st) OV.dot(st, '#8e8e93', 5);
-      if (en) OV.dot(en, '#8e8e93', 5);
-      if (low && a.dip > 0) OV.ring(low, col, 10, 3);
-      const at = low || st; if (at) overlayLabel(at[0] + 14, at[1] + 18, `dip ${a.dip.toFixed(2)} torso → ${a.score.toFixed(0)}`, col);
+    frameOverlay(f, P, leadLeft) {                         // every window holding this frame: impact → end + 0.15 s
+      const es = S.punches.filter(p => (p.hrp?.verdict === 'pass' || p.hrp?.verdict === 'fail') && f >= p.hrp.ws && f <= p.hrp.we
+                                       && !S.hiddenP.has(p.type));
+      for (const e of es) {
+        const a = e.hrp, wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
+        const col = a.verdict === 'fail' ? '#ff3b30' : '#34c759';
+        OV.trail(a.ws, a.we, wr, col);                                       // the whole measured line
+        const st = PAT(a.ws, wr), en = PAT(a.we, wr), low = a.lowF != null ? PAT(a.lowF, wr) : null;
+        if (st) OV.dot(st, '#8e8e93', 5);
+        if (en) OV.dot(en, '#8e8e93', 5);
+        if (low && a.dip > 0) OV.ring(low, col, 10, 3);
+        const w = P(wr); if (w) OV.dot(w, col, 4.5);                         // where the wrist is now
+        const at = low || st, name = es.length > 1 ? `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()} · ` : '';
+        if (at) overlayLabel(at[0] + 14, at[1] + 18, `${name}dip ${a.dip.toFixed(2)} torso → ${a.score.toFixed(0)} · f ${f - a.ws + 1}/${a.we - a.ws + 1}`, col);
+      }
     },
   },
   {
