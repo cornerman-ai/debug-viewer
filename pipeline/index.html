@@ -2081,9 +2081,9 @@ function ruleCard() {
                         + 'every frame between the ends sits under that line; okay otherwise. No grade per punch',
                  bands: [['some frame on or over the line', 'okay'], ['every frame under it', 'not okay']],
                  pal: {okay: '#34c759', 'not okay': '#ff3b30'}},
-         round: {label: 'per round', rule: '100 × (1 − the share of judged punches not okay): 100 with none, 0 with all, '
-                        + 'linear — a plain number, no bands; fewer than 10 judged punches: not rated',
-                 bands: [['0 % not okay', '100'], ['0 → 100 %', '100 → 0'], ['100 %', '0']],
+         round: {label: 'per round', rule: 'the share of judged punches not okay: 100 with none, linearly down to 0 at 70 % '
+                        + '— a plain number, no bands; fewer than 10 judged punches: not rated',
+                 bands: [['0 % not okay', '100'], ['0 → 70 %', '100 → 0'], ['≥ 70 %', '0']],
                  pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}},
     calc: `${q.fail} of ${q.pass + q.fail} judged punches not okay = ${pct(S.layerSum.hrp?.not_ok_share)} → ${S.layerSum.hrp?.score ?? '–'}`}));
   for (const kind of ['hips', 'shoulders']) {                                        // 18, 19

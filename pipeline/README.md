@@ -114,7 +114,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   starts, green okay, red not okay, labelled with the frames under the chord. Overlapping windows each draw on the
   video, on their own wrist, labelled by hand. On the video, for every frame of that window: the wrist's whole line, the chord
   (dashed white) between the two ends (grey dots), each frame between them as a red (under) or green dot, and where
-  the wrist is now. Round = 100 × (1 − the share of judged punches not okay), a plain number. Rebuilt 2026-10-01 — the earlier versions are in
+  the wrist is now. Round = 100 with no punch not okay, linearly to 0 at 70 % not okay, a plain number. Rebuilt 2026-10-01 — the earlier versions are in
   `combined_pipeline/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
 - **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the hand
   that is NOT throwing, read at impact −2, impact and impact +2 frames and weighted ¼ · ½ · ¼ — how far it sits below
