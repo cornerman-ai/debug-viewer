@@ -44,7 +44,7 @@ The side panel has two views, switched at its top:
   sequences).
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
   bad 1, mid 2, good 3, great 4), and the sum over 4 × the rated rules is put on 0–100 (not-rated rules count in
-  neither) — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count
+  neither), coloured and labelled on the same tier scale as the rules, with the same bar — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count
   per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–33 in the Notion
   order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 70–85 good,
   60–70 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under

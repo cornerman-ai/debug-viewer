@@ -125,6 +125,7 @@
   .big .n .tier { font-size: 13px; font-weight: 600; margin-left: 8px; letter-spacing: 0; }
   .overall { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 600; }
   .overall b { font-size: 26px; letter-spacing: -0.02em; }
+  .overall .tier { font-size: 14px; font-weight: 600; margin-left: 8px; letter-spacing: 0; }
   .overall-sum { font-size: 12px; color: var(--text2); margin: 0 0 8px; }
   .brief { padding: 6px 0; border-top: 1px solid var(--sep); }
   .overall-sum + .brief { border-top: 0; }
@@ -2342,9 +2343,10 @@ function renderBrief() {
   $('briefCard').style.display = rows.length ? '' : 'none';
   const rated = groups.slice(0, TIER.length).flatMap(g => g.rs.map(() => TIER_POINTS[g.name]));
   const pts = rated.reduce((a, b) => a + b, 0), max = 4 * rated.length;
-  const overall = max ? Math.round(1000 * pts / max) / 10 : null;
+  const overall = max ? Math.round(1000 * pts / max) / 10 : null, ot = overall == null ? null : tierOf(overall);   // same scale as the rules
   $('briefCard').innerHTML = `<div class="label">Brief · ${rows.length} rules</div>` +
-    `<div class="overall"><span>Overall round score</span><b class="num">${overall ?? '–'}</b></div>` +
+    `<div class="overall"><span>Overall round score</span><b class="num"${ot ? ` style="color:${ot[2]}"` : ''}>${overall ?? '–'}` +
+      `${ot ? `<span class="tier" style="color:${ot[2]}">${ot[1]}</span>` : ''}</b></div>` + hpBar(overall, ot) +
     `<div class="overall-sum">${max ? `${pts} of ${max} points · ${rated.length} rated rules × 4 · ` +
       `${TIER.map(([, n]) => `${n} ${TIER_POINTS[n]}`).join(', ')}` : 'no rule rated'}</div>` + groups.map(g =>
     `<div class="brief"><div class="bh"><span style="color:${g.col}">${cap(g.name)}</span><span class="num">${g.rs.length}</span></div>` +
