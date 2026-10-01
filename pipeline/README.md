@@ -176,9 +176,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   shoulder's front (the lead keypoint pushed forward 0.10 torso) in torso lengths, scored 100 at or behind it and
   linearly to 0 at 0.40 in front — green at 100, red below — read side-on
   only. A dashed gray line is everything the rule could not look at: a joint not visible, a punch in flight, or the
-  wrong camera angle. Round = the share of judged frames that are bad, every frame counting however brief:
-  both = the mean frame score, a plain number. Both read
-  joints at visibility 0.30, like every rule. Read `runs.csv` + the stage's `.json`.
+  wrong camera angle. Round = the mean frame score over every judged frame, however brief — a plain number, no
+  bands; under 150 judged frames → not rated. Both read joints at visibility 0.30, like every rule. Read `runs.csv` + the stage's `.json`.
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
   — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of
   the camera, or a joint not visible. Width = ankle-to-ankle distance in torso lengths,
