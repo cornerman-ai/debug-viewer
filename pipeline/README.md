@@ -40,8 +40,10 @@ The side panel has two views, switched at its top:
 
 - **Now** — what is under the playhead: the facing angle, the current punch and the current defensive move, each with
   the sections of the rule layers that are on.
-- **Round** — the whole video. **Round score** lists every rule we have, one row each: the 0–100 score where the
-  rule has one (arm extension, head off center, hit height), otherwise its rating, and under it four lines — what the
+- **Round** — the whole video. **Round score** lists every rule we have, one row each, numbered 1–33 in the Notion
+  order: its 0–100 score — a plain number for most rules; hit height and hand return path add a quality band; stance
+  depth and width, slip distance and the two bladedness axes still give a rating word instead — or "not rated" under
+  the rule's floor (10 judged punches / combos / moves, 150 frames), and under it four lines — what the
   rule measures, what it was measured on, its thresholds, and the sum that produced the number. Then the punch and defense distributions and the combos (counts and the most-used sequences).
 
 The **Timeline layers** card stays below both views: it only turns timeline rows on and off, and each toggle shows

@@ -49,18 +49,21 @@ myrule: {moves: 'jab, cross', angles: 'side-on'},            // angles: front, b
 
 ## 2b. A Round score row
 
-In `ruleCard()` in `index.html`, one `add(name, value, colour, band, info)` call in the Notion rule order. `value` is
-the 0–100 score where the rule has one, otherwise its rating word. `info` carries the four lines every row shows:
+In `ruleCard()` in `index.html`, one `add(name, value, colour, band, info)` call in the Notion rule order (and the
+rule's number in `NOTION` and `LAYER_RULES`). `value` is the 0–100 score — the house style is a plain number, no
+bands, `'not rated'` when the backend wrote `score: null` — otherwise a rating word. Per-punch / per-frame scores
+are green only at 100 and red below, and a reading at the rule's line or on its good side is 100. `info` carries the
+four lines every row shows:
 
 ```js
-add('My rule', js.rating, MYCOL[js.rating], null, {
+add('My rule', js.score ?? 'not rated', js.score == null ? '#8e8e93' : 'var(--text)', null, {
   what: 'the coaching question in one plain line, ending in a question mark',
   on:   'what it was measured on, with the counts (70 of 81 judged)',
   th:   {                                                    // two groups; drop either if the rule has no such level
     event: {label: 'per punch', rule: 'what is measured on one punch / move / frame / combo',
-            bands: [['≥ 157°', 'pass'], ['< 157°', 'fail']], pal: VERD, note: 'optional second line'},
-    round: {label: 'per round', rule: 'how the round number is produced',
-            bands: [['≥ 50 %', 'good'], ['25–50 %', 'some'], ['< 25 %', 'bad']], pal: MYCOL}},
+            bands: [['≥ 160°', '100'], ['100° → 160°', '0 → 100 (linear)'], ['≤ 100°', '0']],
+            pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a', '0': '#ff3b30'}, note: 'optional second line'},
+    round: {label: 'per round', rule: 'the mean punch score — a plain number, no bands; fewer than 10 judged punches: not rated'}},
   calc: '29 turned / 34 combos = 85%'});                     // the actual sum, with this video's numbers
 ```
 
@@ -89,7 +92,8 @@ moved with it, in `changes.md`.
 
 ## 4. Before pushing
 
-- Open both test videos in the browser and check the new row / rating renders with no console errors.
+- Add the rule's script to `STAGES` in the backend's `combined_pipeline/run_all.py`, or a fresh run never makes it.
+- Open both test videos in the browser and check the new row renders with no console errors.
 - Update `README.md` (the layer list, or the whole-video rule list).
 - Push `debug-viewer` main — it deploys to <https://cornerman-ai.github.io/debug-viewer/pipeline/>.
 
