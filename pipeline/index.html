@@ -123,8 +123,11 @@
   .big .n { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
   .big .n.small { font-size: 14px; }
   .big .n .tier { font-size: 13px; font-weight: 600; margin-left: 8px; letter-spacing: 0; }
+  .overall { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 600; }
+  .overall b { font-size: 26px; letter-spacing: -0.02em; }
+  .overall-sum { font-size: 12px; color: var(--text2); margin: 0 0 8px; }
   .brief { padding: 6px 0; border-top: 1px solid var(--sep); }
-  .label + .brief { border-top: 0; padding-top: 0; }
+  .overall-sum + .brief { border-top: 0; }
   .brief .bh { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; }
   .brief .bl { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.45; }
   .rsort { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 8px; font-size: 12px; }
@@ -1672,7 +1675,9 @@ async function showVideoList() {
 }
 function fillSelect(names, onPick) {
   const sel = $('videoSelect');
-  sel.innerHTML = names.map(n => `<option>${n.replace(/</g, '&lt;')}</option>`).join('');
+  // an explicit value: an option's text collapses runs of spaces, and a folder name can carry two ("Pointers  )")
+  const esc = n => n.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  sel.innerHTML = names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   sel.style.display = '';
   sel.onchange = async e => { sel.value = e.target.value; await guard(() => onPick(e.target.value)); };
 }
@@ -2310,7 +2315,11 @@ function ruleCard() {
   renderBrief();
   renderRules();
 }
-// The brief: every rule under its tier on the shared colour scale, names only, with the count per tier.
+// The brief: every rule under its tier on the shared colour scale, names only, with the count per tier, and the
+// overall round score (the user's call, 2026-10-01): each rated rule earns points by its tier — critical 0, bad 1,
+// mid 2, good 3, great 4 — and the sum over the most it could earn (4 x rated rules) is put on 0-100.
+// Not-rated rules are left out of both.
+const TIER_POINTS = {great: 4, good: 3, mid: 2, bad: 1, critical: 0};
 function renderBrief() {
   const rows = S.ruleRows || [];
   const groups = [...TIER.map(([, name, col]) => ({name, col, rs: []})), {name: 'not rated', col: '#8e8e93', rs: []}];
@@ -2319,7 +2328,13 @@ function renderBrief() {
     groups[t ? TIER.indexOf(t) : TIER.length].rs.push(r);
   }
   $('briefCard').style.display = rows.length ? '' : 'none';
-  $('briefCard').innerHTML = `<div class="label">Brief · ${rows.length} rules</div>` + groups.map(g =>
+  const rated = groups.slice(0, TIER.length).flatMap(g => g.rs.map(() => TIER_POINTS[g.name]));
+  const pts = rated.reduce((a, b) => a + b, 0), max = 4 * rated.length;
+  const overall = max ? Math.round(1000 * pts / max) / 10 : null;
+  $('briefCard').innerHTML = `<div class="label">Brief · ${rows.length} rules</div>` +
+    `<div class="overall"><span>Overall round score</span><b class="num">${overall ?? '–'}</b></div>` +
+    `<div class="overall-sum">${max ? `${pts} of ${max} points · ${rated.length} rated rules × 4 · ` +
+      `${TIER.map(([, n]) => `${n} ${TIER_POINTS[n]}`).join(', ')}` : 'no rule rated'}</div>` + groups.map(g =>
     `<div class="brief"><div class="bh"><span style="color:${g.col}">${cap(g.name)}</span><span class="num">${g.rs.length}</span></div>` +
     `<div class="bl">${g.rs.length ? g.rs.map(r => r.name).join(', ') : '<span class="m">none</span>'}</div></div>`).join('');
 }
