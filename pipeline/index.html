@@ -122,6 +122,8 @@
   .big { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; }
   .big .n { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
   .big .n.small { font-size: 14px; }
+  .big .n .tier { font-size: 13px; font-weight: 600; margin-left: 8px; letter-spacing: 0; }
+  .tiers { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; font-weight: 600; margin: 2px 0 8px; }
   .grp { display: flex; align-items: center; gap: 8px; margin: 16px 0 6px; font-size: 10.5px; font-weight: 700;
     color: var(--text2); text-transform: uppercase; letter-spacing: 0.07em; }
   .grp::after { content: ''; flex: 1; height: 1px; background: var(--sep); }
@@ -1868,6 +1870,11 @@ const NOTION = {
   'Same offensive combos': 30, 'Same combined combos': 31, 'Hook stop': 32, 'Rear-foot pivot': 33,
 };
 const notionNo = name => String(NOTION[name] ?? '?');
+// One colour scale for every rule's round score (the user's call, 2026-10-01) — display only, the score stays the
+// number the rule computed. Lower bound inclusive: 85 is great, 70 good, 60 mid, 40 bad.
+const TIER = [[85, 'great', '#34c759'], [70, 'good', '#8fd14f'], [60, 'mid', '#e6b800'], [40, 'bad', '#ff9500'],
+              [0, 'critical', '#ff3b30']];
+const tierOf = v => TIER.find(([lo]) => v >= lo);
 // Round view — every rule we have, one row each, in the Notion order. A row carries its value (the 0-100 score
 // where the rule has one, otherwise "not rated") and four lines: what it measures, what it was measured on, the
 // thresholds, and the sum that produced the number.
@@ -2261,10 +2268,10 @@ function ruleCard() {
   $('scoreCard').style.display = rows.length ? '' : 'none';
   rows.sort((x, y) => (NOTION[x.name] ?? 99) - (NOTION[y.name] ?? 99));             // one list, the Notion order
   const rule = r => {
-    const big = /^[\d.]+$/.test(r.value);
+    const big = /^[\d.]+$/.test(r.value), t = big ? tierOf(+r.value) : null;
     return `<div class="rule">` +
-      `<div class="big"><span class="k">${notionNo(r.name)} · ${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${r.color}">${r.value}` +
-      '</span></div>' +
+      `<div class="big"><span class="k">${notionNo(r.name)} · ${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${t ? t[2] : r.color}">${r.value}` +
+      (t ? `<span class="tier" style="color:${t[2]}">${t[1]}</span>` : '') + '</span></div>' +
       `<div class="exp"><span>measures</span><span>${r.what}</span>` +
       `<span>on</span><span>${r.on}</span>` +
       `<span>thresholds</span><span>${[r.th.event, r.th.round].filter(Boolean).map(g =>
@@ -2276,6 +2283,7 @@ function ruleCard() {
       `<span>round</span><span>${r.value === 'not rated' ? 'None' : r.calc}</span></div></div>`;   // not rated: no sum to show
   };
   $('scoreCard').innerHTML = '<div class="label">Round score</div>' +
+    `<div class="tiers">${TIER.map(([lo, name, col], i) => `<span style="color:${col}">${lo}–${i ? TIER[i - 1][0] : 100} ${name}</span>`).join('')}</div>` +
     `<div class="grpbox">${rows.map(rule).join('')}</div>`;
 }
 const layerOn = k => !!(S.has?.[k] && V.layers[k]);

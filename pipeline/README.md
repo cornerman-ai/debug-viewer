@@ -43,7 +43,8 @@ The side panel has two views, switched at its top:
 - **Round** — the whole video's counts: the punch and defense distributions and the combos (counts and the most-used
   sequences).
 - **Rules** — the whole video's **Round score**, the only card on the tab: every rule we have, one row each, numbered 1–33 in the Notion
-  order: its 0–100 score — a plain number — or "not rated" under
+  order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 70–85 good,
+  60–70 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 150 frames), and under it four lines — what the
   rule measures, what it was measured on, its thresholds, and the sum that produced the number.
 
