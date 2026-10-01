@@ -419,8 +419,79 @@ const STANCE = {
           roundRule: 'the mean frame score over every judged frame \u2014 a plain number, no bands; fewer than 150 judged frames: not rated',
           scope: {moves: 'every frame', angles: 'side-on'}},
 };
-const SLIPCOL = {short: '#ff9f0a', ok: '#34c759', far: '#ff3b30'};
-const SLIPNAME = {short: 'too short', ok: 'good distance', far: 'too far'};
+// slip distance (slip_distance/moves.csv): how far the head travelled sideways during a SLIP, from where it started
+// to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose. One script,
+// two rules, two timeline rows: 14 "slip far enough" (100 from 0.20 torso, 0 with no travel) and 15 "slips compact"
+// (100 up to 0.70, 0 at 1.00). Each row is coloured by its own slip score: green at 100, orange between, red at 0.
+const slipCol = v => v == null ? '#8e8e93' : v >= 100 ? '#34c759' : v <= 0 ? '#ff3b30' : '#ff9f0a';
+function slipLayer(rule) {
+  const key = `slip${rule}`, sk = `s${rule}`;
+  const label = rule === 14 ? 'Slip far enough' : 'Slips compact';
+  const scale = rule === 14 ? '100 from 0.20 torso of travel, 0 with no travel' : '100 up to 0.70 torso of travel, 0 at 1.00';
+  return {
+    key, label, short: label, items: true,
+    frameOverlay(f, P) {                                   // the head's path through the slip, and its furthest point
+      const it = OV.at(key, f); if (!it || !it.verdict) return;
+      const col = slipCol(it[sk]);
+      // the rule's reading: the midpoint of the EXTENT of landmarks 0-10 at visibility >= 0.30, minus the hip centre.
+      // Drawing the nose instead would show sideways steps the number excludes.
+      const C = S.skelC;
+      const read = fr => {
+        if (!S.skel || fr < 0 || fr >= S.skel.length / (33 * C)) return null;
+        const b = fr * 33 * C;
+        let lo = Infinity, hi = -Infinity, ys = 0, n = 0;
+        for (let j = 0; j < 11; j++) {
+          const x = S.skel[b + j * C], y = S.skel[b + j * C + 1];
+          if (!(S.skel[b + j * C + 6] >= 0.30) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+          lo = Math.min(lo, x); hi = Math.max(hi, x); ys += y; n++;
+        }
+        const lh = PAT(fr, J.lhip), rh = PAT(fr, J.rhip);
+        if (!n || !(lh && rh)) return null;
+        const head = PXY((lo + hi) / 2, ys / n);
+        return head ? {head, hipx: (lh[0] + rh[0]) / 2, hipy: (lh[1] + rh[1]) / 2} : null;
+      };
+      const here = read(f); if (!here) return;
+      OV.line([here.hipx, here.hipy], [here.hipx, here.head[1]], '#8e8e93', 1.5, [4, 4]);   // the line it is read from
+      octx.save(); octx.strokeStyle = col; octx.lineWidth = 2.5; octx.lineCap = 'round'; octx.beginPath();
+      let base = null, started = false;                     // the path, drawn as sideways travel, hips held still
+      for (let fr = it.sf; fr <= Math.min(f, it.ef); fr++) {
+        const r = read(fr); if (!r) continue;
+        if (!base) base = r;
+        const q = [here.hipx + (r.head[0] - r.hipx), r.head[1]];
+        started ? octx.lineTo(...q) : octx.moveTo(...q); started = true;
+      }
+      if (started) octx.stroke();
+      octx.restore();
+      if (base) {                                           // the rule's baseline: the first READABLE frame
+        const b0 = [here.hipx + (base.head[0] - base.hipx), base.head[1]];
+        OV.ring(b0, '#8e8e93', 8, 2);
+        OV.line([b0[0], here.head[1]], [here.head[0], here.head[1]], col, 2, [3, 3]);
+      }
+      const pk = read(it.peakF);
+      if (pk && f >= it.peakF) OV.ring([here.hipx + (pk.head[0] - pk.hipx), pk.head[1]], col, 11, 3);
+      OV.dot(here.head, col, 4.5);
+      overlayLabel(here.head[0] + 16, here.head[1] + (rule === 14 ? -18 : 6),
+                   `rule ${rule}: travelled ${it.travel.toFixed(2)} torso → ${it[sk] == null ? '–' : it[sk].toFixed(0)}`, col);
+    },
+    csv: ['slip_distance', 'moves.csv'], json: ['slip_distance', 'slip_distance.json'],
+    parseItem: (r, num) => r.verdict ? {type: r.defense_type, side: r.side, sf: num(r.start_frame), ef: num(r.end_frame),
+      travel: num(r.travel), peakF: num(r.peak_frame), verdict: r.verdict, s14: num(r.score_far_enough), s15: num(r.score_compact)} : null,
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => `<b>${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type} · rule ${rule}: ${x[sk] == null ? '–' : x[sk].toFixed(0)}</b> · ` +
+      `${fmtT(x.sf / S.fps)}<br><span class="num">the head travelled <b>${x.travel.toFixed(2)}</b> torso from where it started</span><br>` +
+      `<span class="m">${scale}</span>`,
+    row(e, x, {c, y, h, span, tag, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
+      c.fillStyle = slipCol(x[sk]); c.globalAlpha = on ? 1 : 0.9;
+      rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
+      if (x.peakF != null) { const xi = tx((x.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      tag(x0, w, y, h, x[sk] == null ? '' : `${x[sk].toFixed(0)}`);
+    },
+  };
+}
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
 // the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
@@ -680,71 +751,7 @@ const RULE_LAYERS = [
       }
     },
   },
-  {
-    // slip distance (slip_distance/moves.csv): how far the head travelled sideways during a SLIP, from where it
-    // started to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose.
-    key: 'slipd', label: 'Slip distance', short: 'Slip distance', items: true,
-    frameOverlay(f, P) {                                   // the head's path through the slip, and its furthest point
-      const it = OV.at('slipd', f); if (!it || !it.verdict) return;
-      const col = SLIPCOL[it.verdict] || '#8e8e93';
-      // the rule's reading: the midpoint of the EXTENT of landmarks 0-10 at visibility >= 0.30, minus the hip centre.
-      // Drawing the nose instead would show sideways steps the number excludes.
-      const C = S.skelC;
-      const read = fr => {
-        if (!S.skel || fr < 0 || fr >= S.skel.length / (33 * C)) return null;
-        const b = fr * 33 * C;
-        let lo = Infinity, hi = -Infinity, ys = 0, n = 0;
-        for (let j = 0; j < 11; j++) {
-          const x = S.skel[b + j * C], y = S.skel[b + j * C + 1];
-          if (!(S.skel[b + j * C + 6] >= 0.30) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
-          lo = Math.min(lo, x); hi = Math.max(hi, x); ys += y; n++;
-        }
-        const lh = PAT(fr, J.lhip), rh = PAT(fr, J.rhip);
-        if (!n || !(lh && rh)) return null;
-        const head = PXY((lo + hi) / 2, ys / n);
-        return head ? {head, hipx: (lh[0] + rh[0]) / 2, hipy: (lh[1] + rh[1]) / 2} : null;
-      };
-      const here = read(f); if (!here) return;
-      OV.line([here.hipx, here.hipy], [here.hipx, here.head[1]], '#8e8e93', 1.5, [4, 4]);   // the line it is read from
-      octx.save(); octx.strokeStyle = col; octx.lineWidth = 2.5; octx.lineCap = 'round'; octx.beginPath();
-      let base = null, started = false;                     // the path, drawn as sideways travel, hips held still
-      for (let fr = it.sf; fr <= Math.min(f, it.ef); fr++) {
-        const r = read(fr); if (!r) continue;
-        if (!base) base = r;
-        const q = [here.hipx + (r.head[0] - r.hipx), r.head[1]];
-        started ? octx.lineTo(...q) : octx.moveTo(...q); started = true;
-      }
-      if (started) octx.stroke();
-      octx.restore();
-      if (base) {                                           // the rule's baseline: the first READABLE frame
-        const b0 = [here.hipx + (base.head[0] - base.hipx), base.head[1]];
-        OV.ring(b0, '#8e8e93', 8, 2);
-        OV.line([b0[0], here.head[1]], [here.head[0], here.head[1]], col, 2, [3, 3]);
-      }
-      const pk = read(it.peakF);
-      if (pk && f >= it.peakF) OV.ring([here.hipx + (pk.head[0] - pk.hipx), pk.head[1]], col, 11, 3);
-      OV.dot(here.head, col, 4.5);
-      overlayLabel(here.head[0] + 16, here.head[1] - 18, `travelled ${it.travel.toFixed(2)} torso`, col);
-    },
-    csv: ['slip_distance', 'moves.csv'], json: ['slip_distance', 'slip_distance.json'],
-    parseItem: (r, num) => r.verdict ? {type: r.defense_type, side: r.side, sf: num(r.start_frame), ef: num(r.end_frame),
-      travel: num(r.travel), peakF: num(r.peak_frame), verdict: r.verdict, s14: num(r.score_far_enough), s15: num(r.score_compact)} : null,
-    summary: () => '',
-    card: () => '',
-    tip: (e, x) => `<b>${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type} · ${SLIPNAME[x.verdict]}</b> · ` +
-      `${fmtT(x.sf / S.fps)}<br><span class="num">the head travelled <b>${x.travel.toFixed(2)}</b> torso from where it started</span><br>` +
-      `<span class="num">rule 14 far enough <b>${x.s14 == null ? '–' : x.s14.toFixed(0)}</b> · rule 15 compact <b>${x.s15 == null ? '–' : x.s15.toFixed(0)}</b></span><br>` +
-      `<span class="m">14: 100 from 0.20, 0 with no travel · 15: 100 up to 0.70, 0 at 1.00 torso</span>`,
-    row(e, x, {c, y, h, span, tag, tx, fps}) {
-      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
-      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
-      c.fillStyle = SLIPCOL[x.verdict]; c.globalAlpha = on ? 1 : 0.9;
-      rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
-      if (x.peakF != null) { const xi = tx((x.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
-        c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
-      tag(x0, w, y, h, `${x.travel.toFixed(2)}`);
-    },
-  },
+  slipLayer(14), slipLayer(15),
   {
     // keep the guard before punching (hand_drop/punches.csv): how far the punching wrist sits below the nose, in torso
     // lengths, averaged over every readable frame of the 0.25 s before the punch starts. Low above 0.40 — the same
@@ -1428,7 +1435,7 @@ const GUARD_FULL = {lead: 0.50, rear: 0.30};                    // guard height:
 // Which Notion rules (by number, renumbered 2026-10-01) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [3], guard: [4], resting: [6], chin_depth: [7], chin_height: [8], elbow: [9],
-  hoc: [10], stance_depth: [11], stance_width: [12], slipd: [14, 15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
+  hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
   rpivot: [33], work: [25],
 };
@@ -1794,7 +1801,8 @@ const ALL_ANGLES = 'front, back, side-on';
 const SCOPE = {
   defcov:    {moves: 'defensive moves after an offensive combo',  angles: 'front, back, side-on'},
   guard:     {moves: 'every frame, per hand, while that hand is not punching', angles: 'front, back, side-on'},
-  slipd:     {moves: 'slips only',                              angles: 'front, back'},
+  slip14:    {moves: 'slips only',                              angles: 'front, back'},
+  slip15:    {moves: 'slips only',                              angles: 'front, back'},
   stance_width: {moves: 'every frame',                          angles: 'front, back'},
   stance_depth: {moves: 'every frame',                          angles: 'side-on'},
   drop:      {moves: 'every punch, the hand that throws',       angles: ALL_ANGLES},
@@ -1847,8 +1855,8 @@ function scoreCounts(key) {
           fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
 // The Notion "Production rules" numbering (renumbered 2026-10-01: rules 3 and 34 were removed, the rest closed up to
-// 1-33): the round view is one list in this order. Slip distance is one script and one timeline layer for two Notion
-// rules — 14 "slip far enough" and 15 "keep slips compact" — each with its own round row.
+// 1-33): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
+// enough" and 15 "keep slips compact" — each with its own timeline row and round row.
 const NOTION = {
   'Balance at impact': 1, 'Punching hand drop before punch': 2, 'Defense after combo': 3,
   'Guard height': 4, 'Hand balance': 5, 'Dropping resting hand while punching': 6, 'Chin depth': 7, 'Chin height': 8,

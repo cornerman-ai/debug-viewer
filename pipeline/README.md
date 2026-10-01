@@ -160,8 +160,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 
 - **Slip distance** (`slip_distance/`): per slip, how far the head travelled sideways from where it started, in
   torso lengths, with a white tick at the furthest frame (orange < 0.20 too short, green 0.20–0.70, red > 0.70 too
-  far). Rolls and ducks are not measured. Judged front-on / back-on only. One timeline row for two round rows, each the mean of its slip
-  scores: rule 14 "slip far enough" (100 at 0.20 torso of travel or more, 0 with none) and 15 "slips compact" (100
+  far). Rolls and ducks are not measured. Judged front-on / back-on only. Two timeline rows, one per rule, each slip coloured by that
+  rule's slip score (green 100, orange between, red 0), and two round rows, each the mean of its slip scores: rule 14 "slip far enough" (100 at 0.20 torso of travel or more, 0 with none) and 15 "slips compact" (100
   up to 0.70, 0 at 1.00). Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
   hand is not punching — low above 0.50 for the lead hand, 0.30 for the rear. Continuous row, lead in the top half,
