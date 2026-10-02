@@ -23,6 +23,10 @@ Chrome or Edge (it reads folders with the File System Access API) and Google Dri
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
 (fps, stance, video name), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
 `*_blazepose_full.npy` skeleton for the stick figure. A missing stage is named in the timeline header; the rest still works.
+Switching videos is safe at any moment — while playing, mid-load, while a skeleton is still downloading: the old
+video pauses at once and stays as it was (dimmed) until the new one has been read in full, in parallel, and swapped
+in in one step; a pick overtaken by a newer one is dropped and its downloads cancelled, so nothing from one video
+ever lands on another.
 Each rule layer reads its own stage folder (`<stage>/*.csv` + `<stage>.json`, listed per layer below) when present;
 the per-punch ones are joined to the punches by start frame and hand.
 

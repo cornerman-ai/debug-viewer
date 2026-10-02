@@ -91,6 +91,9 @@
   .stage .clock { position: absolute; bottom: 12px; right: 12px; pointer-events: none; }
 
   .inspector { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; }
+  /* a switch in progress: the old video stays, paused and dimmed, until the new one is swapped in */
+  .loading .inspector { opacity: .55; transition: opacity .15s; }
+  .loading { cursor: progress; }
   .inspector .card { padding: 14px 16px; }
   .label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
   .facing { display: flex; align-items: center; gap: 14px; }
@@ -727,10 +730,10 @@ const RULE_LAYERS = [
     // cut short where the next punch starts.
     key: 'defcov', label: 'Defense after combo', short: 'Defend after combos', items: true,
     csv: ['defense_after_combo', 'combos.csv'], json: ['defense_after_combo', 'defense_after_combo.json'],
-    parseItem: (r, num) => r.covered === '1'
+    parseItem: (r, num, fps) => r.covered === '1'
       ? {covered: true, sf: num(r.move_start_frame), ef: num(r.move_end_frame), type: r.move_type, side: r.move_side,
          delay: num(r.delay_s), seq: r.sequence, endF: num(r.end_frame)}
-      : {covered: false, sf: num(r.end_frame), ef: Math.max(num(r.end_frame), Math.round(num(r.window_end_time) * S.fps) - 1),
+      : {covered: false, sf: num(r.end_frame), ef: Math.max(num(r.end_frame), Math.round(num(r.window_end_time) * fps) - 1),
          seq: r.sequence, endF: num(r.end_frame), cut: r.cut_by_punch === '1'},
     summary: () => '',
     card: () => '',
@@ -1531,18 +1534,18 @@ async function ensurePerm(h) {
 }
 const fsSource = (videoDir, dataDir) => ({
   name: videoDir.name,
-  text: async parts => (await fileIn(videoDir, parts)).text(),
+  text: async parts => (await fileIn(videoDir, parts)).text(),          // a local read cannot be cancelled: ignored if stale
   mediaFile: async parts => dataDir ? fileIn(dataDir, parts) : null,
   hasData: !!dataDir,
 });
 // ?data=<url of Ambo/data>&video=<folder name>: the same over HTTP (a local server; used for testing)
 const httpSource = (base, name) => {
   const u = parts => base + parts.map(encodeURIComponent).join('/');
-  const get = async parts => { const r = await fetch(u(parts)); if (!r.ok) throw new Error(`${r.status} ${parts.join('/')}`); return r; };
+  const get = async (parts, signal) => { const r = await fetch(u(parts), {signal}); if (!r.ok) throw new Error(`${r.status} ${parts.join('/')}`); return r; };
   return {
     name, http: true, hasData: true,
-    text: async parts => (await get(['pipeline_tests', name, ...parts])).text(),
-    mediaFile: async parts => ({url: u(parts), arrayBuffer: async () => (await get(parts)).arrayBuffer()}),
+    text: async (parts, signal) => (await get(['pipeline_tests', name, ...parts], signal)).text(),
+    mediaFile: async parts => ({url: u(parts), arrayBuffer: async signal => (await get(parts, signal)).arrayBuffer()}),
   };
 };
 async function httpList(base) {
@@ -1560,90 +1563,116 @@ try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLay
 const video = $('video');
 
 // ════════════════════════════ loading ════════════════════════════
+// A switch can come at any moment — mid-load, mid-playback, while the previous video's skeleton is still
+// downloading. So a load never touches the live state until it is complete: it builds the new video into `N`, then
+// swaps it in at once. Every load takes a generation number; one that a newer pick has overtaken is dropped
+// unseen, and its downloads are cancelled (HTTP) or ignored (a folder). The old video pauses the moment a new one is
+// picked and keeps its own, consistent overlay until the swap.
+let loadGen = 0, loadCtl = null;
+const isStale = gen => gen !== loadGen;
 async function loadFolder(src) {
-  S.src = src;
-  const [pjs, angleCsv, defCsv] = await Promise.all([
-    src.text(STAGES.punchJson).then(JSON.parse).catch(() => null),
-    src.text(STAGES.angle).catch(() => null),
-    src.text(STAGES.defenses).catch(() => null)]);
-  let pcsv = await src.text(STAGES.punches).catch(() => null), hasImpact = !!pcsv;
-  if (!pcsv) pcsv = await src.text(STAGES.punchesFallback).catch(() => null);
+  const gen = ++loadGen;
+  loadCtl?.abort(); const ctl = loadCtl = new AbortController(), sig = ctl.signal;
+  video.pause();
+  $('app').classList.add('loading');
+  $('subtitle').textContent = `Loading ${src.name}…`;
+  try {
+    const N = await buildVideo(src, sig);
+    if (isStale(gen)) return;
+    commitVideo(src, N);
+    loadMedia(gen, sig);
+    resize(); draw(true);
+  } catch (e) {
+    if (isStale(gen)) return;                               // a newer pick took over: its errors are not this load's
+    throw e;
+  } finally {
+    if (!isStale(gen)) $('app').classList.remove('loading');
+  }
+}
+
+// every file of one video, read in parallel; nothing here touches S
+async function buildVideo(src, sig) {
+  const txt = parts => src.text(parts, sig).catch(() => null);
+  const jsn = parts => src.text(parts, sig).then(JSON.parse).catch(() => null);
+  const [pjs, angleCsv, defCsv, impCsv] = await Promise.all([
+    jsn(STAGES.punchJson), txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches)]);
+  const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
-  S.fps = pjs?.run?.fps || 30; S.stance = pjs?.run?.stance || 'orthodox';
-  S.videoName = pjs?.run?.video || `${src.name}.mp4`;
+  const N = {fps: pjs?.run?.fps || 30, stance: pjs?.run?.stance || 'orthodox',
+             videoName: pjs?.run?.video || `${src.name}.mp4`, hasImpact, missing: []};
   const A = angleCsv ? parseCSV(angleCsv) : [];
-  S.n = A.length || pjs?.run?.n_frames || 0;
-  S.angle = new Float32Array(S.n); S.pose = new Uint8Array(S.n);
-  A.forEach((r, i) => { S.angle[i] = +r.angle_deg; S.pose[i] = +r.has_pose; });
-  S.hasAngle = A.length > 0;
-  S.punches = (pcsv ? parseCSV(pcsv) : []).map(r => ({
+  N.n = A.length || pjs?.run?.n_frames || 0;
+  N.angle = new Float32Array(N.n); N.pose = new Uint8Array(N.n);
+  A.forEach((r, i) => { N.angle[i] = +r.angle_deg; N.pose[i] = +r.has_pose; });
+  N.hasAngle = A.length > 0;
+  N.punches = (pcsv ? parseCSV(pcsv) : []).map(r => ({
     kind: 'p', sf: +r.start_frame, ef: +r.end_frame, type: r.punch_type, hand: r.hand, target: r.target,
     impact: hasImpact && r.impact_status === 'ok' ? +r.impact_frame : null, impConf: r.impact_conf ? +r.impact_conf : null,
     impStatus: hasImpact ? r.impact_status : 'not run'})).sort((a, b) => a.sf - b.sf);
-  S.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
+  N.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
     kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share,
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
-  const byKey = new Map(S.punches.map(p => [`${p.sf}|${p.hand}`, p]));
+  const byKey = new Map(N.punches.map(p => [`${p.sf}|${p.hand}`, p]));
   const num = v => v === '' || v === undefined ? null : +v;
-  S.has = {}; S.layerSum = {}; S.items = {};
-  await Promise.all(RULE_LAYERS.map(async L => {           // every rule layer: its CSV joined to the punches, its JSON summary
-    for (const p of S.punches) delete p[L.key];
-    const [text, js] = await Promise.all([src.text(L.csv).catch(() => null),
-                                          L.json ? src.text(L.json).then(JSON.parse).catch(() => null) : null]);
-    S.has[L.key] = !!text; S.layerSum[L.key] = js;
-    if (!text) return;
-    if (L.items) { S.items[L.key] = parseCSV(text).map(r => L.parseItem(r, num)).filter(Boolean); return; }
-    for (const r of parseCSV(text)) { const p = byKey.get(`${r.start_frame}|${r.hand}`); const d = p && L.parse(r, num); if (d) p[L.key] = d; }
-  }));
-  S.sameDef = await src.text(['same_defense', 'same_defense.json']).then(JSON.parse).catch(() => null);
-  S.samePunch = await src.text(['same_punches', 'same_punches.json']).then(JSON.parse).catch(() => null);
-  S.bodyShots = await src.text(['bodyshots', 'bodyshots.json']).then(JSON.parse).catch(() => null);
-  S.defAfter = await src.text(['defense_after_combo', 'defense_after_combo.json']).then(JSON.parse).catch(() => null);
-  S.angleChg = await src.text(['angle_change', 'angle_change.json']).then(JSON.parse).catch(() => null);
-  S.hipSum = await src.text(['hip_rotation', 'hip_rotation.json']).then(JSON.parse).catch(() => null);
-  S.shSum = await src.text(['shoulder_rotation', 'shoulder_rotation.json']).then(JSON.parse).catch(() => null);
-  S.stanceW = await src.text(['stance_width', 'stance_width.json']).then(JSON.parse).catch(() => null);
-  S.guard = await src.text(['guard_height', 'guard_height.json']).then(JSON.parse).catch(() => null);
-  S.handDrop = await src.text(['hand_drop', 'hand_drop.json']).then(JSON.parse).catch(() => null);
-  S.workRate = await src.text(['work_rate', 'work_rate.json']).then(JSON.parse).catch(() => null);
-  S.decay = await src.text(['output_decay', 'output_decay.json']).then(JSON.parse).catch(() => null);
-  S.comboLen = await src.text(['combo_length', 'combo_length.json']).then(JSON.parse).catch(() => null);
-  S.handBal = await src.text(['hand_balance', 'hand_balance.json']).then(JSON.parse).catch(() => null);
-  S.slipD = await src.text(['slip_distance', 'slip_distance.json']).then(JSON.parse).catch(() => null);
-  S.stanceD = await src.text(['stance_depth', 'stance_depth.json']).then(JSON.parse).catch(() => null);
-  if (!S.n) S.n = Math.max(1, ...S.punches.map(p => p.ef + 1), ...S.defenses.map(d => d.ef + 1));
-  S.dur = S.n / S.fps;
-  S.hiddenP.clear(); S.hiddenD.clear();
+  N.has = {}; N.layerSum = {}; N.items = {};
+  const SUMS = {sameDef: 'same_defense', samePunch: 'same_punches', bodyShots: 'bodyshots', defAfter: 'defense_after_combo',
+                angleChg: 'angle_change', hipSum: 'hip_rotation', shSum: 'shoulder_rotation', stanceW: 'stance_width',
+                guard: 'guard_height', handDrop: 'hand_drop', workRate: 'work_rate', decay: 'output_decay',
+                comboLen: 'combo_length', handBal: 'hand_balance', slipD: 'slip_distance', stanceD: 'stance_depth'};
+  await Promise.all([
+    ...RULE_LAYERS.map(async L => {                          // every rule layer: its CSV joined to the punches, its JSON summary
+      const [text, js] = await Promise.all([txt(L.csv), L.json ? jsn(L.json) : null]);
+      N.has[L.key] = !!text; N.layerSum[L.key] = js;
+      if (!text) return;
+      if (L.items) { N.items[L.key] = parseCSV(text).map(r => L.parseItem(r, num, N.fps)).filter(Boolean); return; }
+      for (const r of parseCSV(text)) { const p = byKey.get(`${r.start_frame}|${r.hand}`); const d = p && L.parse(r, num); if (d) p[L.key] = d; }
+    }),
+    ...Object.entries(SUMS).map(async ([k, stage]) => { N[k] = await jsn([stage, `${stage}.json`]); }),
+  ]);
+  if (!N.n) N.n = Math.max(1, ...N.punches.map(p => p.ef + 1), ...N.defenses.map(d => d.ef + 1));
+  N.dur = N.n / N.fps;
+  N.missing = [!hasImpact && 'punch impact', !angleCsv && 'facing angle', !defCsv && 'defense'].filter(Boolean);
+  return N;
+}
 
+// the swap: one synchronous step, so the draw loop never sees half of one video and half of another
+function commitVideo(src, N) {
+  const {missing, hasImpact, ...state} = N;
+  Object.assign(S, state, {src, skel: null, skelC: 0});
+  S.hiddenP.clear(); S.hiddenD.clear();
+  V.hover = null; V.hoverLayer = null; V.shown = null; V.lastFrame = -1;
   $('title').textContent = src.name;
   $('title').style.display = $('videoSelect').style.display === 'none' ? '' : 'none';   // the dropdown already names it
   $('subtitle').textContent = `${S.n.toLocaleString()} frames · ${S.fps} fps · ${fmtT(S.dur).replace(/\.\d+$/, '')} · ` +
     `${S.punches.length} punches · ${S.defenses.length} defensive moves`;
   $('welcome').style.display = 'none'; $('app').classList.add('ready');
-  const missing = [!hasImpact && 'punch impact', !angleCsv && 'facing angle', !defCsv && 'defense'].filter(Boolean);
   $('banner').textContent = missing.length ? `Not in this folder: ${missing.join(', ')}` : '';
   $('banner').classList.toggle('show', missing.length > 0);
-  buildChips(); buildLayers(); setSpan(10); V.lastFrame = -1;
-  await loadMedia();
-  resize(); draw(true);
+  buildChips(); buildLayers(); setSpan(10);
 }
 
-async function loadMedia() {
+async function loadMedia(gen, sig) {
   const src = S.src;
-  S.skel = null;
   if (S.objectUrl) { URL.revokeObjectURL(S.objectUrl); S.objectUrl = null; }
   if (!src.hasData) { video.removeAttribute('src'); video.load(); $('mediaMsg').classList.add('show'); return; }
   $('mediaMsg').classList.remove('show');
   const stem = S.videoName.replace(/\.[^.]+$/, '');
   try {
     const f = await src.mediaFile(['raw_videos', 'full_pipeline_test_videos', S.videoName]);
+    if (isStale(gen)) return;
     if (f.url) video.src = f.url; else { S.objectUrl = URL.createObjectURL(f); video.src = S.objectUrl; }
-  } catch (e) { $('mediaMsg').classList.add('show'); console.warn('video not found', e); }
-  // the skeleton only draws the stick figure: load it after the video so playback is never waiting on it
+  } catch (e) { if (!isStale(gen)) { $('mediaMsg').classList.add('show'); console.warn('video not found', e); } }
+  // the skeleton only draws the stick figure: load it after the video so playback is never waiting on it — and
+  // only ever onto the video it belongs to
   src.mediaFile(['skeleton_data', 'full_pipeline_test_videos', `${stem}_blazepose_full.npy`])
-    .then(f => f.arrayBuffer()).then(buf => { const a = parseNpy(buf); if (a.shape[1] === 33) { S.skel = a.data; S.skelC = a.shape[2]; draw(true); } })
-    .catch(e => console.warn('skeleton not loaded', e));
+    .then(f => f.arrayBuffer(sig))
+    .then(buf => {
+      if (isStale(gen)) return;
+      const a = parseNpy(buf);
+      if (a.shape[1] === 33) { S.skel = a.data; S.skelC = a.shape[2]; draw(true); }
+    })
+    .catch(e => { if (!isStale(gen) && e.name !== 'AbortError') console.warn('skeleton not loaded', e); });
 }
 
 // ── opening: a data root (lists pipeline_tests/*) or one video folder ──
