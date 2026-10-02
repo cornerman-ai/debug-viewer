@@ -190,18 +190,17 @@
   .layer .lsum i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
   .layer .lsum .m, .lsum .m { color: var(--text3); }
   .scope { display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; margin-top: 3px; font-size: 11.5px; line-height: 1.45; color: var(--text3); }
-  .scope span:nth-child(odd) { color: var(--text3); opacity: 0.75; }
+  .scope > span:nth-child(odd) { color: var(--text3); opacity: 0.75; }   /* the labels only, not the badges inside */
   .angs { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
   .ang { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; line-height: 1;
          padding: 3px 7px; border-radius: 999px; }
   .ang i { font-style: normal; font-size: 9px; }
-  .ang.on { color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
-            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent); }
+  .ang.on { color: var(--c); background: color-mix(in srgb, var(--c) 20%, transparent);
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 65%, transparent); }
   .ang.off { color: var(--text3, var(--text2)); opacity: .45; text-decoration: line-through; }
   .angnote { font-size: 11px; color: var(--text3, var(--text2)); }
   .rmeta .angs { margin-left: 2px; }
-  .scope .angs .ang, .rmeta .angs .ang { opacity: 1; }
-  .scope .angs .ang.off, .rmeta .angs .ang.off { opacity: .45; }
+
   .event .sub { margin-top: 10px; padding-top: 8px; border-top: 0.5px solid var(--sep); }
   .event .sub .h { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
     display: flex; align-items: center; gap: 6px; }
