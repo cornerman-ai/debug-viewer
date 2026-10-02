@@ -191,6 +191,17 @@
   .layer .lsum .m, .lsum .m { color: var(--text3); }
   .scope { display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; margin-top: 3px; font-size: 11.5px; line-height: 1.45; color: var(--text3); }
   .scope span:nth-child(odd) { color: var(--text3); opacity: 0.75; }
+  .angs { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .ang { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; line-height: 1;
+         padding: 3px 7px; border-radius: 999px; }
+  .ang i { font-style: normal; font-size: 9px; }
+  .ang.on { color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent); }
+  .ang.off { color: var(--text3, var(--text2)); opacity: .45; text-decoration: line-through; }
+  .angnote { font-size: 11px; color: var(--text3, var(--text2)); }
+  .rmeta .angs { margin-left: 2px; }
+  .scope .angs .ang, .rmeta .angs .ang { opacity: 1; }
+  .scope .angs .ang.off, .rmeta .angs .ang.off { opacity: .45; }
   .event .sub { margin-top: 10px; padding-top: 8px; border-top: 0.5px solid var(--sep); }
   .event .sub .h { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
     display: flex; align-items: center; gap: 6px; }
@@ -1892,9 +1903,19 @@ const SCOPE = {
   work:      {moves: 'every frame',                             angles: ALL_ANGLES},
   combined:  {moves: 'punches, defensive moves',                angles: ALL_ANGLES},
 };
+// Which camera angles a rule judges, as three badges — lit = judged, struck-through = skipped. Front and back share
+// the facing row's blue, side-on its orange, so the badge reads like the timeline it sits next to.
+const ANGLE_BADGES = [['front', 'Front', '⬤'], ['side-on', 'Side', '◐'], ['back', 'Back', '◯']];
+function angleBadges(angles) {
+  const [list, note] = angles.split(' \u2014');
+  const on = new Set(list.split(',').map(s => s.trim()));
+  return `<span class="angs">${ANGLE_BADGES.map(([k, label, ic]) =>
+    `<span class="ang ${on.has(k) ? 'on' : 'off'}" style="--c:${FACECOL[k]}" title="${on.has(k) ? 'judged' : 'skipped'} ${k === 'side-on' ? 'side-on' : k + '-on'}">` +
+    `<i>${ic}</i>${label}</span>`).join('')}${note ? `<span class="angnote">${note.trim()}</span>` : ''}</span>`;
+}
 function scopeTxt(key) {
   const c = SCOPE[key];
-  return c ? `<div class="scope"><span>measured on:</span><span>${c.moves}</span><span>angles:</span><span>${c.angles}</span></div>` : '';
+  return c ? `<div class="scope"><span>measured on:</span><span>${c.moves}</span><span>angles:</span><span>${angleBadges(c.angles)}</span></div>` : '';
 }
 function layerChip(key, js) {
   if (!js) return null;
@@ -1946,12 +1967,13 @@ const RULE_META = (() => {
   const layerOf = {};
   for (const [k, ns] of Object.entries(LAYER_RULES)) for (const n of ns) layerOf[n] ??= k;
   // the angle gate from the layer's scope: side-on / front, back / every angle (a rule with no layer judges every angle)
+  const anglesOf = n => SCOPE[layerOf[n]]?.angles || ALL_ANGLES;                 // the layer's scope text, for the badges
   const gate = n => {
-    const a = (SCOPE[layerOf[n]]?.angles || ALL_ANGLES).split(' \u2014')[0];
+    const a = anglesOf(n).split(' \u2014')[0];
     return a === 'side-on' ? 'Side-on' : a === 'front, back' ? 'Front, back' : 'Every angle';
   };
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
-    [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o, angle: gate(+n)}]));
+    [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o, angle: gate(+n), angles: anglesOf(+n)}]));
 })();
 const ON_ORDER = ['On a punch', 'On a combo', 'On a defensive move', 'On a frame', 'Whole round only'];
 // Each sort runs both ways: click the active button again to flip it. `dir` names the two directions in words.
@@ -2414,7 +2436,7 @@ function renderRules() {
       `<div class="big"><span class="k">${notionNo(r.name)} · ${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${t ? t[2] : r.color}">${r.value}` +
       (t ? `<span class="tier" style="color:${t[2]}">${t[1]}</span>` : '') + '</span></div>' +
       hpBar(big ? +r.value : null, t) +
-      `<div class="rmeta">${[meta(r).group, ...meta(r).on, meta(r).angle].map(x => `<span>${x}</span>`).join('')}</div>` +
+      `<div class="rmeta">${[meta(r).group, ...meta(r).on].map(x => `<span>${x}</span>`).join('')}${angleBadges(meta(r).angles)}</div>` +
       `<div class="exp"><span>measures</span><span>${r.what}</span>` +
       `<span>on</span><span>${r.on}</span>` +
       `<span>thresholds</span><span>${[r.th.event, r.th.round].filter(Boolean).map(g =>
