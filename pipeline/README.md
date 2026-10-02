@@ -110,7 +110,7 @@ side-on / front, back / every angle, under a heading — and the active button f
 the punch card's sections follow the same order.
 - **Explanations** — one card, static text: every rule in plain words, in one shape — what it actually measures (one
   sentence starting "How…", "Whether…", "What share…" or "The same as rule N…", with the trap its name hides right
-  after), a grey **Judged on** line (what · camera view · scoring) and **Why** a coach wants it. Written
+  after), a grey line (what it judges · camera view · scoring) and **Why** a coach wants it. Written
   from the scripts and checked against them on 2026-10-02; when a rule's script changes, its line in `EXPLAIN` changes
   with it.
 

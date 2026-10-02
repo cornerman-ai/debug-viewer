@@ -3664,7 +3664,7 @@ $('ovr').onclick = e => { if (e.target === $('ovr')) $('ovr').style.display = 'n
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('ovr').style.display !== 'none') $('ovr').style.display = 'none'; });
 
 // ── the Explanations tab: what each rule actually computes, checked against its script (2026-10-02), in one
-// standard shape per rule — what it measures (plain words, the caveat right after), a "Judged on" line (what ·
+// standard shape per rule — what it measures (plain words, the caveat right after), a grey line (what it judges ·
 // camera view · scoring) and why it matters. Static text: it does not depend on the loaded video. ──
 const ANY = 'any view', SIDE = 'side view only', FRONT = 'front or back view only';
 const EXPLAIN = [   // [number, what it measures, judged on, camera view, scoring, why]
@@ -3778,7 +3778,7 @@ function renderExplain() {
     `orthodox. A round score is the average (or share) over everything the rule judged; with too little to judge, ` +
     `the rule is not rated.</div>` +
     EXPLAIN.map(([n, what, on, view, scoring, why]) => `<div class="xrule"><div class="xh"><span class="bn">${n}</span>${nameOf[n]}</div>` +
-      `<p>${what}</p><p class="meta"><b>Judged on</b> ${on} · ${view} · ${scoring}</p>` +
+      `<p>${what}</p><p class="meta">${cap(on)} · ${view} · ${scoring}</p>` +
       `<p class="why"><b>Why</b> ${why}</p></div>`).join('');
 }
 renderExplain();
