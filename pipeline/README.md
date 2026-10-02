@@ -152,8 +152,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   turn of the punching shoulder against a set range per punch type (lead jab 5–30°, lead hook 35–70°, lead uppercut
   25–60°, lead body shot 40–75°, rear cross 30–60°, rear hook 40–75°, rear uppercut 30–75°, rear body shot 50–75°),
   scored like hip rotation — green at 100, red below, the score on the block; on the video the shoulder line in the
-  same colour. The round is the mean punch score, no bands. The CSV also carries
-  `shoulder_minus_hip`, the separation the biomechanics papers measure, unjudged for now.
+  same colour. The round is the mean punch score, no bands.
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — the zone the fist
   is in at its impact frame on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt;
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
