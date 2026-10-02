@@ -76,6 +76,15 @@ that rule's headline verdict. It sorts by rule number (the default on every load
 side-on / front, back / every angle, under a heading — and the active button flips the order; the timeline rows and
 the punch card's sections follow the same order.
 
+**All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
+are videos, columns are the overall round score and rules 1–33, each cell the 0–100 score tinted in its tier's colour
+("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
+timeline CSVs and the facing curve, which no round score needs (checked equal to the full read on all 495 cells,
+2026-10-02), and scored by the same code as the Rules tab, so a cell always equals what that video's Round score card
+says. A median row closes the table. Click any column header to sort by it (click again to flip), a video's name to
+open it. Read once per folder (about 36 s for 15 videos over the local server) and kept; **Reload** re-reads after a
+pipeline re-run. Esc or a click outside closes it.
+
 **Rule layers** (side panel, all off by default, the choice is remembered): each adds a timeline row, a section in
 the punch card and a video overlay.
 
