@@ -75,8 +75,9 @@ The side panel has five views, switched at its top:
 that rule's headline verdict. It sorts by rule number (the default on every load) or by the angles each rule judges —
 side-on / front, back / every angle, under a heading — and the active button flips the order; the timeline rows and
 the punch card's sections follow the same order.
-- **Explanations** — one card, static text: every rule in plain words — what it actually computes (the joints, the
-  frames, the reference, the camera angles it judges, the traps its name hides) and why a coach wants it. Written
+- **Explanations** — one card, static text: every rule in plain words, in one shape — what it actually measures (one
+  sentence starting "How…", "Whether…", "What share…" or "The same as rule N…", with the trap its name hides right
+  after), a grey **Judged on** line (what · camera view · scoring) and **Why** a coach wants it. Written
   from the scripts and checked against them on 2026-10-02; when a rule's script changes, its line in `EXPLAIN` changes
   with it.
 

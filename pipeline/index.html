@@ -210,7 +210,9 @@
   .xrule .xh { font-size: 13px; font-weight: 600; }
   .xrule .xh .bn { color: var(--text3); font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; }
   .xrule p { margin: 3px 0 0; font-size: 12px; line-height: 1.5; color: var(--text); }
+  .xrule p.meta { font-size: 11.5px; color: var(--text3); }
   .xrule p.why { color: var(--text2); }
+  .xrule p b { font-weight: 600; color: var(--text2); margin-right: 4px; }
   .xintro { font-size: 12px; line-height: 1.5; color: var(--text2); margin-bottom: 6px; }
   .rule:first-of-type { border-top: 0; }
   .exp { display: grid; grid-template-columns: 68px 1fr; gap: 1px 10px; margin-top: 2px; font-size: 11.5px; line-height: 1.5; color: var(--text2); }
@@ -3569,86 +3571,123 @@ $('ovrClose').onclick = () => { $('ovr').style.display = 'none'; };
 $('ovr').onclick = e => { if (e.target === $('ovr')) $('ovr').style.display = 'none'; };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('ovr').style.display !== 'none') $('ovr').style.display = 'none'; });
 
-// ── the Explanations tab: what each rule actually computes, checked against its script (2026-10-02), and why a
-// coach would want it. Static text — it does not depend on the loaded video. [number, what is measured, why] ──
-const EXPLAIN = [
-  [1, 'Side-on punches, at impact, left-right in the image only: is the nose no more than 0.20 of the ankle gap past either ankle (50 points, zero at 0.75 past), and is the hips’ centre within 0.20 of the gap from the ankles’ midpoint (50 points, zero right over an ankle)? One frame; no weight or centre of mass is measured.',
-      'A head out past the feet, or the hips over one leg, as the punch lands means he is falling into it and cannot recover or follow up.'],
-  [2, 'How far the punching wrist sits below the nose, averaged over the 0.25 s before the punch starts, in torso lengths: full marks up to 0.40, zero at 0.70. It is where the hand starts from, not a dip or wind-up movement.',
+// ── the Explanations tab: what each rule actually computes, checked against its script (2026-10-02), in one
+// standard shape per rule — what it measures (plain words, the caveat right after), a "Judged on" line (what ·
+// camera view · scoring) and why it matters. Static text: it does not depend on the loaded video. ──
+const ANY = 'any view', SIDE = 'side view only', FRONT = 'front or back view only';
+const EXPLAIN = [   // [number, what it measures, judged on, camera view, scoring, why]
+  [1, 'Whether the boxer’s head and hips are still over their feet at impact. Only left-to-right in the picture is read, at that one frame — not weight or centre of mass.',
+      'every punch', SIDE, 'head (the nose): full 50 up to 0.20 of the ankle gap past an ankle, 0 at 0.75 · hips: full 50 within 0.20 of the feet’s midpoint, 0 right over an ankle',
+      'A head out past the feet, or the hips over one leg, means the boxer is falling into the punch and can’t recover or follow up.'],
+  [2, 'How low the punching hand sits in the quarter second before it is thrown, from the nose down to the wrist. It is the starting height, not a dip or wind-up.',
+      'every punch', ANY, 'full marks up to 0.40 torso below the nose, zero at 0.70',
       'A punch from a low hand has further to travel and leaves the head open on the way.'],
-  [3, 'For each combination of 2+ punches: does the defense model find a roll, slip, duck or pull-back starting anywhere from its first punch to 2 s after its last (or until his next punch, if sooner)? Full marks when 70 % of combos have one. Most of the moves it finds start during the combo; blocks, parries and footwork are not seen.',
-      'The counter comes as he finishes punching; head movement built into the attack is his way out.'],
-  [4, 'Every frame, how far each wrist sits below the nose (height only), in torso lengths, while that hand is not punching: full marks up to 0.50 for the lead and 0.30 for the rear, zero at 0.70; the frame weighs lead 30, rear 70. A hand held out wide still counts as up.',
+  [3, 'Whether the boxer moves their head — a roll, slip, duck or pull-back — during a combination or within 2 seconds after it (or before their next punch, if that comes sooner). Most moves it finds start during the combination; blocks, parries and footwork aren’t detected.',
+      'every combination of 2+ punches', ANY, 'full marks when 70 % of combinations have one, zero at none',
+      'The counter comes as they finish punching; head movement built into the attack is the way out.'],
+  [4, 'How low each hand sits while it isn’t punching, from the nose down to the wrist — height only, so a hand held out wide still counts as up.',
+      'every frame', ANY, 'full marks up to 0.50 torso below the nose for the lead hand and 0.30 for the rear, zero at 0.70 · the frame counts lead 30, rear 70',
       'Hands that sit low between punches leave the head open.'],
-  [5, 'The share of all punches thrown with the rear hand: full marks from 25 % to 60 %, zero at all-lead or all-rear. It is about which hand throws, not body balance (that is rule 1).',
+  [5, 'What share of all punches the rear hand throws. It is about which hand does the work, not body balance (that’s rule 1).',
+      'every punch', ANY, 'full marks from 25 % to 60 % rear, zero at all-lead or all-rear',
       'Living on one hand is predictable: jabs alone never commit, rear hands alone have nothing setting them up.'],
-  [6, 'At each punch’s impact (2 frames before, at, 2 after), how far the other, non-punching wrist sits below the nose, in torso lengths: full marks up to 0.40, zero at 0.70. It is the hand’s height at that moment, not a drop from where it was.',
+  [6, 'How low the other hand — the one not punching — sits at impact (averaged with 2 frames either side). It is that hand’s height at that moment, not how far it dropped.',
+      'every punch', ANY, 'full marks up to 0.40 torso below the nose, zero at 0.70',
       'While one hand punches the other is the guard; if it sags, the counter lands.'],
-  [7, 'Side-on frames outside punches: how far the chin sits in front of the lead shoulder’s front, left-right in the image, in torso lengths: full marks at or behind it, zero at 0.40 in front. The chin is estimated from the nose and mouth corners, so the whole head leaning forward also reads as chin out.',
-      'Behind the shoulder the chin is covered from the side; out in front of it, it is the target.'],
-  [8, 'Frames outside punches, any angle: how high the chin sits against the top of the lead shoulder (height only), in torso lengths: full marks at or below it, zero at 0.20 above. A raised lead shoulder counts the same as a lowered chin.',
+  [7, 'How far the chin pokes out in front of the lead shoulder, seen from the side. The chin is estimated from the nose and mouth, so leaning the whole head forward also counts as chin out.',
+      'every frame outside punches', SIDE, 'full marks with the chin at or behind the front of the shoulder, zero at 0.40 torso in front',
+      'Behind the shoulder the chin is covered from the side; in front of it, it’s the target.'],
+  [8, 'How high the chin sits compared with the top of the lead shoulder — height only, so a raised shoulder counts the same as a lowered chin.',
+      'every frame outside punches', ANY, 'full marks at or below the shoulder top, zero at 0.20 torso above',
       'Chin down behind the lead shoulder is the basic protection; chin up is an open target.'],
-  [9, 'Front- and back-on frames: the how far each elbow sits out past its own shoulder, left-right in the image and away from the body’s midline, in torso lengths: full marks up to 0.15, zero at 0.50, 50 points per arm. An elbow pulled in toward the midline counts as tucked; an arm throwing a hook or a body shot is skipped.',
+  [9, 'How far each elbow sticks out sideways past its own shoulder, away from the body. An elbow pulled in toward the middle counts as tucked; an arm throwing a hook or a body shot is skipped.',
+      'every frame', FRONT, 'per arm: full marks up to 0.15 torso out, zero at 0.50 · the frame counts 50 per arm',
       'A flared elbow opens the ribs to body shots and telegraphs the punch.'],
-  [10, 'Front- and back-on punches: how far the head (the middle of the visible face points) sits left or right of a vertical line through the hips’ centre, in torso lengths, weighted 75 % at impact and 12.5 % each a quarter and three quarters into the punch: full marks from 0.25, zero on the line. A position, not a movement: either side counts, and a step that takes the hips along reads as zero.',
+  [10, 'How far the head sits to the left or right of the hips while punching. It reads position, not movement: either side counts, and stepping with the whole body reads as zero.',
+       'every punch, mostly at impact (75 %) and a little at the quarter and three-quarter points (12.5 % each)', FRONT, 'full marks from 0.25 torso off the hips’ line, zero right on it',
        'A head left on the centre line while punching is exactly where the return punch goes.'],
-  [11, 'Side-on frames: the left-right image gap between the ankles, in leg lengths (hip–knee–ankle): full marks at 0.50 and longer, zero with the feet level. Too long is never penalised.',
+  [11, 'How far one foot is in front of the other, seen from the side, against leg length. A stance that is too long is never penalised.',
+       'every frame', SIDE, 'full marks at 0.50 leg lengths or more, zero with the feet level',
        'One foot well in front of the other is the base for absorbing punches and pushing off.'],
-  [12, 'Front- and back-on frames: the straight-line image distance between the ankles, in torso lengths: full marks at 0.50 and wider, zero with the feet together. It is the total gap, not only side-to-side, so a long narrow stance can score full marks too; too wide is never penalised.',
+  [12, 'How far apart the ankles are, seen from the front or back — the straight-line distance, so a long, narrow stance can also reach full marks. Too wide is never penalised.',
+       'every frame', FRONT, 'full marks at 0.50 torso apart or more, zero with the feet together',
        'Feet too close together leave no base to stay balanced or move from.'],
-  [13, 'After each combination (punches and defensive moves): does the direction he faces turn 45° or more from where it was during the combo, at any point in the next 2 s (smoothed over 0.5 s)? Full marks when half the combos do. Turning only, not footwork: a sidestep that keeps the same facing counts as no change.',
+  [13, 'Whether the boxer turns to face a new direction — 45° or more — within 2 seconds after a combination. It is a turn, not footwork: a sidestep that keeps the same facing counts as no change.',
+       'every combination of punches and defensive moves', ANY, 'full marks when half of them end in a turn, zero at none',
        'Changing angle after an attack avoids the return fire and opens new lines.'],
-  [14, 'Slips only, front- or back-on: how far the head (the middle of the visible face points) moves left-right relative to the hips’ centre during the slip, in torso lengths: full marks from 0.20, zero with no movement. Which way it went, and whether it left a punch’s line, is not checked.',
-       'A slip that barely moves the head does not take it out of the way.'],
-  [15, 'The same reading as rule 14, scored from the other end: full marks up to 0.70 torso lengths of sideways head travel, zero at 1.00.',
+  [14, 'How far the head moves sideways, relative to the hips, during a slip. It doesn’t check which way the head went or whether it left a punch’s line.',
+       'slips only', FRONT, 'full marks from 0.20 torso of travel, zero with none',
+       'A slip that barely moves the head doesn’t take it out of the way.'],
+  [15, 'The same as rule 14 — sideways head travel during a slip — but checking that the slip isn’t too big.',
+       'slips only', FRONT, 'full marks up to 0.70 torso of travel, zero at 1.00',
        'An oversized slip carries the head far off the hips: slow to come back and out of position to counter.'],
-  [16, 'Side-on jabs and crosses: the wrist’s height above its own shoulder from impact to 0.15 s after the punch ends, against a straight line between its first and last value. Not okay when every frame between sits below that line — the hand sank on the way back. Full marks with no punch not okay, zero at 70 %. Sideways loops are not seen.',
+  [16, 'Whether the hand sinks on its way back after a jab or cross. It follows the wrist’s height above its shoulder from impact until just after the punch ends, and flags the punch when that height sags below a straight line the whole way. Sideways loops aren’t seen.',
+       'jabs and crosses', SIDE, 'full marks when no punch sags, zero when 70 % do',
        'A hand that drops on its way home leaves the face open just when the counter comes.'],
-  [17, 'Frames outside punches, any angle: the hip line’s angle, from the 3D landmarks seen from above, against square to the opponent (the facing model’s direction): 0° chest-on, 90° side-on. Zero at 18.2° or less, full marks from 27.9° up (a coach’s cut-offs) — it penalises standing too square, never too bladed.',
+  [17, 'How far the hips are turned from square to the opponent, from the 3D skeleton and the facing model: 0° is chest-on, 90° side-on. It penalises standing too square — never too turned.',
+       'every frame outside punches', ANY, 'zero at 18.2° or less, full marks from 27.9° (a coach’s cut-offs)',
        'Standing square shows the opponent the whole front of the body as a target.'],
-  [18, 'The same on the shoulder line, with its own cut-offs: zero at 12.7° or less, full marks from 17.6° up.',
+  [18, 'The same as rule 17, for the shoulders.',
+       'every frame outside punches', ANY, 'zero at 12.7° or less, full marks from 17.6° (a coach’s cut-offs)',
        'The upper body can square up while the hips stay turned, or the reverse, so it is judged on its own.'],
-  [19, 'Every punch: how many degrees the hip line turned between the punch’s first frame and impact (3D landmarks seen from above), against a range for that hand and type — e.g. lead jab 0–25°, rear cross 20–60°. Inside = 100; too little falls to 0 at no turn; too much costs at most 20. The net change only, in either direction.',
-       'Power comes from the hips turning; without it the punch is all arm.'],
-  [20, 'The same on the shoulder line, with its own ranges — e.g. rear cross 30–60°, lead hook 35–70°. It is not compared with the hips.',
+  [19, 'How much the hips turn from the start of a punch to impact, seen from above in the 3D skeleton, against a normal range for that punch (e.g. 20–60° for a cross, 0–25° for a jab). Only the net turn counts, in either direction.',
+       'every punch', ANY, 'full marks inside the range · too little falls to zero at no turn · too much costs at most 20',
+       'Power comes from the hips; without the turn the punch is all arm.'],
+  [20, 'The same as rule 19, for the shoulders, with their own ranges (e.g. 30–60° for a cross). It isn’t compared with the hips.',
+       'every punch', ANY, 'full marks inside the range · too little falls to zero at no turn · too much costs at most 20',
        'The shoulders’ turn carries the punch’s reach and weight; the arm alone is short and light.'],
-  [21, 'Side-on jabs and crosses: the elbow angle (shoulder–elbow–wrist) at the frame where the wrist is furthest from the shoulder: full marks at 160° or straighter, zero at 100°. When the boxer is small in the frame full marks start at 150°, and very small he is not judged.',
+  [21, 'How straight the arm is — the angle at the elbow — at the moment the hand is furthest from the shoulder.',
+       'jabs and crosses', SIDE, 'full marks at 160° or straighter (150° when the boxer is small in the picture), zero at 100° · very small: not judged',
        'A straight that lands with a bent arm falls short and carries no weight.'],
-  [22, 'Side-on punches of every type: the punching wrist’s height at impact against a standing copy of the boxer’s own body — head or body is on target; over the head, the shoulder band or below the belt is off. Score = the share on target. Height only, and either zone counts for any punch type.',
+  [22, 'Whether the punch would land on the head or body of an opponent the boxer’s own size, judged from the height of the punching wrist at impact; over the head, the shoulder area or below the belt is a miss. Height only, and any punch can score on either zone.',
+       'every punch', SIDE, 'the share of punches on target',
        'Punches into the gap between head and body, or over the top, hit nothing.'],
-  [23, 'The time from the punch’s first detected frame to impact, against labelled punches of the same type: full marks at or under their 30th percentile (jab 131 ms), zero at the 80th (jab 265 ms). Duration only: no fist velocity, no distance.',
+  [23, 'How long the punch takes from its first detected frame to impact, against labelled punches of the same type. It is time only — not how fast the fist moves or how far it travels.',
+       'every punch', ANY, 'full marks as quick as the fastest 30 % (jab 131 ms), zero at the 80th percentile (jab 265 ms)',
        'A slow punch is seen coming and gets blocked or countered.'],
-  [24, 'Of his combinations (2+ punches, each starting within 0.3 s of the one before ending), the share with 3 or more punches: full marks from 40 %, zero at none. Single punches do not count at all.',
+  [24, 'What share of the boxer’s combinations have 3 or more punches. A combination is 2+ punches, each thrown within 0.3 s of the last one ending; single punches don’t count at all.',
+       'every combination', ANY, 'full marks from 40 %, zero at none',
        'Longer combinations break through a guard; a boxer stuck at one-twos is easy to read.'],
-  [25, 'The share of the video spent in dead gaps — 3 s or more with no punch, no defensive move and no quick turn (90° in under 1 s): full marks with none, zero at half the video. It is not punches per minute.',
+  [25, 'How much of the video is dead time: stretches of 3 seconds or more with no punch, no defensive move and no quick turn (90° in under a second). It isn’t punches per minute.',
+       'the whole video', ANY, 'full marks with no dead time, zero when half the video is dead',
        'Long stretches of doing nothing hand the round and the initiative to the opponent.'],
-  [26, 'Punches at the start against punches at the end of the span from his first punch to his last — the first and last thirds under 90 s, otherwise the first and last 30 s: full marks up to 15 % fewer at the end, zero at 40 % fewer. Total volume is not judged.',
+  [26, 'Whether the boxer still throws at the end as much as at the start, from their first punch to their last: the first third against the last third (the first 30 s against the last 30 s from 90 s up). Total volume isn’t judged.',
+       'every punch', ANY, 'full marks up to 15 % fewer at the end, zero at 40 % fewer',
        'Fading late shows conditioning running out, and rounds are often won at the end.'],
-  [27, 'The share of all punches taken by his two most-used types — jab, cross, head hook, head uppercut, body shot (both hands’ hooks are one type, likewise uppercuts): full marks at 66 % or less, zero at 100 %.',
+  [27, 'What share of all punches are the boxer’s two favourite types — out of jab, cross, head hook, head uppercut and body shot. Lead and rear hooks count as one type, likewise uppercuts.',
+       'every punch', ANY, 'full marks at 66 % or less, zero at 100 %',
        'A boxer with two punches is predictable.'],
-  [28, 'Of his hooks and uppercuts, the share the punch model classes as body shots: zero at none, full marks from 25 %. Jabs and crosses are left out (the model does not split head from body for straights), and nothing measures where a punch lands.',
+  [28, 'What share of hooks and uppercuts the punch model labels as body shots. Jabs and crosses are left out (the model can’t tell head from body for straights), and nothing checks where a punch actually lands.',
+       'hooks and uppercuts', ANY, 'full marks from 25 %, zero at none',
        'Body work slows the opponent and opens the head; head-hunting alone is easy to defend.'],
-  [29, 'Over all detected defensive moves: the share of his most-used kind (roll, slip, duck, pull-back; full marks up to 60 %) and the share going to his most-used side (lead or rear — rolls and slips only; full up to 70 %), each zero at 100 %, half the score each. Which punch a move answered is not looked at.',
+  [29, 'Whether the boxer always uses the same defensive move, or always goes to the same side: the share of their most-used move, and the share going to their favourite side (rolls and slips only). Which punch a move answered isn’t considered.',
+       'every defensive move', ANY, 'half the score each · move: full marks up to 60 %, side: up to 70 %, each zero at 100 %',
        'One defensive habit, repeated, gets read and timed.'],
-  [30, 'Of his combinations (punches only), the share that are exactly one of his three most-used sequences (hand and punch type, in order): full marks below 40 %, zero at 100 %. One extra or missed punch makes a different sequence.',
+  [30, 'What share of combinations are exactly one of the boxer’s three most-used sequences (hand and punch type, in order). One extra or missed punch makes a different sequence.',
+       'combinations of punches', ANY, 'full marks below 40 %, zero at 100 %',
        'The same combination over and over lets the opponent time it.'],
-  [31, 'The same with the defensive moves in the sequence (their kind, not their side). Noise in the defense model adds variety, so it reads as more varied than rule 30.',
+  [31, 'The same as rule 30, with the defensive moves included in the sequence. Noise in the defense model adds variety, so it reads as more varied than rule 30.',
+       'combinations of punches and defensive moves', ANY, 'full marks below 40 %, zero at 100 %',
        'Patterns of attack and defense get read just like punch patterns.'],
-  [32, 'Head hooks, front- or back-on: at impact, how far the wrist has crossed left-right past his own centre line: full marks at or short of the centre, zero a third of a torso past his far shoulder (placed at half his widest shoulder span). Where the hand is at its deepest point, not whether it stops.',
-       'A hook that swings past the target loses its snap, opens him up and takes the longest way back.'],
-  [33, 'Rear-hand punches, any angle: at impact, how high the rear heel sits above the rear toe in the image, in torso lengths: zero with the heel level, full marks from 0.20. The stance already lifts the heel, so a planted foot scores about 65; no foot rotation is measured.',
+  [32, 'How far the hand has travelled across the body at the deepest point of a head hook — whether it stays near the centre line or swings on past the far shoulder. It reads where the hand is at that moment, not whether it actually stops.',
+       'head hooks', FRONT, 'full marks at or short of the centre line, zero a third of a torso past the far shoulder',
+       'A hook that swings past the target loses its snap, opens the boxer up and takes the longest way back.'],
+  [33, 'How high the rear heel is off the floor (above the toe) at impact on a rear-hand punch. The stance already lifts the heel a little, so a planted foot scores about 65; turning of the foot isn’t measured.',
+       'rear-hand punches', ANY, 'zero with the heel level with the toe, full marks from 0.20 torso up',
        'The rear heel coming up lets the hips turn through; a flat-footed power punch is all arm.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));
   $('explainCard').innerHTML = `<div class="label">Explanations · ${EXPLAIN.length} rules</div>` +
-    `<div class="xintro">What each rule actually computes — read this before trusting a name. Torso = the image distance ` +
-    `from the shoulders’ midpoint to the hips’ midpoint; impact = the frame where the punch reaches deepest, not the ` +
-    `moment of contact; lead = the left side (every video is read as orthodox); positions are 2D image ` +
-    `coordinates unless a rule says 3D. Each round score is the mean (or share) over what the rule judged; under its ` +
-    `floor it is not rated.</div>` +
-    EXPLAIN.map(([n, what, why]) => `<div class="xrule"><div class="xh"><span class="bn">${n}</span>${nameOf[n]}</div>` +
-      `<p>${what}</p><p class="why">Why: ${why}</p></div>`).join('');
+    `<div class="xintro">What each rule really measures — the name alone can mislead. Distances are in torso lengths ` +
+    `(shoulders to hips in the picture), so they don’t change with how far the boxer stands from the camera. ` +
+    `Everything is read from the flat picture unless a rule says 3D. Impact is the frame where the punch reaches ` +
+    `furthest, not the moment it hits something. The left side is treated as the lead: every video is read as ` +
+    `orthodox. A round score is the average (or share) over everything the rule judged; with too little to judge, ` +
+    `the rule is not rated.</div>` +
+    EXPLAIN.map(([n, what, on, view, scoring, why]) => `<div class="xrule"><div class="xh"><span class="bn">${n}</span>${nameOf[n]}</div>` +
+      `<p>${what}</p><p class="meta"><b>Judged on</b> ${on} · ${view} · ${scoring}</p>` +
+      `<p class="why"><b>Why</b> ${why}</p></div>`).join('');
 }
 renderExplain();
 
