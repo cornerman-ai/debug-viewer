@@ -49,7 +49,10 @@ The side panel has two views, switched at its top:
   rear-hand punches), then the detail sections of the layers that are on. **Defense**: a slip on rules 14 and 15; no
   rule scores a single roll, duck or pull-back. **Combo**: each combo the playhead is in — an offensive one on rules 24
   (length), 30 (how often that sequence repeats) and 3 (defended after it?), a combined one on rules 13 (angle changed
-  after it?) and 31 (repeats).
+  after it?) and 31 (repeats). **Frame**: this frame on every per-frame rule — guard height (lead 30 + rear 70), chin
+  depth and height, elbow tuck (50 / 50), stance depth and width, both bladedness axes, and what work rate counts it
+  as. Judged or not, and why, comes from the rule's own runs.csv; the score is the rule's formula on this frame's
+  skeleton, the same number the video overlay draws, with the reading it came from.
 - **Round** — the whole video's counts: the punch and defense distributions and the combos (counts and the most-used
   sequences).
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
