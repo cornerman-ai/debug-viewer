@@ -146,6 +146,19 @@
   .hp i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,.25); }
   @keyframes hpfill { from { width: 0; } }
   @media (prefers-reduced-motion: reduce) { .hp .fill { animation: none; } }
+  /* the Now tab's rule lists: one rule per line, its result right after the name */
+  .evctx { font-size: 12px; color: var(--text2); margin: 2px 0 6px; }
+  .evh { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 2px; }
+  .ev { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; font-size: 13px; padding: 2px 0; }
+  .ev .bn { min-width: 18px; text-align: right; font-size: 11px; color: var(--text2); opacity: .6; }
+  .ev b { font-weight: 600; }
+  .ev .evtier { font-size: 11px; font-weight: 600; }
+  .ev.off > span:nth-child(2) { color: var(--text2); }
+  .ev .evna { font-size: 11px; color: var(--text2); opacity: .8; }
+  .evskip { font-size: 11.5px; color: var(--text2); opacity: .8; margin: -1px 0 2px 24px; line-height: 1.35; }
+  .cseq { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; font-size: 12px; margin: 2px 0 4px; }
+  .cseq .cel { display: inline-flex; align-items: center; gap: 4px; }
+  .cseq .csep { color: var(--text2); }
   .rsort { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 8px; font-size: 12px; }
   .rsort span { color: var(--text2); margin-right: 4px; }
   .rsort button { border: 0; border-radius: 6px; padding: 3px 8px; font: inherit; background: var(--fill); color: var(--text); cursor: pointer; }
@@ -309,6 +322,7 @@
       </div>
       <div class="card event" id="punchCard"><div class="label">Punch</div><div class="empty">No punch</div></div>
       <div class="card event" id="defCard"><div class="label">Defense</div><div class="empty">No defensive move</div></div>
+      <div class="card event" id="comboCard"><div class="label">Combo</div><div class="empty">No combo</div></div>
     </div>
 
     <div id="rulesView" style="display:none">
@@ -1647,6 +1661,7 @@ async function buildVideo(src, sig) {
       for (const r of parseCSV(text)) { const p = byKey.get(`${r.start_frame}|${r.hand}`); const d = p && L.parse(r, num); if (d) p[L.key] = d; }
     }),
     ...Object.entries(SUMS).map(async ([k, stage]) => { N[k] = await jsn([stage, `${stage}.json`]); }),
+    txt(['angle_change', 'combos.csv']).then(t => { N.angleCombos = t ? parseCSV(t) : []; }),
   ]);
   if (!N.n) N.n = Math.max(1, ...N.punches.map(p => p.ef + 1), ...N.defenses.map(d => d.ef + 1));
   N.dur = N.n / N.fps;
@@ -2527,23 +2542,117 @@ function compass(a) {
   }
   g.innerHTML = s;
 }
+// ── the Now tab: the punch, the defensive move and the combo under the playhead, each judged on every rule that
+// applies to it — a score in the round score's tier colours, a verdict, or "not judged" and why ──
+const RULE_NAME = no => Object.keys(NOTION).find(n => NOTION[n] === no) || `rule ${no}`;
+const SKIPTXT = {
+  not_side_on: 'thrown front- or back-on; this rule reads side-on only',
+  facing_head_on: 'thrown front- or back-on; this rule reads side-on only',
+  side_on: 'thrown side-on; this rule reads front- or back-on only',
+  not_front_or_back_on: 'thrown side-on; this rule reads front- or back-on only',
+  no_impact_frame: 'no impact frame', no_impact: 'no impact frame', no_facing: 'no facing angle over the punch',
+  facing_unknown: 'no facing angle over the punch', too_far_from_camera: 'the boxer is too far from the camera',
+  no_reference_for_this_punch_type: 'no reference for this punch type',
+};
+const skipTxt = c => SKIPTXT[c] || (c ? c.replace(/_/g, ' ') : 'not judged');
+const GOOD = '#22C55E', BAD = '#EF4444', MIDC = '#F97316';
+// [layer key, does the rule apply to this punch, its reading -> {score} | {text, col} | {skip}]
+const scored = x => x?.verdict ? {score: x.score} : {skip: x?.skip};
+const PUNCH_RULES = [
+  ['bal', () => true, scored],
+  ['drop', () => true, scored],
+  ['resting', () => true, scored],
+  ['hoc', () => true, x => x?.score != null ? {score: x.score} : {skip: x?.skip}],
+  ['hrp', p => p.type === 'jab' || p.type === 'cross', x => !x ? {skip: ''} : x.verdict === 'skip' ? {skip: x.skip}
+    : {text: x.verdict === 'fail' ? 'not okay — a U' : 'okay', col: x.verdict === 'fail' ? BAD : GOOD}],
+  ['hip', () => true, x => x?.status === 'ok' ? {score: x.score} : {skip: x?.status}],
+  ['shoulder', () => true, x => x?.status === 'ok' ? {score: x.score} : {skip: x?.status}],
+  ['arm', p => p.type === 'jab' || p.type === 'cross', x => x?.score != null ? {score: x.score} : {skip: x?.skip || x?.verdict}],
+  ['hit', () => true, x => !x || x.verdict === 'skip' ? {skip: x?.skip}
+    : {text: `${x.verdict === 'on_target' ? 'on target' : 'off target'} · ${ZONE[x.zone]?.[1] || x.zone}`,
+       col: x.verdict === 'on_target' ? GOOD : BAD}],
+  ['speed', () => true, scored],
+  ['hookstop', p => p.type === 'hook', scored],
+  ['rpivot', p => p.hand === 'rear', scored],
+];
+function evRow(no, r) {
+  const t = r.score != null && Number.isFinite(r.score) ? tierOf(r.score) : null;
+  if (r.skip !== undefined)                                // not judged: the reason on its own line, under the name
+    return `<div class="ev off"><span class="bn">${no}</span><span>${RULE_NAME(no)}</span><span class="evna">not judged</span></div>`
+      + `<div class="evskip">${skipTxt(r.skip)}</div>`;
+  const val = t ? `<b class="num" style="color:${t[2]}">${r.score.toFixed(1)}</b><span class="evtier" style="color:${t[2]}">${t[1]}</span>`
+    : `<b style="color:${r.col || 'var(--text)'}">${r.text}</b>`;
+  return `<div class="ev"><span class="bn">${no}</span><span>${RULE_NAME(no)}</span>${val}</div>`;
+}
+function evList(rows) {
+  const judged = rows.filter(([, r]) => r.skip === undefined).length;
+  return `<div class="evh">${judged} of ${rows.length} rule${rows.length === 1 ? '' : 's'} judged</div>` +
+    rows.sort((a, b) => a[0] - b[0]).map(([no, r]) => evRow(no, r)).join('');
+}
 function eventCard(el, label, e, f) {
   if (!e) { el.innerHTML = `<div class="label">${label}</div><div class="empty">${label === 'Punch' ? 'No punch' : 'No defensive move'}</div>`; return; }
-  const fps = S.fps, n = e.ef - e.sf + 1;
+  const fps = S.fps;
   if (e.kind === 'p') {
     const s = styleP(e.type), imp = e.impact;
-    const impTxt = imp === null ? `<span style="color:var(--text3)">none (${e.impStatus})</span>`
-      : f === imp ? '<span style="color:#ff3b30">▶ now</span>' : f < imp ? `in ${imp - f} f` : `${f - imp} f ago`;
+    const impTxt = imp === null ? 'no impact frame' : f === imp ? '<span style="color:#ff3b30">impact now</span>'
+      : f < imp ? `impact in ${imp - f} f` : `impact ${f - imp} f ago`;
+    const rows = PUNCH_RULES.filter(([k, applies]) => S.has[k] && applies(e)).map(([k, , read]) => [LAYER_RULES[k][0], read(e[k])]);
     el.innerHTML = `<div class="label">Punch</div><div class="name"><span class="dot" style="background:${s.c}"></span>${cap(e.hand)} ${s.name}</div>
-      <div class="rows num"><span>Target</span><b>${e.target || '–'}</b><span>Frames</span><b>${e.sf}–${e.ef} · ${n}</b>
-      <span>Time</span><b>${fmtT(e.sf / fps)}</b><span>Impact</span><b>${imp === null ? '–' : 'f ' + imp}</b>
-      <span></span><b>${impTxt}</b>${imp === null ? '' : `<span>Impact conf.</span><b>${e.impConf.toFixed(2)}</b>`}</div>` + layerSections(e);
+      <div class="evctx num">${fmtT(e.sf / fps)} · ${impTxt}</div>` + evList(rows) + layerSections(e);
   } else {
     const s = styleD(e.type);
     el.innerHTML = `<div class="label">Defense</div><div class="name"><span class="dot" style="background:${s.c}"></span>${e.side ? cap(e.side) + ' ' : ''}${s.name}</div>
-      <div class="rows num"><span>Frames</span><b>${e.sf}–${e.ef} · ${n}</b><span>Time</span><b>${fmtT(e.sf / fps)}</b>
-      <span>Which-move share</span><b>${e.share.toFixed(2)}</b><span>Move prob.</span><b>${e.prob.toFixed(2)}</b></div>`;
+      <div class="evctx num">${fmtT(e.sf / fps)} · ${((e.ef - e.sf + 1) / fps).toFixed(2)} s</div>` + defenseRules(e);
   }
+}
+// a slip is judged by rules 14 and 15; no rule scores a single roll, duck or pull-back (rule 29 is whole-round)
+function defenseRules(e) {
+  if (e.type !== 'slip')
+    return `<div class="empty">No rule scores a single ${styleD(e.type).name.toLowerCase()} — rules 14 and 15 judge slips only;
+      rule 29 (same defense) looks at the whole round.</div>`;
+  if (!S.has.slip14) return '<div class="empty">slip distance is not in this folder</div>';
+  const it = (S.items.slip14 || []).find(x => x.sf === e.sf);
+  let rows;
+  if (it) rows = [[14, {score: it.s14}], [15, {score: it.s15}]];
+  else {                                  // not judged: say why — side-on by the facing over the move, else no reading
+    let c = 0, n = 0;
+    for (let f = e.sf; f <= e.ef && f < S.n; f++) if (S.hasAngle && S.pose[f]) { c += Math.abs(Math.cos(S.angle[f] * Math.PI / 180)); n++; }
+    const why = !n ? 'no_facing' : c / n < Math.SQRT1_2 ? 'side_on' : 'the head or torso is not visible';
+    rows = [[14, {skip: why}], [15, {skip: why}]];
+  }
+  return evList(rows) + (it ? `<div class="evctx num">the head travelled ${it.travel.toFixed(2)} torso sideways</div>` : '');
+}
+// the combo(s) under the playhead: offensive (punches only) and combined (punches + defensive moves)
+function comboCard(el, f) {
+  const off = (S.items.offensive || []).filter(c => c.sf <= f && f <= c.ef);
+  const cmb = (S.items.combined || []).filter(c => c.sf <= f && f <= c.ef);
+  if (!off.length && !cmb.length) { el.innerHTML = '<div class="label">Combo</div><div class="empty">No combo</div>'; return; }
+  const seqHtml = c => c.els.map(m => { const st = elName(m); return `<span class="cel"><span class="dot" style="background:${st.c}"></span>${st.name}</span>`; }).join('<span class="csep">›</span>');
+  const reps = (kind, c) => (S.layerSum[kind]?.[kind]?.sequences || []).find(q => q.sequence === c.seq)?.count;
+  const block = (kind, c) => {
+    const rows = [];
+    if (kind === 'offensive') {
+      rows.push([24, {text: c.n >= 3 ? `${c.n} punches — a long combination` : `${c.n} punches — short`, col: c.n >= 3 ? GOOD : MIDC}]);
+      const r = reps(kind, c);
+      if (r != null) rows.push([30, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: r > 1 ? MIDC : GOOD}]);
+      if (S.has.defcov) {
+        const d = (S.items.defcov || []).find(x => x.endF === c.ef);
+        if (d) rows.push([3, d.covered ? {text: `defended — ${d.side ? d.side + ' ' : ''}${styleD(d.type)?.name.toLowerCase() || d.type} `
+                                         + (d.delay < 0 ? `starting ${(-d.delay).toFixed(2)} s before it ends` : `${d.delay.toFixed(2)} s after`), col: GOOD}
+                                       : {text: d.cut ? 'not defended before the next punch' : 'not defended', col: BAD}]);
+      }
+    } else {
+      const a = (S.angleCombos || []).find(x => +x.start_frame === c.sf);
+      if (a) rows.push([13, a.changed === '' ? {skip: 'no_facing'}
+        : {text: a.changed === 'yes' ? `changed angle — ${(+a.change_deg).toFixed(0)}° after` : `kept the angle — ${(+a.change_deg).toFixed(0)}° after`,
+           col: a.changed === 'yes' ? GOOD : BAD}]);
+      const r = reps(kind, c);
+      if (r != null) rows.push([31, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: r > 1 ? MIDC : GOOD}]);
+    }
+    return `<div class="sub"><div class="h">${kind === 'offensive' ? 'Offensive combo' : 'Combined combo'} · ${c.n} elements</div>
+      <div class="cseq">${seqHtml(c)}</div>${evList(rows)}</div>`;
+  };
+  el.innerHTML = '<div class="label">Combo</div>' + off.map(c => block('offensive', c)).join('') + cmb.map(c => block('combined', c)).join('');
 }
 const iqr = q => q.map(x => x == null ? '–' : x.toFixed(1)).join('–') + '°';
 // a small scale 0°..max: the IQR as a shaded band, this punch's value as a marker in its verdict color
@@ -2995,7 +3104,7 @@ function draw(force) {
     const pNow = at(S.punches, f, S.hiddenP), dNow = at(S.defenses, f, S.hiddenD);
     const a = S.hasAngle && S.pose[f] ? S.angle[f] : null;
     $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
-    eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f);
+    eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f); comboCard($('comboCard'), f);
     $('clock').textContent = `${fmtT(video.currentTime)} · f ${f}`;
     const hud = [];
     for (const e of pNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}</span>`);

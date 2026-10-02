@@ -42,8 +42,14 @@ on the punching wrist around impact, and pills naming the current punch / move.
 
 The side panel has two views, switched at its top:
 
-- **Now** — what is under the playhead: the facing angle, the current punch and the current defensive move, each with
-  the sections of the rule layers that are on.
+- **Now** — what is under the playhead: the facing angle, then three cards, each judged on every rule that applies
+  to it — a score in the round score's tier colours, a verdict (okay / not okay, on / off target), or "not judged" and
+  why (the camera angle, the joint not visible, too far from the camera…). **Punch**: every per-punch rule that applies
+  to that punch (arm extension and hand return path for jabs and crosses only, hook stop for hooks, rear-foot pivot for
+  rear-hand punches), then the detail sections of the layers that are on. **Defense**: a slip on rules 14 and 15; no
+  rule scores a single roll, duck or pull-back. **Combo**: each combo the playhead is in — an offensive one on rules 24
+  (length), 30 (how often that sequence repeats) and 3 (defended after it?), a combined one on rules 13 (angle changed
+  after it?) and 31 (repeats).
 - **Round** — the whole video's counts: the punch and defense distributions and the combos (counts and the most-used
   sequences).
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
