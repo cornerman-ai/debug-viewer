@@ -1593,7 +1593,9 @@ async function loadFolder(src) {
 // every file of one video, read in parallel; nothing here touches S
 async function buildVideo(src, sig) {
   const txt = parts => src.text(parts, sig).catch(() => null);
-  const jsn = parts => src.text(parts, sig).then(JSON.parse).catch(() => null);
+  // a bare NaN / Infinity (Python writes them for an empty measurement) is not JSON: read it as null, never drop the file
+  const jsn = parts => src.text(parts, sig).then(t => JSON.parse(t.replace(/([:\[,]\s*)-?(?:NaN|Infinity)\b/g, '$1null')))
+    .catch(() => null);
   const [pjs, angleCsv, defCsv, impCsv] = await Promise.all([
     jsn(STAGES.punchJson), txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches)]);
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
