@@ -188,6 +188,79 @@
   .ovr-t tr.omed td { border-top: 1px solid var(--sep); }
   .ovr-t tr.omed td.on { color: var(--text2); font-weight: 600; }
   .ovr-t td.oerr { color: var(--text2); font-style: italic; }
+  /* upload */
+  .upl-box { width: min(880px, 94vw); max-height: 92vh; overflow: auto; }
+  .up-srv { display: inline-flex; align-items: center; gap: 6px; }
+  .up-srv .dot { width: 7px; height: 7px; border-radius: 50%; background: #22C55E; display: inline-block; }
+  .up-srv .dot.bad { background: #EF4444; }
+  .up-center { display: flex; align-items: center; justify-content: center; min-height: 220px; }
+  .up-drop { margin: 6px 0 4px; border: 2px dashed var(--fill2); border-radius: 14px; padding: 46px 24px; text-align: center;
+    cursor: pointer; transition: border-color .15s, background .15s, transform .15s; display: flex; flex-direction: column;
+    align-items: center; gap: 6px; }
+  .up-drop:hover, .up-drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .up-drop.over { transform: scale(1.01); }
+  .up-drop .ic { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent); margin-bottom: 6px; }
+  .up-drop.over .ic { animation: upbob .8s ease-in-out infinite; }
+  .up-drop b { font-size: 16px; } .up-drop u { color: var(--accent); text-decoration: none; }
+  .up-drop .m { max-width: 520px; margin-top: 8px; font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .up-err { color: #EF4444; font-size: 12.5px; margin-top: 6px; min-height: 1em; }
+  .up-err a { color: var(--accent); cursor: pointer; margin-left: 6px; }
+  .up-ready, .up-run { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; margin-top: 6px; }
+  @media (max-width: 760px) { .up-ready, .up-run { grid-template-columns: 1fr; } }
+  .up-prev { width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; background: #000; object-fit: contain; display: block; }
+  .up-ph { width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; background: var(--fill); display: grid; place-items: center; }
+  .up-vname { font-weight: 600; margin-top: 8px; word-break: break-word; }
+  .up-form label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+  .up-namerow { display: flex; align-items: center; gap: 6px; }
+  .up-namerow input { flex: 1; font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--sep);
+    background: var(--elev); color: var(--text); outline: none; }
+  .up-namerow input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+  .up-facts { margin: 10px 0 4px; font-size: 13px; }
+  .up-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .up-head { display: flex; align-items: baseline; gap: 10px; }
+  .up-head b { font-size: 28px; letter-spacing: -0.02em; }
+  .up-bar { height: 10px; border-radius: 5px; background: var(--fill); overflow: hidden; margin: 8px 0 12px; }
+  .up-bar i { display: block; height: 100%; width: 0; border-radius: 5px; transition: width .6s ease;
+    background: var(--accent) repeating-linear-gradient(-45deg, rgba(255,255,255,.22) 0 8px, transparent 8px 16px);
+    background-size: 22.6px 22.6px; animation: upstripe .9s linear infinite; }
+  .up-bar i.still { animation: none; }
+  .up-bar i.ok { background: #22C55E; } .up-bar i.bad { background: #EF4444; }
+  .up-steps { display: flex; flex-direction: column; }
+  .up-step { display: grid; grid-template-columns: 24px 1fr; gap: 10px; padding: 7px 0; border-top: 0.5px solid var(--sep); }
+  .up-step:first-child { border-top: 0; }
+  .up-step .t { font-size: 13.5px; font-weight: 600; } .up-step .s { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .up-step.pending .t, .up-step.pending .s { color: var(--text3); }
+  .up-ic { width: 20px; height: 20px; border-radius: 50%; box-sizing: border-box; display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; color: #fff; margin-top: 1px; }
+  .up-step.pending .up-ic { border: 2px solid var(--fill2); }
+  .up-step.active .up-ic { border: 2.5px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent);
+    animation: upspin .8s linear infinite; }
+  .up-step.wait .up-ic { border: 2px solid var(--accent); animation: uppulse 1.4s ease-in-out infinite; }
+  .up-step.done .up-ic { background: #22C55E; animation: uppop .3s ease-out; }
+  .up-step.failed .up-ic { background: #EF4444; }
+  .up-log { font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text3); margin-top: 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.4em; }
+  .up-foot { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .up-foot .m { font-size: 12px; color: var(--text2); }
+  .up-pre { width: 100%; max-height: 180px; overflow: auto; font: 11px ui-monospace, Consolas, monospace; background: var(--fill);
+    border-radius: 8px; padding: 8px 10px; margin: 0; white-space: pre-wrap; color: var(--text2); }
+  .up-off { text-align: center; padding: 26px 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .up-off p { margin: 0; max-width: 560px; color: var(--text2); font-size: 13px; line-height: 1.5; }
+  .up-off pre { font: 12.5px ui-monospace, Consolas, monospace; background: var(--fill); padding: 8px 12px; border-radius: 8px; margin: 4px 0; }
+  .up-spin { width: 13px; height: 13px; border-radius: 50%; display: inline-block; vertical-align: -2px; box-sizing: border-box;
+    border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: upspin .8s linear infinite; }
+  .up-spin.big { width: 34px; height: 34px; border-width: 3px; }
+  .upchip { display: inline-flex; align-items: center; gap: 7px; }
+  @media (max-width: 1250px) { #upBtn .uplbl { display: none; } #upBtn svg { margin-right: 0 !important; } }
+  .upchip .ok { color: #22C55E; font-weight: 700; } .upchip .bad { color: #EF4444; font-weight: 700; }
+  .upchip.done { background: color-mix(in srgb, #22C55E 16%, var(--fill)); }
+  @keyframes upspin { to { transform: rotate(360deg); } }
+  @keyframes upstripe { to { background-position: 22.6px 0; } }
+  @keyframes uppop { from { transform: scale(.4); } to { transform: scale(1); } }
+  @keyframes uppulse { 50% { transform: scale(.75); opacity: .5; } }
+  @keyframes upbob { 50% { transform: translateY(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .up-bar i, .up-step .up-ic, .up-spin, .up-drop .ic { animation: none !important; } }
   .rsort { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 8px; font-size: 12px; }
   .rsort span { color: var(--text2); margin-right: 4px; }
   .rsort button { border: 0; border-radius: 6px; padding: 3px 8px; font: inherit; background: var(--fill); color: var(--text); cursor: pointer; }
@@ -300,6 +373,9 @@
   <a class="btn" href="../" style="text-decoration:none" title="the frame-by-frame rule debug viewer">Rule debug viewer</a>
   <select class="btn" id="videoSelect" style="display:none" title="video folders in pipeline_tests"></select>
   <button class="btn" id="allBtn" style="display:none" title="every video's round scores in one table">All videos</button>
+  <button class="btn upchip" id="upChip" style="display:none"></button>
+  <button class="btn" id="upBtn" title="upload a video: it is copied to Google Drive and run through the whole pipeline">
+    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" style="vertical-align:-2px;margin-right:4px"><path d="M8 11V2M4 6l4-4 4 4M2 11v3h12v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="uplbl">Upload video</span></button>
   <button class="btn" id="openBtn">Open Folder…</button>
 </div>
 
@@ -411,6 +487,14 @@
       <button class="btn" id="ovrReload" title="read every video again">Reload</button><button class="btn" id="ovrClose">Close</button></div>
     <div class="tiers" id="ovrTiers"></div>
     <div class="ovr-scroll"><table class="ovr-t" id="ovrTable"></table></div>
+  </div>
+</div>
+
+<div class="ovr" id="upl" style="display:none">
+  <div class="ovr-box upl-box">
+    <div class="ovr-head"><b>Upload a video</b><span class="m up-srv" id="uplSrv"></span><div class="spacer"></div>
+      <button class="btn" id="uplClose">Close</button></div>
+    <div id="uplBody"></div>
   </div>
 </div>
 
@@ -1643,6 +1727,13 @@ const httpSource = (base, name) => {
     mediaFile: async parts => ({url: u(parts), arrayBuffer: async signal => (await get(parts, signal)).arrayBuffer()}),
   };
 };
+// list pipeline_tests over HTTP and open `want` (or the first video) — at start, and again after an upload
+async function useHttp(base, want) {
+  const names = await httpList(base);
+  S.httpBase = base; S.videoNames = names; S.sourceFor = async name => httpSource(base, name); OVR.data = null;
+  fillSelect(names, async name => loadFolder(httpSource(base, name)));
+  await $('videoSelect').onchange({target: {value: names.includes(want) ? want : names[0]}});
+}
 async function httpList(base) {
   const html = await (await fetch(base + 'pipeline_tests/')).text();
   return [...html.matchAll(/href="([^"]+)\/"/g)].map(m => decodeURIComponent(m[1])).filter(n => !n.startsWith('.'));
@@ -3473,6 +3564,7 @@ $('stage').addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (!S.src || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  if ($('upl').style.display !== 'none' || $('ovr').style.display !== 'none') return;     // a window is open
   if (e.code === 'Escape' && V.faceFilter) { e.preventDefault(); setFaceFilter(null); return; }
   const f = frameNow(), events = S.punches.filter(p => !S.hiddenP.has(p.type)).concat(S.defenses.filter(d => !S.hiddenD.has(d.type))).sort((a, b) => a.sf - b.sf);
   if (e.code === 'Space') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
@@ -3691,19 +3783,347 @@ function renderExplain() {
 }
 renderExplain();
 
+// ════════════════════════════ upload: a new video, through the whole pipeline ════════════════════════════
+// The page cannot run the pipeline; combined_pipeline/pipeline_server.py (cornerman-backend) can, on the machine with
+// the Drive mount. Served by it, the viewer calls its own origin; opened any other way (the hosted page + Open
+// Folder) it looks for the server on this machine's default port. The server copies the video into
+// raw_videos/full_pipeline_test_videos and runs `run_all.py --video <name>`; this page shows where it is and, when it
+// is done, opens the new video like any other. The job lives on the server: closing the window (or reloading the
+// page) does not stop it — only an upload still in flight is lost.
+const UP = {state: 'idle', file: null, url: null, ext: '', meta: null, job: null, xhr: null, sent: 0, upT0: 0, polledAt: 0,
+            stages: [], shared: 6, min: false, poll: null, err: null, existing: null, opened: false, foot: null};
+const escH = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const apiBase = () => (S.httpBase || 'http://localhost:8766/') + '__api/';
+async function api(path, opts = {}) {
+  const r = await fetch(apiBase() + path, {cache: 'no-store', ...opts, signal: opts.signal || AbortSignal.timeout(5000)});
+  return {ok: r.ok, status: r.status, data: await r.json().catch(() => ({}))};
+}
+const UP_ACTIVE = new Set(['queued', 'copying', 'skeleton', 'stages', 'checking']);
+const UP_EXT = ['.mp4', '.mov', '.m4v'];
+// Seconds per step for a video of D seconds, measured on this PC (2026-10-02: a 45 s upload, step by step, and the
+// 15-video run): the skeleton runs at about real time; the facing model grows with the square of the length (583
+// frames 1.2 s, 8,679 frames 242 s); every rule takes well under a second. Only the bar and "about N min left" use
+// them — the time left is also rescaled by how fast the finished steps really ran; every step's state is the server's.
+const UP_COST = {
+  copying: (D, size) => 0.5 + size / 200e6,
+  skeleton: D => D + 4,
+  stage: (n, D) => ({punches: 0.01 * D + 2, impact: 0.01 * D + 0.6, facing_angle: 0.0027 * D * D + 0.5,
+                     punch_facing: 0.005 * D + 0.2, defense: 0.006 * D + 0.3, combinations: 0.1,
+                     hip_rotation: 0.01 * D + 0.1, shoulder_rotation: 0.01 * D + 0.1}[n] ?? 0.003 * D + 0.05),
+};
+const upTotal = (D, size) => UP_COST.copying(D, size) + UP_COST.skeleton(D) + UP.stages.reduce((a, n) => a + UP_COST.stage(n, D), 0);
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const aboutMin = s => s < 60 ? 'under a minute' : `about ${Math.ceil(s / 60)} min`;
+const MBs = b => `${(b / 1e6).toFixed(b < 1e7 ? 1 : 0)} MB`;
+const prettyStage = n => n.replace(/_/g, ' ');
+
+function upOpen() { $('upl').style.display = ''; UP.min = false; upChip(); }
+function upHide() {                       // a job (or an upload in flight) goes on, shrunk into the header chip
+  $('upl').style.display = 'none';
+  UP.min = !!(UP.job || UP.xhr);
+  upChip();
+}
+function upReset() {
+  clearTimeout(UP.poll);
+  if (UP.url) URL.revokeObjectURL(UP.url);
+  Object.assign(UP, {state: 'pick', file: null, url: null, ext: '', meta: null, job: null, xhr: null, sent: 0, err: null, upDur: 0,
+                     existing: null, opened: false, foot: null, min: false});
+  $('uplBody').dataset.view = '';
+  upChip();
+}
+async function upHealth() {
+  UP.state = 'checking'; upRender();
+  try {
+    const r = await api('health');
+    if (!r.ok) throw new Error();
+    UP.stages = r.data.stages || []; UP.shared = r.data.shared_stages ?? 6; UP.state = 'pick';
+    try { localStorage.setItem('cornermanUploadServer', '1'); } catch {}
+  } catch { UP.state = 'offline'; }
+  upRender();
+}
+// a job already on the server (a reload mid-run): pick it up, minimised to the header chip
+async function upResume() {
+  try {
+    const h = await api('health'); if (!h.ok) return;
+    UP.stages = h.data.stages || []; UP.shared = h.data.shared_stages ?? 6;
+    const j = ((await api('jobs')).data || []).find(x => UP_ACTIVE.has(x.status));
+    if (!j || UP.job) return;
+    Object.assign(UP, {job: j, polledAt: performance.now(), state: 'run', min: true});
+    upRender(); upPoll();
+  } catch {}
+}
+
+// ── choosing the file ──
+function upChoose(f) {
+  UP.err = null; UP.existing = null;
+  const ext = (f.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+  if (!UP_EXT.includes(ext)) { UP.err = `${ext || 'That file'} is not a video the viewer can play — upload an MP4 or MOV.`; return upRender(); }
+  if (UP.url) URL.revokeObjectURL(UP.url);
+  const url = URL.createObjectURL(f), probe = document.createElement('video');
+  probe.preload = 'metadata'; probe.muted = true; probe.src = url;
+  probe.onloadedmetadata = () => {
+    Object.assign(UP, {file: f, url, ext, meta: {duration: probe.duration, w: probe.videoWidth, h: probe.videoHeight}, state: 'ready'});
+    upRender(); upCheckName();
+  };
+  probe.onerror = () => { URL.revokeObjectURL(url); UP.err = 'This browser cannot play that file — convert it to MP4 (H.264) and try again.'; upRender(); };
+}
+let upCheckT = 0;
+async function upCheckName() {
+  const inp = $('upName'), go = $('upGo'); if (!inp) return;
+  const name = inp.value.trim() + UP.ext, t = ++upCheckT;
+  if (!inp.value.trim()) { go.disabled = true; $('upErr').textContent = 'The video needs a name.'; return; }
+  try {
+    const r = await api(`check?name=${encodeURIComponent(name)}`);
+    if (t !== upCheckT || !$('upErr')) return;
+    go.disabled = !r.data.ok;
+    $('upErr').innerHTML = r.data.ok ? '' : escH(r.data.error) + (r.data.existing ? `<a data-open="${escH(r.data.existing)}">Open it</a>` : '');
+    $('upErr').querySelector('a')?.addEventListener('click', e => upOpenStem(e.target.dataset.open));
+  } catch { UP.state = 'offline'; upRender(); }
+}
+
+// ── the upload itself, then the job ──
+async function upStart() {
+  const name = $('upName').value.trim() + UP.ext;
+  $('upGo').disabled = true;
+  const chk = await api(`check?name=${encodeURIComponent(name)}`).catch(() => null);
+  if (!chk) { UP.state = 'offline'; return upRender(); }
+  if (!chk.data.ok) return upCheckName();
+  Object.assign(UP, {state: 'run', sent: 0, upT0: performance.now(), job: null, err: null, foot: null});
+  upRender();
+  const xhr = UP.xhr = new XMLHttpRequest();
+  xhr.open('POST', apiBase() + `upload?name=${encodeURIComponent(chk.data.name)}&duration=${UP.meta.duration.toFixed(2)}`);
+  xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+  xhr.upload.onprogress = e => { UP.sent = e.loaded; };
+  xhr.onload = () => {
+    UP.xhr = null; UP.upDur = (performance.now() - UP.upT0) / 1000;
+    let d = {}; try { d = JSON.parse(xhr.responseText); } catch {}
+    if (xhr.status === 201) { UP.job = d; UP.polledAt = performance.now(); upPoll(); }
+    else Object.assign(UP, {state: 'failed', err: d.error || `the upload failed (${xhr.status})`, existing: d.existing || null});
+    upRender();
+  };
+  xhr.onerror = () => { UP.xhr = null; Object.assign(UP, {state: 'failed', err: 'The upload was cut off — is the pipeline server still running?'}); upRender(); };
+  xhr.send(UP.file);
+}
+async function upPoll() {
+  clearTimeout(UP.poll);
+  if (!UP.job) return;
+  try {
+    const r = await api(`jobs/${UP.job.id}`);
+    if (r.ok) { UP.job = r.data; UP.polledAt = performance.now(); }
+    else if (r.status === 404) UP.job = {...UP.job, status: 'failed', error: 'The pipeline server restarted and lost this job — upload the video again.'};
+  } catch {}                                                // the server is busy or away: keep asking
+  const st = UP.job.status;
+  if (st === 'done' && UP.state !== 'done') { UP.state = 'done'; upRender(); if (!UP.min) setTimeout(() => { if (UP.state === 'done' && !UP.min && !UP.opened) upOpenVideo(); }, 1400); }
+  else if (st === 'failed' && UP.state !== 'failed') { UP.state = 'failed'; upRender(); }
+  if (UP_ACTIVE.has(st)) UP.poll = setTimeout(upPoll, 1000);
+}
+async function upOpenStem(stem) {
+  $('upl').style.display = 'none';
+  await guard(async () => {
+    if (S.httpBase) await useHttp(S.httpBase, stem);
+    else if (S.dataDir) { await idb.set('lastVideo', stem); await showVideoList(); }
+    else throw new Error(`“${stem}” is ready — open the Ambo data folder to see it.`);
+  });
+}
+async function upOpenVideo() {
+  const stem = UP.job?.stem; if (!stem) return;
+  UP.opened = true;
+  await upOpenStem(stem);
+  upReset();
+}
+
+// ── drawing ──
+function upProgress(j) {
+  const D = j.duration || UP.meta?.duration || 60, st = UP.stages;
+  if (j.status === 'done') return {frac: 1, left: 0};
+  if (j.status === 'checking') return {frac: 0.995, left: 1};
+  const steps = [['copying', UP_COST.copying(D, j.size)], ['skeleton', UP_COST.skeleton(D)], ...st.map(n => [n, UP_COST.stage(n, D)])];
+  const total = steps.reduce((a, [, c]) => a + c, 0);
+  const key = j.status === 'stages' ? j.stage : j.status === 'failed' ? (j.stage || j.failed_in) : j.status;
+  const i = steps.findIndex(([k]) => k === key);
+  if (i < 0) return {frac: 0, left: total};
+  const el = j.phase_started ? j.now - j.phase_started + (j.status === 'failed' ? 0 : (performance.now() - UP.polledAt) / 1000) : 0;
+  const before = steps.slice(0, i).reduce((a, [, c]) => a + c, 0), c = steps[i][1], into = Math.min(el / c, 0.95) * c;
+  // how fast this machine is running against the estimate, from the steps already timed (once there is enough of them)
+  const timed = steps.slice(0, i).filter(([k]) => j.times?.[k] != null);
+  const est = timed.reduce((a, [, c]) => a + c, 0), real = timed.reduce((a, [k]) => a + j.times[k], 0);
+  const pace = est > 15 ? Math.min(3, Math.max(0.3, real / est)) : 1;
+  return {frac: (before + into) / total, left: pace * (total - before - into)};
+}
+const UP_ROWS = ['upload', 'copying', 'skeleton', 'shared', 'rules', 'ready'];
+function upRows(j) {
+  const st = UP.stages, sh = UP.shared, nRules = Math.max(0, st.length - sh);
+  const D = j?.duration || UP.meta?.duration || 0, size = j?.size || UP.file?.size || 0;
+  const idx = j?.stage ? st.indexOf(j.stage) : -1;
+  const rowOf = status => status === 'stages' ? (idx < sh ? 'shared' : 'rules') : status === 'checking' ? 'rules'
+    : status === 'queued' ? 'copying' : status;
+  const failed = UP.state === 'failed';
+  const at = !j ? 'upload' : j.status === 'done' ? 'end' : j.status === 'failed' ? rowOf(j.failed_in) : rowOf(j.status);
+  const atI = at === 'end' ? UP_ROWS.length : UP_ROWS.indexOf(at);
+  const speed = UP.sent / Math.max(0.2, (performance.now() - UP.upT0) / 1000);
+  const tm = j?.times || {}, took = keys => { const v = keys.map(k => tm[k]).filter(x => x != null);
+    return v.length ? ` · ${(t => t < 60 ? `${Math.max(1, Math.round(t))} s` : mmss(t))(v.reduce((a, b) => a + b, 0))}` : ''; };
+  const T = {
+    upload: ['Upload', s => s === 'active' ? `${Math.floor(100 * UP.sent / Math.max(1, size))} % · ${MBs(UP.sent)} of ${MBs(size)} · ${MBs(speed)}/s`
+                         : s === 'done' ? `${MBs(size)} sent to the pipeline server${UP.upDur ? ` · ${Math.max(1, Math.round(UP.upDur))} s` : ''}`
+                         : s === 'failed' ? 'did not arrive' : `${MBs(size)}`],
+    copying: ['Copy to Google Drive', s => j?.status === 'queued' ? `waiting for “${escH(j.ahead?.[0] || 'another video')}” to finish first`
+                         : s === 'pending' ? 'Ambo › data › raw_videos › full_pipeline_test_videos'
+                         : `into Ambo › data › raw_videos › full_pipeline_test_videos${s === 'done' ? took(['copying']) : ''}`],
+    skeleton: ['Skeleton', s => s === 'active' ? `BlazePose on every frame — ${aboutMin(UP_COST.skeleton(D))} for ${mmss(D)} of video`
+                         : `BlazePose on every frame${s === 'done' ? took(['skeleton']) : ''}`],
+    shared: ['Punches, defense, facing', s => s === 'active' && idx >= 0 ? `${prettyStage(j.stage)} · ${idx + 1} of ${sh}`
+                         : s === 'done' ? `${sh} stages${took(st.slice(0, sh))}` : 'punches, impact, facing angle, defense, combinations'],
+    rules: ['Rules', s => s === 'active' && j?.status === 'checking' ? 'checking every output'
+                         : s === 'active' && idx >= sh ? `${prettyStage(j.stage)} · ${idx - sh + 1} of ${nRules}`
+                         : s === 'done' ? `${nRules} rule stages${took(st.slice(sh))} — every score in the Rules tab` : `${nRules} rule stages`],
+    ready: ['Ready', s => s === 'done' ? (UP.min ? 'open it from the header' : 'opening it here…') : 'the video opens here with all its results'],
+  };
+  return UP_ROWS.map((r, i) => {
+    let s = i < atI ? 'done' : i === atI ? (j?.status === 'failed' || (failed && !j) ? 'failed' : 'active') : 'pending';
+    if (r === 'copying' && j?.status === 'queued') s = 'wait';
+    const [t, sub] = T[r];
+    return `<div class="up-step ${s}"><span class="up-ic">${s === 'done' ? '✓' : s === 'failed' ? '!' : ''}</span>` +
+      `<div><div class="t">${t}</div><div class="s">${sub(s)}</div></div></div>`;
+  }).join('');
+}
+function upRender() {
+  const b = $('uplBody'), srv = $('uplSrv');
+  srv.innerHTML = UP.state === 'offline' ? '<i class="dot bad"></i>no pipeline server' : UP.state === 'checking' ? 'looking for the pipeline server…'
+    : `<i class="dot"></i>pipeline server · ${escH(apiBase().replace(/__api\/$/, ''))}`;
+  const view = ['run', 'done', 'failed'].includes(UP.state) ? 'run' : UP.state;
+  if (UP.state === 'failed' && !UP.job && !UP.file) {            // nothing was sent: back to picking, with the reason
+    UP.state = 'pick'; return upRender();
+  }
+  if (b.dataset.view === view && view === 'run') return upTick();
+  b.dataset.view = view; UP.foot = null;
+  if (view === 'checking') { b.innerHTML = '<div class="up-center"><span class="up-spin big"></span></div>'; return; }
+  if (view === 'offline') {
+    b.innerHTML = `<div class="up-off"><div class="up-drop" style="border:0;padding:0;cursor:default"><span class="ic">` +
+      `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 3v9M6.5 6.5a8 8 0 1 0 11 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span></div>` +
+      `<b>The pipeline server isn’t running</b>` +
+      `<p>An upload runs the whole pipeline — the skeleton and every rule — so it needs the machine with the Google Drive ` +
+      `mount and the two conda envs. Start the server there, in cornerman-backend:</p>` +
+      `<pre>python combined_pipeline/pipeline_server.py</pre>` +
+      `<p>then open <b>http://localhost:8766/</b>, or keep this page and try again.</p>` +
+      `<button class="btn primary" id="upRetry" style="margin-top:6px">Try again</button></div>`;
+    $('upRetry').onclick = upHealth; return;
+  }
+  if (view === 'pick') {
+    b.innerHTML = `<div class="up-drop" id="upDrop" tabindex="0"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24">` +
+      `<path d="M12 16V4M7 9l5-5 5 5M4 16v4h16v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>` +
+      `<b>Drop a video here</b><span>or <u>choose a file</u></span>` +
+      `<div class="m">MP4 or MOV. It is copied to Ambo › data › raw_videos › full_pipeline_test_videos, then runs through ` +
+      `the skeleton extraction and every rule — about as long as the video itself, longer for long ones. When it is done, it opens here like any other video.</div></div>` +
+      `<div class="up-err">${escH(UP.err || '')}${UP.existing ? `<a id="upExisting">Open “${escH(UP.existing)}”</a>` : ''}</div>`;
+    const drop = $('upDrop'), pick = () => {
+      const inp = Object.assign(document.createElement('input'), {type: 'file', accept: 'video/mp4,video/quicktime,.mp4,.mov,.m4v'});
+      inp.onchange = () => inp.files[0] && upChoose(inp.files[0]); inp.click();
+    };
+    drop.onclick = pick; drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } };
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) upChoose(f); };
+    if (UP.existing) $('upExisting').onclick = () => upOpenStem(UP.existing);
+    return;
+  }
+  if (view === 'ready') {
+    const m = UP.meta, stem = UP.file.name.replace(/\.[^.]+$/, '');
+    b.innerHTML = `<div class="up-ready"><video class="up-prev" id="upPrev" muted loop autoplay playsinline></video>` +
+      `<div class="up-form"><label for="upName">Name — it becomes the video’s folder in pipeline_tests</label>` +
+      `<div class="up-namerow"><input id="upName" spellcheck="false" value="${escH(stem)}"><span class="m">${escH(UP.ext)}</span></div>` +
+      `<div class="up-err" id="upErr"></div>` +
+      `<div class="up-facts num">${mmss(m.duration)} · ${m.w}×${m.h} · ${MBs(UP.file.size)}</div>` +
+      `<div class="m" style="font-size:12.5px">The whole pipeline takes ${aboutMin(upTotal(m.duration, UP.file.size))} for a video this long. ` +
+      `You can keep browsing meanwhile.</div>` +
+      `<div class="up-actions"><button class="btn primary" id="upGo">Upload &amp; analyse</button>` +
+      `<button class="btn" id="upAnother">Choose another</button></div></div></div>`;
+    $('upPrev').src = UP.url;
+    let t; $('upName').oninput = () => { clearTimeout(t); t = setTimeout(upCheckName, 250); };
+    $('upName').onkeydown = e => { if (e.key === 'Enter' && !$('upGo').disabled) upStart(); };
+    $('upGo').onclick = upStart;
+    $('upAnother').onclick = () => { upReset(); upRender(); };
+    return;
+  }
+  // run / done / failed: one layout, updated in place by upTick
+  const j = UP.job;
+  b.innerHTML = `<div class="up-run"><div>` +
+      (UP.url ? '<video class="up-prev" id="upPrev" muted loop autoplay playsinline></video>' : '<div class="up-ph" id="upPh"><span class="up-spin big"></span></div>') +
+      `<div class="up-vname" id="upVname">${escH(j?.stem || (UP.file?.name || '').replace(/\.[^.]+$/, ''))}</div>` +
+      `<div class="m num" id="upVfacts" style="font-size:12px;color:var(--text2)"></div></div>` +
+    `<div><div class="up-head"><b class="num" id="upPct">0%</b><span class="m" id="upEta" style="font-size:13px;color:var(--text2)"></span>` +
+      `<div class="spacer" style="flex:1"></div><span class="num" id="upEl" style="font-size:12px;color:var(--text3)"></span></div>` +
+      `<div class="up-bar"><i id="upFill"></i></div><div class="up-steps" id="upSteps"></div>` +
+      `<div class="up-log" id="upLog"></div><div class="up-foot" id="upFoot"></div></div></div>`;
+  if (UP.url) $('upPrev').src = UP.url;
+  upTick();
+}
+function upTick() {
+  if (!$('upSteps')) { upChip(); return; }
+  const j = UP.job, size = j?.size || UP.file?.size || 0;
+  const upFrac = j ? 1 : size ? UP.sent / size : 0;
+  const p = j ? upProgress(j) : {frac: 0, left: UP.meta ? upTotal(UP.meta.duration, size) : null};
+  const frac = UP.state === 'done' ? 1 : 0.03 * upFrac + 0.97 * p.frac;
+  $('upPct').textContent = `${Math.floor(frac * 100)}%`;
+  const fill = $('upFill'); fill.style.width = `${(Math.max(frac, 0.01) * 100).toFixed(1)}%`;
+  fill.classList.toggle('still', UP.state !== 'run'); fill.classList.toggle('ok', UP.state === 'done'); fill.classList.toggle('bad', UP.state === 'failed');
+  $('upEta').textContent = UP.state === 'done' ? 'all done' : UP.state === 'failed' ? 'stopped'
+    : j?.status === 'queued' ? 'waiting in line' : !j ? 'uploading…' : `${aboutMin(p.left)} left`;
+  const drift = j && UP.state === 'run' ? (performance.now() - UP.polledAt) / 1000 : 0;
+  const el = j ? ((j.finished || j.now + drift) - j.created) : (performance.now() - UP.upT0) / 1000;
+  $('upEl').textContent = `${mmss(Math.max(0, el))} elapsed`;
+  const D = j?.duration || UP.meta?.duration;
+  $('upVfacts').textContent = [D ? mmss(D) : '', size ? MBs(size) : ''].filter(Boolean).join(' · ');
+  $('upSteps').innerHTML = upRows(j);
+  $('upLog').textContent = UP.state === 'run' ? (j?.log?.at(-1) || '').trim() : '';
+  // once the video is on Drive the server can play it: a reloaded page gets its preview back (HTTP mode)
+  if ($('upPh') && S.httpBase && j && !['queued', 'copying', 'failed'].includes(j.status)) {   // a failed job removed it
+    $('upPh').outerHTML = '<video class="up-prev" id="upPrev" muted loop autoplay playsinline></video>';
+    $('upPrev').src = S.httpBase + ['raw_videos', 'full_pipeline_test_videos', j.name].map(encodeURIComponent).join('/');
+  }
+  if (UP.foot !== UP.state) {                                    // the buttons, only when the state changes
+    UP.foot = UP.state;
+    const f = $('upFoot'), err = j?.error || UP.err;
+    if (UP.state === 'run') f.innerHTML = `<button class="btn" id="upMin">Keep browsing</button>` +
+      `<span class="m">The job runs on the server — this window shrinks into the header, and closing it stops nothing.</span>`;
+    else if (UP.state === 'done') f.innerHTML = `<button class="btn primary" id="upOpenV">Open the video</button><button class="btn" id="upMore">Upload another</button>`;
+    else f.innerHTML = `<div class="up-err" style="width:100%">${escH(err || 'Something went wrong.')}` +
+      `${UP.existing ? `<a id="upExisting">Open “${escH(UP.existing)}”</a>` : ''}</div>` +
+      (j?.log?.length ? `<pre class="up-pre">${escH(j.log.join('\n'))}</pre>` : '') + `<button class="btn" id="upMore">Upload another</button>`;
+    $('upMin') && ($('upMin').onclick = upHide);
+    $('upOpenV') && ($('upOpenV').onclick = upOpenVideo);
+    $('upMore') && ($('upMore').onclick = () => { upReset(); upHealth(); });
+    $('upExisting') && ($('upExisting').onclick = () => upOpenStem(UP.existing));
+  }
+  upChip();
+}
+function upChip() {
+  const c = $('upChip'), j = UP.job, show = UP.min && (j || UP.xhr);
+  c.style.display = show ? '' : 'none'; c.classList.toggle('done', UP.state === 'done');
+  if (!show) return;
+  c.innerHTML = UP.state === 'done' ? `<span class="ok">✓</span>${escH(j.stem.length > 28 ? j.stem.slice(0, 27) + '…' : j.stem)} is ready — open`
+    : UP.state === 'failed' ? '<span class="bad">!</span>Upload failed — details'
+    : `<span class="up-spin"></span>Analysing · ${$('upPct')?.textContent || '…'}`;
+  c.title = j ? j.name : '';
+}
+$('upBtn').onclick = () => { upOpen(); if (UP.job || UP.xhr || UP.state === 'ready') upRender(); else upHealth(); };
+$('upChip').onclick = () => { if (UP.state === 'done') upOpenVideo(); else { upOpen(); upRender(); } };
+$('uplClose').onclick = upHide;
+$('upl').onclick = e => { if (e.target.id === 'upl') upHide(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('upl').style.display !== 'none') upHide(); });
+setInterval(() => { if (UP.job || UP.xhr) upTick(); }, 500);
+window.addEventListener('beforeunload', e => { if (UP.xhr) { e.preventDefault(); e.returnValue = ''; } });
+
 // ════════════════════════════ start ════════════════════════════
 (async () => {
   const q = new URLSearchParams(location.search);
   if (q.get('data')) {                                       // HTTP mode (a local server), for testing
     const base = q.get('data').replace(/\/?$/, '/');
-    await guard(async () => {
-      const names = await httpList(base);
-      S.videoNames = names; S.sourceFor = async name => httpSource(base, name); OVR.data = null;
-      fillSelect(names, async name => loadFolder(httpSource(base, name)));
-      const want = q.get('video'); await $('videoSelect').onchange({target: {value: names.includes(want) ? want : names[0]}});
-    });
+    await guard(() => useHttp(base, q.get('video')));
+    upResume();
     return;
   }
+  try { if (localStorage.getItem('cornermanUploadServer')) upResume(); } catch {}   // only once a server was seen
   const d = await idb.get('dataDir');
   if (d) {
     const rb = $('reopenBtn'); rb.style.display = ''; rb.textContent = `Continue with “${d.name}”`;
