@@ -194,13 +194,14 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   (0.50, "lead 100") and the zero line (0.70), and labels the frame score: lead 30 + rear 70, or one hand alone.
   Round = the mean frame score, a plain number with no bands. Reads `runs.csv` + `guard_height.json`.
 - **Hips bladed** (`bladedness_hips/`) and **Shoulders bladed** (`bladedness_shoulders/`): both per frame outside
-  punches, both continuous rows. The angle is that line's turn out of the image plane from the 3D landmarks — 0°
-  chest-on, 90° side-on — and the two cuts per axis are a coach's verdicts on 30 frames (hips 18.2 / 27.9,
-  shoulders 12.7 / 17.6). Frame score: 0 at the squared cut or below, 100 at the fine cut or above, linear between
-  (red / orange / green on the row; the overlay labels the angle and the score). There is no upper edge; he never
-  called anyone too bladed. Every facing angle is judged. Round = the mean frame score, a plain number. **The angle is measured against the camera**,
-  which stands in for the opponent only on the curated frontal set — none of the test videos is in it, so read
-  these two as a demonstration of the rule rather than a verdict on the boxer. Read `runs.csv` + the stage's `.json`.
+  punches, both continuous rows. The angle is that line's turn from square TO THE OPPONENT: its direction in the 3D
+  landmarks minus the facing model's direction to the opponent (the model's labelers drew a line from the boxer
+  toward his opponent) — 0° chest-on, 90° side-on; with the boxer facing the camera it is the lens's formula. The two
+  cuts per axis are a coach's verdicts on 30 frames (hips 18.2 / 27.9, shoulders 12.7 / 17.6). Frame score: 0 at the
+  squared cut or below, 100 at the fine cut or above, linear between (red / orange / green on the row; the overlay
+  labels the angle and the score). There is no upper edge; he never called anyone too bladed. Every facing angle is
+  judged; a frame with no facing angle is not. Round = the mean frame score, a plain number. Read `runs.csv` + the
+  stage's `.json`.
 - **Chin height** (`chin_height/`) and **Chin depth** (`chin_depth/`): both per frame outside punches, both
   continuous rows, both reading the skeleton chin (`nose + 2.25 × nose→mouth` — BlazePose has no jaw landmark).
   Height is the chin against the top of the lead shoulder (the keypoint raised 0.06 torso) in torso lengths, scored 100 with the chin at or below

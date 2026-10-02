@@ -710,7 +710,14 @@ const BLADE = {
   shoulders: {stage: 'bladedness_shoulders', label: 'Shoulders bladed', short: 'Shoulders bladed', cuts: [12.7, 17.6]},
 };
 const BLADECOL = {squared: '#ff3b30', between: '#ff9f0a', bladed: '#34c759'};
-const BLADESKIP = {no_pose: 'a joint it needs is not visible', punching: 'a punch is in flight'};
+const BLADESKIP = {no_pose: 'a joint it needs is not visible', punching: 'a punch is in flight',
+                   no_facing: 'no facing angle — the direction to the opponent is unknown'};
+// the line's angle from square to the opponent: its yaw in the world landmarks minus the facing model's direction to
+// the opponent, folded to 0-90 (run_bladedness.py); with the boxer facing the camera it is the lens's atan2(|dz|, |dx|)
+function bladeDeg(dx, dz, facing) {
+  const r = (Math.atan2(dz, dx) * 180 / Math.PI - facing) * Math.PI / 180;
+  return Math.atan2(Math.abs(Math.sin(r)), Math.abs(Math.cos(r))) * 180 / Math.PI;
+}
 // the frame score: 100 at or past the fine cut, linearly down to 0 at the squared cut, 0 below it
 const bladeScore = (deg, [c0, c1]) => 100 * Math.min(1, Math.max(0, (deg - c0) / (c1 - c0)));
 function bladeLayer(kind) {
@@ -729,7 +736,9 @@ function bladeLayer(kind) {
       OV.line(a, b, col, 5); OV.dot(a, col, 4); OV.dot(b, col, 4);
       const dx = Q(jl, 3) - Q(jr, 3), dz = Q(jl, 5) - Q(jr, 5);              // the world x and z channels
       if (!(Number.isFinite(dx) && Number.isFinite(dz))) return;
-      const deg = Math.atan2(Math.abs(dz), Math.abs(dx)) * 180 / Math.PI;
+      const fa = S.hasAngle && S.pose?.[f] ? S.angle[f] : NaN;
+      if (!Number.isFinite(fa)) return;
+      const deg = bladeDeg(dx, dz, fa);
       const judged = it && !BLADESKIP[it.state];
       overlayLabel((a[0] + b[0]) / 2 - 24, (a[1] + b[1]) / 2 - 20,
                    `${deg.toFixed(1)}\u00b0${judged ? ` \u2192 ${bladeScore(deg, C.cuts).toFixed(0)}` : ''}`, col);
@@ -739,7 +748,7 @@ function bladeLayer(kind) {
       if (BLADESKIP[x.state]) return `<b>Not judged</b> ${t}<br><span>${BLADESKIP[x.state]}</span>`;
       const name = x.state === 'squared' ? 'Squared up' : x.state === 'between' ? 'In between' : 'Bladed enough';
       return `<b>${name}</b> ${t}${x.score == null ? '' : ` \u00b7 mean frame score <b>${x.score.toFixed(0)}</b>`}<br>` +
-        `<span class="m">the ${kind} line against the camera: 0 at ${C.cuts[0]}\u00b0 or less, 100 at ${C.cuts[1]}\u00b0 or more, ` +
+        `<span class="m">the ${kind} line against the direction to the opponent: 0 at ${C.cuts[0]}\u00b0 or less, 100 at ${C.cuts[1]}\u00b0 or more, ` +
         `linear between \u2014 a coach's cuts, and only meaningful where the camera stands in for the opponent</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
@@ -1949,8 +1958,8 @@ const SCOPE = {
   resting:   {moves: 'every punch at impact ±2 frames, the hand that does not throw', angles: ALL_ANGLES},
   chin_height: {moves: 'every frame outside a punch',           angles: ALL_ANGLES},
   chin_depth:  {moves: 'every frame outside a punch',           angles: 'side-on'},
-  blade_hips:      {moves: 'every frame outside a punch',       angles: 'front, back, side-on \u2014 meaningful only where the camera stands in for the opponent'},
-  blade_shoulders: {moves: 'every frame outside a punch',       angles: 'front, back, side-on \u2014 meaningful only where the camera stands in for the opponent'},
+  blade_hips:      {moves: 'every frame outside a punch',       angles: ALL_ANGLES},   // against the opponent, so any view
+  blade_shoulders: {moves: 'every frame outside a punch',       angles: ALL_ANGLES},
   hrp:       {moves: 'jab, cross',                              angles: 'side-on'},
   bal:       {moves: 'every punch at its impact frame',         angles: 'side-on'},
   hookstop:  {moves: 'every head hook at its impact frame',     angles: 'front, back'},
@@ -2289,10 +2298,10 @@ function ruleCard() {
     add(C.label, bd.score ?? 'not rated', bd.score == null ? '#8e8e93' : 'var(--text)', {
       what: `is he standing square to the opponent, seen at the ${kind}?`,
       on: `${bd.n_frames.toLocaleString()} frames · ${bd.judged_frames.toLocaleString()} judged outside punches · `
-          + `median ${bd.median_deg ?? '–'}° — the angle is measured against the CAMERA, which only stands in for the `
-          + `opponent on the curated frontal set`,
-      th: {event: {label: 'per frame', rule: `the ${kind} line's angle out of the image plane, from the 3D landmarks `
-                          + `— 0° is chest-on, 90° side-on. The two cuts are a coach's verdicts on 30 frames, the only `
+          + `median ${bd.median_deg ?? '–'}° — measured against the direction to the opponent the facing model gives`,
+      th: {event: {label: 'per frame', rule: `the ${kind} line's angle from square to the opponent — its direction in `
+                          + `the 3D landmarks minus the facing model's direction to the opponent — 0° chest-on, 90° side-on.`
+                          + ` The two cuts are a coach's verdicts on 30 frames, the only `
                           + `bladedness thresholds that exist; there is no upper edge, because he never called anyone too bladed`,
                    bands: [[`≤ ${C.cuts[0]}°`, '0'], [`${C.cuts[0]}–${C.cuts[1]}°`, '0 → 100 (linear)'], [`≥ ${C.cuts[1]}°`, '100']],
                    pal: {'0': '#ff3b30', '0 → 100 (linear)': '#ff9f0a', '100': '#34c759'}},
@@ -2747,8 +2756,8 @@ function frameCard(el, f) {
     const st = state(key)?.state;
     if (!st || BLADESKIP[st]) { rows.push([no, {skip: BLADESKIP[st] || 'no reading'}]); continue; }
     const dx = S.skel[b + jl * C + 3] - S.skel[b + jr * C + 3], dz = S.skel[b + jl * C + 5] - S.skel[b + jr * C + 5];
-    const deg = Math.atan2(Math.abs(dz), Math.abs(dx)) * 180 / Math.PI;
-    rows.push([no, Number.isFinite(deg) ? {score: bladeScore(deg, BLADE[kind].cuts), note: `${deg.toFixed(1)}° out of the image plane`} : {skip: 'no reading'}]);
+    const deg = S.hasAngle && S.pose[f] ? bladeDeg(dx, dz, S.angle[f]) : NaN;
+    rows.push([no, Number.isFinite(deg) ? {score: bladeScore(deg, BLADE[kind].cuts), note: `${deg.toFixed(1)}° from square to the opponent`} : {skip: 'no reading'}]);
   }
   // 25 work rate: what this frame counts as — the round's score is the share of dead time
   if (S.has.work) {
