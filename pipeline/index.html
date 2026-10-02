@@ -310,7 +310,7 @@
   </div>
   <div class="split v" id="splitV" title="drag to resize · double-click to reset"></div>
   <div class="inspector">
-    <div class="seg viewSeg" id="viewSeg"><button data-v="now" class="on">Now</button><button data-v="round">Round</button><button data-v="rules">Rules</button></div>
+    <div class="seg viewSeg" id="viewSeg"><button data-v="now" class="on">Now</button><button data-v="round">Round</button><button data-v="rules">Rules</button><button data-v="timelines">Timelines</button></div>
 
     <div id="nowView" style="display:contents">
       <div class="card">
@@ -351,10 +351,12 @@
       </div>
     </div>
 
+    <div id="timelinesView" style="display:none">
     <div class="card" id="layersCard">
       <div class="label">Timeline layers</div>
       <div class="rsort" id="layerSort"></div>
       <div id="layerList"></div>
+    </div>
     </div>
     </div>
   </div>
@@ -1849,14 +1851,15 @@ function comboDist(kind, all) {
     '';
   const b = $(`comboMore-${kind}`); if (b) b.onclick = () => comboDist(kind, !all);
 }
-$('viewSeg').onclick = e => {      // Now (this frame) | Round (the whole video's counts) | Rules (every rule's round score)
+// Now (this frame) | Round (the whole video's counts) | Rules (every rule's round score) | Timelines (the layer toggles)
+$('viewSeg').onclick = e => {
   const b = e.target.closest('button'); if (!b) return;
   $('viewSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
   const v = b.dataset.v;
   $('nowView').style.display = v === 'now' ? 'contents' : 'none';
   $('roundView').style.display = v === 'round' ? 'contents' : 'none';
   $('rulesView').style.display = v === 'rules' ? 'contents' : 'none';
-  $('layersCard').style.display = v === 'now' ? '' : 'none';    // the timeline toggles belong to Now
+  $('timelinesView').style.display = v === 'timelines' ? 'contents' : 'none';
 };
 
 // one compact row: name on the left, a colored dot + verdict + number on the right; the rule goes in the tooltip
