@@ -48,6 +48,28 @@
   .btn:hover { background: var(--fill2); }
   .btn.primary { background: var(--accent); color: #fff; }
   .btn.primary:hover { filter: brightness(1.08); }
+  #videoSelect { display: none !important; }                  /* the model behind the picker, never shown */
+  .vpick { position: relative; }
+  .vpick-btn { display: inline-flex; align-items: center; gap: 8px; max-width: 440px; padding-right: 26px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text2) 50%), linear-gradient(135deg, var(--text2) 50%, transparent 50%);
+    background-position: calc(100% - 13px) 50%, calc(100% - 9px) 50%; background-size: 4px 4px; background-repeat: no-repeat; }
+  .vpick-btn .vt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vn { flex: none; min-width: 22px; padding: 1px 5px; border-radius: 5px; background: var(--fill); color: var(--text2);
+    font-size: 11px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+  .vpop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; width: min(600px, 92vw); background: var(--panel-solid);
+    border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.22), 0 0 0 0.5px var(--sep); padding: 8px; }
+  .vpop input { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--sep); background: var(--elev); color: var(--text); outline: none; }
+  .vpop input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+  .vlist { max-height: min(60vh, 520px); overflow: auto; margin-top: 6px; }
+  .vrow { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+  .vrow .vt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .vrow.act { background: var(--fill); }
+  .vrow.cur .vt { color: var(--accent); font-weight: 600; }
+  .vrow.cur .vn { background: var(--accent); color: #fff; }
+  .vrow mark { background: color-mix(in srgb, #EAB308 35%, transparent); color: inherit; border-radius: 2px; }
+  .vempty { padding: 14px 8px; color: var(--text3); font-size: 13px; }
+  .vfoot { margin-top: 6px; padding: 4px 4px 0; border-top: 0.5px solid var(--sep); font-size: 11px; color: var(--text3); }
   select.btn { appearance: none; -webkit-appearance: none; padding-right: 26px; max-width: 360px;
     background-image: linear-gradient(45deg, transparent 50%, var(--text2) 50%), linear-gradient(135deg, var(--text2) 50%, transparent 50%);
     background-position: calc(100% - 13px) 50%, calc(100% - 9px) 50%; background-size: 4px 4px; background-repeat: no-repeat; }
@@ -372,6 +394,14 @@
   <div class="spacer"></div>
   <a class="btn" href="../" style="text-decoration:none" title="the frame-by-frame rule debug viewer">Rule debug viewer</a>
   <select class="btn" id="videoSelect" style="display:none" title="video folders in pipeline_tests"></select>
+  <div class="vpick" id="vpick" style="display:none">
+    <button class="btn vpick-btn" id="vpickBtn" title="pick a video — press / to search"><span class="vn" id="vpickNo"></span><span class="vt" id="vpickName"></span></button>
+    <div class="vpop" id="vpop" style="display:none">
+      <input id="vpickQ" placeholder="Search videos — name or number" spellcheck="false" autocomplete="off">
+      <div class="vlist" id="vlist" role="listbox"></div>
+      <div class="vfoot" id="vfoot"></div>
+    </div>
+  </div>
   <button class="btn" id="allBtn" style="display:none" title="every video's round scores in one table">All videos</button>
   <button class="btn upchip" id="upChip" style="display:none"></button>
   <button class="btn" id="upBtn" title="upload a video: it is copied to Google Drive and run through the whole pipeline">
@@ -1910,9 +1940,77 @@ function fillSelect(names, onPick) {
   // an explicit value: an option's text collapses runs of spaces, and a folder name can carry two ("Pointers  )")
   const esc = n => n.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   sel.innerHTML = names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-  sel.style.display = ''; $('allBtn').style.display = '';
-  sel.onchange = async e => { sel.value = e.target.value; await guard(() => onPick(e.target.value)); };
+  sel.style.display = ''; $('allBtn').style.display = ''; $('vpick').style.display = '';
+  sel.onchange = async e => { sel.value = e.target.value; vpickSync(); await guard(() => onPick(e.target.value)); };
+  vpickSync();
 }
+
+// ── the video picker: every video in pipeline_tests, numbered in alphabetical order (the dropdown's order — a new
+// video shifts the numbers after it), searchable by name or number. Every word typed must appear; a number alone also
+// finds that video. ↑ ↓ move, Enter opens, Esc closes; / opens it from anywhere. ──
+const VP = {open: false, rows: [], act: 0};
+const vpNames = () => [...$('videoSelect').options].map(o => o.value);
+function vpickSync() {
+  const names = vpNames(), cur = $('videoSelect').value, i = names.indexOf(cur);
+  $('vpickNo').textContent = i >= 0 ? i + 1 : '';
+  $('vpickName').textContent = cur;
+  $('vpickBtn').title = `${i >= 0 ? `${i + 1} of ${names.length} · ` : ''}${cur} — press / to search`;
+}
+function vpickFilter() {
+  const names = vpNames(), q = $('vpickQ').value.trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean);
+  const all = names.map((name, i) => ({name, no: i + 1}));
+  VP.rows = !words.length ? all : all.filter(r => String(r.no) === q || words.every(w => r.name.toLowerCase().includes(w)))
+    .sort((a, b) => (String(b.no) === q) - (String(a.no) === q) || a.no - b.no);   // an exact number first
+  const cur = $('videoSelect').value;
+  VP.act = Math.max(0, words.length ? 0 : VP.rows.findIndex(r => r.name === cur));
+  const mark = name => {                                    // highlight every typed word in the name
+    if (!words.length) return escH(name);
+    const lo = name.toLowerCase(), hit = new Array(name.length).fill(false);
+    for (const w of words) for (let k = lo.indexOf(w); k >= 0; k = lo.indexOf(w, k + 1)) hit.fill(true, k, k + w.length);
+    let out = '', on = false;
+    for (let k = 0; k < name.length; k++) {
+      if (hit[k] !== on) { out += hit[k] ? '<mark>' : '</mark>'; on = hit[k]; }
+      out += escH(name[k]);
+    }
+    return out + (on ? '</mark>' : '');
+  };
+  $('vlist').innerHTML = VP.rows.length ? VP.rows.map((r, k) =>
+    `<div class="vrow${r.name === cur ? ' cur' : ''}" role="option" data-k="${k}"><span class="vn">${r.no}</span><span class="vt">${mark(r.name)}</span></div>`).join('')
+    : `<div class="vempty">No video matches “${escH($('vpickQ').value.trim())}”</div>`;
+  $('vfoot').textContent = `${words.length ? `${VP.rows.length} of ${names.length}` : `${names.length} videos`} · ↑ ↓ to move · Enter to open · Esc to close`;
+  vpickMove(0);
+}
+function vpickMove(d) {
+  if (!VP.rows.length) return;
+  VP.act = (VP.act + d + VP.rows.length) % VP.rows.length;
+  $('vlist').querySelectorAll('.vrow').forEach((el, k) => el.classList.toggle('act', k === VP.act));
+  $('vlist').querySelector('.vrow.act')?.scrollIntoView({block: 'nearest'});
+}
+function vpickOpen() {
+  if (VP.open || $('vpick').style.display === 'none') return;
+  VP.open = true; $('vpop').style.display = ''; $('vpickQ').value = '';
+  vpickFilter(); $('vpickQ').focus();
+}
+function vpickClose() { VP.open = false; $('vpop').style.display = 'none'; }
+function vpickPick(k) {
+  const r = VP.rows[k]; if (!r) return;
+  vpickClose();
+  if (r.name !== $('videoSelect').value) $('videoSelect').onchange({target: {value: r.name}});
+}
+$('vpickBtn').onclick = () => VP.open ? vpickClose() : vpickOpen();
+$('vpickQ').oninput = vpickFilter;
+$('vpickQ').onkeydown = e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); vpickMove(e.key === 'ArrowDown' ? 1 : -1); }
+  else if (e.key === 'Enter') { e.preventDefault(); vpickPick(VP.act); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); vpickClose(); $('vpickBtn').focus(); }
+};
+$('vlist').onmousemove = e => { const el = e.target.closest('.vrow'); if (el && +el.dataset.k !== VP.act) { VP.act = +el.dataset.k; vpickMove(0); } };
+$('vlist').onclick = e => { const el = e.target.closest('.vrow'); if (el) vpickPick(+el.dataset.k); };
+document.addEventListener('mousedown', e => { if (VP.open && !$('vpick').contains(e.target)) vpickClose(); });
+document.addEventListener('keydown', e => {                 // / opens the picker unless something is being typed
+  if (e.key === '/' && !VP.open && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) && $('upl').style.display === 'none'
+      && $('ovr').style.display === 'none') { e.preventDefault(); vpickOpen(); }
+});
 async function guard(fn) {
   try { await fn(); } catch (e) {
     if (e.name === 'AbortError') return;
@@ -3564,7 +3662,7 @@ $('stage').addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (!S.src || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-  if ($('upl').style.display !== 'none' || $('ovr').style.display !== 'none') return;     // a window is open
+  if ($('upl').style.display !== 'none' || $('ovr').style.display !== 'none' || VP.open) return;   // a window is open
   if (e.code === 'Escape' && V.faceFilter) { e.preventDefault(); setFaceFilter(null); return; }
   const f = frameNow(), events = S.punches.filter(p => !S.hiddenP.has(p.type)).concat(S.defenses.filter(d => !S.hiddenD.has(d.type))).sort((a, b) => a.sf - b.sf);
   if (e.code === 'Space') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
@@ -3638,7 +3736,7 @@ function renderOverview() {
       `<span class="orv">${RULE_NAME(n)}${arrow(n)}</span><span class="orn">${n}</span></th>`).join('') + '</tr>';
   const body = sorted.map(d => d.error
     ? `<tr><td class="on" title="${esc(d.name)}">${esc(d.name)}</td><td colspan="34" class="oerr">could not read: ${esc(d.error)}</td></tr>`
-    : `<tr class="${d.name === S.src?.name ? 'cur' : ''}"><td class="on" data-open="${esc(d.name)}" title="open ${esc(d.name)} · ${d.punches} punches · ${d.frames.toLocaleString()} frames">${esc(d.name)}</td>` +
+    : `<tr class="${d.name === S.src?.name ? 'cur' : ''}"><td class="on" data-open="${esc(d.name)}" title="open ${esc(d.name)} · ${d.punches} punches · ${d.frames.toLocaleString()} frames"><span class="vn">${(S.videoNames || []).indexOf(d.name) + 1}</span> ${esc(d.name)}</td>` +
       cell(d.overall, `${esc(d.name)} · overall`, true) + nos.map(n => cell(d.scores[n], `${esc(d.name)} · ${n} ${RULE_NAME(n)}`)).join('') + '</tr>').join('');
   const foot = data.some(d => !d.error) ? `<tr class="omed"><td class="on">Median of ${data.filter(d => !d.error).length} videos</td>` +
     cell(median('overall'), 'median · overall', true) + nos.map(n => cell(median(n), `median · ${n} ${RULE_NAME(n)}`)).join('') + '</tr>' : '';

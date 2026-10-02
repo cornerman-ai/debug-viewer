@@ -14,8 +14,11 @@ The stage folders are written by the backend's `combined_pipeline/rules_creation
 
 Chrome or Edge (it reads folders with the File System Access API) and Google Drive for desktop. **Open Folder…**:
 
-- the Ambo **data** folder → a dropdown of every video folder in `pipeline_tests/`; the folder is remembered, so
-  next time **Continue with “data”** reopens it;
+- the Ambo **data** folder → a picker of every video folder in `pipeline_tests/`, numbered in alphabetical order (a
+  new video shifts the numbers after it; the All videos table shows the same numbers) and searchable: click it or
+  press **/**, type any words of the name or a number (every word must appear; a number alone also finds that video,
+  first), ↑ ↓ to move, Enter to open, Esc to close. The folder is remembered, so next time **Continue with “data”**
+  reopens it;
 - or one video folder, e.g. `pipeline_tests/2 rounds bagwork, working on balance [r1puy8]_CUT/`. The video and
   skeleton live outside that folder (`raw_videos/full_pipeline_test_videos/`, `skeleton_data/full_pipeline_test_videos/`),
   so the page asks to link the data folder once, or to pick the video file by hand.
