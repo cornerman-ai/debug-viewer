@@ -230,7 +230,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   read front-on; depth = the horizontal ankle gap in leg lengths, read side-on. Each frame scores 100 at 0.50 and
   above, 0 with the feet together (or level), linearly between — green at 100, red below. Round = the mean frame
   score, a plain number; under 150 judged frames → not rated. Read `runs.csv` + the stage's `.json`.
-- **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = |x shoulder − x elbow| / torso per arm,
+- **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = how far the elbow sits out past its
+  shoulder, away from the body's midline, / torso per arm (pulled in counts 0; the lens's |x shoulder − x elbow| until 2026-10-02),
   judged only while the boxer is within 45° of facing or backing the camera and that arm isn't throwing a hook. The row
   is continuous — every frame belongs to a stretch: green tucked (< 0.20), yellow borderline (0.20–0.30), red flared
   (≥ 0.30), and a thin gray strip where the rule cannot judge, with the reason in its tooltip (the boxer is side-on,

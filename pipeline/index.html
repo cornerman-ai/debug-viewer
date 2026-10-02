@@ -1427,7 +1427,8 @@ const RULE_LAYERS = [
     },
   },
   {
-    // elbow tuck (elbow_tuck/): the lens's flare = |x shoulder - x elbow| / torso per arm, judged only while the
+    // elbow tuck (elbow_tuck/): flare = how far the elbow sits OUT past its shoulder (away from the midline; inward
+    // counts 0) / torso per arm — the lens's |x shoulder - x elbow| until 2026-10-02 — judged only while the
     // boxer is within 45 deg of facing / backing the camera and that arm isn't throwing a hook. The row shows the
     // judged stretches, coloured by state (tucked / borderline / flared), lead in the top half, rear in
     // the bottom; a hole means the rule could not judge those frames.
@@ -1438,18 +1439,19 @@ const RULE_LAYERS = [
       const part = {};
       // run_elbow_tuck.py hardcodes lead = the LEFT arm (it takes no stance), so the overlay follows it or the label
       // and the row it sits under would name opposite arms. Switch to leadLeft once the rule takes the stance.
-      for (const [arm, sj, ej] of [['lead', J.lsh, J.lel], ['rear', J.rsh, J.rel]]) {
-        const sh = P(sj), el = P(ej); if (!(sh && el)) continue;
+      for (const [arm, sj, ej, oj] of [['lead', J.lsh, J.lel, J.rsh], ['rear', J.rsh, J.rel, J.lsh]]) {
+        const sh = P(sj), el = P(ej), os = P(oj); if (!(sh && el)) continue;
         const st = now.find(it => it.arm === arm)?.state;
         const skip = !st || !!ELBOWSKIP[st];               // no_pose / side_on / hook: the rule looked away
-        const flare = Math.abs(sh[0] - el[0]) / t;
+        const out = os ? Math.sign(sh[0] - os[0]) : 0;     // the image direction away from the body's midline
+        const raw = out * (el[0] - sh[0]) / t, flare = Math.max(0, raw);   // pulled in = 0, as run_elbow_tuck.py
         const col = skip ? '#8e8e93'
                   : st === 'flared' ? '#ff3b30' : st === 'borderline' ? '#ff9f0a' : '#34c759';
         OV.line([sh[0], sh[1] - 10], [sh[0], el[1] + 10], '#8e8e93', 1.5, [4, 4]);   // straight down from the shoulder
         OV.line([sh[0], el[1]], el, col, 3.5);                                       // and out to the elbow
         OV.dot(el, col, 4);
         overlayLabel(el[0] + (el[0] > sh[0] ? 10 : -84), el[1] - 14,
-          skip ? arm : `${arm} ${flare.toFixed(2)}`, col);
+          skip ? arm : `${arm} ${flare.toFixed(2)}${raw < 0 ? ' · in' : ''}`, col);
         if (!skip) part[arm] = Math.min(1, Math.max(0, (0.50 - flare) / 0.35));      // full to 0.15, 0 at 0.50
       }
       const hs = Object.keys(part), n = P(J.nose);          // the frame score: 50 / 50, or one arm alone
@@ -2163,7 +2165,8 @@ function ruleCard() {
   if (el) add('Elbow tuck', el.score ?? 'not rated', el.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does the elbow stay in, or flare out to the side?',
     on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook or a body shot)`,
-    th: {event: {label: 'per frame', rule: 'flare = the sideways shoulder → elbow gap in torso lengths',
+    th: {event: {label: 'per frame', rule: 'flare = how far the elbow sits out past its own shoulder, away from the '
+                        + 'body’s midline, in torso lengths — an elbow pulled in toward the midline counts as 0',
                  note: 'frame score: each arm 50 — full up to 0.15 flare, linearly to 0 at 0.50; one arm alone '
                      + '(the other hidden or throwing a hook or a body shot) is the whole 100. The colours keep the lens’s cut-offs',
                  bands: [['< 0.20', 'tucked'], ['0.20–0.30', 'borderline'], ['≥ 0.30', 'flared']], pal: ELBOWSTATE},
@@ -2772,10 +2775,11 @@ function frameCard(el, f) {
   // 9 elbow tuck: each judged arm 0-1 (full to 0.15 torso of flare, 0 at 0.50), 50 / 50
   if (S.has.elbow) {
     const part = {}, why = [];
-    for (const [arm, sj, ej] of [['lead', J.lsh, J.lel], ['rear', J.rsh, J.rel]]) {
+    for (const [arm, sj, ej, oj] of [['lead', J.lsh, J.lel, J.rsh], ['rear', J.rsh, J.rel, J.lsh]]) {
       const st = state('elbow', it => it.arm === arm)?.state;
       if (!st || ELBOWSKIP[st]) { why.push(`${arm}: ${ELBOWSKIP[st] || 'no reading'}`); continue; }
-      const fl = Math.abs(J2(sj)?.[0] - J2(ej)?.[0]) / torso;
+      const out = Math.sign(J2(sj)?.[0] - J2(oj)?.[0]);                       // away from the body's midline
+      const fl = Math.max(0, out * (J2(ej)?.[0] - J2(sj)?.[0])) / torso;     // pulled in = 0
       if (Number.isFinite(fl)) part[arm] = clip((0.50 - fl) / 0.35);
     }
     const hs = Object.keys(part);
@@ -3584,7 +3588,7 @@ const EXPLAIN = [
       'Behind the shoulder the chin is covered from the side; out in front of it, it is the target.'],
   [8, 'Frames outside punches, any angle: how high the chin sits against the top of the lead shoulder (height only), in torso lengths: full marks at or below it, zero at 0.20 above. A raised lead shoulder counts the same as a lowered chin.',
       'Chin down behind the lead shoulder is the basic protection; chin up is an open target.'],
-  [9, 'Front- and back-on frames: the left-right image gap between each elbow and its own shoulder, in torso lengths: full marks up to 0.15, zero at 0.50, 50 points per arm. Either direction counts, so an elbow pulled in across the chest reads like one flared out; an arm throwing a hook or a body shot is skipped.',
+  [9, 'Front- and back-on frames: the how far each elbow sits out past its own shoulder, left-right in the image and away from the body’s midline, in torso lengths: full marks up to 0.15, zero at 0.50, 50 points per arm. An elbow pulled in toward the midline counts as tucked; an arm throwing a hook or a body shot is skipped.',
       'A flared elbow opens the ribs to body shots and telegraphs the punch.'],
   [10, 'Front- and back-on punches: how far the head (the middle of the visible face points) sits left or right of a vertical line through the hips’ centre, in torso lengths, weighted 75 % at impact and 12.5 % each a quarter and three quarters into the punch: full marks from 0.25, zero on the line. A position, not a movement: either side counts, and a step that takes the hips along reads as zero.',
        'A head left on the centre line while punching is exactly where the return punch goes.'],
