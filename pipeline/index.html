@@ -674,10 +674,17 @@ function slipLayer(rule) {
         }
         const lh = PAT(fr, J.lhip), rh = PAT(fr, J.rhip);
         if (!n || !(lh && rh)) return null;
+        for (const j of [J.lsh, J.rsh, J.lhip, J.rhip])          // run_slip_distance.geometry: no reading unless both
+          if (!(S.skel[b + j * C + 6] >= 0.30)) return null;      // shoulders and both hips are at >= 0.30
         const head = PXY((lo + hi) / 2, ys / n);
         return head ? {head, hipx: (lh[0] + rh[0]) / 2, hipy: (lh[1] + rh[1]) / 2} : null;
       };
       const here = read(f); if (!here) return;
+      if (rule === 15 && layerOn('slip14')) {                 // both rows on: rule 14 drew the path, rule 15 adds its label
+        overlayLabel(here.head[0] + 16, here.head[1] + 6,
+          `rule 15: travelled ${it.travel.toFixed(2)} torso → ${it.s15 == null ? '–' : Math.floor(it.s15)}`, col);
+        return;
+      }
       OV.line([here.hipx, here.hipy], [here.hipx, here.head[1]], '#8e8e93', 1.5, [4, 4]);   // the line it is read from
       octx.save(); octx.strokeStyle = col; octx.lineWidth = 2.5; octx.lineCap = 'round'; octx.beginPath();
       let base = null, started = false;                     // the path, drawn as sideways travel, hips held still
@@ -698,7 +705,7 @@ function slipLayer(rule) {
       if (pk && f >= it.peakF) OV.ring([here.hipx + (pk.head[0] - pk.hipx), pk.head[1]], col, 11, 3);
       OV.dot(here.head, col, 4.5);
       overlayLabel(here.head[0] + 16, here.head[1] + (rule === 14 ? -18 : 6),
-                   `rule ${rule}: travelled ${it.travel.toFixed(2)} torso → ${it[sk] == null ? '–' : it[sk].toFixed(0)}`, col);
+                   `rule ${rule}: travelled ${it.travel.toFixed(2)} torso → ${it[sk] == null ? '–' : Math.floor(it[sk])}`, col);
     },
     csv: ['slip_distance', 'moves.csv'], json: ['slip_distance', 'slip_distance.json'],
     parseItem: (r, num) => r.verdict ? {type: r.defense_type, side: r.side, sf: num(r.start_frame), ef: num(r.end_frame),
@@ -776,7 +783,7 @@ function stanceLayer(kind) {
         if (legs.length === 2) unit = gap / ((legs[0] + legs[1]) / 2);   // the rule needs both legs, or it looks away
       }
       if (judged && unit != null) overlayLabel((la[0] + ra[0]) / 2 - 30, y + 18,
-        `${unit.toFixed(2)} ${kind === 'width' ? 'torso' : 'leg'}`, col);
+        `${unit.toFixed(2)} ${kind === 'width' ? 'torso' : 'leg'} → ${Math.floor(100 * Math.min(1, unit / 0.5))}`, col);
     },
     tip: (e, x) => {
       const t = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
@@ -790,7 +797,7 @@ function stanceLayer(kind) {
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, skip = !!STANCESKIP[x.state];
       const w = Math.max(2, x1 - x0);
       if (skip) { skipStrip(c, x0, w, y + h / 2, on, x.state); return; }
-      c.fillStyle = STANCECOL[x.state];
+      c.fillStyle = STANCECOL[x.state] || '#8e8e93';
       c.globalAlpha = on ? 1 : 0.85;
       rr(x0, y + 3, w, h - 6, 4);
       c.fill(); c.globalAlpha = 1;
@@ -803,7 +810,7 @@ const CHIN = {
            rule: 'the chin against the top of the lead shoulder, in torso lengths: 100 at or below it, 0 at 0.20 torso above'},
   depth:  {stage: 'chin_depth', json: 'chin_depth.json', label: 'Chin depth', short: 'Chin behind shoulder',
            bad: 'chin out', good: 'tucked',
-           rule: 'the chin against the front of the lead shoulder, in torso lengths, read side-on only'},
+           rule: 'the chin against the front of the lead shoulder (its keypoint pushed 0.10 torso forward), in torso lengths: 100 at or behind it, 0 at 0.40 torso in front, read side-on only'},
 };
 const CHINCOL = {over: '#ff3b30', under: '#34c759', out: '#ff3b30', tucked: '#34c759'};
 const CHINSKIP = {no_reading: 'a joint the chin needs is not visible',
@@ -828,7 +835,7 @@ function chinLayer(kind) {
       const chin = [nose[0] + 2.25 * ((mL[0] + mR[0]) / 2 - nose[0]),
                     nose[1] + 2.25 * ((mL[1] + mR[1]) / 2 - nose[1])];
       const lead = leadLeft ? lsh : rsh;
-      OV.line(nose, chin, '#8e8e93', 1.5, [3, 3]); OV.ring(chin, col, 9, 3);  // the formula that stands in for a jaw
+      OV.line(nose, chin, '#8e8e93', 1.5, [3, 3]); OV.ring(chin, col, kind === 'height' ? 9 : 13, 3);  // the formula that stands in for a jaw — one ring per axis
       const judged = !!it && !CHINSKIP[it.state];             // gray on the timeline: draw the geometry, state no number
       if (kind === 'height') {
         const t = torso(); if (!t) return;                                  // torso lengths, like the rule
@@ -838,7 +845,7 @@ function chinLayer(kind) {
         if (judged) {
           const hv = (chin[1] - top) / t;                                     // canvas pixels are isotropic
           const sc = 100 * Math.min(1, Math.max(0, (hv + 0.20) / 0.20));   // run_chin_tuck.py HEIGHT_FULL / ZERO
-          overlayLabel(chin[0] + 14, chin[1], `${hv.toFixed(2)} torso → ${sc.toFixed(0)}`, col);
+          overlayLabel(chin[0] + 14, chin[1], `${hv.toFixed(2)} torso → ${Math.floor(sc)}`, col);
         }
       } else {
         const t = torso(); if (!t) return;
@@ -849,7 +856,7 @@ function chinLayer(kind) {
         OV.line([front, lead[1] - 30], [front, lead[1] + 60], col, 2.5);      // the shoulder's front, not its joint
         OV.line([front, chin[1]], chin, col, 2, [3, 3]);
         const g = d * (chin[0] - front) / t, sc = 100 * Math.min(1, Math.max(0, 1 - Math.max(g, 0) / 0.40));
-        if (judged) overlayLabel(chin[0] + 14, chin[1], `${g.toFixed(2)} torso → ${sc.toFixed(0)}`, col);
+        if (judged) overlayLabel(chin[0] + 14, chin[1], `${g.toFixed(2)} torso → ${Math.floor(sc)}`, col);
       }
     },
     tip: (e, x) => {
@@ -904,9 +911,9 @@ function bladeLayer(kind) {
       const fa = S.hasAngle && S.pose?.[f] ? S.angle[f] : NaN;
       if (!Number.isFinite(fa)) return;
       const deg = bladeDeg(dx, dz, fa);
-      const judged = it && !BLADESKIP[it.state];
-      overlayLabel((a[0] + b[0]) / 2 - 24, (a[1] + b[1]) / 2 - 20,
-                   `${deg.toFixed(1)}\u00b0${judged ? ` \u2192 ${bladeScore(deg, C.cuts).toFixed(0)}` : ''}`, col);
+      const judged = it && !BLADESKIP[it.state];             // gray on the timeline: draw the line, state no number
+      if (judged) overlayLabel((a[0] + b[0]) / 2 - 24, (a[1] + b[1]) / 2 - 20,
+                               `${deg.toFixed(1)}\u00b0 \u2192 ${Math.floor(bladeScore(deg, C.cuts))}`, col);
     },
     tip: (e, x) => {
       const t = `\u00b7 ${fmtT(x.sf / S.fps)} \u00b7 ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
@@ -1021,7 +1028,7 @@ const RULE_LAYERS = [
     frameOverlay(f, P, leadLeft, Q, torso) {               // inside the 0.25 s before a punch: what the rule reads
       // windows overlap other punches all the time (a cross starting while the jab is out), so every window that
       // holds this frame draws, each on its own wrist, each label named by hand
-      const es = S.punches.filter(p => p.drop?.verdict && f >= p.drop.a && f <= p.drop.b); if (!es.length) return;
+      const es = S.punches.filter(p => p.drop?.verdict && f >= p.drop.a && f <= p.drop.b && !S.hiddenP.has(p.type)); if (!es.length) return;
       const nose = P(J.nose), sh = P(J.lsh), sh2 = P(J.rsh), t = torso(); if (!(nose && sh && sh2 && t)) return;
       const x0 = Math.min(sh[0], sh2[0]) - 50, x1 = Math.max(sh[0], sh2[0]) + 50;
       OV.level(nose[1], x0, x1, '#8e8e93', [3, 4]);                  // the nose
@@ -1035,7 +1042,7 @@ const RULE_LAYERS = [
         OV.level(nose[1] + x.drop * t, x0, x1, col);                 // this window's mean, the number that decides
         OV.trail(x.a, f, wr, col);                                   // its wrist so far in the window
         // this frame's own reading, with the rule's gate: nose, shoulders, hips and the wrist at visibility > 0.30
-        const seen = [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, wr].every(j => Q(j, 6) > 0.30);
+        const seen = [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, wr].every(j => Q(j, 6) >= 0.30);
         const w = P(wr), now = seen && w ? (w[1] - nose[1]) / t : null;
         if (w) OV.ring(w, seen ? col : '#8e8e93', 11, 3);
         overlayLabel(x0, nose[1] - 16,
@@ -1090,12 +1097,14 @@ const RULE_LAYERS = [
       overlayLabel(x1 + 6, nose[1] + 0.40 * torso, '100', '#8e8e93');
       overlayLabel(x1 + 6, nose[1] + 0.70 * torso, '0', '#8e8e93');
       OV.level(nose[1] + x.drop * torso, x0, x1, col);                     // the weighted reading
-      for (const [off, r] of [[-2, 7], [0, 12], [2, 7]]) {                 // the three frames it is read at
+      for (const [off, r, v] of [[-2, 7, x.m2], [0, 12, x.d0], [2, 7, x.p2]]) {   // the three frames it is read at
+        if (v == null) continue;                                             // a frame the rule could not read
         const q = PAT(e.impact + off, wr); if (q) OV.ring(q, col, r, off ? 2 : 3);
+        OV.line([x1 - 16, nose[1] + v * torso], [x1, nose[1] + v * torso], col, off ? 2 : 3);   // its reading, own nose + torso
       }
       const now = P(wr); if (now && Math.abs(f - e.impact) > 2) OV.dot(now, col, 4);
       overlayLabel(x0, nose[1] + x.drop * torso - 16,
-        `${x.rest} hand resting · ${x.drop.toFixed(3)} below the nose → ${x.score.toFixed(1)}`, col);
+        `${x.rest} hand resting · ${x.drop.toFixed(3)} torso below the nose → ${x.score.toFixed(1)}`, col);
     },
   },
   {
@@ -1133,7 +1142,7 @@ const RULE_LAYERS = [
       ring(e, 'bal', bx, y, w, h);
     },
     overlay(e, x, f, P) {                                  // the base between the ankles, the head over it, the hips
-      if (!x.verdict) return;
+      if (!x.verdict || e.impact == null) return;
       const at = j => PAT(e.impact, j);                    // the rule reads the IMPACT frame, not the playhead
       const la = at(J.lan), ra = at(J.ran), nose = at(J.nose), lh = at(J.lhip), rh = at(J.rhip);
       if (!(la && ra && nose && lh && rh)) return;
@@ -1152,7 +1161,7 @@ const RULE_LAYERS = [
       const headCol = x.headOk ? '#34c759' : '#ff3b30';
       OV.line([nose[0], nose[1]], [nose[0], y], headCol, 2.5, [6, 4]); OV.ring(nose, headCol, 13, 3);
       overlayLabel(Math.min(lo[0], nose[0]) - 10, y + 26,
-        `head ${x.head.toFixed(2)} · hips ${x.off.toFixed(2)} off centre`, x.verdict === 'balanced' ? '#34c759' : '#ff3b30');
+        `head ${x.head.toFixed(2)} · hips ${x.off.toFixed(2)} off centre${x.score != null ? ` → ${x.score.toFixed(1)}` : ''}`, x.verdict === 'balanced' ? '#34c759' : '#ff3b30');
     },
   },
   {
@@ -1169,6 +1178,9 @@ const RULE_LAYERS = [
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_front_or_back_on' ? 'thrown side-on — the hook travels across the frame, and side-on that axis points at the camera'
                                                 : x && x.skip === 'body_shot' ? 'a body shot — the classifier cannot tell a body hook from a body uppercut'
                                                 : x && x.skip === 'not_a_hook' ? 'not a hook'
+                                                : x && x.skip === 'no_impact_frame' ? 'no impact frame'
+                                                : x && x.skip === 'no_facing' ? 'no facing angle over the punch'
+                                                : x && x.skip === 'shoulders_on_top_of_each_other' ? 'the shoulders overlap in the image — no direction of travel'
                                                 : 'the wrist or the body is not visible at the impact frame'}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Past the far shoulder</span><b>${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)} torso</b>
         <span>Scale</span><b>100 at the centre line, 0 at +0.333 torso past the far shoulder</b>
@@ -1317,14 +1329,27 @@ const RULE_LAYERS = [
       const es = S.punches.filter(p => (p.hrp?.verdict === 'pass' || p.hrp?.verdict === 'fail') && f >= p.hrp.ws && f <= p.hrp.we
                                        && !S.hiddenP.has(p.type));
       for (const e of es) {
-        const a = e.hrp, wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
+        const a = e.hrp, lead = (e.hand === 'lead') === leadLeft, wr = lead ? J.lwr : J.rwr, sj = lead ? J.lsh : J.rsh;
         const col = a.verdict === 'fail' ? '#ff3b30' : '#34c759';
         OV.trail(a.ws, a.we, wr, col);                                       // the wrist's whole measured line
         const st = PAT(a.ws, wr), en = PAT(a.we, wr);                       // the two end frames: the chord's ends
-        if (st && en) OV.line(st, en, '#ffffff', 2, [5, 4]);
+        // The rule's chord is a straight line in (frame, wrist height above ITS shoulder), not in the image: at window
+        // frame k it sits g(k) = g0 + (g1 - g0)·k/(K-1) px above that frame's shoulder (g = shoulder y - wrist y; the
+        // rule's one median torso per window cancels). Drawn at the wrist's own x, a dot is under this dashed line exactly
+        // when the rule counted it as under the chord (checked 2026-10-02: 0 of 12,628 dots differ from the rule's mask).
+        const s0 = PAT(a.ws, sj), s1 = PAT(a.we, sj), K = a.we - a.ws + 1;
+        if (st && en && s0 && s1) {
+          const g0 = s0[1] - st[1], g1 = s1[1] - en[1], ref = [];
+          for (let k = 0; k < K; k++) {
+            const q = PAT(a.ws + k, wr), sh = PAT(a.ws + k, sj); if (!(q && sh)) continue;
+            const r = [q[0], sh[1] - (g0 + (g1 - g0) * k / (K - 1))]; ref.push(r);
+            if (k > 0 && k < K - 1) { const dc = a.mask[k - 1] === '1' ? '#ff3b30' : '#34c759'; OV.line(r, q, dc, 1.5); OV.dot(q, dc, 3.5); }
+          }
+          octx.save(); octx.strokeStyle = '#ffffff'; octx.lineWidth = 2; octx.setLineDash([5, 4]); octx.beginPath();
+          ref.forEach((pt, i) => i ? octx.lineTo(...pt) : octx.moveTo(...pt)); octx.stroke(); octx.restore();
+        }
         if (st) OV.dot(st, '#8e8e93', 5);
         if (en) OV.dot(en, '#8e8e93', 5);
-        [...a.mask].forEach((m, k) => { const q = PAT(a.ws + 1 + k, wr); if (q) OV.dot(q, m === '1' ? '#ff3b30' : '#34c759', 3.5); });
         const w = P(wr); if (w) OV.ring(w, col, 9, 2.5);                    // where the wrist is now
         const name = es.length > 1 ? `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()} · ` : '';
         if (st) overlayLabel(st[0] + 14, st[1] - 18, `${name}${a.verdict === 'fail' ? 'not okay — a U' : 'okay'} · ${a.below}/${a.between} under the chord`, col);
@@ -1368,11 +1393,14 @@ const RULE_LAYERS = [
       octx.beginPath(); octx.moveTo(...pa); octx.lineTo(...pb); octx.lineTo(...pc); octx.stroke();
       // this frame's elbow bend in image space: the rule's own 2D reading (canvas pixels are isotropic)
       const u = [pa[0] - pb[0], pa[1] - pb[1]], v = [pc[0] - pb[0], pc[1] - pb[1]];
+      if (!(Math.hypot(...u) && Math.hypot(...v))) return;                // a zero-length bone has no angle
       const ang = Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v)))));
       const bend = 180 - ang * 180 / Math.PI, a0 = Math.atan2(u[1], u[0]), a1 = Math.atan2(v[1], v[0]);
       const ccw = ((a1 - a0 + 2 * Math.PI) % (2 * Math.PI)) > Math.PI;
       octx.lineWidth = 2.5; octx.beginPath(); octx.arc(pb[0], pb[1], 18, a0, a1, ccw); octx.stroke();
-      overlayLabel(pb[0] + 14, pb[1] + 28, `elbow ${(180 - bend).toFixed(0)}°${peak && a.score != null ? ` · furthest reach → ${a.score.toFixed(1)}` : ''}`, col);
+      const judged = a.verdict === 'pass' || a.verdict === 'fail';
+      overlayLabel(pb[0] + 14, pb[1] + 28, `elbow ${(180 - bend).toFixed(0)}°` + (!judged ? ` · not judged (${(a.skip || a.verdict).replace(/_/g, ' ')})`
+        : peak && a.score != null ? ` · furthest reach → ${a.score.toFixed(1)} (full at ${a.full}°)` : ''), col);
     },
   },
   {
@@ -1401,16 +1429,17 @@ const RULE_LAYERS = [
     row(e, r, {c, y, h, span, tag, ring}) {                // the start → impact verdict
       if (r.status !== 'ok') return;
       const [x, w] = span(e);
-      c.fillStyle = r.score >= 100 ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
+      c.fillStyle = r.vsi === 'good' ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
       tag(x, w, y, h, r.score == null ? `${r.si.toFixed(0)}°` : r.score.toFixed(1));
       ring(e, 'shoulder', x, y, w, h);
     },
-    overlay(e, r, f, P) {                                  // the shoulder line, colored by the start → impact verdict
+    overlay(e, r, f, P, leadLeft) {                        // the shoulder line, colored by the start → impact verdict
       if (r.status !== 'ok') return;
       const l = P(11), rt = P(12); if (!(l && rt)) return;
-      const col = r.score >= 100 ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
+      const col = r.vsi === 'good' ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
       octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
-      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `shoulders ${r.si.toFixed(1)}° (range ${iqr(r.bsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
+      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `shoulders start → impact ${r.si.toFixed(1)}° (range ${iqr(r.bsi || r.qsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
+      rotationTopView(e, r, leadLeft, 11, 12, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 70], col);
     },
   },
   {
@@ -1439,16 +1468,17 @@ const RULE_LAYERS = [
     row(e, r, {c, y, h, span, tag, ring}) {                // the start → impact verdict
       if (r.status !== 'ok') return;
       const [x, w] = span(e);
-      c.fillStyle = r.score >= 100 ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
+      c.fillStyle = r.vsi === 'good' ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
       tag(x, w, y, h, r.score == null ? `${r.si.toFixed(0)}°` : r.score.toFixed(1));
       ring(e, 'hip', x, y, w, h);
     },
-    overlay(e, r, f, P) {                                  // the hip line, colored by the start → impact verdict
+    overlay(e, r, f, P, leadLeft) {                        // the hip line, colored by the start → impact verdict
       if (r.status !== 'ok') return;
       const l = P(23), rt = P(24); if (!(l && rt)) return;
-      const col = r.score >= 100 ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
+      const col = r.vsi === 'good' ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
       octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
-      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `hips ${r.si.toFixed(1)}° (range ${iqr(r.bsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
+      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `hips start → impact ${r.si.toFixed(1)}° (range ${iqr(r.bsi || r.qsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
+      rotationTopView(e, r, leadLeft, 23, 24, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 70], col);
     },
   },
   {
@@ -1488,9 +1518,10 @@ const RULE_LAYERS = [
     },
     overlay(e, x, f, P, leadLeft) {                        // the fist at the impact frame, with its zone
       if (x.land == null || Math.abs(f - x.land) > 2 || !x.verdict || x.verdict === 'skip') return;
-      const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2], q = P(wr); if (!q) return;
+      const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2], q = PAT(x.land, wr); if (!q) return;   // where the rule read it
       const col = VERD[x.verdict]; octx.strokeStyle = col; octx.lineWidth = 3; octx.setLineDash([5, 4]);
       octx.beginPath(); octx.arc(q[0], q[1], 22, 0, 7); octx.stroke(); octx.setLineDash([]);
+      const now = P(wr); if (now && f !== x.land) OV.dot(now, col, 4);   // the wrist now, off the frame that was judged
       overlayLabel(q[0] + 26, q[1] - 18, `${x.hf != null ? x.hf.toFixed(2) + ' · ' : ''}${ZONE[x.zone]?.[1] || x.zone} · ${VNAME[x.verdict]}`, col);
     },
   },
@@ -1529,17 +1560,19 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'hoc', bx, y, w, h);
     },
-    overlay(e, x, f, P) {                                  // the vertical hip line and the head's distance from it (label = the impact reading)
+    overlay(e, x, f, P) {                                  // the vertical hip line and the head's distance from it (label = the combined reading)
       if (x.score == null) return;
       const l = P(23), rt = P(24); if (!(l && rt)) return;
-      const hd = [...Array(11).keys()].map(P).filter(Boolean); if (!hd.length) return;
+      const C = S.skelC, vis = j => S.skel[f * 33 * C + j * C + 6] >= 0.30;   // run_head_offcenter.py: head points at >= 0.30
+      const hd = [...Array(11).keys()].filter(vis).map(P).filter(Boolean); if (!hd.length) return;
       const hx = (Math.min(...hd.map(q => q[0])) + Math.max(...hd.map(q => q[0]))) / 2, hy = hd.reduce((a, q) => a + q[1], 0) / hd.length;
       const cx = (l[0] + rt[0]) / 2, cy = (l[1] + rt[1]) / 2, col = x.verdict === 'off' ? '#34c759' : '#ff3b30', atImpact = Math.abs(f - x.usedF) <= 1;
       octx.strokeStyle = col; octx.lineWidth = 2; octx.setLineDash([6, 5]);
       octx.beginPath(); octx.moveTo(cx, cy); octx.lineTo(cx, hy - 40); octx.stroke(); octx.setLineDash([]);
       octx.lineWidth = atImpact ? 4 : 2.5; octx.beginPath(); octx.moveTo(cx, hy); octx.lineTo(hx, hy); octx.stroke();
       octx.fillStyle = col; octx.beginPath(); octx.arc(hx, hy, atImpact ? 7 : 5, 0, 7); octx.fill();
-      overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line · ${x.comb?.toFixed(2)} torso (0.75 impact + 0.125 · 25 % + 0.125 · 75 %) → ${x.score.toFixed(1)}${atImpact ? ' · IMPACT' : ''}`, col);
+      const here = f === x.usedF ? ['impact', x.off] : f === x.q25F ? ['25 %', x.q25] : f === x.q75F ? ['75 %', x.q75] : null;
+      overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head off line · ${x.comb?.toFixed(2)} torso (0.75 impact + 0.125 · 25 % + 0.125 · 75 %) → ${x.score.toFixed(1)}${here ? ` · ${here[0]}: ${offTxt(here[1])}` : atImpact ? ' · IMPACT' : ''}`, col);
     },
   },
   {
@@ -1561,13 +1594,12 @@ const RULE_LAYERS = [
         const skip = !st || !!ELBOWSKIP[st];               // no_pose / side_on / hook: the rule looked away
         const out = os ? Math.sign(sh[0] - os[0]) : 0;     // the image direction away from the body's midline
         const raw = out * (el[0] - sh[0]) / t, flare = Math.max(0, raw);   // pulled in = 0, as run_elbow_tuck.py
-        const col = skip ? '#8e8e93'
-                  : st === 'flared' ? '#ff3b30' : st === 'borderline' ? '#ff9f0a' : '#34c759';
+        const col = skip ? '#8e8e93' : ELBOWSTATE[st] || '#8e8e93';      // the same colours as the timeline row
         OV.line([sh[0], sh[1] - 10], [sh[0], el[1] + 10], '#8e8e93', 1.5, [4, 4]);   // straight down from the shoulder
         OV.line([sh[0], el[1]], el, col, 3.5);                                       // and out to the elbow
         OV.dot(el, col, 4);
         overlayLabel(el[0] + (el[0] > sh[0] ? 10 : -84), el[1] - 14,
-          skip ? arm : `${arm} ${flare.toFixed(2)}${raw < 0 ? ' · in' : ''}`, col);
+          skip ? `${arm} · ${SKIPWORD[st] || 'not judged'}` : `${arm} ${flare.toFixed(2)}${raw < 0 ? ' · in' : ''}`, col);
         if (!skip) part[arm] = Math.min(1, Math.max(0, (0.50 - flare) / 0.35));      // full to 0.15, 0 at 0.50
       }
       const hs = Object.keys(part), n = P(J.nose);          // the frame score: 50 / 50, or one arm alone
@@ -1621,13 +1653,14 @@ const RULE_LAYERS = [
       overlayLabel(x1 + 6, nose[1] + GUARD_FULL.rear * t, 'rear 100', '#8e8e93');
       overlayLabel(x1 + 6, nose[1] + GUARD_FULL.lead * t, 'lead 100', '#8e8e93');
       overlayLabel(x1 + 6, nose[1] + 0.70 * t, '0', '#8e8e93');
-      const runs = S.items.guard || [], part = {};
+      const runs = S.items.guard || [], part = {}, why = [];
       for (const [hand, j] of [['lead', leadLeft ? J.lwr : J.rwr], ['rear', leadLeft ? J.rwr : J.lwr]]) {
         const w = P(j); if (!w) continue;
         const it = runs.find(q => q.hand === hand && f >= q.sf && f <= q.ef);  // the rule's own verdict for this hand
         const judged = it?.state === 'ok' || it?.state === 'low';             // throwing or unreadable: gray, no share
         const d = (w[1] - nose[1]) / t, full = GUARD_FULL[hand];
         if (judged) part[hand] = Math.min(1, Math.max(0, (0.70 - d) / (0.70 - full)));
+        else why.push(`${hand} ${SKIPWORD[it?.state] || 'not read'}`);
         const col = !judged ? '#8e8e93' : it.state === 'ok' ? '#34c759' : '#ff3b30';
         OV.dot(w, col, 5);
         if (it?.state === 'low') OV.line([w[0], nose[1] + full * t], w, '#ff3b30', 2, [3, 3]);
@@ -1636,7 +1669,7 @@ const RULE_LAYERS = [
       const sc = hs.length === 2 ? 30 * part.lead + 70 * part.rear : hs.length === 1 ? 100 * part[hs[0]] : null;
       overlayLabel(x0, nose[1] - 16, sc == null ? 'frame not scored — no hand can be judged'
         : `frame score ${sc.toFixed(1)}` + (hs.length === 2 ? ` · lead ${(30 * part.lead).toFixed(1)}/30 · rear ${(70 * part.rear).toFixed(1)}/70`
-                                                              : ` · ${hs[0]} hand alone`), '#e5e5ea');
+                                                              : ` · ${hs[0]} hand alone${why.length ? ` (${why.join(', ')})` : ''}`), '#e5e5ea');
     },
     csv: ['guard_height', 'runs.csv'], json: ['guard_height', 'guard_height.json'],
     parseItem: (r, num) => ({hand: r.hand, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
@@ -2918,7 +2951,8 @@ function comboCard(el, f) {
 // numbers the video overlay draws ──
 function frameCard(el, f) {
   if (!S.skel) { el.innerHTML = `<div class="label">Frame · f ${f}</div><div class="empty">no skeleton loaded</div>`; return; }
-  const C = S.skelC, b = f * 33 * C, W = video.videoWidth || 16, H = video.videoHeight || 9;
+  if (!video.videoWidth) { el.innerHTML = `<div class="label">Frame · f ${f}</div><div class="empty">video not loaded — no pixel scale to read the skeleton in</div>`; return; }
+  const C = S.skelC, b = f * 33 * C, W = video.videoWidth, H = video.videoHeight;
   if (f >= S.skel.length / (33 * C)) { el.innerHTML = `<div class="label">Frame · f ${f}</div><div class="empty">past the skeleton</div>`; return; }
   const J2 = j => { const x = S.skel[b + j * C], y = S.skel[b + j * C + 1];      // image pixels, so ratios are true
     return Number.isFinite(x) && Number.isFinite(y) ? [x * W, y * H] : null; };
@@ -3052,7 +3086,7 @@ function drawOverlay(f, punchesNow) {
   const P = j => { const x = S.skel[base + j * C], y = S.skel[base + j * C + 1];
     return Number.isFinite(x) && Number.isFinite(y) ? [Z.tx + (R.x + x * R.w) * Z.k, Z.ty + (R.y + y * R.h) * Z.k] : null; };
   PAT = (fr, j) => {                                       // the same mapping at any frame: trails and past markers
-    if (!S.skel || fr < 0 || fr >= S.skel.length / (33 * C)) return null;
+    if (!S.skel || !Number.isInteger(fr) || fr < 0 || fr >= S.skel.length / (33 * C)) return null;   // PAT(null) is no frame
     const b = fr * 33 * C, x = S.skel[b + j * C], y = S.skel[b + j * C + 1];
     return Number.isFinite(x) && Number.isFinite(y) ? [Z.tx + (R.x + x * R.w) * Z.k, Z.ty + (R.y + y * R.h) * Z.k] : null;
   };
@@ -3104,6 +3138,7 @@ function drawRuleOverlay(e, f, P) {
 // for every layer that is on, with the raw BlazePose-33 channels, because these rules read joints (mouth, heels,
 // toes) and channels (the world x/z) the punch overlays never need.
 function drawFrameOverlays(f, P) {
+  if (!video.videoWidth) return;                             // no video size: a 16:9 stand-in box would skew every ratio
   const leadLeft = S.stance !== 'southpaw', C = S.skelC, base = f * 33 * C;
   const Q = (j, ch) => S.skel[base + j * C + ch];            // raw channel: 0 x, 1 y, 3 world x, 5 world z, 6 visibility
   const torso = () => {                                      // torso length in screen pixels, the rules' unit
@@ -3112,6 +3147,24 @@ function drawFrameOverlays(f, P) {
     return Math.hypot((a[0] + b[0]) / 2 - (c[0] + d[0]) / 2, (a[1] + b[1]) / 2 - (c[1] + d[1]) / 2);
   };
   for (const L of RULE_LAYERS) if (L.frameOverlay && layerOn(L.key)) L.frameOverlay(f, P, leadLeft, Q, torso);
+}
+// Hip / shoulder rotation as the rule measures it: seen from above (world x = channel 3, z = channel 5; 0° = toward
+// the camera, drawn down; +90° = the camera's right), the direction other joint → punching joint at the start and at
+// impact, against the facing angle at impact. The rule's number is |angle(facing, impact) - angle(facing, start)|, so
+// the label prints both angles rather than the arc between the rays — the rays can sit on either side of the facing.
+// Checked 2026-10-02: reproduces the CSV's rot_start_impact to 0.11 deg on 945 punches per rule.
+function rotationTopView(e, r, leadLeft, jl, jr, c, col) {
+  if (e.impact == null || r.facing == null || !S.skel) return;
+  const C = S.skelC, n = S.skel.length / (33 * C), Wc = (fr, j, ch) => S.skel[(fr * 33 + j) * C + ch];
+  if (!(e.sf >= 0 && e.sf < n && e.impact >= 0 && e.impact < n)) return;
+  const own = (e.hand === 'lead') === leadLeft ? jl : jr, oth = own === jl ? jr : jl;
+  const dir = fr => Math.atan2(Wc(fr, own, 3) - Wc(fr, oth, 3), -(Wc(fr, own, 5) - Wc(fr, oth, 5))) * 180 / Math.PI;
+  const ds = dir(e.sf), di = dir(e.impact); if (!(Number.isFinite(ds) && Number.isFinite(di))) return;
+  const wrap = d => ((d + 180) % 360 + 360) % 360 - 180, R = 34, rad = Math.PI / 180;
+  const ray = (deg, cc, w, dash) => OV.line(c, [c[0] + R * Math.sin(deg * rad), c[1] + R * Math.cos(deg * rad)], cc, w, dash);
+  octx.save(); octx.fillStyle = 'rgba(0,0,0,0.45)'; octx.beginPath(); octx.arc(c[0], c[1], R + 6, 0, 7); octx.fill(); octx.restore();
+  ray(r.facing, '#8e8e93', 2); ray(ds, '#ffffff', 2, [3, 3]); ray(di, col, 3);
+  overlayLabel(c[0] + R + 10, c[1], `from above, vs facing: start ${Math.abs(wrap(r.facing - ds)).toFixed(1)}° → impact ${Math.abs(wrap(r.facing - di)).toFixed(1)}°`, col);
 }
 // Shared bits of overlay grammar, so thirteen rules do not each invent their own.
 const OV = {

@@ -187,37 +187,46 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   punch. The block covers the measured window itself (impact → end + 0.15 s), lead windows on the top half of the row
   and rear on the bottom (a cross's window runs into the next jab's all the time), a white edge where each window
   starts, green okay, red not okay, labelled with the frames under the chord. Overlapping windows each draw on the
-  video, on their own wrist, labelled by hand. On the video, for every frame of that window: the wrist's whole line, the chord
-  (dashed white) between the two ends (grey dots), each frame between them as a red (under) or green dot, and where
-  the wrist is now. Round = 100 with no punch not okay, linearly to 0 at 70 % not okay, a plain number. Rebuilt 2026-10-01 — the earlier versions are in
+  video, on their own wrist, labelled by hand. On the video, for every frame of that window: the wrist's whole line, the
+  two ends (grey dots), each frame between them as a red (under) or green dot tied by a thin line to the chord, and
+  where the wrist is now. The chord (dashed white) is the rule's own: a straight line in time of the wrist's height above
+  its shoulder, drawn at each frame's wrist x and that frame's shoulder height — so a dot is under it exactly when the
+  rule counted it (0 of 12,628 dots differ, 2026-10-02). Until then it was a straight image segment between the two end
+  positions, which ignored the shoulder and the timing and contradicted the verdict on a quarter of the dots. Round = 100 with no punch not okay, linearly to 0 at 70 % not okay, a plain number. Rebuilt 2026-10-01 — the earlier versions are in
   `combined_pipeline/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
 - **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the hand
   that is NOT throwing, read at impact −2, impact and impact +2 frames and weighted ¼ · ½ · ¼ — how far it sits below
   the nose. Scored 100 up to 0.40 torso (the line hand drop uses, an absolute one: a boxer who holds his hands low
   all round must not pass), linearly to 0 at 0.70; green at 100, red below, with the score on the block. The overlay
-  rings the resting wrist at all three frames and draws the 100 / 0 lines and the weighted reading. That hand's own
+  draws the 100 / 0 lines and the weighted reading at the impact frame, ticks each of the three readings on that scale
+  (each read against its own frame's nose and torso, as the rule does), and rings the resting wrist at every frame
+  the rule could read. That hand's own
   median guard is shown in the card, unjudged. Round = the mean punch score, a plain number with no bands. Frames
   around the impact and not the punch's window, because punches overlap inside a combination, which would leave most
   punches unjudgeable. Reads `punches.csv` + `resting_hand.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the elbow angle at the frame of furthest reach, scored
   linearly — 100 at 160° or straighter, 0 at 100° — and eased far from the camera: with the torso under ¼ of the
   frame height full marks start at 150°, under ⅛ the punch is not judged. Green at 100 and red below, the score on the block and a white
-  tick at the frame measured; on the video the punching arm in the same colour with this frame's elbow angle. The
-  round is the mean punch score, a plain number with no bands.
+  tick at the frame measured; on the video the punching arm in the same colour with this frame's elbow angle (a punch
+  the rule did not judge says why: head-on, too far from the camera…). The round is the mean punch score, a plain
+  number with no bands.
 - **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a set range per punch type (lead
   jab 0–25°, lead hook 25–60°, lead uppercut 15–50°, lead body shot 25–60°, rear cross 20–60°, rear hook 25–60°, rear
   uppercut 20–50°, rear body shot 25–50°): 100 inside, linear from 0° to the lower bound below it, and above it up
   to 20 off — linear from the upper bound to twice it, capped at 20. Green at 100, red below, the score on the block; the round is the mean punch score, no bands (from
-  `hip_rotation.json`); on the video the hip line in the same colour. The impact → end step is in the CSV but not shown.
+  `hip_rotation.json`); on the video the hip line coloured by the rule's verdict, and — since that line is not the
+  measurement — a dial of what is: seen from above (the world landmarks), the direction other hip → punching hip at
+  the start (dashed white) and at impact, against the facing angle (grey), labelled with both angles; their difference
+  is the rule's number (checked to 0.14° on 5,352 punches, 2026-10-02). The impact → end step is in the CSV but not shown.
 - **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
   turn of the punching shoulder against a set range per punch type (lead jab 5–30°, lead hook 35–70°, lead uppercut
   25–60°, lead body shot 40–75°, rear cross 30–60°, rear hook 40–75°, rear uppercut 30–75°, rear body shot 50–75°),
   scored like hip rotation — green at 100, red below, the score on the block; on the video the shoulder line in the
-  same colour. The round is the mean punch score, no bands.
+  verdict's colour and the same dial from above. The round is the mean punch score, no bands.
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — the zone the fist
   is in at its impact frame on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt;
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
-  fist at that frame with its zone. Round = 100 × the on-target share of the judged punches, a plain number. Until
+  fist where it was at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. Round = 100 × the on-target share of the judged punches, a plain number. Until
   2026-09-30 it judged jabs and crosses only, at the most-extended frame.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head is
   off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
