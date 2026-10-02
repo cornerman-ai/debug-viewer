@@ -205,6 +205,13 @@
   .grp .n { font-weight: 600; color: var(--text3); letter-spacing: 0; text-transform: none; }
   .grpbox { border-radius: 10px; background: var(--fill); padding: 2px 10px; }
   .rule { padding: 8px 0; border-top: 0.5px solid var(--sep); }
+  .xrule { padding: 9px 0; border-top: 0.5px solid var(--sep); }
+  .xrule:first-of-type { border-top: 0; }
+  .xrule .xh { font-size: 13px; font-weight: 600; }
+  .xrule .xh .bn { color: var(--text3); font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .xrule p { margin: 3px 0 0; font-size: 12px; line-height: 1.5; color: var(--text); }
+  .xrule p.why { color: var(--text2); }
+  .xintro { font-size: 12px; line-height: 1.5; color: var(--text2); margin-bottom: 6px; }
   .rule:first-of-type { border-top: 0; }
   .exp { display: grid; grid-template-columns: 68px 1fr; gap: 1px 10px; margin-top: 2px; font-size: 11.5px; line-height: 1.5; color: var(--text2); }
   .exp > span:nth-child(odd) { color: var(--text3); }
@@ -340,7 +347,7 @@
   </div>
   <div class="split v" id="splitV" title="drag to resize · double-click to reset"></div>
   <div class="inspector">
-    <div class="seg viewSeg" id="viewSeg"><button data-v="now" class="on">Now</button><button data-v="round">Round</button><button data-v="rules">Rules</button><button data-v="timelines">Timelines</button></div>
+    <div class="seg viewSeg" id="viewSeg"><button data-v="now" class="on">Now</button><button data-v="round">Round</button><button data-v="rules">Rules</button><button data-v="timelines">Timelines</button><button data-v="explain">Explanations</button></div>
 
     <div id="nowView" style="display:contents">
       <div class="card">
@@ -387,6 +394,10 @@
       <div class="rsort" id="layerSort"></div>
       <div id="layerList"></div>
     </div>
+    </div>
+
+    <div id="explainView" style="display:none">
+      <div class="card" id="explainCard"></div>
     </div>
     </div>
   </div>
@@ -787,7 +798,7 @@ function bladeLayer(kind) {
       const name = x.state === 'squared' ? 'Squared up' : x.state === 'between' ? 'In between' : 'Bladed enough';
       return `<b>${name}</b> ${t}${x.score == null ? '' : ` \u00b7 mean frame score <b>${x.score.toFixed(0)}</b>`}<br>` +
         `<span class="m">the ${kind} line against the direction to the opponent: 0 at ${C.cuts[0]}\u00b0 or less, 100 at ${C.cuts[1]}\u00b0 or more, ` +
-        `linear between \u2014 a coach's cuts, and only meaningful where the camera stands in for the opponent</span>`;
+        `linear between \u2014 a coach's cuts</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
@@ -1466,7 +1477,7 @@ const RULE_LAYERS = [
       };
       const rows = (x.both || [x]).slice().sort(a => a.arm === 'lead' ? -1 : 1);
       return `<b>Elbow tuck</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>')
-           + `<br><span class="m">tucked &lt; 0.20 · borderline 0.20–0.30 · flared ≥ 0.30 · front-on only, hooks excluded</span>`;
+           + `<br><span class="m">tucked &lt; 0.20 · borderline 0.20–0.30 · flared ≥ 0.30 · front- and back-on only, that arm’s hooks and body shots excluded</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
@@ -1910,6 +1921,7 @@ $('viewSeg').onclick = e => {
   $('roundView').style.display = v === 'round' ? 'contents' : 'none';
   $('rulesView').style.display = v === 'rules' ? 'contents' : 'none';
   $('timelinesView').style.display = v === 'timelines' ? 'contents' : 'none';
+  $('explainView').style.display = v === 'explain' ? 'contents' : 'none';
 };
 
 // one compact row: name on the left, a colored dot + verdict + number on the right; the rule goes in the tooltip
@@ -2011,7 +2023,7 @@ const SCOPE = {
   shoulder:  {moves: 'every punch',                             angles: ALL_ANGLES},
   hit:       {moves: 'every punch',                             angles: 'side-on'},
   hoc:       {moves: 'every punch',                             angles: 'front, back'},
-  elbow:     {moves: 'every frame except hooks',                angles: 'front, back'},
+  elbow:     {moves: 'every frame except that arm’s hooks and body shots', angles: 'front, back'},
   offensive: {moves: 'punches',                                 angles: ALL_ANGLES},
   work:      {moves: 'every frame',                             angles: ALL_ANGLES},
   combined:  {moves: 'punches, defensive moves',                angles: ALL_ANGLES},
@@ -2119,8 +2131,8 @@ function ruleCard() {
   };
 
   if (ac) add('Angle change', ac.score ?? 'not rated', ac.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'after attacking, does he step off the line he attacked from?',
-    on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (no facing angle to read)`,
+    what: 'after a combination, does he turn to face a new angle? (a turn of the facing direction, not footwork)',
+    on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (ending too close to the video’s end to read what follows)`,
     th: {event: {label: 'per combo', rule: 'a turn of ≥ 45° from the combo’s mean facing (smoothed over 0.5 s), '
                         + 'reached within 2 s of its last frame, counts as a change'},
          round: {label: 'per round', rule: 'the share of readable combos that changed angle, scored 0 at none and 100 '
@@ -2140,7 +2152,7 @@ function ruleCard() {
     calc: `mean punch score over the ${q.pass + q.fail} judged punches`
           + (S.layerSum.arm?.scored_at ? ` · ${S.layerSum.arm.scored_at['160']} against 160°, ${S.layerSum.arm.scored_at['150']} against 150°` : '')}));
   if (da) add('Defense after combo', da.score ?? 'not rated', da.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'does he defend right after he throws, or stand there?',
+    what: 'does a defensive move come with, or right after, his combinations?',
     on: `${da.n_combos} offensive combos (punches only) · all judged`,
     th: {event: {label: 'per combo', rule: 'a defensive move starting anywhere from the combo’s first frame to 2 s '
                         + 'after its last one covers it — or only until the next punch starts, if that comes first'},
@@ -2150,17 +2162,17 @@ function ruleCard() {
           + `${da.n_cut_by_punch} windows cut short by the next punch`});
   if (el) add('Elbow tuck', el.score ?? 'not rated', el.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does the elbow stay in, or flare out to the side?',
-    on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook)`,
+    on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook or a body shot)`,
     th: {event: {label: 'per frame', rule: 'flare = the sideways shoulder → elbow gap in torso lengths',
                  note: 'frame score: each arm 50 — full up to 0.15 flare, linearly to 0 at 0.50; one arm alone '
-                     + '(the other hidden or throwing a hook) is the whole 100. The colours keep the lens’s cut-offs',
+                     + '(the other hidden or throwing a hook or a body shot) is the whole 100. The colours keep the lens’s cut-offs',
                  bands: [['< 0.20', 'tucked'], ['0.20–0.30', 'borderline'], ['≥ 0.30', 'flared']], pal: ELBOWSTATE},
          round: {label: 'per round', rule: 'the mean frame score over every scored frame — a plain number, no bands; '
                         + 'fewer than 150 scored frames: not rated'}},
     calc: `mean of ${el.scored_frames.toLocaleString()} frame scores (${el.both_arms_frames.toLocaleString()} with both arms) · `
           + `flared: lead ${pct(el.arms.lead.flared_share)}, rear ${pct(el.arms.rear.flared_share)}`});
   scored('hoc', 'Head off center line', q => ({
-    what: 'does the head leave the center line while punching, or stay a still target?',
+    what: 'while punching, is the head off the line through his hips, or sitting on it?',
     on: `${q.pass + q.fail + q.skip} punches · ${q.pass + q.fail} judged, ${q.skip} skipped (thrown side-on, where the camera cannot see the head move sideways)`,
     th: {event: {label: 'per punch', rule: 'offset = 0.75 × at impact + 0.125 × a quarter into the punch + 0.125 × '
                         + 'three quarters in; the punch scores 0 when the head stays on the line, rising linearly to 100 at '
@@ -2230,8 +2242,8 @@ function ruleCard() {
                                            ['Slips compact', sl?.compact, 'far', 'too far']]) {
     if (!part) continue;
     add(name, part.score ?? 'not rated', part.score == null ? '#8e8e93' : 'var(--text)', {
-      what: fault === 'short' ? 'when he slips, does the head move far enough to make the punch miss?'
-                              : 'when he slips, does the head stay over the base instead of travelling too far?',
+      what: fault === 'short' ? 'when he slips, does the head move far enough sideways off his hips?'
+                              : 'when he slips, does the head stay near his hips instead of travelling too far?',
       on: slipOn, th: {event: slipEvent[fault], round: slipRound},
       calc: sl.judged_slips ? `mean of ${sl.judged_slips} slip scores = ${part.mean_score ?? '–'} · ${part.with_fault} ${word}`
                             : 'no slip could be read front-on'});
@@ -2392,7 +2404,7 @@ function ruleCard() {
           + Object.entries(psp.by_type).map(([t, v]) => `${PUNCH[t]?.name || t} ${v.mean_score}`).join(', ')});
   const bal = S.layerSum.bal;
   if (bal) add('Balance at impact', bal.score ?? 'not rated', bal.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'when the punch lands, is his head still over his own feet?',
+    what: 'when the punch lands, are his head and hips still over his own feet?',
     on: `${bal.n_punches} punches · ${bal.judged_punches} judged side-on (fore-aft is the axis this fault lives on), `
         + `${bal.n_punches - bal.judged_punches} skipped (thrown head-on, no impact frame, or the feet not visible)`,
     th: {event: {label: 'per punch', rule: 'a score 0–100 at the impact frame, head 0–50 + hips 0–50, in ankle distances. '
@@ -2421,7 +2433,7 @@ function ruleCard() {
           + `median ${hs.median_cross} torso past the far shoulder`});
   const rp = S.layerSum.rpivot;
   if (rp) add('Rear-foot pivot', rp.score ?? 'not rated', rp.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'when a rear-hand punch lands, is the rear heel up and turning, or flat on the floor?',
+    what: 'when a rear-hand punch lands, is the rear heel up off the floor, or flat?',
     on: `${rp.n_rear_punches} rear-hand punches · ${rp.judged_punches} judged (every angle — the lift is vertical), `
         + `${rp.n_rear_punches - rp.judged_punches} skipped (no impact frame, or the rear foot or the torso not visible)`,
     th: {event: {label: 'per punch', rule: 'at the impact frame, how far the rear heel sits above the rear toe, in torso '
@@ -3552,6 +3564,89 @@ $('ovrReload').onclick = () => overviewLoad(true);
 $('ovrClose').onclick = () => { $('ovr').style.display = 'none'; };
 $('ovr').onclick = e => { if (e.target === $('ovr')) $('ovr').style.display = 'none'; };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('ovr').style.display !== 'none') $('ovr').style.display = 'none'; });
+
+// ── the Explanations tab: what each rule actually computes, checked against its script (2026-10-02), and why a
+// coach would want it. Static text — it does not depend on the loaded video. [number, what is measured, why] ──
+const EXPLAIN = [
+  [1, 'Side-on punches, at impact, left-right in the image only: is the nose no more than 0.20 of the ankle gap past either ankle (50 points, zero at 0.75 past), and is the hips’ centre within 0.20 of the gap from the ankles’ midpoint (50 points, zero right over an ankle)? One frame; no weight or centre of mass is measured.',
+      'A head out past the feet, or the hips over one leg, as the punch lands means he is falling into it and cannot recover or follow up.'],
+  [2, 'How far the punching wrist sits below the nose, averaged over the 0.25 s before the punch starts, in torso lengths: full marks up to 0.40, zero at 0.70. It is where the hand starts from, not a dip or wind-up movement.',
+      'A punch from a low hand has further to travel and leaves the head open on the way.'],
+  [3, 'For each combination of 2+ punches: does the defense model find a roll, slip, duck or pull-back starting anywhere from its first punch to 2 s after its last (or until his next punch, if sooner)? Full marks when 70 % of combos have one. Most of the moves it finds start during the combo; blocks, parries and footwork are not seen.',
+      'The counter comes as he finishes punching; head movement built into the attack is his way out.'],
+  [4, 'Every frame, how far each wrist sits below the nose (height only), in torso lengths, while that hand is not punching: full marks up to 0.50 for the lead and 0.30 for the rear, zero at 0.70; the frame weighs lead 30, rear 70. A hand held out wide still counts as up.',
+      'Hands that sit low between punches leave the head open.'],
+  [5, 'The share of all punches thrown with the rear hand: full marks from 25 % to 60 %, zero at all-lead or all-rear. It is about which hand throws, not body balance (that is rule 1).',
+      'Living on one hand is predictable: jabs alone never commit, rear hands alone have nothing setting them up.'],
+  [6, 'At each punch’s impact (2 frames before, at, 2 after), how far the other, non-punching wrist sits below the nose, in torso lengths: full marks up to 0.40, zero at 0.70. It is the hand’s height at that moment, not a drop from where it was.',
+      'While one hand punches the other is the guard; if it sags, the counter lands.'],
+  [7, 'Side-on frames outside punches: how far the chin sits in front of the lead shoulder’s front, left-right in the image, in torso lengths: full marks at or behind it, zero at 0.40 in front. The chin is estimated from the nose and mouth corners, so the whole head leaning forward also reads as chin out.',
+      'Behind the shoulder the chin is covered from the side; out in front of it, it is the target.'],
+  [8, 'Frames outside punches, any angle: how high the chin sits against the top of the lead shoulder (height only), in torso lengths: full marks at or below it, zero at 0.20 above. A raised lead shoulder counts the same as a lowered chin.',
+      'Chin down behind the lead shoulder is the basic protection; chin up is an open target.'],
+  [9, 'Front- and back-on frames: the left-right image gap between each elbow and its own shoulder, in torso lengths: full marks up to 0.15, zero at 0.50, 50 points per arm. Either direction counts, so an elbow pulled in across the chest reads like one flared out; an arm throwing a hook or a body shot is skipped.',
+      'A flared elbow opens the ribs to body shots and telegraphs the punch.'],
+  [10, 'Front- and back-on punches: how far the head (the middle of the visible face points) sits left or right of a vertical line through the hips’ centre, in torso lengths, weighted 75 % at impact and 12.5 % each a quarter and three quarters into the punch: full marks from 0.25, zero on the line. A position, not a movement: either side counts, and a step that takes the hips along reads as zero.',
+       'A head left on the centre line while punching is exactly where the return punch goes.'],
+  [11, 'Side-on frames: the left-right image gap between the ankles, in leg lengths (hip–knee–ankle): full marks at 0.50 and longer, zero with the feet level. Too long is never penalised.',
+       'One foot well in front of the other is the base for absorbing punches and pushing off.'],
+  [12, 'Front- and back-on frames: the straight-line image distance between the ankles, in torso lengths: full marks at 0.50 and wider, zero with the feet together. It is the total gap, not only side-to-side, so a long narrow stance can score full marks too; too wide is never penalised.',
+       'Feet too close together leave no base to stay balanced or move from.'],
+  [13, 'After each combination (punches and defensive moves): does the direction he faces turn 45° or more from where it was during the combo, at any point in the next 2 s (smoothed over 0.5 s)? Full marks when half the combos do. Turning only, not footwork: a sidestep that keeps the same facing counts as no change.',
+       'Changing angle after an attack avoids the return fire and opens new lines.'],
+  [14, 'Slips only, front- or back-on: how far the head (the middle of the visible face points) moves left-right relative to the hips’ centre during the slip, in torso lengths: full marks from 0.20, zero with no movement. Which way it went, and whether it left a punch’s line, is not checked.',
+       'A slip that barely moves the head does not take it out of the way.'],
+  [15, 'The same reading as rule 14, scored from the other end: full marks up to 0.70 torso lengths of sideways head travel, zero at 1.00.',
+       'An oversized slip carries the head far off the hips: slow to come back and out of position to counter.'],
+  [16, 'Side-on jabs and crosses: the wrist’s height above its own shoulder from impact to 0.15 s after the punch ends, against a straight line between its first and last value. Not okay when every frame between sits below that line — the hand sank on the way back. Full marks with no punch not okay, zero at 70 %. Sideways loops are not seen.',
+       'A hand that drops on its way home leaves the face open just when the counter comes.'],
+  [17, 'Frames outside punches, any angle: the hip line’s angle, from the 3D landmarks seen from above, against square to the opponent (the facing model’s direction): 0° chest-on, 90° side-on. Zero at 18.2° or less, full marks from 27.9° up (a coach’s cut-offs) — it penalises standing too square, never too bladed.',
+       'Standing square shows the opponent the whole front of the body as a target.'],
+  [18, 'The same on the shoulder line, with its own cut-offs: zero at 12.7° or less, full marks from 17.6° up.',
+       'The upper body can square up while the hips stay turned, or the reverse, so it is judged on its own.'],
+  [19, 'Every punch: how many degrees the hip line turned between the punch’s first frame and impact (3D landmarks seen from above), against a range for that hand and type — e.g. lead jab 0–25°, rear cross 20–60°. Inside = 100; too little falls to 0 at no turn; too much costs at most 20. The net change only, in either direction.',
+       'Power comes from the hips turning; without it the punch is all arm.'],
+  [20, 'The same on the shoulder line, with its own ranges — e.g. rear cross 30–60°, lead hook 35–70°. It is not compared with the hips.',
+       'The shoulders’ turn carries the punch’s reach and weight; the arm alone is short and light.'],
+  [21, 'Side-on jabs and crosses: the elbow angle (shoulder–elbow–wrist) at the frame where the wrist is furthest from the shoulder: full marks at 160° or straighter, zero at 100°. When the boxer is small in the frame full marks start at 150°, and very small he is not judged.',
+       'A straight that lands with a bent arm falls short and carries no weight.'],
+  [22, 'Side-on punches of every type: the punching wrist’s height at impact against a standing copy of the boxer’s own body — head or body is on target; over the head, the shoulder band or below the belt is off. Score = the share on target. Height only, and either zone counts for any punch type.',
+       'Punches into the gap between head and body, or over the top, hit nothing.'],
+  [23, 'The time from the punch’s first detected frame to impact, against labelled punches of the same type: full marks at or under their 30th percentile (jab 131 ms), zero at the 80th (jab 265 ms). Duration only: no fist velocity, no distance.',
+       'A slow punch is seen coming and gets blocked or countered.'],
+  [24, 'Of his combinations (2+ punches, each starting within 0.3 s of the one before ending), the share with 3 or more punches: full marks from 40 %, zero at none. Single punches do not count at all.',
+       'Longer combinations break through a guard; a boxer stuck at one-twos is easy to read.'],
+  [25, 'The share of the video spent in dead gaps — 3 s or more with no punch, no defensive move and no quick turn (90° in under 1 s): full marks with none, zero at half the video. It is not punches per minute.',
+       'Long stretches of doing nothing hand the round and the initiative to the opponent.'],
+  [26, 'Punches at the start against punches at the end of the span from his first punch to his last — the first and last thirds under 90 s, otherwise the first and last 30 s: full marks up to 15 % fewer at the end, zero at 40 % fewer. Total volume is not judged.',
+       'Fading late shows conditioning running out, and rounds are often won at the end.'],
+  [27, 'The share of all punches taken by his two most-used types — jab, cross, head hook, head uppercut, body shot (both hands’ hooks are one type, likewise uppercuts): full marks at 66 % or less, zero at 100 %.',
+       'A boxer with two punches is predictable.'],
+  [28, 'Of his hooks and uppercuts, the share the punch model classes as body shots: zero at none, full marks from 25 %. Jabs and crosses are left out (the model does not split head from body for straights), and nothing measures where a punch lands.',
+       'Body work slows the opponent and opens the head; head-hunting alone is easy to defend.'],
+  [29, 'Over all detected defensive moves: the share of his most-used kind (roll, slip, duck, pull-back; full marks up to 60 %) and the share going to his most-used side (lead or rear — rolls and slips only; full up to 70 %), each zero at 100 %, half the score each. Which punch a move answered is not looked at.',
+       'One defensive habit, repeated, gets read and timed.'],
+  [30, 'Of his combinations (punches only), the share that are exactly one of his three most-used sequences (hand and punch type, in order): full marks below 40 %, zero at 100 %. One extra or missed punch makes a different sequence.',
+       'The same combination over and over lets the opponent time it.'],
+  [31, 'The same with the defensive moves in the sequence (their kind, not their side). Noise in the defense model adds variety, so it reads as more varied than rule 30.',
+       'Patterns of attack and defense get read just like punch patterns.'],
+  [32, 'Head hooks, front- or back-on: at impact, how far the wrist has crossed left-right past his own centre line: full marks at or short of the centre, zero a third of a torso past his far shoulder (placed at half his widest shoulder span). Where the hand is at its deepest point, not whether it stops.',
+       'A hook that swings past the target loses its snap, opens him up and takes the longest way back.'],
+  [33, 'Rear-hand punches, any angle: at impact, how high the rear heel sits above the rear toe in the image, in torso lengths: zero with the heel level, full marks from 0.20. The stance already lifts the heel, so a planted foot scores about 65; no foot rotation is measured.',
+       'The rear heel coming up lets the hips turn through; a flat-footed power punch is all arm.'],
+];
+function renderExplain() {
+  const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));
+  $('explainCard').innerHTML = `<div class="label">Explanations · ${EXPLAIN.length} rules</div>` +
+    `<div class="xintro">What each rule actually computes — read this before trusting a name. Torso = the image distance ` +
+    `from the shoulders’ midpoint to the hips’ midpoint; impact = the frame where the punch reaches deepest, not the ` +
+    `moment of contact; lead = the left side (every video is read as orthodox); positions are 2D image ` +
+    `coordinates unless a rule says 3D. Each round score is the mean (or share) over what the rule judged; under its ` +
+    `floor it is not rated.</div>` +
+    EXPLAIN.map(([n, what, why]) => `<div class="xrule"><div class="xh"><span class="bn">${n}</span>${nameOf[n]}</div>` +
+      `<p>${what}</p><p class="why">Why: ${why}</p></div>`).join('');
+}
+renderExplain();
 
 // ════════════════════════════ start ════════════════════════════
 (async () => {

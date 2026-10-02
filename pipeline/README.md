@@ -40,7 +40,7 @@ defense, and an overview of the whole video (drag it to move the window). Scroll
 hover for details; the chips in the side panel hide or show a punch / defense type. On the video: the skeleton, a ring
 on the punching wrist around impact, and pills naming the current punch / move.
 
-The side panel has two views, switched at its top:
+The side panel has five views, switched at its top:
 
 - **Now** — what is under the playhead: the facing angle, then three cards, each judged on every rule that applies
   to it — a score in the round score's tier colours, a verdict (okay / not okay, on / off target), or "not judged" and
@@ -75,6 +75,10 @@ The side panel has two views, switched at its top:
 that rule's headline verdict. It sorts by rule number (the default on every load) or by the angles each rule judges —
 side-on / front, back / every angle, under a heading — and the active button flips the order; the timeline rows and
 the punch card's sections follow the same order.
+- **Explanations** — one card, static text: every rule in plain words — what it actually computes (the joints, the
+  frames, the reference, the camera angles it judges, the traps its name hides) and why a coach wants it. Written
+  from the scripts and checked against them on 2026-10-02; when a rule's script changes, its line in `EXPLAIN` changes
+  with it.
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
 are videos, columns are the overall round score and rules 1–33, each cell the 0–100 score tinted in its tier's colour
