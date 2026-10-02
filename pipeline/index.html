@@ -152,6 +152,7 @@
   .rsort button.on { background: var(--accent); color: #fff; }
   .rsort button i { font-style: normal; margin-left: 4px; }
   .rsort-dir { font-size: 11px; color: var(--text2); margin: -4px 0 8px; }
+  .rsort .rsort-inline { font-size: 11px; color: var(--text2); margin-left: 4px; }
   .rgroup { font-size: 12px; font-weight: 600; color: var(--text2); margin: 10px 2px 4px; }
   .rmeta { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 0 6px; }
   .rmeta span { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--fill); color: var(--text2); }
@@ -337,6 +338,7 @@
 
     <div class="card" id="layersCard">
       <div class="label">Timeline layers</div>
+      <div class="rsort" id="layerSort"></div>
       <div id="layerList"></div>
     </div>
     </div>
@@ -1849,6 +1851,48 @@ function srow(name, main, color, value, rule) {
 }
 
 const count = (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
+// The Timeline layers card — and the timeline rows, which follow it — sort by rule number (the default, every load)
+// or by the angles each rule judges, grouped under a heading; clicking the active button flips the order.
+const ANGLE_GROUPS = ['Side-on', 'Front, back', 'Every angle'];
+const angleGroup = k => {
+  const a = (SCOPE[k]?.angles || ALL_ANGLES).split(' \u2014')[0];
+  return a === 'side-on' ? 'Side-on' : a === 'front, back' ? 'Front, back' : 'Every angle';
+};
+const LSORTS = {rule: {label: 'rule number', dir: ['1 → 33', '33 → 1']},
+                angle: {label: 'angles', dir: ['side-on first', 'every angle first']}};
+V.layerSort = 'rule'; V.layerDesc = false;
+function layerOrder() {
+  if (V.layerSort === 'angle') {
+    const groups = V.layerDesc ? [...ANGLE_GROUPS].reverse() : ANGLE_GROUPS;
+    return groups.flatMap(g => LAYERS.filter(k => angleGroup(k) === g));
+  }
+  return V.layerDesc ? [...LAYERS].reverse() : LAYERS;
+}
+function sortLayers() {
+  const list = $('layerList');
+  list.querySelectorAll('.rgroup').forEach(h => h.remove());
+  let last = null;
+  for (const k of layerOrder()) {
+    const el = list.querySelector(`.toggle[data-layer="${k}"]`).closest('.layer');
+    if (V.layerSort === 'angle' && angleGroup(k) !== last) {
+      last = angleGroup(k);
+      const n = LAYERS.filter(x => angleGroup(x) === last).length;
+      list.insertAdjacentHTML('beforeend', `<div class="rgroup">${last} · ${n}</div>`);
+    }
+    list.appendChild(el);
+  }
+  const srt = LSORTS[V.layerSort];
+  $('layerSort').innerHTML = `<span>Sort by</span>${Object.entries(LSORTS).map(([k, s]) => {
+      const on = k === V.layerSort;
+      return `<button data-sort="${k}" class="${on ? 'on' : ''}" title="${on ? `${s.dir[+V.layerDesc]} · click to flip` : s.dir[0]}">` +
+        `${s.label}${on ? `<i>${V.layerDesc ? '↓' : '↑'}</i>` : ''}</button>`;
+    }).join('')}<span class="rsort-inline">${srt.dir[+V.layerDesc]}</span>`;
+  $('layerSort').querySelectorAll('button').forEach(b => b.onclick = () => {
+    if (b.dataset.sort === V.layerSort) V.layerDesc = !V.layerDesc;
+    else { V.layerSort = b.dataset.sort; V.layerDesc = false; }
+    sortLayers(); layout(); resize(); draw(true);
+  });
+}
 function buildLayers() {
   const list = $('layerList');
   if (!list.children.length) {                             // the toggles, once
@@ -1860,6 +1904,7 @@ function buildLayers() {
       try { localStorage.setItem('pipelineViewerLayers', JSON.stringify(V.layers)); } catch {}
       layout(); resize(); draw(true);
     });
+    sortLayers();
   }
   for (const L of RULE_LAYERS) {
     const t = list.querySelector(`.toggle[data-layer="${L.key}"]`);
@@ -2514,7 +2559,7 @@ function iqrBar(val, q, col, good) {
 }
 const pillV = v => `<span class="verdict" style="background:${VERD[v] || '#8e8e93'}">${VNAME[v] || v}</span>`;
 function layerSections(e) {
-  return LAYERS.map(k => RULE[k]).filter(L => layerOn(L.key)).map(L => L.card(e, L.items
+  return layerOrder().map(k => RULE[k]).filter(L => layerOn(L.key)).map(L => L.card(e, L.items
     ? (S.items[L.key] || []).find(it => it.els?.some(m => m.kind === 'punch' && m.sf === e.sf)) : e[L.key])).join('');
 }
 const at = (arr, f, hidden) => arr.filter(e => e.sf <= f && f <= e.ef && !hidden.has(e.type));
@@ -2656,7 +2701,7 @@ function layout() {
   TR = {ruler: [0, 24], angle: [30, 190], lead: [228, 30], rear: [262, 30], def: [302, 30]};
   const any = LAYERS.some(layerOn);
   let y = any ? 358 : 342;                                     // 16 px for the "RULES" caption when there are rule rows
-  for (const k of LAYERS) if (layerOn(k)) { TR[k] = [y, 26]; y += 30; }
+  for (const k of layerOrder()) if (layerOn(k)) { TR[k] = [y, 26]; y += 30; }
   if (any) TR.rules = 347;
   TR.bottom = y - (any ? 4 : 10);                              // lowest edge of the scrolling rows
   TR.over = [TR.bottom + 14, 30];

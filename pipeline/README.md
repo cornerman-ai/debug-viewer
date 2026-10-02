@@ -63,7 +63,9 @@ The side panel has two views, switched at its top:
   buttons say which way, e.g. worst → best). The card always opens on rule number, 1 → 33.
 
 The **Timeline layers** card stays below both views: it only turns timeline rows on and off, and each toggle shows
-that rule's headline verdict.
+that rule's headline verdict. It sorts by rule number (the default on every load) or by the angles each rule judges —
+side-on / front, back / every angle, under a heading — and the active button flips the order; the timeline rows and
+the punch card's sections follow the same order.
 
 **Rule layers** (side panel, all off by default, the choice is remembered): each adds a timeline row, a section in
 the punch card and a video overlay.
