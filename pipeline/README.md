@@ -24,7 +24,9 @@ Chrome or Edge (it reads folders with the File System Access API) and Google Dri
   so the page asks to link the data folder once, or to pick the video file by hand.
 
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
-(fps, stance, video name), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
+(fps, stance, video name — and `mirrored`: a southpaw's stages ran on his skeleton mirrored to orthodox, so the page
+flips back what carries an image side — the facing angle's sign, hook stop's x lines, the balance head position,
+head-off-center's left / right — and takes lead = his right side; the skeleton it draws is the real one), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
 `*_blazepose_full.npy` skeleton for the stick figure. A missing stage is named in the timeline header; the rest still works.
 Switching videos is safe at any moment — while playing, mid-load, while a skeleton is still downloading: the old
 video pauses at once and stays as it was (dimmed) until the new one has been read in full, in parallel, and swapped

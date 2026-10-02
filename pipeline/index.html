@@ -627,7 +627,7 @@ function comboLayer(kind, label, short, what) {
     },
   };
 }
-const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${v >= 0 ? 'right' : 'left'}`;
+const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${(S.mirrored ? -v : v) >= 0 ? 'right' : 'left'}`;   // image sides
 // ââ stance width / depth: the same shape, one per axis. Both are per-frame rules whose rows are continuous
 //    stretches (ok / too small / not judged), like elbow tuck. ââ
 const STANCE = {
@@ -1123,13 +1123,13 @@ const RULE_LAYERS = [
                                                 : x && x.skip === 'no_impact_frame' ? 'no impact frame'
                                                 : x && x.skip === 'no_facing' ? 'no facing angle over the punch'
                                                 : 'the feet or the body are not visible at the impact frame'}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Head</span><b>${x.headScore.toFixed(1)} / 50 · at ${x.head.toFixed(2)} (full −0.20 to 1.20, 0 past 0.75)</b>
+       `<div class="rows num" style="margin-top:0"><span>Head</span><b>${x.headScore.toFixed(1)} / 50 · at ${(S.mirrored ? 1 - x.head : x.head).toFixed(2)} (full −0.20 to 1.20, 0 past 0.75)</b>
         <span>Hips</span><b>${x.hipsScore.toFixed(1)} / 50 · ${x.off.toFixed(2)} off the midpoint (full ≤ 0.20, 0 at 0.50)</b>
         <span>Score</span><b>${x.score.toFixed(1)} / 100</b>
         <span>Verdict</span><b>${x.verdict}${x.why ? ' — ' + x.why : ''}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
       `<span class="num"><b>${x.score.toFixed(1)} / 100</b> · ${x.verdict}${x.why ? ' · ' + x.why : ''}</span><br>` +
-      `<span class="num">head at ${x.head.toFixed(2)} (0 and 1 are the ankles, −0.20 to 1.20 passes) · ` +
+      `<span class="num">head at ${(S.mirrored ? 1 - x.head : x.head).toFixed(2)} (0 and 1 are the ankles, −0.20 to 1.20 passes) · ` +
       `hips ${x.off.toFixed(2)} off their midpoint</span><br>` +
       `<span class="m">head 50 inside the green zone (≤ 0.20 of the ankle distance past an ankle), down to 0 at 0.75 past it; ` +
       `hips 50 within 0.20 of the midpoint, down to 0 at 0.50 (over an ankle)</span>`),
@@ -1161,7 +1161,7 @@ const RULE_LAYERS = [
       const headCol = x.headOk ? '#34c759' : '#ff3b30';
       OV.line([nose[0], nose[1]], [nose[0], y], headCol, 2.5, [6, 4]); OV.ring(nose, headCol, 13, 3);
       overlayLabel(Math.min(lo[0], nose[0]) - 10, y + 26,
-        `head ${x.head.toFixed(2)} · hips ${x.off.toFixed(2)} off centre${x.score != null ? ` → ${x.score.toFixed(1)}` : ''}`, x.verdict === 'balanced' ? '#34c759' : '#ff3b30');
+        `head ${(S.mirrored ? 1 - x.head : x.head).toFixed(2)} · hips ${x.off.toFixed(2)} off centre${x.score != null ? ` → ${x.score.toFixed(1)}` : ''}`, x.verdict === 'balanced' ? '#34c759' : '#ff3b30');
     },
   },
   {
@@ -1203,10 +1203,11 @@ const RULE_LAYERS = [
       const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
       const lsh = P(J.lsh), rsh = P(J.rsh), w = P(wr);
       if (!(lsh && rsh && w)) return;
-      const line = PXY(x.lineNx, 0); if (!line) return;
+      const nx = v => v == null ? null : S.mirrored ? 1 - v : v;          // image x from a mirrored run, flipped back
+      const line = PXY(nx(x.lineNx), 0); if (!line) return;
       const col = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
       const yTop = Math.min(lsh[1], rsh[1]) - 60, yBot = Math.max(lsh[1], rsh[1]) + 90;
-      const centre = PXY(x.centreNx, 0), zero = PXY(x.zeroNx, 0);
+      const centre = PXY(nx(x.centreNx), 0), zero = PXY(nx(x.zeroNx), 0);
       const cx = centre ? centre[0] : (lsh[0] + rsh[0]) / 2;
       OV.line([cx, yTop], [cx, yBot], '#34c759', 3);                          // the centre line: 100 up to here
       OV.line([line[0], yTop + 20], [line[0], yBot - 20], '#8e8e93', 1.5, [4, 4]);   // his far shoulder, for reference
@@ -1243,10 +1244,11 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'rpivot', bx, y, w, h);
     },
-    overlay(e, x, f) {                                      // the rear foot at impact: toe level, the line, the heel
+    overlay(e, x, f, P, leadLeft) {                         // the rear foot at impact: toe level, the line, the heel
       if (!x.verdict) return;
-      // run_rear_pivot.py reads the RIGHT foot (every test video is orthodox, the rule takes no stance)
-      const he = PAT(e.impact, 30), to = PAT(e.impact, 32);
+      // run_rear_pivot.py reads the right foot of an orthodox skeleton (heel 30, toe 32); a southpaw's run is mirrored,
+      // so on his real skeleton that is the left foot (heel 29, toe 31)
+      const he = PAT(e.impact, leadLeft ? 30 : 29), to = PAT(e.impact, leadLeft ? 32 : 31);
       const ls = PAT(e.impact, 11), rs = PAT(e.impact, 12), lh = PAT(e.impact, 23), rh = PAT(e.impact, 24);
       if (!(he && to && ls && rs && lh && rh)) return;
       const torso = Math.hypot((ls[0] + rs[0]) / 2 - (lh[0] + rh[0]) / 2, (ls[1] + rs[1]) / 2 - (lh[1] + rh[1]) / 2);
@@ -1586,9 +1588,11 @@ const RULE_LAYERS = [
       const t = torso(); if (!t) return;
       const now = (S.items.elbow || []).filter(it => f >= it.sf && f <= it.ef);      // the rule's own state, per arm
       const part = {};
-      // run_elbow_tuck.py hardcodes lead = the LEFT arm (it takes no stance), so the overlay follows it or the label
-      // and the row it sits under would name opposite arms. Switch to leadLeft once the rule takes the stance.
-      for (const [arm, sj, ej, oj] of [['lead', J.lsh, J.lel, J.rsh], ['rear', J.rsh, J.rel, J.lsh]]) {
+      // run_elbow_tuck.py reads lead = the left arm of an orthodox skeleton; a southpaw's run is mirrored to orthodox,
+      // so the rule's lead arm is the boxer's lead arm — the right one on a southpaw's real skeleton
+      const ARMS2 = leadLeft ? [['lead', J.lsh, J.lel, J.rsh], ['rear', J.rsh, J.rel, J.lsh]]
+                             : [['lead', J.rsh, J.rel, J.lsh], ['rear', J.lsh, J.lel, J.rsh]];
+      for (const [arm, sj, ej, oj] of ARMS2) {
         const sh = P(sj), el = P(ej), os = P(oj); if (!(sh && el)) continue;
         const st = now.find(it => it.arm === arm)?.state;
         const skip = !st || !!ELBOWSKIP[st];               // no_pose / side_on / hook: the rule looked away
@@ -1803,7 +1807,7 @@ async function httpList(base) {
 }
 
 // ════════════════════════════ state ════════════════════════════
-const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], skel: null,
+const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], skel: null, mirrored: false,
            stance: 'orthodox', videoName: '', objectUrl: null, hiddenP: new Set(), hiddenD: new Set()};
 const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover: null, hoverLayer: null, lastFrame: -1,
            faceFilter: null,   // 'front' | 'side-on' | 'back': shift-click a band in the facing row to isolate it,
@@ -1852,12 +1856,13 @@ async function buildVideo(src, sig, lite = false) {
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
-  const N = {fps: pjs?.run?.fps || 30, stance: pjs?.run?.stance || 'orthodox',
+  const N = {fps: pjs?.run?.fps || 30, stance: pjs?.run?.stance || 'orthodox', mirrored: !!pjs?.run?.mirrored,
              videoName: pjs?.run?.video || `${src.name}.mp4`, hasImpact, missing: []};
   const A = angleCsv ? parseCSV(angleCsv) : [];
   N.n = A.length || pjs?.run?.n_frames || 0;
   N.angle = new Float32Array(N.n); N.pose = new Uint8Array(N.n);
-  A.forEach((r, i) => { N.angle[i] = +r.angle_deg; N.pose[i] = +r.has_pose; });
+  const sgn = N.mirrored ? -1 : 1;                           // a mirrored run's facing turns the other way on screen
+  A.forEach((r, i) => { N.angle[i] = sgn * +r.angle_deg; N.pose[i] = +r.has_pose; });
   N.hasAngle = A.length > 0;
   N.punches = (pcsv ? parseCSV(pcsv) : []).map(r => ({
     kind: 'p', sf: +r.start_frame, ef: +r.end_frame, type: r.punch_type, hand: r.hand, target: r.target,
@@ -3000,7 +3005,8 @@ function frameCard(el, f) {
   // 9 elbow tuck: each judged arm 0-1 (full to 0.15 torso of flare, 0 at 0.50), 50 / 50
   if (S.has.elbow) {
     const part = {}, why = [];
-    for (const [arm, sj, ej, oj] of [['lead', J.lsh, J.lel, J.rsh], ['rear', J.rsh, J.rel, J.lsh]]) {
+    for (const [arm, sj, ej, oj] of leadLeft ? [['lead', J.lsh, J.lel, J.rsh], ['rear', J.rsh, J.rel, J.lsh]]
+                                             : [['lead', J.rsh, J.rel, J.lsh], ['rear', J.lsh, J.lel, J.rsh]]) {
       const st = state('elbow', it => it.arm === arm)?.state;
       if (!st || ELBOWSKIP[st]) { why.push(`${arm}: ${ELBOWSKIP[st] || 'no reading'}`); continue; }
       const out = Math.sign(J2(sj)?.[0] - J2(oj)?.[0]);                       // away from the body's midline
@@ -3155,6 +3161,7 @@ function drawFrameOverlays(f, P) {
 // Checked 2026-10-02: reproduces the CSV's rot_start_impact to 0.11 deg on 945 punches per rule.
 function rotationTopView(e, r, leadLeft, jl, jr, c, col) {
   if (e.impact == null || r.facing == null || !S.skel) return;
+  const F = S.mirrored ? -r.facing : r.facing;             // a mirrored run's facing, back on the real skeleton
   const C = S.skelC, n = S.skel.length / (33 * C), Wc = (fr, j, ch) => S.skel[(fr * 33 + j) * C + ch];
   if (!(e.sf >= 0 && e.sf < n && e.impact >= 0 && e.impact < n)) return;
   const own = (e.hand === 'lead') === leadLeft ? jl : jr, oth = own === jl ? jr : jl;
@@ -3163,8 +3170,8 @@ function rotationTopView(e, r, leadLeft, jl, jr, c, col) {
   const wrap = d => ((d + 180) % 360 + 360) % 360 - 180, R = 34, rad = Math.PI / 180;
   const ray = (deg, cc, w, dash) => OV.line(c, [c[0] + R * Math.sin(deg * rad), c[1] + R * Math.cos(deg * rad)], cc, w, dash);
   octx.save(); octx.fillStyle = 'rgba(0,0,0,0.45)'; octx.beginPath(); octx.arc(c[0], c[1], R + 6, 0, 7); octx.fill(); octx.restore();
-  ray(r.facing, '#8e8e93', 2); ray(ds, '#ffffff', 2, [3, 3]); ray(di, col, 3);
-  overlayLabel(c[0] + R + 10, c[1], `from above, vs facing: start ${Math.abs(wrap(r.facing - ds)).toFixed(1)}° → impact ${Math.abs(wrap(r.facing - di)).toFixed(1)}°`, col);
+  ray(F, '#8e8e93', 2); ray(ds, '#ffffff', 2, [3, 3]); ray(di, col, 3);
+  overlayLabel(c[0] + R + 10, c[1], `from above, vs facing: start ${Math.abs(wrap(F - ds)).toFixed(1)}° → impact ${Math.abs(wrap(F - di)).toFixed(1)}°`, col);
 }
 // Shared bits of overlay grammar, so thirteen rules do not each invent their own.
 const OV = {
@@ -3925,8 +3932,8 @@ function renderExplain() {
     `<div class="xintro">What each rule really measures — the name alone can mislead. Distances are in torso lengths ` +
     `(shoulders to hips in the picture), so they don’t change with how far the boxer stands from the camera. ` +
     `Everything is read from the flat picture unless a rule says 3D. Impact is the frame where the punch reaches ` +
-    `furthest, not the moment it hits something. The left side is treated as the lead: every video is read as ` +
-    `orthodox. A round score is the average (or share) over everything the rule judged; with too little to judge, ` +
+    `furthest, not the moment it hits something. A southpaw's video is mirrored before the rules read it, so “lead” is ` +
+    `always the boxer's lead hand. A round score is the average (or share) over everything the rule judged; with too little to judge, ` +
     `the rule is not rated.</div>` +
     EXPLAIN.map(([n, what, on, view, scoring, why]) => `<div class="xrule"><div class="xh"><span class="bn">${n}</span>${nameOf[n]}</div>` +
       `<p>${what}</p><p class="meta">${cap(on)} · ${view} · ${scoring}</p>` +
