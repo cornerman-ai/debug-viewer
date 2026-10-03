@@ -128,6 +128,12 @@ says. A median row closes the table. Click any column header to sort by it (clic
 open it. Read once per folder (about 36 s for 15 videos over the local server) and kept; **Reload** re-reads after a
 pipeline re-run. Esc or a click outside closes it.
 
+**Thresholds** are not in this page: every number a card, the Explanations tab or an overlay shows is read from the
+video's `pipeline_tests/<stem>/rule_thresholds.json` - the copy of the backend's `combined_pipeline/configs/
+rule_thresholds.json` that `run_all.py` writes next to the outputs, so a card shows the numbers its video was computed
+with. A folder without it shows "thresholds file missing — rerun this video" (no hardcoded fallback). The score tiers
+(great / good / mid / bad / critical) stay in the page.
+
 **Rule names** live in one table, `RULE_NAMES` (number → name, the Notion order), and every place the page names a
 rule reads it — the Rules tab, the Brief, the All videos headers, Explanations, the Now cards, the timeline rows and
 their cards. Renaming a rule is that one entry (plus the docs); the layer keys, stage folders and CSV columns are
