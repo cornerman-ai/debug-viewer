@@ -554,8 +554,7 @@ const J = {nose: 0, lsh: 11, rsh: 12, lel: 13, rel: 14, lwr: 15, rwr: 16, lhip: 
 // a rename is one entry (plus the docs). Layer keys, stage folders and CSV columns are identifiers and never follow a
 // rename. Renamed: 2 "Punching hand drop before punch" → "Punch starts from low guard" (2026-10-03),
 // 5 "Hand balance" → "Lead/rear hand balance" (2026-10-03), and on 2026-10-03 also
-// 7 "Chin depth" → "Chin tuck depth", 8 "Chin height" → "Chin tuck height", 10 "Head off center line" → "Head off
-// center line at impact", 13 "Angle change" → "Angle change after combo", 15 "Slips compact" → "Slip not too
+// 7 "Chin depth" → "Chin tuck depth", 8 "Chin height" → "Chin tuck height", 13 "Angle change" → "Angle change after combo", 15 "Slips compact" → "Slip not too
 // much", 25 "Work rate" → "Dead time", 26 "Output through the round" → "Fading output through round", 27 "Same
 // punches" → "Punch variety", 29 "Same defense" → "Defense variety", 30 "Same offensive combos" → "Offensive combo
 // variety", 31 "Same combined combos" → "Combined combo variety", 32 "Hook stop" → "Hook overswing", 33 "Rear-foot
@@ -563,7 +562,7 @@ const J = {nose: 0, lsh: 11, rsh: 12, lel: 13, rel: 14, lwr: 15, rwr: 16, lhip: 
 const RULE_NAMES = {
   1: 'Balance at impact', 2: 'Punch starts from low guard', 3: 'Defense after combo', 4: 'Guard height',
   5: 'Lead/rear hand balance', 6: 'Dropping resting hand while punching', 7: 'Chin tuck depth', 8: 'Chin tuck height',
-  9: 'Elbow tuck', 10: 'Head off center line at impact', 11: 'Stance depth', 12: 'Stance width',
+  9: 'Elbow tuck', 10: 'Head off center line', 11: 'Stance depth', 12: 'Stance width',
   13: 'Angle change after combo', 14: 'Slip far enough', 15: 'Slip not too much', 16: 'Hand return path',
   17: 'Hips bladed', 18: 'Shoulders bladed', 19: 'Hip rotation', 20: 'Shoulder rotation',
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
@@ -1551,7 +1550,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    key: 'hoc', label: RN(10), short: 'Head off center at impact',
+    key: 'hoc', label: RN(10), short: 'Head off center',
     csv: ['head_offcenter', 'head_offcenter.csv'], json: ['head_offcenter', 'head_offcenter.json'],
     parse: (r, num) => ({score: num(r.score), verdict: r.verdict, impF: num(r.impact_frame), usedF: num(r.impact_used_frame),
       off: num(r.impact_offset), q25: num(r.q25_offset), q25F: num(r.q25_frame), q75: num(r.q75_offset), q75F: num(r.q75_frame),
@@ -1573,7 +1572,7 @@ const RULE_LAYERS = [
         <div class="rows num" style="opacity:.6"><span>For reference, not judged:</span><b></b>
         <span>furthest in the punch</span><b>${offTxt(x.max)}${x.maxF != null ? ' · f ' + x.maxF : ''}</b></div>`) + '</div>',
     tip: (e, x, {head, v}) => x.score == null
-      ? head + `<span class="m">head off center line at impact: not judged${x.skip === 'side_on' ? ' (side-on)' : x.skip ? ' (' + x.skip + ')' : ''}</span>`
+      ? head + `<span class="m">head off center: not judged${x.skip === 'side_on' ? ' (side-on)' : x.skip ? ' (' + x.skip + ')' : ''}</span>`
       : head + `<span class="num">head off the center line: <b>${x.comb == null ? '–' : x.comb.toFixed(2)} torso</b> · score <b>${x.score.toFixed(1)}</b></span><br>` +
         `<span class="num">0.75 · impact ${offTxt(x.off)} · 0.125 · at 25 % ${offTxt(x.q25)} · 0.125 · at 75 % ${offTxt(x.q75)}</span><br>` +
         `<span class="m">linear: 0 = head on the line, 100 = ≥ 0.25 torso off (green only at 100) · for reference: furthest ${offTxt(x.max)}</span>`,
@@ -2317,7 +2316,7 @@ function scoreCounts(key) {
                              skip: n(x => x.verdict === 'skip')};
   if (key === 'hrp') return {pass: n(x => x.verdict === 'pass'), fail: n(x => x.verdict === 'fail'),
                              skip: n(x => x.verdict === 'skip')};
-  return {pass: n(x => x.verdict === 'off'),                          // head off center line at impact: green only at 100
+  return {pass: n(x => x.verdict === 'off'),                          // head off center: green only at 100
           fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
 // The Notion "Production rules" numbering (renumbered 2026-10-01: rules 3 and 34 were removed, the rest closed up to

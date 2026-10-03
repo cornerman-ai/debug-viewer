@@ -26,7 +26,7 @@ Chrome or Edge (it reads folders with the File System Access API) and Google Dri
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
 (fps, stance, video name — and `mirrored`: a southpaw's stages ran on his skeleton mirrored to orthodox, so the page
 flips back what carries an image side — the facing angle's sign, hook overswing's x lines, the balance head position,
-rule 10's left / right — and takes lead = his right side; the skeleton it draws is the real one), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
+head-off-center's left / right — and takes lead = his right side; the skeleton it draws is the real one), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
 `*_blazepose_full.npy` skeleton for the stick figure. A missing stage is named in the timeline header; the rest still works.
 Switching videos is safe at any moment — while playing, mid-load, while a skeleton is still downloading: the old
 video pauses at once and stays as it was (dimmed) until the new one has been read in full, in parallel, and swapped
@@ -137,7 +137,7 @@ identifiers and keep their names.
 the punch card and a video overlay.
 
 Every rule with geometry in the frame now draws it. Rules that judge a punch (arm extension, hit height, hip and
-shoulder rotation, head off center line at impact, punch starts from low guard, resting hand, balance, hand return path, hook overswing, rear-foot heel up)
+shoulder rotation, head off center, punch starts from low guard, resting hand, balance, hand return path, hook overswing, rear-foot heel up)
 draw for the punch under the playhead. Rules that judge frames (guard height, elbow tuck, chin tuck height and depth, stance width and depth, both
 bladedness axes, slip distance) draw on every frame through `frameOverlay`, which gets the raw BlazePose-33
 channels — they need joints (mouth corners, heels, toes) and channels (world x/z) the punch overlays never touch.
@@ -235,7 +235,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
   fist where it was at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. Round = 100 × the on-target share of the judged punches, a plain number. Until
   2026-09-30 it judged jabs and crosses only, at the most-extended frame.
-- **Head off center line at impact** (rule 10, `head_offcenter/`; "Head off center line" until 2026-10-03): per punch thrown facing or backing the camera, how far the head is
+- **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head is
   off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
   green at 100, red below, the score on the block — with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
 - **Offensive combos** and **Combined combos** (`combinations/`, not rules): the same rule for both — no pause longer
