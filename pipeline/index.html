@@ -553,17 +553,23 @@ const J = {nose: 0, lsh: 11, rsh: 12, lel: 13, rel: 14, lwr: 15, rwr: 16, lhip: 
 // the Rules tab, the Brief, the All videos headers, Explanations, the Now cards, the timeline rows and their cards — so
 // a rename is one entry (plus the docs). Layer keys, stage folders and CSV columns are identifiers and never follow a
 // rename. Renamed: 2 "Punching hand drop before punch" → "Punch starts from low guard" (2026-10-03),
-// 5 "Hand balance" → "Lead/rear hand balance" (2026-10-03).
+// 5 "Hand balance" → "Lead/rear hand balance" (2026-10-03), and on 2026-10-03 also
+// 7 "Chin depth" → "Chin tuck depth", 8 "Chin height" → "Chin tuck height", 10 "Head off center line" → "Head off
+// center line at impact", 13 "Angle change" → "Angle change after combo", 15 "Slips compact" → "Slip not too
+// much", 25 "Work rate" → "Dead time", 26 "Output through the round" → "Fading output through round", 27 "Same
+// punches" → "Punch variety", 29 "Same defense" → "Defense variety", 30 "Same offensive combos" → "Offensive combo
+// variety", 31 "Same combined combos" → "Combined combo variety", 32 "Hook stop" → "Hook overswing", 33 "Rear-foot
+// pivot" → "Rear-foot heel up".
 const RULE_NAMES = {
   1: 'Balance at impact', 2: 'Punch starts from low guard', 3: 'Defense after combo', 4: 'Guard height',
-  5: 'Lead/rear hand balance', 6: 'Dropping resting hand while punching', 7: 'Chin depth', 8: 'Chin height',
-  9: 'Elbow tuck', 10: 'Head off center line', 11: 'Stance depth', 12: 'Stance width',
-  13: 'Angle change', 14: 'Slip far enough', 15: 'Slips compact', 16: 'Hand return path',
+  5: 'Lead/rear hand balance', 6: 'Dropping resting hand while punching', 7: 'Chin tuck depth', 8: 'Chin tuck height',
+  9: 'Elbow tuck', 10: 'Head off center line at impact', 11: 'Stance depth', 12: 'Stance width',
+  13: 'Angle change after combo', 14: 'Slip far enough', 15: 'Slip not too much', 16: 'Hand return path',
   17: 'Hips bladed', 18: 'Shoulders bladed', 19: 'Hip rotation', 20: 'Shoulder rotation',
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
-  25: 'Work rate', 26: 'Output through the round', 27: 'Same punches', 28: 'Body shots',
-  29: 'Same defense', 30: 'Same offensive combos', 31: 'Same combined combos', 32: 'Hook stop',
-  33: 'Rear-foot pivot',
+  25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
+  29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
+  33: 'Rear-foot heel up',
 };
 const RN = no => RULE_NAMES[no];
 const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12]];
@@ -665,7 +671,7 @@ const STANCE = {
 };
 // slip distance (slip_distance/moves.csv): how far the head travelled sideways during a SLIP, from where it started
 // to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose. One script,
-// two rules, two timeline rows: 14 "slip far enough" (100 from 0.20 torso, 0 with no travel) and 15 "slips compact"
+// two rules, two timeline rows: 14 "slip far enough" (100 from 0.20 torso, 0 with no travel) and 15 "slip not too much"
 // (100 up to 0.70, 0 at 1.00). Each row is coloured by its own slip score: green at 100, orange between, red at 0.
 const slipCol = v => v == null ? '#8e8e93' : v >= 100 ? '#34c759' : v <= 0 ? '#ff3b30' : '#ff9f0a';
 function slipLayer(rule) {
@@ -991,7 +997,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    // work rate (work_rate/segments.csv): the whole video as runs — work (a punch or a defensive move covers it),
+    // rule 25, dead time (work_rate/segments.csv): the whole video as runs — work (a punch or a defensive move covers it),
     // turn (only a change of angle: the 0.5 s-smoothed facing turning ≥ 90° in < 1 s, the turn itself only), pause (a gap under 3 s, left
     // empty) and dead (a gap of 3 s or more, the only thing the round score counts).
     key: 'work', label: RN(25), short: RN(25), items: true,
@@ -1182,7 +1188,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    // stopping the hook (hook_stop/punches.csv): where the fist is when it stops. 100 with the fist at the boxer's
+    // rule 32, hook overswing (hook_stop/punches.csv): where the fist is when it stops. 100 with the fist at the boxer's
     // centre line or short of it, linearly to 0 at a third of a torso past his own far shoulder (set from his
     // squared-up width over the clip so a bladed frame cannot shrink it).
     key: 'hookstop', label: RN(32), short: RN(32),
@@ -1237,13 +1243,13 @@ const RULE_LAYERS = [
     },
   },
   {
-    // rear-foot pivot (rear_pivot/punches.csv): at the impact of every rear-hand punch, how far the rear heel sits
+    // rule 33, rear-foot heel up (rear_pivot/punches.csv): at the impact of every rear-hand punch, how far the rear heel sits
     // above the rear toe, in torso lengths. 0 with the heel level with the toe, 100 from 0.20, linear between.
     key: 'rpivot', label: RN(33), short: RN(33),
     csv: ['rear_pivot', 'punches.csv'], json: ['rear_pivot', 'rear_pivot.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, lift: num(r.lift), score: num(r.score)} : {verdict: '', skip: r.skip_reason},
     summary: () => '',
-    card: (e, x) => `<div class="sub"><div class="h">Rear-foot pivot</div>` +
+    card: (e, x) => `<div class="sub"><div class="h">${RN(33)}</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'lead_hand' ? 'a lead-hand punch — the rule reads rear-hand punches only'
                                                 : x && x.skip === 'no_impact_frame' ? 'no impact frame'
                                                 : 'the rear heel or toe, or the torso, is not visible at the impact frame'}</div>` :
@@ -1545,7 +1551,7 @@ const RULE_LAYERS = [
     },
   },
   {
-    key: 'hoc', label: RN(10), short: 'Head off center',
+    key: 'hoc', label: RN(10), short: 'Head off center at impact',
     csv: ['head_offcenter', 'head_offcenter.csv'], json: ['head_offcenter', 'head_offcenter.json'],
     parse: (r, num) => ({score: num(r.score), verdict: r.verdict, impF: num(r.impact_frame), usedF: num(r.impact_used_frame),
       off: num(r.impact_offset), q25: num(r.q25_offset), q25F: num(r.q25_frame), q75: num(r.q75_offset), q75F: num(r.q75_frame),
@@ -1567,7 +1573,7 @@ const RULE_LAYERS = [
         <div class="rows num" style="opacity:.6"><span>For reference, not judged:</span><b></b>
         <span>furthest in the punch</span><b>${offTxt(x.max)}${x.maxF != null ? ' · f ' + x.maxF : ''}</b></div>`) + '</div>',
     tip: (e, x, {head, v}) => x.score == null
-      ? head + `<span class="m">head off center: not judged${x.skip === 'side_on' ? ' (side-on)' : x.skip ? ' (' + x.skip + ')' : ''}</span>`
+      ? head + `<span class="m">head off center line at impact: not judged${x.skip === 'side_on' ? ' (side-on)' : x.skip ? ' (' + x.skip + ')' : ''}</span>`
       : head + `<span class="num">head off the center line: <b>${x.comb == null ? '–' : x.comb.toFixed(2)} torso</b> · score <b>${x.score.toFixed(1)}</b></span><br>` +
         `<span class="num">0.75 · impact ${offTxt(x.off)} · 0.125 · at 25 % ${offTxt(x.q25)} · 0.125 · at 75 % ${offTxt(x.q75)}</span><br>` +
         `<span class="m">linear: 0 = head on the line, 100 = ≥ 0.25 torso off (green only at 100) · for reference: furthest ${offTxt(x.max)}</span>`,
@@ -2129,7 +2135,7 @@ function buildChips() {
 }
 const COMBO_TOP = 3;                       // sequences listed per combo kind before "Show all"
 // the whole-video summaries, one compact row each; the rule itself sits in the row's tooltip
-const WORKKIND = {                    // work rate's timeline row
+const WORKKIND = {                    // the timeline row of rule 25, dead time
   work: {c: '#34c759', name: 'Working', why: 'a punch or a defensive move covers it'},
   turn: {c: '#5ac8fa', name: 'Changing angle', why: 'no punch or move, but the smoothed facing turns 90° or more in under 1 s — the turn itself counts as work'},
   dead: {c: '#ff3b30', name: 'Dead time', why: '3 s or more with no punch, no defensive move and no change of angle'},
@@ -2311,12 +2317,12 @@ function scoreCounts(key) {
                              skip: n(x => x.verdict === 'skip')};
   if (key === 'hrp') return {pass: n(x => x.verdict === 'pass'), fail: n(x => x.verdict === 'fail'),
                              skip: n(x => x.verdict === 'skip')};
-  return {pass: n(x => x.verdict === 'off'),                          // head off center: green only at 100
+  return {pass: n(x => x.verdict === 'off'),                          // head off center line at impact: green only at 100
           fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
 // The Notion "Production rules" numbering (renumbered 2026-10-01: rules 3 and 34 were removed, the rest closed up to
 // 1-33): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
-// enough" and 15 "keep slips compact" — each with its own timeline row and round row.
+// enough" and 15 "slip not too much" — each with its own timeline row and round row.
 const NOTION = Object.fromEntries(Object.entries(RULE_NAMES).map(([no, name]) => [name, +no]));   // name -> number
 const notionNo = name => String(NOTION[name] ?? '?');
 // One colour scale for every rule's round score (the user's call, 2026-10-01) — display only, the score stays the
@@ -2915,7 +2921,7 @@ function eventCard(el, label, e, f) {
 function defenseRules(e) {
   if (e.type !== 'slip')
     return `<div class="empty">No rule scores a single ${styleD(e.type).name.toLowerCase()} — rules 14 and 15 judge slips only;
-      rule 29 (same defense) looks at the whole round.</div>`;
+      rule 29 (defense variety) looks at the whole round.</div>`;
   if (!S.has.slip14) return '<div class="empty">slip distance is not in this folder</div>';
   const it = (S.items.slip14 || []).find(x => x.sf === e.sf);
   let rows;
@@ -3054,7 +3060,7 @@ function frameCard(el, f) {
     const deg = S.hasAngle && S.pose[f] ? bladeDeg(dx, dz, S.angle[f]) : NaN;
     rows.push([no, Number.isFinite(deg) ? {score: bladeScore(deg, BLADE[kind].cuts), note: `${deg.toFixed(1)}° from square to the opponent`} : {skip: 'no reading'}]);
   }
-  // 25 work rate: what this frame counts as — the round's score is the share of dead time
+  // 25 dead time: what this frame counts as — the round's score is the share of dead time
   if (S.has.work) {
     const k = state('work')?.kind;
     const WK = {work: ['working — a punch or a defensive move', GOOD], turn: ['changing angle — counts as work', GOOD],
