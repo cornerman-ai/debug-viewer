@@ -128,11 +128,16 @@ says. A median row closes the table. Click any column header to sort by it (clic
 open it. Read once per folder (about 36 s for 15 videos over the local server) and kept; **Reload** re-reads after a
 pipeline re-run. Esc or a click outside closes it.
 
+**Rule names** live in one table, `RULE_NAMES` (number → name, the Notion order), and every place the page names a
+rule reads it — the Rules tab, the Brief, the All videos headers, Explanations, the Now cards, the timeline rows and
+their cards. Renaming a rule is that one entry (plus the docs); the layer keys, stage folders and CSV columns are
+identifiers and keep their names.
+
 **Rule layers** (side panel, all off by default, the choice is remembered): each adds a timeline row, a section in
 the punch card and a video overlay.
 
 Every rule with geometry in the frame now draws it. Rules that judge a punch (arm extension, hit height, hip and
-shoulder rotation, head off center, hand drop, resting hand, balance, hand return path, hook stop, rear-foot pivot)
+shoulder rotation, head off center, punch starts from low guard, resting hand, balance, hand return path, hook stop, rear-foot pivot)
 draw for the punch under the playhead. Rules that judge frames (guard height, elbow tuck, chin height and depth, stance width and depth, both
 bladedness axes, slip distance) draw on every frame through `frameOverlay`, which gets the raw BlazePose-33
 channels — they need joints (mouth corners, heels, toes) and channels (world x/z) the punch overlays never touch.
@@ -148,7 +153,7 @@ camera angle — is a **dashed gray mid-line carrying the reason**: `joint hidde
 `punching` or `hook`, written on the strip when there is room for it and in the tooltip always. The row is
 continuous, so a gray stretch never means "nothing happened" — it means the rule could not look, and says why.
 
-- **Hand drop before punch** (`hand_drop/`): per punch, the punching wrist's mean height below the nose over every
+- **Punch starts from low guard** (rule 2, `hand_drop/`; "Punching hand drop before punch" until 2026-10-03): per punch, the punching wrist's mean height below the nose over every
   readable frame of the 0.25 s before the punch started, in torso lengths, scored 100 up to 0.40 and linearly to 0
   at 0.70 — green at 100, red below it, with the score on the block. The block, its highlight and its tooltip sit on the 0.25 s
   WINDOW before the punch, not on the punch, because that is what the rule measured. With the playhead inside the
@@ -198,7 +203,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   `combined_pipeline/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
 - **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the hand
   that is NOT throwing, read at impact −2, impact and impact +2 frames and weighted ¼ · ½ · ¼ — how far it sits below
-  the nose. Scored 100 up to 0.40 torso (the line hand drop uses, an absolute one: a boxer who holds his hands low
+  the nose. Scored 100 up to 0.40 torso (the line rule 2 uses, an absolute one: a boxer who holds his hands low
   all round must not pass), linearly to 0 at 0.70; green at 100, red below, with the score on the block. The overlay
   draws the 100 / 0 lines and the weighted reading at the impact frame, ticks each of the three readings on that scale
   (each read against its own frame's nose and torso, as the rule does), and rings the resting wrist at every frame
