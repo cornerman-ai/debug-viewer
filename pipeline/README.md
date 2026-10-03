@@ -305,7 +305,7 @@ fewer than 10 readable combos → not rated.
   only until the next punch starts, if that comes first. Round = 100 at 70 % of combos covered or more, 0 at none,
   linearly in between; a plain number, no bands (fewer than 10 combos → not rated).
 
-**Hand balance** (`hand_balance/hand_balance.json`, a whole-video rule — no timeline row): the share of punches
+**Lead/rear hand balance** (rule 5, `hand_balance/hand_balance.json`; "Hand balance" until 2026-10-03; a whole-video rule — no timeline row): the share of punches
 thrown with the rear hand, scored 100 from 25 % to 60 % and falling linearly to 0 at 0 % (all lead) and at 100 % (all
 rear); a plain number, no bands; fewer than 10 punches → not rated. The band is off-centre on purpose: the lead hand should throw more, the jab
 being the most thrown punch. Each hand's punch types sit beside it, unjudged.
