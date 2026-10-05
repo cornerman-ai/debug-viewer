@@ -642,8 +642,8 @@ const RN = no => RULE_NAMES[no];
 // files — so the page shows the numbers THAT video was scored with. T(n, 'move.score.full') reads one (n = the rule
 // number, or 'house'; a dotted path also reaches into a dict / list). H(n, 'min_judged') reads rule n's floor: the
 // house one (the floors every rule shares) unless the rule's house_overrides changes it — rule 26 judges from 30
-// punches, rules 9 / 10 / 12 need a 5 px torso. camSkip(n, |cos|) is a rule's camera gate: its `camera` (side_on /
-// front_back) within its camera_window_deg. A missing file or key throws ThMissing, and THR(fn) puts the marker
+// punches, rules 9 / 10 / 12 need a 5 px torso. camSkip(n, facing°) is a rule's camera gate: its `camera` (side_on /
+// front_back) and its camera_window_deg, any shape. A missing file or key throws ThMissing, and THR(fn) puts the marker
 // in place of the threshold text — never a hardcoded fallback. The formatters print a number the way the text
 // writes it; null (the Explanations tab, soft mode) prints '…'. ──
 const TH_MISSING = 'thresholds file missing — rerun this video';
@@ -664,26 +664,30 @@ function H(n, k) {
   return o && k in o ? T(n, `house_overrides.${k}`) : T('house', k);
 }
 // A gated rule's camera window: the |facing angle| ranges in degrees it judges (0 = facing the camera, 90 = side-on,
-// 180 = back to it; both sides alike) - side_on [[a, 180 - a]], front_back [[0, a], [180 - a, 180]], symmetric because
-// the rules gate on |cos(facing)| (see rule_config.py). A snapshot from before 2026-10-05 has only the house's
-// camera_cut_deg: the same window, rebuilt from it. camCut(n) is that a.
+// 180 = back to it; both sides alike), any shape - e.g. side-on [[60, 105]], front only [[0, 30]] - every rule gating
+// on the angle itself (rule_config.camera_window / in_window, both ends included). A snapshot from before 2026-10-05
+// has only the house's camera_cut_deg: the same window, rebuilt from it.
 function camWindow(n) {
   const view = T(n, 'camera'), w = S.th?.rules?.[n]?.camera_window_deg;
   if (w) return w;
   const a = H(n, 'camera_cut_deg');
   return view === 'side_on' ? [[a, 180 - a]] : [[0, a], [180 - a, 180]];
 }
-const camCut = n => { const w = camWindow(n); return T(n, 'camera') === 'side_on' ? w[0][0] : w[0][1]; };
-// the camera gate on the facing angle's |cos| (1 = facing or backing the camera, 0 = side-on), the cut at cos(a):
-// a front_back rule skips a frame under it as side-on, a side_on rule one over it as front-on; null = in view.
-// Called only for a rule that has a camera gate, so a rule without `camera` reads as a missing key
-function camSkip(n, absCos) {
-  const view = T(n, 'camera'), cut = Math.cos(camCut(n) * Math.PI / 180);
-  return view === 'front_back' ? (absCos < cut ? 'side_on' : null) : view === 'side_on' ? (absCos > cut ? 'front_on' : null) : null;
+// whether a facing angle (degrees, any sign or turn) is inside rule n's window - the backend's in_window
+const inCam = (n, deg) => {
+  if (!Number.isFinite(deg)) return false;
+  const a = Math.abs((((deg + 180) % 360) + 360) % 360 - 180);
+  return camWindow(n).some(([lo, hi]) => a >= lo && a <= hi);
+};
+// The camera gate as the rules apply it: null = in view, else why not - a front_back rule skips a facing outside its
+// window as 'side_on', a side_on rule as 'front_on'. Called only for a rule that has a camera gate, so a rule without
+// `camera` reads as a missing key
+function camSkip(n, deg) {
+  const view = T(n, 'camera');
+  return inCam(n, deg) ? null : view === 'front_back' ? 'side_on' : 'front_on';
 }
 // The window beside the Front / Side / Back badges, only once a rule's window differs from the 45 deg default
-// (" — 60–105°", any shape - rule 1 gates on the angle itself); '' for the default, an ungated rule, or no snapshot.
-// (camSkip above is for the |cos|-gated rules only: their windows are symmetric, so one cut describes them.)
+// (" — 60–105°", any shape); '' for the default, an ungated rule, or no snapshot.
 const camRange = n => camWindow(n).map(([lo, hi]) => `${fN(lo)}–${fN(hi)}°`).join(' + ');   // "60–105°"
 function camNote(n) {
   try {
@@ -3200,10 +3204,11 @@ function defenseRules(e) {
   const it = (S.items.slip14 || []).find(x => x.sf === e.sf);
   let rows;
   if (it) rows = [[14, {score: it.s14}], [15, {score: it.s15}]];
-  else {                                  // not judged: say why — side-on by the facing over the move, else no reading
-    let c = 0, n = 0;
-    for (let f = e.sf; f <= e.ef && f < S.n; f++) if (S.hasAngle && S.pose[f]) { c += Math.abs(Math.cos(S.angle[f] * Math.PI / 180)); n++; }
-    const why = THR(() => !n ? 'no_facing' : camSkip(14, c / n) || 'the head or torso is not visible', TH_MISSING);
+  else {                                  // not judged: say why — outside the window by the move's facing, else no reading
+    let sx = 0, cx = 0, n = 0;            // the backend's reading: the circular mean of the facing over the move
+    for (let f = e.sf; f <= e.ef && f < S.n; f++) if (S.hasAngle && Number.isFinite(S.angle[f])) {
+      sx += Math.sin(S.angle[f] * Math.PI / 180); cx += Math.cos(S.angle[f] * Math.PI / 180); n++; }
+    const why = THR(() => !n ? 'no_facing' : camSkip(14, Math.atan2(sx, cx) * 180 / Math.PI) || 'the head or torso is not visible', TH_MISSING);
     rows = [[14, {skip: why}], [15, {skip: why}]];
   }
   return evList(rows) + (it ? `<div class="evctx num">the head travelled ${it.travel.toFixed(2)} torso sideways</div>` : '');
