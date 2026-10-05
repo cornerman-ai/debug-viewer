@@ -23,6 +23,13 @@ Chrome or Edge (it reads folders with the File System Access API) and Google Dri
   skeleton live outside that folder (`raw_videos/full_pipeline_test_videos/`, `skeleton_data/full_pipeline_test_videos/`),
   so the page asks to link the data folder once, or to pick the video file by hand.
 
+Someone without the folder set up gets the setup guide on the start screen (open by default on a browser that has no
+remembered folder): Google Drive for Desktop → My Drive › Ambo › data, the folder tree the page expects, a plain copy
+as the no-Drive route, and the local server as the third. A wrongly picked folder is checked, not just refused: the
+guide lists which of `pipeline_tests/`, `raw_videos/`, `skeleton_data/` it holds and names the likely slip (one level
+too deep, half-synced). Picking Ambo or My Drive steps down to `Ambo/data` by itself. A video file that is missing
+names the exact path it was looked for at.
+
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
 (fps, stance, video name — and `mirrored`: a southpaw's stages ran on his skeleton mirrored to orthodox, so the page
 flips back what carries an image side — the facing angle's sign, hook overswing's x lines, the balance head position,

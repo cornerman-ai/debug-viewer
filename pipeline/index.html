@@ -367,13 +367,35 @@
   .tooltip .m { color: var(--text2); }
 
   /* ── empty state ── */
-  .welcome { height: calc(100vh - 52px); display: flex; align-items: center; justify-content: center; }
-  .welcome .box { text-align: center; max-width: 520px; padding: 40px; }
+  .welcome { height: calc(100vh - 52px); display: flex; overflow-y: auto; padding: 0 16px; }
+  .welcome .box { text-align: center; max-width: 600px; width: 100%; padding: 40px 0; margin: auto; }
   .welcome h1 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 8px; font-weight: 700; }
   .welcome p { color: var(--text2); font-size: 14px; margin: 0 0 22px; }
   .welcome .actions { display: flex; flex-direction: column; gap: 10px; align-items: center; }
   .welcome .fine { color: var(--text3); font-size: 12px; margin-top: 18px; }
   .welcome .err { color: #ff3b30; font-size: 13px; margin-top: 14px; white-space: pre-line; }
+  /* the setup guide: how to get the data folder, and what a wrongly picked folder is missing */
+  .guide { margin-top: 22px; text-align: left; border-radius: 12px; background: var(--panel-solid); box-shadow: var(--shadow); }
+  .guide > summary { cursor: pointer; padding: 12px 16px; font-weight: 600; font-size: 13px; list-style: none;
+    display: flex; align-items: center; gap: 10px; }
+  .guide > summary::-webkit-details-marker { display: none; }
+  .guide > summary::before { content: ''; flex: none; width: 6px; height: 6px; border-right: 1.5px solid var(--text2);
+    border-bottom: 1.5px solid var(--text2); transform: rotate(-45deg); transition: transform .15s; }
+  .guide[open] > summary::before { transform: rotate(45deg); }
+  .guide .gbody { padding: 0 16px 16px; font-size: 12.5px; color: var(--text2); }
+  .guide ol { margin: 0 0 14px; padding-left: 18px; } .guide li { margin: 6px 0; }
+  .guide b { color: var(--text); font-weight: 600; }
+  .guide code, .media-where { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .guide code { color: var(--text); background: var(--fill); padding: 1px 5px; border-radius: 5px; }
+  .gtree { font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--text); background: var(--fill);
+    border-radius: 8px; padding: 10px 12px; margin: 6px 0 14px; overflow-x: auto; white-space: pre; }
+  .gtree .c { color: var(--text3); } .gtree .pick { color: var(--accent); font-weight: 600; }
+  .gcheck { margin: 0 0 14px; padding: 10px 12px; border-radius: 8px; color: var(--text);
+    background: color-mix(in srgb, #ff3b30 9%, transparent); }
+  .gcheck:empty { display: none; }
+  .gcheck .row { display: flex; gap: 8px; align-items: baseline; margin: 2px 0; }
+  .gcheck .ok { color: #34c759; font-weight: 700; } .gcheck .no { color: #ff3b30; font-weight: 700; }
+  .galt { margin-top: 8px; }
   .facechip { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px;
     background: var(--fill); color: var(--text); font-size: 12px; font-weight: 600; padding: 4px 9px 4px 10px;
     cursor: pointer; white-space: nowrap; box-shadow: 0 0 0 0.5px var(--sep); }
@@ -419,6 +441,39 @@
     </div>
     <div class="fine">Pick the Ambo <b>data</b> folder to choose among all test videos,<br>or a single video folder inside <b>pipeline_tests</b>.</div>
     <div class="err" id="welcomeErr"></div>
+    <details class="guide" id="guide">
+      <summary>First time here? How to set up the data folder</summary>
+      <div class="gbody">
+        <div class="gcheck" id="guideCheck"></div>
+        <ol>
+          <li><b>Get the Ambo folder onto this computer</b> with <b>Google Drive for Desktop</b>, signed in with the account
+            Ambo is shared with. If Ambo sits under <i>Shared with me</i>, add it to My Drive first: on drive.google.com,
+            right-click Ambo → <i>Organize</i> → <i>Add shortcut</i> → <i>My Drive</i>.</li>
+          <li><b>Find it on disk.</b> Windows: File Explorer → <i>Google Drive</i> (usually G:) → My Drive → Ambo → data.
+            Mac: Finder → <i>Google Drive</i> → My Drive → Ambo → data.</li>
+          <li><b>Click Open Folder…</b> and pick that <b>data</b> folder, in Chrome or Edge (other browsers cannot open
+            folders). The page remembers it for next time.</li>
+        </ol>
+        <div>The folder you pick has to look like this:</div>
+<pre class="gtree"><span class="pick">data/</span>                            <span class="c">← pick this folder</span>
+├─ pipeline_tests/               <span class="c">the results, from run_all.py</span>
+│  └─ <i>&lt;video&gt;</i>/                   <span class="c">one folder per video</span>
+│     ├─ punch_classification/
+│     ├─ facing_angle/  …        <span class="c">one folder per stage</span>
+│     └─ rule_thresholds.json
+├─ raw_videos/
+│  └─ full_pipeline_test_videos/
+│     └─ <i>&lt;video&gt;</i>.mp4             <span class="c">the footage</span>
+└─ skeleton_data/
+   └─ full_pipeline_test_videos/
+      └─ <i>&lt;video&gt;</i>_blazepose_full.npy   <span class="c">the stick figure</span></pre>
+        <div class="galt"><b>No Google Drive?</b> A copy works just as well: the same three folders anywhere on disk.
+          For one video, copy its folder from <code>pipeline_tests</code>, its <code>.mp4</code> and its
+          <code>_blazepose_full.npy</code> into the same places.</div>
+        <div class="galt"><b>Running the backend?</b> <code>python combined_pipeline/pipeline_server.py</code>, then open
+          <code>http://localhost:8766/</code>: no folder to pick, and Upload video works.</div>
+      </div>
+    </details>
   </div>
 </div>
 
@@ -431,8 +486,9 @@
       <div class="clock pill num" id="clock">0:00.000 · f 0</div>
       <button class="pill num zoombtn" id="zoomReset" title="reset the zoom (0 or double-click)">1.0× · reset</button>
       <div class="media-msg" id="mediaMsg">
-        <div style="font-size:15px;font-weight:600">Video and skeleton are outside this folder</div>
-        <div style="color:#aaa;max-width:420px">Link the Ambo <b>data</b> folder once (it is remembered), or pick the video file directly.</div>
+        <div style="font-size:15px;font-weight:600" id="mediaHead">Video and skeleton are outside this folder</div>
+        <div style="color:#aaa;max-width:420px" id="mediaBody">Link the Ambo <b>data</b> folder once (it is remembered), or pick the video file directly.</div>
+        <div class="media-where" style="color:#aaa;max-width:460px;word-break:break-all" id="mediaWhere"></div>
         <div style="display:flex;gap:8px"><button class="btn primary" id="linkData">Link data folder…</button><button class="btn" id="pickVideo" style="background:rgba(255,255,255,.14);color:#fff">Pick video…</button></div>
       </div>
     </div>
@@ -2056,17 +2112,27 @@ function commitVideo(src, N) {
   renderExplain();                                          // the Explanations tab reads this video's thresholds
 }
 
+// The overlay when the footage is not there, naming the exact place this video's file is looked for - so a copied or
+// half-synced folder can be put right by hand. `linked`: a data folder is open, the file just is not in it.
+function mediaMissing(linked) {
+  $('mediaHead').textContent = linked ? 'Video not found' : 'Video and skeleton are outside this folder';
+  $('mediaBody').innerHTML = linked
+    ? 'Google Drive may still be syncing it, or it was never copied. Pick the video file directly, or put it here:'
+    : 'Link the Ambo <b>data</b> folder once (it is remembered), or pick the video file directly. The data folder holds it at:';
+  $('mediaWhere').textContent = ['data', 'raw_videos', 'full_pipeline_test_videos', S.videoName].join(' › ');
+  $('mediaMsg').classList.add('show');
+}
 async function loadMedia(gen, sig) {
   const src = S.src;
   if (S.objectUrl) { URL.revokeObjectURL(S.objectUrl); S.objectUrl = null; }
-  if (!src.hasData) { video.removeAttribute('src'); video.load(); $('mediaMsg').classList.add('show'); return; }
+  if (!src.hasData) { video.removeAttribute('src'); video.load(); mediaMissing(false); return; }
   $('mediaMsg').classList.remove('show');
   const stem = S.videoName.replace(/\.[^.]+$/, '');
   try {
     const f = await src.mediaFile(['raw_videos', 'full_pipeline_test_videos', S.videoName]);
     if (isStale(gen)) return;
     if (f.url) video.src = f.url; else { S.objectUrl = URL.createObjectURL(f); video.src = S.objectUrl; }
-  } catch (e) { if (!isStale(gen)) { $('mediaMsg').classList.add('show'); console.warn('video not found', e); } }
+  } catch (e) { if (!isStale(gen)) { mediaMissing(true); console.warn('video not found', e); } }
   // the skeleton only draws the stick figure: load it after the video so playback is never waiting on it — and
   // only ever onto the video it belongs to
   src.mediaFile(['skeleton_data', 'full_pipeline_test_videos', `${stem}_blazepose_full.npy`])
@@ -2084,22 +2150,55 @@ async function pickDir() {
   if (!window.showDirectoryPicker) throw new Error('This browser cannot open folders — use Chrome or Edge.');
   return window.showDirectoryPicker({id: 'cornerman-pipeline', mode: 'read'});
 }
-const NOT_DATA = name => `“${name}” is not the Ambo data folder. Open the folder that contains pipeline_tests, `
-  + `raw_videos and skeleton_data — in Google Drive that is Ambo › data.`;
+// ── the setup guide's check: what a picked folder holds against what the data root needs, and the likely slip ──
+const DATA_PARTS = ['pipeline_tests', 'raw_videos', 'skeleton_data'];
+const STAGE_DIRS = new Set(['punch_classification', 'punch_impact', 'facing_angle', 'punch_facing', 'defense_classification',
+                            'combinations']);
+async function diagnose(h) {
+  const has = {};
+  for (const n of DATA_PARTS) has[n] = await hasEntry(h, n);
+  const n = h.name;
+  const hint =
+    has.pipeline_tests ? 'This is the data folder, but part of it is not here: Google Drive may still be syncing, '
+      + 'or that part is not shared with you. A copy needs all three folders.'
+    : n === 'pipeline_tests' || n === 'raw_videos' || n === 'skeleton_data'
+      ? `You opened ${n}, which sits inside data: open the folder one level up, data itself.`
+    : n === 'full_pipeline_test_videos' ? 'That folder is two levels inside data: open data itself.'
+    : STAGE_DIRS.has(n) ? 'That is one stage’s folder inside a video: open data, or that video’s own folder.'
+    : 'Open the data folder itself: the one holding the three folders above (in Google Drive: Ambo › data).';
+  return {has, hint};
+}
+function showDiagnosis(name, {has, hint}) {
+  $('guideCheck').innerHTML = `<div style="font-weight:600;margin-bottom:4px">You opened “${escH(name)}”</div>`
+    + DATA_PARTS.map(k => `<div class="row"><span class="${has[k] ? 'ok' : 'no'}">${has[k] ? '✓' : '✗'}</span>`
+      + `<code>${k}/</code>${has[k] ? '' : ' not in it'}</div>`).join('')
+    + `<div style="margin-top:6px">${escH(hint)}</div>`;
+  $('guide').open = true;
+}
+async function folderError(h, msg) {
+  const d = await diagnose(h);
+  showDiagnosis(h.name, d);
+  return Object.assign(new Error(msg), {hint: d.hint});
+}
 async function openHandle(h) {
-  if (!(await hasEntry(h, 'pipeline_tests')) && (await hasEntry(h, 'data'))) {   // picked Ambo itself: step into data
-    const d = await h.getDirectoryHandle('data');
-    if (await hasEntry(d, 'pipeline_tests')) h = d;
+  // picked Ambo, or My Drive above it: step down to data
+  for (const path of [['data'], ['Ambo', 'data']]) {
+    if (await hasEntry(h, 'pipeline_tests')) break;
+    try {
+      let d = h;
+      for (const p of path) d = await d.getDirectoryHandle(p);
+      if (await hasEntry(d, 'pipeline_tests')) h = d;
+    } catch {}
   }
   if (await hasEntry(h, 'pipeline_tests')) {                 // the data root
-    const gone = [];
-    for (const n of ['raw_videos', 'skeleton_data']) if (!(await hasEntry(h, n))) gone.push(n);
-    if (gone.length) throw new Error(`“${h.name}” has pipeline_tests but no ${gone.join(' and no ')} — `
-      + `Google Drive may not have finished syncing, or that folder is not shared with you.`);
+    const gone = DATA_PARTS.filter(n => n !== 'pipeline_tests');
+    for (const n of [...gone]) if (await hasEntry(h, n)) gone.splice(gone.indexOf(n), 1);
+    if (gone.length) throw await folderError(h, `“${h.name}” has pipeline_tests but no ${gone.join(' and no ')}.`);
     S.dataDir = h; await idb.set('dataDir', h);
+    $('guideCheck').innerHTML = '';
     await showVideoList();
   } else if (!(await hasEntry(h, 'punch_classification'))) { // neither the data root nor one video's folder
-    throw new Error(NOT_DATA(h.name));
+    throw await folderError(h, `“${h.name}” is not the Ambo data folder.`);
   } else {                                                    // a single video folder
     await idb.set('lastVideo', h.name);
     if (!S.dataDir) { const d = await idb.get('dataDir'); if (d && (await d.queryPermission({mode: 'read'})) === 'granted') S.dataDir = d; }
@@ -2112,7 +2211,8 @@ async function showVideoList() {
   const names = [];
   for await (const [name, e] of pt.entries()) if (e.kind === 'directory' && !name.startsWith('.')) names.push(name);
   names.sort();
-  if (!names.length) throw new Error('pipeline_tests has no video folders yet.');
+  if (!names.length) throw Object.assign(new Error('pipeline_tests has no video folders yet.'),
+    {hint: 'run_all.py has not run on any video here yet, or Google Drive is still syncing the folder.'});
   S.videoNames = names; S.sourceFor = async name => fsSource(await pt.getDirectoryHandle(name), S.dataDir); OVR.data = null;
   fillSelect(names, async name => { await idb.set('lastVideo', name); await loadFolder(await S.sourceFor(name)); });
   const last = await idb.get('lastVideo');
@@ -2197,15 +2297,17 @@ document.addEventListener('keydown', e => {                 // / opens the picke
 async function guard(fn) {
   try { await fn(); } catch (e) {
     if (e.name === 'AbortError') return;
-    console.error(e); $('welcomeErr').textContent = e.message;
-    if (!$('app').classList.contains('ready')) $('welcome').style.display = ''; else alert(e.message);
+    console.error(e);   // a folder check shows its hint in the guide; any other hint goes under the message
+    $('welcomeErr').textContent = e.hint && !$('guideCheck').innerHTML ? `${e.message}\n${e.hint}` : e.message;
+    if (!$('app').classList.contains('ready')) $('welcome').style.display = '';
+    else alert(e.hint ? `${e.message}\n\n${e.hint}` : e.message);   // the setup guide is not on screen: say it here
   }
 }
-const openFlow = () => guard(async () => openHandle(await pickDir()));
+const openFlow = () => guard(async () => { const h = await pickDir(); $('guideCheck').innerHTML = ''; await openHandle(h); });
 $('openBtn').onclick = openFlow; $('welcomeOpen').onclick = openFlow;
 $('linkData').onclick = () => guard(async () => {
   const h = await pickDir();
-  if (!(await hasEntry(h, 'raw_videos'))) throw new Error(`“${h.name}” is not the Ambo data folder (no raw_videos inside).`);
+  if (!(await hasEntry(h, 'raw_videos'))) throw await folderError(h, `“${h.name}” is not the Ambo data folder (no raw_videos inside).`);
   S.dataDir = h; await idb.set('dataDir', h);
   if (S.loneVideoDir) await loadFolder(fsSource(S.loneVideoDir, h));
 });
@@ -4457,17 +4559,20 @@ window.addEventListener('beforeunload', e => { if (UP.xhr) { e.preventDefault();
   if (q.get('data')) {                                       // HTTP mode (a local server), for testing
     const base = q.get('data').replace(/\/?$/, '/');
     await guard(() => useHttp(base, q.get('video')));
+    if (!$('app').classList.contains('ready')) $('guide').open = true;   // the server did not answer: show the other ways
     upResume();
     return;
   }
   try { if (localStorage.getItem('cornermanUploadServer')) upResume(); } catch {}   // only once a server was seen
   const d = await idb.get('dataDir');
+  $('guide').open = !d;                                       // first time on this browser: the setup guide, open
   if (d) {
     const rb = $('reopenBtn'); rb.style.display = ''; rb.textContent = `Continue with “${d.name}”`;
     rb.onclick = () => guard(async () => {
       if (!(await ensurePerm(d))) throw new Error('Permission to read the folder was not granted.');
       if (!(await hasEntry(d, 'pipeline_tests')) && !(await hasEntry(d, 'punch_classification'))) {
         await idb.set('dataDir', undefined); rb.style.display = 'none';          // a remembered folder that moved
+        $('guide').open = true;
         throw new Error(`The folder “${d.name}” used last time is no longer where it was (moved, renamed or removed). `
           + `Use Open Folder… and pick Ambo › data again.`);
       }
