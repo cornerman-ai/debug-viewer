@@ -720,10 +720,10 @@ const restFrames = () => { const m = T(6, 'move.frames_around_impact');
 const restOffs = () => restFrames()?.map(([o]) => o) ?? null;
 const restWeights = () => restFrames().map(([, w]) => fG(w)).join(' · ');
 const guardFull = hand => T(4, `move.score.full.${hand}`);                        // rule 4: full marks up to here
-// rule 4 at frame f: every line × lines_scale_in_defensive_move inside a detected defensive move (since 2026-10-05;
-// an older snapshot has no scale: 1, the lines as that video was scored)
-const guardScale = f => (S.defenses || []).some(d => f >= d.sf && f <= d.ef)
-  ? (S.th?.rules?.[4]?.move?.lines_scale_in_defensive_move ?? 1) : 1;
+// rule 4 at frame f: inside a detected defensive move each hand's full-marks line is full_in_defensive_move (since
+// 2026-10-05; an older snapshot has none: the normal line, as that video was scored). The zero line never changes.
+const guardDef = f => !!S.th?.rules?.[4]?.move?.full_in_defensive_move && (S.defenses || []).some(d => f >= d.sf && f <= d.ef);
+const guardLine = (hand, f) => guardDef(f) ? T(4, `move.full_in_defensive_move.${hand}`) : guardFull(hand);
 // rule 9's linear stretch, zero - full flare: rounded so 0.50 - 0.15 is the 0.35 the score always divided by
 const elbowSpan = (zero, full) => +(zero - full).toFixed(12);
 // rules 19 / 20 on the Rules tab: the ranges and the cost above them, from the snapshot
@@ -1891,8 +1891,8 @@ const RULE_LAYERS = [
     frameOverlay(f, P, leadLeft, Q, torso) {               // each hand's full-marks line, the zero line, and the wrists
       const t = torso(), nose = P(J.nose), l = P(J.lsh), r = P(J.rsh);
       if (!(t && nose && l && r)) return;
-      const s = guardScale(f);                             // inside a defensive move every line is scaled
-      const GF = {lead: guardFull('lead') * s, rear: guardFull('rear') * s}, zero = T(4, 'move.score.zero') * s;
+      const dm = guardDef(f);                              // inside a defensive move: the defensive-move lines
+      const GF = {lead: guardLine('lead', f), rear: guardLine('rear', f)}, zero = T(4, 'move.score.zero');
       const W4 = {lead: T(4, 'move.score.points.lead'), rear: T(4, 'move.score.points.rear')};
       const x0 = Math.min(l[0], r[0]) - 45, x1 = Math.max(l[0], r[0]) + 45;
       OV.level(nose[1] + GF.rear * t, x0, x1, '#8e8e93');                        // rear: full marks up to its line
@@ -1918,7 +1918,7 @@ const RULE_LAYERS = [
       overlayLabel(x0, nose[1] - 16, sc == null ? 'frame not scored — no hand can be judged'
         : `frame score ${sc.toFixed(1)}` + (hs.length === 2 ? ` · lead ${(W4.lead * part.lead).toFixed(1)}/${fN(W4.lead)} · rear ${(W4.rear * part.rear).toFixed(1)}/${fN(W4.rear)}`
                                                               : ` · ${hs[0]} hand alone${why.length ? ` (${why.join(', ')})` : ''}`)
-        + (s !== 1 && sc != null ? ` · defensive move: lines × ${fG(s)}` : ''), '#e5e5ea');
+        + (dm && sc != null ? ` · defensive move: lead line ${fD(GF.lead, 2)}, rear ${fD(GF.rear, 2)}` : ''), '#e5e5ea');
     },
     csv: ['guard_height', 'runs.csv'], json: ['guard_height', 'guard_height.json'],
     parseItem: (r, num) => ({hand: r.hand, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
@@ -1937,7 +1937,7 @@ const RULE_LAYERS = [
       const rows = (x.both || [x]).sort(a => a.hand === 'lead' ? -1 : 1);
       return `<b>Guard height</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>') +
         `<br><span class="m">${THR(() => `low below ${fD(guardFull('lead'), 2)} torso under the nose for the lead hand, ${fD(guardFull('rear'), 2)} for the rear`
-          + ` (× ${fG(T(4, 'move.lines_scale_in_defensive_move'))} during a defensive move)`)}, while that hand is not punching</span>`;
+          + ` (${fD(T(4, 'move.full_in_defensive_move.lead'), 2)} / ${fD(T(4, 'move.full_in_defensive_move.rear'), 2)} during a defensive move)`)}, while that hand is not punching</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
@@ -2810,8 +2810,8 @@ function ruleCard() {
                         + `full marks up to its line — lead ${ld}, rear ${rr_} — falling linearly to 0 at ${z}. The frame `
                         + `score is lead ${fN(T(4, 'move.score.points.lead'))} + rear ${fN(T(4, 'move.score.points.rear'))}; when only one hand can be judged (the other punching or hidden) `
                         + 'it is the whole 100',
-                 note: (sc => `during a detected defensive move every line is × ${fG(sc)}: lead ${fD(guardFull('lead') * sc, 2)}, `
-                        + `rear ${fD(guardFull('rear') * sc, 2)}, 0 at ${fD(T(4, 'move.score.zero') * sc, 2)}`)(T(4, 'move.lines_scale_in_defensive_move')),
+                 note: `during a detected defensive move: full marks up to lead ${fD(T(4, 'move.full_in_defensive_move.lead'), 2)}, `
+                        + `rear ${fD(T(4, 'move.full_in_defensive_move.rear'), 2)}; 0 still at ${z}`,
                  bands: [[`lead ≤ ${ld}, rear ≤ ${rr_}`, 'full marks'], [`${z} and lower`, '0']],
                  pal: {'full marks': '#34c759', '0': '#ff3b30'}},
          round: {label: 'per round', rule: 'the mean frame score over every scored frame — a plain number, no bands; '
@@ -3316,15 +3316,15 @@ function frameCard(el, f) {
   const FR = (no, fn) => rows.push([no, THR(fn, {text: TH_MISSING, col: '#8e8e93'})]);
   // 4 guard height: each judged hand 0-1 (full to its line, 0 at the zero line below the nose), lead / rear weights
   if (S.has.guard) FR(4, () => {
-    const s = guardScale(f), part = {}, why = [], zero = T(4, 'move.score.zero') * s;
+    const part = {}, why = [], zero = T(4, 'move.score.zero');
     const W4 = {lead: T(4, 'move.score.points.lead'), rear: T(4, 'move.score.points.rear')};
     for (const [hand, j] of [['lead', leadLeft ? J.lwr : J.rwr], ['rear', leadLeft ? J.rwr : J.lwr]]) {
       const st = state('guard', it => it.hand === hand)?.state;
       if (st !== 'ok' && st !== 'low') { why.push(`${hand}: ${GUARDSKIP[st] || 'no reading'}`); continue; }
       const d = (J2(j)?.[1] - J2(J.nose)?.[1]) / torso;
-      if (Number.isFinite(d)) part[hand] = clip((zero - d) / (zero - guardFull(hand) * s));
+      if (Number.isFinite(d)) part[hand] = clip((zero - d) / (zero - guardLine(hand, f)));
     }
-    const hs = Object.keys(part), dm = s !== 1 ? ` · defensive move: lines × ${fG(s)}` : '';
+    const hs = Object.keys(part), dm = guardDef(f) ? ` · defensive move: lead line ${fD(guardLine('lead', f), 2)}, rear ${fD(guardLine('rear', f), 2)}` : '';
     return hs.length === 2 ? {score: W4.lead * part.lead + W4.rear * part.rear, note: `lead ${(W4.lead * part.lead).toFixed(0)}/${fN(W4.lead)} · rear ${(W4.rear * part.rear).toFixed(0)}/${fN(W4.rear)}${dm}`}
          : hs.length === 1 ? {score: 100 * part[hs[0]], note: `${hs[0]} hand alone · ${why.join(' · ')}${dm}`} : {skip: why.join(' · ')};
   });

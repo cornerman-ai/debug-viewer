@@ -273,11 +273,11 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   rule's slip score (green 100, orange between, red 0), and two round rows, each the mean of its slip scores: rule 14 "slip far enough" (100 at 0.20 torso of travel or more, 0 with none) and 15 "slip not too much" (100
   up to 0.70, 0 at 1.00). Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
-  hand is not punching — low above 0.50 for the lead hand, 0.30 for the rear, both halved (0.25 / 0.15, 0 at 0.35)
-  inside a detected defensive move (since 2026-10-05). Continuous row, lead in the top half,
+  hand is not punching — low above 0.50 for the lead hand, 0.30 for the rear, and 0.30 for both inside a detected
+  defensive move (since 2026-10-05; 0 at 0.70 throughout). Continuous row, lead in the top half,
   rear in the bottom: green guard up, red low, and a dashed gray line for everything the rule could not look at —
   that hand throwing, or a joint not visible. The overlay draws the rear line (0.30, "rear 100"), the lead line
-  (0.50, "lead 100") and the zero line (0.70) — the halved ones inside a defensive move, said in the label — and
+  (0.50, "lead 100") and the zero line (0.70) — inside a defensive move the lead line at 0.30, said in the label — and
   labels the frame score: lead 30 + rear 70, or one hand alone.
   Round = the mean frame score, a plain number with no bands. Reads `runs.csv` + `guard_height.json`.
 - **Hips bladed** (`bladedness_hips/`) and **Shoulders bladed** (`bladedness_shoulders/`): both per frame outside
