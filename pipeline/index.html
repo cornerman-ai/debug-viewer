@@ -643,7 +643,7 @@ const RN = no => RULE_NAMES[no];
 // number, or 'house'; a dotted path also reaches into a dict / list). H(n, 'min_judged') reads rule n's floor: the
 // house one (the floors every rule shares) unless the rule's house_overrides changes it — rule 26 judges from 30
 // punches, rules 9 / 10 / 12 need a 5 px torso. camSkip(n, |cos|) is a rule's camera gate: its `camera` (side_on /
-// front_back) within the house camera_cut_deg. A missing file or key throws ThMissing, and THR(fn) puts the marker
+// front_back) within its camera_window_deg. A missing file or key throws ThMissing, and THR(fn) puts the marker
 // in place of the threshold text — never a hardcoded fallback. The formatters print a number the way the text
 // writes it; null (the Explanations tab, soft mode) prints '…'. ──
 const TH_MISSING = 'thresholds file missing — rerun this video';
@@ -663,12 +663,32 @@ function H(n, k) {
   const o = S.th?.rules?.[n]?.house_overrides;
   return o && k in o ? T(n, `house_overrides.${k}`) : T('house', k);
 }
-// the camera gate on the facing angle's |cos| (1 = facing or backing the camera, 0 = side-on), the cut at
-// cos(camera_cut_deg): a front_back rule skips a frame under it as side-on, a side_on rule one over it as front-on;
-// null = in view. Called only for a rule that has a camera gate, so a rule without `camera` reads as a missing key
+// A gated rule's camera window: the |facing angle| ranges in degrees it judges (0 = facing the camera, 90 = side-on,
+// 180 = back to it; both sides alike) - side_on [[a, 180 - a]], front_back [[0, a], [180 - a, 180]], symmetric because
+// the rules gate on |cos(facing)| (see rule_config.py). A snapshot from before 2026-10-05 has only the house's
+// camera_cut_deg: the same window, rebuilt from it. camCut(n) is that a.
+function camWindow(n) {
+  const view = T(n, 'camera'), w = S.th?.rules?.[n]?.camera_window_deg;
+  if (w) return w;
+  const a = H(n, 'camera_cut_deg');
+  return view === 'side_on' ? [[a, 180 - a]] : [[0, a], [180 - a, 180]];
+}
+const camCut = n => { const w = camWindow(n); return T(n, 'camera') === 'side_on' ? w[0][0] : w[0][1]; };
+// the camera gate on the facing angle's |cos| (1 = facing or backing the camera, 0 = side-on), the cut at cos(a):
+// a front_back rule skips a frame under it as side-on, a side_on rule one over it as front-on; null = in view.
+// Called only for a rule that has a camera gate, so a rule without `camera` reads as a missing key
 function camSkip(n, absCos) {
-  const view = T(n, 'camera'), cut = Math.cos(H(n, 'camera_cut_deg') * Math.PI / 180);
+  const view = T(n, 'camera'), cut = Math.cos(camCut(n) * Math.PI / 180);
   return view === 'front_back' ? (absCos < cut ? 'side_on' : null) : view === 'side_on' ? (absCos > cut ? 'front_on' : null) : null;
+}
+// The window beside the Front / Side / Back badges, only once a rule's window is narrowed from the 45 deg default
+// (" — 75–105°"); '' for the default, an ungated rule, or no snapshot.
+function camNote(n) {
+  try {
+    if (!S.th?.rules?.[n]?.camera) return '';
+    const w = camWindow(n);
+    return camCut(n) === 45 ? '' : ` — ${w.map(([lo, hi]) => `${fN(lo)}–${fN(hi)}°`).join(' + ')}`;
+  } catch { return ''; }
 }
 // rules 19 / 20: where the cost above the range is all spent, "twice the upper bound" while that is 2 x
 const overAt = n => say(T(n, 'move.score.over.max_at_x_upper'), [[2, 'twice the upper bound']], v => `${fN(v)} × the upper bound`);
@@ -3057,7 +3077,7 @@ function renderRules() {
       `<div class="big"><span class="k">${notionNo(r.name)} · ${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${t ? t[2] : r.color}">${r.value}` +
       (t ? `<span class="tier" style="color:${t[2]}">${t[1]}</span>` : '') + '</span></div>' +
       hpBar(big ? +r.value : null, t) +
-      `<div class="rmeta">${[meta(r).group, ...meta(r).on].map(x => `<span>${x}</span>`).join('')}${angleBadges(meta(r).angles)}</div>` +
+      `<div class="rmeta">${[meta(r).group, ...meta(r).on].map(x => `<span>${x}</span>`).join('')}${angleBadges(meta(r).angles + camNote(no(r)))}</div>` +
       `<div class="exp"><span>measures</span><span>${r.what}</span>` +
       `<span>on</span><span>${r.on}</span>` +
       `<span>thresholds</span><span>${[r.th.event, r.th.round].filter(Boolean).map(g =>
@@ -4235,7 +4255,7 @@ function renderExplain() {
     `rule is not rated.</li></ul></div>` +
     `<div class="grpbox">` + EXPLAIN.map(([n, what, on, view, scoring, why]) => `<div class="xrule">` +
       `<div class="xh"><span class="vn">${n}</span><span>${nameOf[n]}</span>` +
-      `<span class="xang">${angleBadges(angles[view] || ALL_ANGLES)}</span></div>` +
+      `<span class="xang">${angleBadges((angles[view] || ALL_ANGLES) + camNote(n))}</span></div>` +
       `<p class="xwhat">${what}</p>` +
       `<div class="xgrid"><span class="xl">On</span><span>${cap(on)}</span>` +
       `<span class="xl">Scoring</span><span>${nums(scoring)}</span>` +

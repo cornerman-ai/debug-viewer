@@ -80,7 +80,7 @@ model grows with the square of the length, so long videos take longer than their
 
 ## Using it
 
-Timeline rows: facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands every gated rule reads, each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
+Timeline rows: facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands (each gated rule's own window is its `camera_window_deg` in the thresholds file, 45° by default; a rule narrowed from that shows its range beside its Front / Side / Back badges, e.g. "Side — 75–105°"), each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
 defense, and an overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
 hover for details; the chips in the side panel hide or show a punch / defense type. On the video: the skeleton, a ring
 on the punching wrist around impact, and pills naming the current punch / move.
