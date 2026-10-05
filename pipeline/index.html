@@ -46,6 +46,8 @@
     transition: background .15s;
   }
   .btn:hover { background: var(--fill2); }
+  a.btn, a.btn:visited { color: inherit; text-decoration: none; }   /* a link styled as a button: the theme's text colour,
+                                                                       not the browser's link blue (unreadable in dark) */
   .btn.primary { background: var(--accent); color: #fff; }
   .btn.primary:hover { filter: brightness(1.08); }
   #videoSelect { display: none !important; }                  /* the model behind the picker, never shown */
@@ -422,7 +424,7 @@
   </div>
   <div class="sub num" id="subtitle"></div>
   <div class="spacer"></div>
-  <a class="btn" href="../" style="text-decoration:none" title="the frame-by-frame rule debug viewer">Rule debug viewer</a>
+  <a class="btn" href="../" title="the frame-by-frame rule debug viewer">Rule debug viewer</a>
   <select class="btn" id="videoSelect" style="display:none" title="video folders in pipeline_tests"></select>
   <div class="vpick" id="vpick" style="display:none">
     <button class="btn vpick-btn" id="vpickBtn" title="pick a video — press / to search"><span class="vn" id="vpickNo"></span><span class="vt" id="vpickName"></span></button>
