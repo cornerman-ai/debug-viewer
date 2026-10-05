@@ -327,6 +327,9 @@
   .exp .thlab { color: var(--text3); opacity: 0.8; }
   .exp .bands { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; margin: 3px 0 1px; }
   .exp .bands span:nth-child(odd) { color: var(--text2); text-align: right; }
+  .exp .dist { margin: 3px 0 2px; }
+  .exp .dist .bar { height: 8px; border-radius: 4px; }
+  .dist .legend .m { color: var(--text3); }
   .big .k { color: var(--text2); font-size: 12.5px; }
   .sep-t { border-top: 0.5px solid var(--sep); margin-top: 10px; padding-top: 8px; }
   .combos .head { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 11.5px; color: var(--text2); }
@@ -3080,6 +3083,7 @@ function renderRules() {
   else if (srt.key) list.sort((x, y) => d * (srt.order.indexOf(srt.key(meta(x))) - srt.order.indexOf(srt.key(meta(y)))) || no(x) - no(y));
   const rule = r => {
     const big = /^[\d.]+$/.test(r.value), t = big ? tierOf(+r.value) : null;
+    const mix = r.value === 'not rated' ? '' : failMix(no(r));        // a per-punch rule: which punches it failed
     return `<div class="rule">` +
       `<div class="big"><span class="k">${notionNo(r.name)} · ${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${t ? t[2] : r.color}">${r.value}` +
       (t ? `<span class="tier" style="color:${t[2]}">${t[1]}</span>` : '') + '</span></div>' +
@@ -3093,7 +3097,8 @@ function renderRules() {
         (g.bands?.length ? `<div class="bands">` + g.bands.map(([when, verdict]) =>
           `<span class="num">${when}</span><span style="color:${g.pal?.[verdict] || 'var(--text2)'}">${verdict}</span>`).join('') + '</div>' : '') +
         `</span></div>`).join('')}</span>` +
-      `<span>round</span><span>${r.value === 'not rated' ? 'None' : r.calc}</span></div></div>`;   // not rated: no sum to show
+      `<span>round</span><span>${r.value === 'not rated' ? 'None' : r.calc}</span>` +   // not rated: no sum to show
+      (mix ? `<span>fails on</span><span>${mix}</span>` : '') + '</div></div>';
   };
   // grouped sorts get a heading per group, so the boundaries show
   let body = '';
@@ -3164,6 +3169,36 @@ const PUNCH_RULES = [
   ['hookstop', p => p.type === 'hook', scored],
   ['rpivot', p => p.hand === 'rear', scored],
 ];
+// "fails on", under a per-punch rule's round line: the punches it failed, split by punch type. The bar is each type's
+// share of the failed punches (the punch distribution's order and colours); after each type, failed / judged of that
+// type, so a type that fails out of proportion to how often it is thrown shows. A fail is what the rule's own counts
+// call one: judged and under 100, off target for hit height (22), not okay for hand return path (16). Every per-punch
+// rule but hook overswing (32), which judges hooks only, so its bar would always read 100 % hooks.
+function failMix(no) {
+  const row = no === 32 ? null : PUNCH_RULES.find(([k]) => LAYER_RULES[k]?.[0] === no);
+  if (!row || !S.has[row[0]]) return '';
+  const [k, applies, read] = row, by = {};
+  for (const p of S.punches) {
+    if (p[k] == null || !applies(p)) continue;
+    const r = read(p[k]);
+    if (r.skip !== undefined) continue;                                   // not judged
+    const b = by[p.type] ??= {judged: 0, failed: 0};
+    b.judged++;
+    if (r.score != null ? r.score < 100 : r.col === BAD) b.failed++;
+  }
+  const types = [...Object.keys(PUNCH), ...Object.keys(by).filter(t => !PUNCH[t])].filter(t => by[t]);
+  const sum = f => types.reduce((a, t) => a + by[t][f], 0), nF = sum('failed'), nJ = sum('judged');
+  if (!nJ) return '';
+  if (!nF) return `<span class="m">all ${nJ} judged punches passed</span>`;
+  const pc = n => `${Math.round(n / nF * 100)}%`, what = {hit: 'off target', hrp: 'not okay — a U'}[k] || 'under 100';
+  return '<div class="dist">' +
+    `<div class="bar">${types.filter(t => by[t].failed).map(t => { const s = styleP(t), b = by[t];
+      return `<span style="flex:${b.failed};background:${s.c}" title="${s.name}: ${b.failed} of the ${nF} failed punches `
+        + `(${pc(b.failed)}) · ${b.failed} of the ${b.judged} judged failed"></span>`; }).join('')}</div>` +
+    `<div class="legend num">${types.map(t => { const s = styleP(t), b = by[t];
+      return `<span><i style="background:${s.c}"></i>${s.name} <b>${pc(b.failed)}</b> <span class="m">${b.failed}/${b.judged}</span></span>`; }).join('')}</div>` +
+    `<div class="note">the ${nF} failed punch${nF === 1 ? '' : 'es'} (${what}) by punch type · after each: failed / judged</div></div>`;
+}
 function evRow(no, r) {
   const t = r.score != null && Number.isFinite(r.score) ? tierOf(r.score) : null;
   if (r.skip !== undefined)                                // not judged: the reason on its own line, under the name
