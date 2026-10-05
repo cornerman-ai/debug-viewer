@@ -681,13 +681,16 @@ function camSkip(n, absCos) {
   const view = T(n, 'camera'), cut = Math.cos(camCut(n) * Math.PI / 180);
   return view === 'front_back' ? (absCos < cut ? 'side_on' : null) : view === 'side_on' ? (absCos > cut ? 'front_on' : null) : null;
 }
-// The window beside the Front / Side / Back badges, only once a rule's window is narrowed from the 45 deg default
-// (" — 75–105°"); '' for the default, an ungated rule, or no snapshot.
+// The window beside the Front / Side / Back badges, only once a rule's window differs from the 45 deg default
+// (" — 60–105°", any shape - rule 1 gates on the angle itself); '' for the default, an ungated rule, or no snapshot.
+// (camSkip above is for the |cos|-gated rules only: their windows are symmetric, so one cut describes them.)
+const camRange = n => camWindow(n).map(([lo, hi]) => `${fN(lo)}–${fN(hi)}°`).join(' + ');   // "60–105°"
 function camNote(n) {
   try {
-    if (!S.th?.rules?.[n]?.camera) return '';
-    const w = camWindow(n);
-    return camCut(n) === 45 ? '' : ` — ${w.map(([lo, hi]) => `${fN(lo)}–${fN(hi)}°`).join(' + ')}`;
+    const view = S.th?.rules?.[n]?.camera;
+    if (!view) return '';
+    const w = camWindow(n), def = view === 'side_on' ? [[45, 135]] : [[0, 45], [135, 180]];
+    return JSON.stringify(w) === JSON.stringify(def) ? '' : ` — ${camRange(n)}`;
   } catch { return ''; }
 }
 // rules 19 / 20: where the cost above the range is all spent, "twice the upper bound" while that is 2 x
@@ -1338,7 +1341,7 @@ const RULE_LAYERS = [
       headScore: num(r.head_score), hipsScore: num(r.hips_score), score: num(r.score)} : {verdict: '', skip: r.skip_reason},
     summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">${RN(1)}</div>` +
-      (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_side_on' ? 'thrown head-on — balance is a fore-aft fault, invisible from there'
+      (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_side_on' ? `not side-on enough (it judges facing ${THR(() => camRange(1), '…')}) — balance is a fore-aft fault, read from the side`
                                                 : x && x.skip === 'no_impact_frame' ? 'no impact frame'
                                                 : x && x.skip === 'no_facing' ? 'no facing angle over the punch'
                                                 : 'the feet or the body are not visible at the impact frame'}</div>` :
@@ -2916,7 +2919,7 @@ function ruleCard() {
   if (bal) add(RN(1), bal.score ?? 'not rated', bal.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'when the punch lands, are his head and hips still over his own feet?',
     on: `${bal.n_punches} punches · ${bal.judged_punches} judged side-on (fore-aft is the axis this fault lives on), `
-        + `${bal.n_punches - bal.judged_punches} skipped (thrown head-on, no impact frame, or the feet not visible)`,
+        + `${bal.n_punches - bal.judged_punches} skipped (facing outside ${THR(() => camRange(1), '…')}, no impact frame, or the feet not visible)`,
     th: THR(() => { const hp = fN(T(1, 'move.head.points')), ip = fN(T(1, 'move.hips.points'));
       return {event: {label: 'per punch', rule: `a score 0–100 at the impact frame, head 0–${hp} + hips 0–${ip}, in ankle distances. `
                         + `Head: ${hp} while the nose is at most ${fD(T(1, 'move.head.full'), 2)} past an ankle, linearly to 0 at ${fD(T(1, 'move.head.zero'), 2)} past it. `

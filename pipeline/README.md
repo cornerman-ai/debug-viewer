@@ -180,7 +180,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   30th percentile of that punch type across 8,166 labelled punches and linearly down to 0 at its 80th; the score on the
   block, green at 100 and red below. Every angle is judged: a time is not foreshortened. Round = the mean punch
   score, a plain number, from at least 10 judged punches. Reads `punches.csv` + `punch_speed.json`.
-- **Balance at impact** (`balance/`): per punch at the impact frame, read side-on, a score 0–100 = head (0–50) +
+- **Balance at impact** (`balance/`): per punch at the impact frame, read side-on (\|facing\| 60–105°, the rule's
+  `camera_window_deg` since 2026-10-05), a score 0–100 = head (0–50) +
   hips (0–50), in ankle distances. Head: 50 while the nose is at most 0.20 past an ankle, linearly to 0 at 0.75
   past it. Hips: 50 while the hip centre is within 0.20 of the ankles' midpoint, linearly to 0 at 0.50 (over an
   ankle). The block is green when both are inside their green zone (score 100), red otherwise, and carries the
