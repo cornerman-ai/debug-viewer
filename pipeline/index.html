@@ -711,10 +711,10 @@ const fG = v => v == null ? '…' : (GLYPHS.find(([x]) => Math.abs(x - v) < 1e-9
 const say = (v, words, alt) => v == null ? '…' : (words.find(([x]) => Math.abs(x - v) < 1e-9)?.[1] ?? alt(v));   // a value the text writes in words
 const ord = v => { if (v == null) return '…'; const n = Math.round(v), t = n % 100;
   return n + (t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'); };   // 30 → "30th"
-const fOff = v => v == null ? '…' : v < 0 ? `−${-v}` : `+${v}`;                  // a frame offset: −2, +2
+const fOff = v => v == null ? '…' : v < 0 ? `−${-v}` : `+${v}`;                  // a frame offset: −1, +1
 const fIv = a => a == null ? '…' : `${fN(a[0])}–${fN(a[1])}`;                          // [20, 60] → "20–60"
 // rule 6: the frames read around the impact, [[offset, weight], …] in offset order — sorted, because an object lists
-// its integer keys ("0", "2") before "-2"; restOffs → [−2, 0, 2], restWeights → "¼ · ½ · ¼"
+// its integer keys ("0", "1") before "-1"; restOffs → [−1, 0, 1], restWeights → "¼ · ½ · ¼"
 const restFrames = () => { const m = T(6, 'move.frames_around_impact');
   return m == null ? null : Object.entries(m).map(([k, w]) => [+k, w]).sort((a, b) => a[0] - b[0]); };
 const restOffs = () => restFrames()?.map(([o]) => o) ?? null;
@@ -1278,11 +1278,13 @@ const RULE_LAYERS = [
   },
   {
     // dropping the resting hand while punching (resting_hand/punches.csv): the hand NOT throwing, read at the impact
-    // frame and 2 frames either side, weighted 0.25 / 0.50 / 0.25; 100 up to 0.40 torso below the nose, 0 at 0.70.
+    // frame and one frame either side of it, weighted and scored by the snapshot's rule 6 (frames_around_impact,
+    // move.score); drop_before / drop_after are its earliest and latest frames (drop_m2 / drop_p2 before 2026-10-05).
     key: 'resting', label: RN(6), short: 'Resting hand drop',
     csv: ['resting_hand', 'punches.csv'], json: ['resting_hand', 'resting_hand.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), score: num(r.score), rest: r.resting_hand,
-      m2: num(r.drop_m2), d0: num(r.drop_0), p2: num(r.drop_p2), n: num(r.frames_read), slip: num(r.slip), base: num(r.baseline)}
+      m2: num(r.drop_before ?? r.drop_m2), d0: num(r.drop_0), p2: num(r.drop_after ?? r.drop_p2), n: num(r.frames_read),
+      slip: num(r.slip), base: num(r.baseline)}
       : {verdict: '', skip: r.skip_reason, rest: r.resting_hand},
     summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">The resting hand at this impact</div>` +
@@ -1310,7 +1312,7 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'resting', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                        // the resting hand at impact −2 / impact / +2, and the scale
+    overlay(e, x, f, P, leadLeft) {                        // the resting hand at the three frames read, and the scale
       if (!x.verdict || e.impact == null) return;
       const low = T(6, 'move.score.full'), zero = T(6, 'move.score.zero'), offs = restOffs();
       const wr = (x.rest === 'lead') === leadLeft ? J.lwr : J.rwr;
@@ -1325,7 +1327,7 @@ const RULE_LAYERS = [
       overlayLabel(x1 + 6, nose[1] + low * torso, '100', '#8e8e93');
       overlayLabel(x1 + 6, nose[1] + zero * torso, '0', '#8e8e93');
       OV.level(nose[1] + x.drop * torso, x0, x1, col);                     // the weighted reading
-      // the three frames it is read at — the CSV's drop_m2 / drop_0 / drop_p2, in the order of the file's offsets
+      // the three frames it is read at — the CSV's drop_before / drop_0 / drop_after, in the order of the file's offsets
       for (const [off, r, v] of [[offs[0], 7, x.m2], [offs[1], 12, x.d0], [offs[2], 7, x.p2]]) {
         if (v == null) continue;                                             // a frame the rule could not read
         const q = PAT(e.impact + off, wr); if (q) OV.ring(q, col, r, off ? 2 : 3);

@@ -220,9 +220,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   positions, which ignored the shoulder and the timing and contradicted the verdict on a quarter of the dots. Round = 100 with no punch not okay, linearly to 0 at 70 % not okay, a plain number. Rebuilt 2026-10-01 — the earlier versions are in
   `combined_pipeline/pipeline_notes/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
 - **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the hand
-  that is NOT throwing, read at impact −2, impact and impact +2 frames and weighted ¼ · ½ · ¼ — how far it sits below
-  the nose. Scored 100 up to 0.40 torso (the line rule 2 uses, an absolute one: a boxer who holds his hands low
-  all round must not pass), linearly to 0 at 0.70; green at 100, red below, with the score on the block. The overlay
+  that is NOT throwing, read at impact −1, impact and impact +1 frames and weighted ¼ · ½ · ¼ — how far it sits below
+  the nose. Scored 100 up to 0.20 torso (an absolute line: a boxer who holds his hands low all round must not pass),
+  linearly to 0 at 0.60 (since 2026-10-05; was ±2 frames, 0.40 / 0.70); green at 100, red below, with the score on
+  the block. The overlay
   draws the 100 / 0 lines and the weighted reading at the impact frame, ticks each of the three readings on that scale
   (each read against its own frame's nose and torso, as the rule does), and rings the resting wrist at every frame
   the rule could read. That hand's own
