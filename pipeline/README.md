@@ -221,7 +221,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   `combined_pipeline/pipeline_notes/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
 - **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the hand
   that is NOT throwing, read at impact −1, impact and impact +1 frames and weighted ¼ · ½ · ¼ — how far it sits below
-  the nose. Scored 100 up to 0.20 torso (an absolute line: a boxer who holds his hands low all round must not pass),
+  the nose. Scored 100 up to 0.25 torso (an absolute line: a boxer who holds his hands low all round must not pass),
   linearly to 0 at 0.60 (since 2026-10-05; was ±2 frames, 0.40 / 0.70); green at 100, red below, with the score on
   the block. The overlay
   draws the 100 / 0 lines and the weighted reading at the impact frame, ticks each of the three readings on that scale
