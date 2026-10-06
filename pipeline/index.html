@@ -969,9 +969,10 @@ function slipLayer(rule) {
 }
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
-// the three facing buckets every gated rule reads: within 45° of the camera, within 45° of straight away, or between
+// the three facing buckets of the facing row: within 45° of the camera, within 45° of straight away, or between (a
+// gated rule reads its own window — side-on rules 65–115° since 2026-10-06 — shown beside its badges)
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
-// Which band a frame is in — the same cuts every gated rule reads. null when there is no pose or no angle there.
+// Which band a frame is in — the facing row's cuts. null when there is no pose or no angle there.
 const faceBand = f => {
   if (!S.hasAngle || !S.pose?.[f]) return null;
   const a = S.angle[f];
