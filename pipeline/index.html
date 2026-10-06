@@ -821,7 +821,9 @@ const ELBOWSTATE = {tucked: '#34c759', borderline: '#ffcc00', flared: '#ff3b30'}
 // Why a frame is gray. The long form goes in the tooltip; SKIPWORD is the short one written on the strip, so the
 // reason is readable without hovering. Every gray state on every row has an entry here.
 const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 'side-on', front_on: 'front-on',
-                  punching: 'punching', hook: 'hook', video_end: 'video ends'};
+                  punching: 'punching', hook: 'hook', video_end: 'video ends', no_side: 'no side'};
+// rules 27 / 29, the variety rows: the share the score reads (the most-used types / type / side) vs everything else
+const VARCOL = {top: '#ff9f0a', other: '#34c759'};
 const ELBOWSKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
                    hook: 'this arm is throwing a hook'};
 function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order
@@ -1277,6 +1279,71 @@ const RULE_LAYERS = [
       overlayLabel(12, videoRect().H - 44, `${RN(13)} · ${f <= it.ef ? 'in the combo' : 'after the combo'}: facing `
         + `${fN(+during.toFixed(1))}° during it, ${now.toFixed(1)}° now · turned ${d.toFixed(0)}° of ${fN(need)}°`,
         d >= need ? '#34c759' : '#e5e5ea');
+    },
+  },
+  {
+    // rule 27, punch variety (same_punches/same_punches.json, over punch_impact/impacts.csv — every punch the rule
+    // counts): each punch a block, amber when its type is one of the round's 2 most-used types (their share is what
+    // the score reads), green when it is another type; the letter is the type. A round rule: no punch is wrong, the
+    // row shows what the share is made of and where in the round it piles up.
+    key: 'varpunch', label: RN(27), short: RN(27), items: true,
+    csv: ['punch_impact', 'impacts.csv'], json: ['same_punches', 'same_punches.json'],
+    parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), type: r.punch_type, hand: r.hand}),
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const js = S.layerSum.varpunch, nm = t => PUNCH[t]?.name || t;
+      if (!js) return `<b>${RN(27)}</b><br><span class="m">same_punches.json is missing — rerun this video</span>`;
+      const top = js.top2_types.includes(x.type);
+      return `<b>${RN(27)}</b> · ${fmtT(x.sf / S.fps)}<br>${cap(x.hand)} ${nm(x.type).toLowerCase()} — `
+        + `<span style="color:${top ? VARCOL.top : VARCOL.other}">${top ? 'one of the 2 most-used types' : 'outside the top 2'}</span><br>`
+        + `<span class="m num">${js.top2_types.map(nm).join(' + ')} = ${pct(js.top2_share)} of the ${js.n_punches} punches · `
+        + `${THR(() => `100 up to ${fP(T(27, 'round.score.full'))} %, 0 at ${fP(T(27, 'round.score.zero'))} %`)}</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const js = S.layerSum.varpunch; if (!js) return;
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
+      c.fillStyle = js.top2_types.includes(x.type) ? VARCOL.top : VARCOL.other; c.globalAlpha = on ? 1 : 0.85;
+      rr(x0, y + 3, w, h - 6, 4); c.fill(); c.globalAlpha = 1;
+      if (w >= 12) {
+        c.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+        c.fillStyle = 'rgba(0,0,0,0.72)'; c.textAlign = 'center'; c.fillText(PUNCH[x.type]?.l || '?', x0 + w / 2, y + h / 2 + 0.5);
+      }
+    },
+  },
+  {
+    // rule 29, defense variety (same_defense/same_defense.json, over defense_classification/defenses.csv — every move
+    // the rule counts), two lanes, the score's two halves: "move" — amber when the move is the round's most-used
+    // type, green another type; "side" — amber when it went to the most-used side, green the other side, a dashed
+    // strip when it has no side (a duck, a pull-back: not counted for the side).
+    key: 'vardef', label: RN(29), short: RN(29), items: true, split: 'lane', halves: ['move', 'side'],
+    csv: ['defense_classification', 'defenses.csv'], json: ['same_defense', 'same_defense.json'],
+    parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), type: r.defense_type, side: r.side}),
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const js = S.layerSum.vardef, nm = t => (DEF[t]?.name || t || '').toLowerCase();
+      if (!js) return `<b>${RN(29)}</b><br><span class="m">same_defense.json is missing — rerun this video</span>`;
+      const mv = js.same_move, sd = js.same_side, topT = x.type === mv.top_type, topS = !!x.side && x.side === sd.top_side;
+      const col = b => b ? VARCOL.top : VARCOL.other;
+      return `<b>${RN(29)}</b> · ${fmtT(x.sf / S.fps)}<br>${x.side ? cap(x.side) + ' ' : ''}${nm(x.type)}<br>`
+        + `move: <span style="color:${col(topT)}">${topT ? 'the most-used type' : 'another type'}</span> · side: `
+        + (x.side ? `<span style="color:${col(topS)}">${topS ? 'the most-used side' : 'the other side'}</span>`
+                  : '<span class="m">none — not counted for the side</span>')
+        + `<br><span class="m num">${nm(mv.top_type)} = ${pct(mv.top_type_share)} of the ${js.n_moves} moves → ${mv.score ?? '–'}`
+        + `${THR(() => ` (100 below ${fP(T(29, 'round.move.full'))} %)`)} · ${sd.top_side ?? '–'} = ${pct(sd.top_side_share)} of the `
+        + `${js.n_with_side} with a side → ${sd.score ?? '–'}${THR(() => ` (100 below ${fP(T(29, 'round.side.full'))} %)`)}</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const js = S.layerSum.vardef; if (!js) return;
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1), hh = h / 2 - 3;
+      c.globalAlpha = on ? 1 : 0.85;
+      c.fillStyle = x.type === js.same_move.top_type ? VARCOL.top : VARCOL.other; rr(x0, y + 3, w, hh, 3); c.fill();   // move
+      if (x.side) { c.fillStyle = x.side === js.same_side.top_side ? VARCOL.top : VARCOL.other; rr(x0, y + h / 2, w, hh, 3); c.fill(); }
+      c.globalAlpha = 1;
+      if (!x.side) skipStrip(c, x0, w, y + h / 2 + hh / 2, on, 'no_side');                                          // side
     },
   },
   {
@@ -2036,6 +2103,7 @@ const RULE_LAYERS = [
 // Which Notion rules (by number, renumbered 2026-10-01) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [3], guard: [4], resting: [6], chin_depth: [7], chin_height: [8], elbow: [9], anglechg: [13],
+  varpunch: [27], vardef: [29],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
   rpivot: [33], work: [25],
@@ -2648,6 +2716,8 @@ const ALL_ANGLES = 'front, back, side-on';
 const SCOPE = {
   defcov:    {moves: 'defensive moves after an offensive combo',  angles: 'front, back, side-on'},
   anglechg:  {moves: 'combined combos, and the 2 s after each',  angles: 'front, back, side-on'},
+  varpunch:  {moves: 'every punch, as a share of the round',      angles: 'front, back, side-on'},
+  vardef:    {moves: 'every defensive move, as a share of the round', angles: 'front, back, side-on'},
   guard:     {moves: 'every frame, per hand, while that hand is not punching', angles: 'front, back, side-on'},
   slip14:    {moves: 'slips only',                              angles: 'front, back'},
   slip15:    {moves: 'slips only',                              angles: 'front, back'},
@@ -3877,7 +3947,8 @@ function drawTimeline(f) {
     if (RULE[k]?.split) {                                    // a split row: its name, then lead / rear per half
       say(L - 12);
       c.fillStyle = text3; c.font = '500 8.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-      c.textAlign = 'left'; c.fillText('lead', L + 4, y + h / 4 + 1); c.fillText('rear', L + 4, y + 3 * h / 4 - 1);
+      const [h1, h2] = RULE[k].halves || ['lead', 'rear'];      // a split row names its halves (lead / rear by default)
+      c.textAlign = 'left'; c.fillText(h1, L + 4, y + h / 4 + 1); c.fillText(h2, L + 4, y + 3 * h / 4 - 1);
       c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textAlign = 'right';
     } else {
       say(k === 'angle' ? L - 36 : L - 12);

@@ -366,23 +366,31 @@ under 1 s, only the frames of the turn itself. A stretch with none of these last
 to 0 at 50 % dead — a plain number, no bands; under 20 s of video → not rated. Punches and actions per minute and the
 seconds credited to turns are shown beside it, unjudged — punch rate is a style, standing still is not.
 
-**Punch variety** (rule 27, `same_punches/same_punches.json`; "Same punches" until 2026-10-03; a whole-video rule — no timeline row): under the target
+**Punch variety** (rule 27, `same_punches/same_punches.json`; "Same punches" until 2026-10-03; a whole-video rule): under the target
 distribution, the share of the 2 most-used punch types, scored 100 at 66 % or less and linearly to 0 at 100 % (a plain
-number; fewer than 10 punches → not rated). The top 2 because jab and cross are normally the most common anyway.
+number; fewer than 10 punches → not rated). The top 2 because jab and cross are normally the most common anyway. Its
+timeline row (since 2026-10-06) shows what that share is made of: every punch the rule counts
+(`punch_impact/impacts.csv`) as a block with its type's letter, amber when the type is one of the 2 most-used, green
+when it is another; hover gives the share and the scale. No punch is right or wrong — it is a round rule.
 
 **Body shots** (`bodyshots/bodyshots.json`, a whole-video rule — no timeline row): under punch variety, body shots /
 (body + head) over hooks and uppercuts only (the classifier can't split jab / cross into head / body): scored 0 at
 none and 100 from 25 %, linearly between (a plain number); fewer than 10 hooks + uppercuts → not rated. The cut-offs are ours.
 
-**Defense variety** (rule 29, `same_defense/same_defense.json`; "Same defense" until 2026-10-03; a whole-video rule — no timeline row): under the defense
+**Defense variety** (rule 29, `same_defense/same_defense.json`; "Same defense" until 2026-10-03; a whole-video rule): under the defense
 distributions, a score of two halves: 50 for the move — full below 60 % of the most-used type, linearly to 0 at 100 % —
 and 50 for the side among moves that have one — full below 70 %, linearly to 0 at 100 %; each half needs 10 moves,
-one alone is the whole score. The defense model finds rolls far
+one alone is the whole score. Its timeline row (since 2026-10-06) has the same two halves as lanes over every move the
+rule counts (`defense_classification/defenses.csv`): **move** — amber when it is the most-used type, green another;
+**side** — amber when it went to the most-used side, green the other side, dashed ("no side") for a duck or a
+pull-back, which the side half does not count. The defense model finds rolls far
 better than slips, so a high roll share is partly the model.
 
 **Adding a rule**: see [instructions.md](instructions.md). In short — a rule that judges punches, frames, defensive
 moves or combos gets a timeline layer (one entry in `RULE_LAYERS` in `index.html`) plus a Round score row; a rule that
-only rates the round gets the Round score row alone, with no timeline row.
+only rates the round gets the Round score row, and a timeline row when the moves it counts can be drawn — punch
+variety and defense variety colour what their share is made of. A split row names its two halves with `halves`
+(lead / rear by default).
 
 **Isolating one camera angle**: shift-click a band in the facing row (front / side-on / back) and the timeline keeps
 only the stretches the boxer spent in that band at full strength — everything else fades back and stops answering the
