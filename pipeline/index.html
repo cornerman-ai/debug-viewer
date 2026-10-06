@@ -821,7 +821,7 @@ const ELBOWSTATE = {tucked: '#34c759', borderline: '#ffcc00', flared: '#ff3b30'}
 // Why a frame is gray. The long form goes in the tooltip; SKIPWORD is the short one written on the strip, so the
 // reason is readable without hovering. Every gray state on every row has an entry here.
 const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 'side-on', front_on: 'front-on',
-                  punching: 'punching', hook: 'hook'};
+                  punching: 'punching', hook: 'hook', video_end: 'video ends'};
 const ELBOWSKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
                    hook: 'this arm is throwing a hook'};
 function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order
@@ -1227,6 +1227,56 @@ const RULE_LAYERS = [
         rr(x0, y + 4, Math.max(3, x1 - x0 - 1), h - 8, 4); c.stroke();
         c.lineWidth = 2; c.beginPath(); c.moveTo(x0, y + 3); c.lineTo(x0, y + h - 3); c.stroke(); c.globalAlpha = 1;
       }
+    },
+  },
+  {
+    // rule 13, angle change after combo (angle_change/combos.csv): one block per combined combo (punches + defensive
+    // moves) over the combo itself — green when the facing turned >= the rule's change within the window after it,
+    // red when it stayed, the turn in degrees on the block — and a thin tail over that window, where the rule looks.
+    // A combo the rule could not read (the video ends inside its window) is a gray dashed strip.
+    key: 'anglechg', label: RN(13), short: 'Angle change', items: true,
+    csv: ['angle_change', 'combos.csv'], json: ['angle_change', 'angle_change.json'],
+    parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), seq: r.sequence, during: num(r.facing_during),
+      after: num(r.facing_after), deg: num(r.change_deg), changed: r.changed}),
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const fac = v => fN(+(S.mirrored ? -v : v).toFixed(1));            // shown as the facing row shows it
+      const st = x.changed === 'yes' ? 'moved to a new angle' : x.changed === 'no' ? 'stayed on the same line'
+        : 'not judged — the video ends inside the window after it';
+      return `<b>${RN(13)}</b> · ${fmtT(x.sf / S.fps)}<br><span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>`
+        + (x.deg == null ? `<span class="m">${st}</span>`
+          : `<span class="num">facing ${fac(x.during)}° during it → most different ${fac(x.after)}° in the `
+            + `${THR(() => `${fN(T(13, 'move.window_after_s'))} s`)} after · turned <b>${x.deg.toFixed(1)}°</b></span><br>`
+            + `<span style="color:${x.changed === 'yes' ? '#34c759' : '#ff3b30'}">${st}</span>`
+            + ` <span class="m">(${THR(() => `a turn of ≥ ${fN(T(13, 'move.min_change_deg'))}° counts`)})</span>`);
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(3, x1 - x0 - 1);
+      if (x.changed !== 'yes' && x.changed !== 'no') { skipStrip(c, x0, w, y + h / 2, on, 'video_end'); return; }
+      const col = x.changed === 'yes' ? '#34c759' : '#ff3b30';
+      let win = null; try { win = T(13, 'move.window_after_s'); } catch (err) { if (!(err instanceof ThMissing)) throw err; }
+      if (win) {                                           // the window the rule reads, as a thin tail
+        const t1 = tx((x.ef + 1) / fps + win);
+        c.fillStyle = col; c.globalAlpha = on ? 0.75 : 0.4; rr(x1, y + h - 8, Math.max(2, t1 - x1), 4, 2); c.fill();
+      }
+      c.fillStyle = col; c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
+      if (w >= 26 && x.deg != null) {
+        c.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+        c.fillStyle = 'rgba(0,0,0,0.75)'; c.textAlign = 'center'; c.fillText(`${Math.round(x.deg)}°`, x0 + w / 2, y + h / 2 + 0.5);
+      }
+    },
+    frameOverlay(f) {                                      // inside a combo or the window after it: the turn so far
+      const win = Math.round(T(13, 'move.window_after_s') * S.fps), need = T(13, 'move.min_change_deg');
+      const items = S.items.anglechg || [];
+      const it = items.find(x => f >= x.sf && f <= x.ef) || [...items].reverse().find(x => f > x.ef && f <= x.ef + win);
+      if (!it || it.during == null || !S.hasAngle || !S.pose[f]) return;
+      const during = S.mirrored ? -it.during : it.during, now = S.angle[f];
+      const d = Math.abs((((now - during) % 360) + 540) % 360 - 180);
+      overlayLabel(12, videoRect().H - 44, `${RN(13)} · ${f <= it.ef ? 'in the combo' : 'after the combo'}: facing `
+        + `${fN(+during.toFixed(1))}° during it, ${now.toFixed(1)}° now · turned ${d.toFixed(0)}° of ${fN(need)}°`,
+        d >= need ? '#34c759' : '#e5e5ea');
     },
   },
   {
@@ -1985,7 +2035,7 @@ const RULE_LAYERS = [
 ];
 // Which Notion rules (by number, renumbered 2026-10-01) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
-  bal: [1], drop: [2], defcov: [3], guard: [4], resting: [6], chin_depth: [7], chin_height: [8], elbow: [9],
+  bal: [1], drop: [2], defcov: [3], guard: [4], resting: [6], chin_depth: [7], chin_height: [8], elbow: [9], anglechg: [13],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
   rpivot: [33], work: [25],
@@ -2597,6 +2647,7 @@ function buildLayers() {
 const ALL_ANGLES = 'front, back, side-on';
 const SCOPE = {
   defcov:    {moves: 'defensive moves after an offensive combo',  angles: 'front, back, side-on'},
+  anglechg:  {moves: 'combined combos, and the 2 s after each',  angles: 'front, back, side-on'},
   guard:     {moves: 'every frame, per hand, while that hand is not punching', angles: 'front, back, side-on'},
   slip14:    {moves: 'slips only',                              angles: 'front, back'},
   slip15:    {moves: 'slips only',                              angles: 'front, back'},

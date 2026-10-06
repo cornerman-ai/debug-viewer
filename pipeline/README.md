@@ -326,10 +326,13 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   overlay labels it ("frame score 65.8 · lead 15.8/50 · rear 50.0/50"). Round = the mean frame score, no bands.
   Reads `runs.csv` + `elbow_tuck.json`.
 
-**Angle change after combo** (rule 13, `angle_change/angle_change.json`; "Angle change" until 2026-10-03; a whole-video rule — no timeline row): per combined combo, the
+**Angle change after combo** (rule 13, `angle_change/combos.csv` + `angle_change.json`; "Angle change" until 2026-10-03): per combined combo, the
 mean facing during it against the most different smoothed facing in the 2 s after it; a turn of ≥ 45° counts as a
 change. Round = 100 at half the combos changed or more, 0 at none, linear between — a plain number, no bands;
-fewer than 10 readable combos → not rated.
+fewer than 10 readable combos → not rated. Its timeline row (since 2026-10-06) is one block per combo — green when
+he turned, red when he stayed, the turn in degrees on it — with a thin tail over the 2 s the rule reads; a combo the
+video ends too soon after is a gray dashed strip ("video ends"). Inside a combo or its window the overlay says how far
+the facing has turned so far against the 45° needed.
 
 - **Defense after combo** (`defense_after_combo/combos.csv` + `.json`): the defensive move that covered an offensive
   combo, drawn in green where the move is; a combo nobody covered draws its empty search window as a hollow red box
