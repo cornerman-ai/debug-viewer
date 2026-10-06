@@ -948,8 +948,9 @@ function slipLayer(rule) {
         }
         const lh = PAT(fr, J.lhip), rh = PAT(fr, J.rhip);
         if (!n || !(lh && rh)) return null;
-        for (const j of [J.lsh, J.rsh, J.lhip, J.rhip])          // run_slip_distance.geometry: no reading unless both
-          if (!(visAt(fr, j, rule) >= minVis)) return null;      // shoulders and both hips are at >= the house floor
+        for (const j of [J.lhip, J.rhip])                        // run_slip_distance.geometry: no reading unless both
+          if (!(visAt(fr, j, rule) >= minVis)) return null;      // hips are at >= the house floor (the shoulders only
+                                                                 // enter the video's torso unit, since 2026-10-06)
         const head = PXY((lo + hi) / 2, ys / n);
         return head ? {head, hipx: (lh[0] + rh[0]) / 2, hipy: (lh[1] + rh[1]) / 2} : null;
       };
@@ -1692,7 +1693,7 @@ const RULE_LAYERS = [
                                                 : x && x.skip === 'no_impact_frame' ? 'no impact frame'
                                                 : x && x.skip === 'no_facing' ? 'no facing angle over the punch'
                                                 : x && x.skip === 'shoulders_on_top_of_each_other' ? 'the shoulders overlap in the image — no direction of travel'
-                                                : 'the wrist or the body is not visible at the impact frame'}</div>` :
+                                                : 'the wrist or a shoulder is not visible at the impact frame'}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Past the far shoulder</span><b>${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)} torso</b>
         <span>Scale</span><b>${THR(() => `100 at the centre line, 0 at +${fD(T(32, 'move.score.zero'), 3)} torso past the far shoulder`)}</b>
         <span>Punch score</span><b>${x.score.toFixed(1)}</b></div>`) + '</div>',
@@ -1883,7 +1884,7 @@ const RULE_LAYERS = [
     card: (e, a) => `<div class="sub"><div class="h">${RN(21)} ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elbow angle at the furthest reach</span><b>${a.elbow == null ? '–' : a.elbow.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
        <span>Scale</span><b>${a.full == null ? '–' : `100 at ≥ ${a.full}°, 0 at ≤ ${THR(() => fN(T(21, 'move.score.zero')))}°, linear`}</b>
-       <span>Torso / frame height</span><b>${a.torsoFrac == null ? '–' : a.torsoFrac.toFixed(3)} <span class="m">${THR(() => `(≥ ${fD(T(21, 'move.score.far_below_torso_frame_h'), 3)}: ${fN(T(21, 'move.score.full.near'))}° · ≥ ${fD(T(21, 'move.score.min_torso_frame_h'), 3)}: ${fN(T(21, 'move.score.full.far'))}° · below: not judged)`)}</span></b>${a.skip ? `<span>Skipped</span><b>${a.skip.replace(/_/g, ' ')}</b>` : ''}
+       <span>Torso / frame height</span><b>${a.torsoFrac == null ? '–' : a.torsoFrac.toFixed(3)} <span class="m">${THR(() => `(≥ ${fD(T(21, 'move.score.far_below_torso_frame_h'), 3)}: ${fN(T(21, 'move.score.full.near'))}° · ≥ ${fD(T(21, 'move.score.min_torso_frame_h'), 3)}: ${fN(T(21, 'move.score.full.far'))}° · below: not judged)`)}</span></b>${a.skip ? `<span>Skipped</span><b>${a.skip === 'peak_not_visible' ? `the arm is hidden at its furthest reach${a.peakF != null ? ' (f ' + a.peakF + ')' : ''}` : a.skip.replace(/_/g, ' ')}</b>` : ''}
        ${a.score != null ? `<span>Punch score</span><b>${a.score.toFixed(1)}</b>` : ''}</div>
        <div class="rows num" style="opacity:.6"><span>For comparison, not judged:</span><b></b>
        <span>elbow at the impact frame</span><b>${a.impElbow == null ? '–' : a.impElbow.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>',
@@ -3503,6 +3504,10 @@ const SKIPTXT = {
   no_impact_frame: 'no impact frame', no_impact: 'no impact frame', no_facing: 'no facing angle over the punch',
   facing_unknown: 'no facing angle over the punch', too_far_from_camera: 'the boxer is too far from the camera',
   no_reference_for_this_punch_type: 'no reference for this punch type',
+  // the joints each reading needs (since 2026-10-06 a rule gates only those, on the frames it reads)
+  peak_not_visible: 'the arm is hidden at its furthest reach',
+  no_head_or_hips: 'the head or the hips are not visible',
+  wrist_or_shoulders_not_visible: 'the wrist or a shoulder is not visible at the impact frame',
 };
 const skipTxt = c => SKIPTXT[c] || (c ? c.replace(/_/g, ' ') : 'not judged');
 const GOOD = '#22C55E', BAD = '#EF4444', MIDC = '#F97316';
@@ -3599,7 +3604,7 @@ function defenseRules(e) {
     let sx = 0, cx = 0, n = 0;            // the backend's reading: the circular mean of the facing over the move
     for (let f = e.sf; f <= e.ef && f < S.n; f++) if (S.hasAngle && Number.isFinite(S.angle[f])) {
       sx += Math.sin(S.angle[f] * Math.PI / 180); cx += Math.cos(S.angle[f] * Math.PI / 180); n++; }
-    const why = THR(() => !n ? 'no_facing' : camSkip(14, Math.atan2(sx, cx) * 180 / Math.PI) || 'the head or torso is not visible', TH_MISSING);
+    const why = THR(() => !n ? 'no_facing' : camSkip(14, Math.atan2(sx, cx) * 180 / Math.PI) || 'the head or the hips are not visible', TH_MISSING);
     rows = [[14, {skip: why}], [15, {skip: why}]];
   }
   return evList(rows) + (it ? `<div class="evctx num">the head travelled ${it.travel.toFixed(2)} torso sideways</div>` : '');

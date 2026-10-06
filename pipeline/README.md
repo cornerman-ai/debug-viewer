@@ -246,7 +246,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   punches unjudgeable. Reads `punches.csv` + `resting_hand.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the elbow angle at the frame of furthest reach, scored
   linearly — 100 at 160° or straighter, 0 at 100° — and eased far from the camera: with the torso under ¼ of the
-  frame height full marks start at 150°, under ⅛ the punch is not judged. Green at 100 and red below, the score on the block and a white
+  frame height full marks start at 150°, under ⅛ the punch is not judged. The furthest reach is found over every frame
+  with a pose and the arm must be visible at that frame (since 2026-10-06): hidden there, the punch is not judged
+  ("the arm is hidden at its furthest reach") instead of being read at a less extended frame. Green at 100 and red below, the score on the block and a white
   tick at the frame measured; on the video the punching arm in the same colour with this frame's elbow angle (a punch
   the rule did not judge says why: head-on, too far from the camera…). The round is the mean punch score, a plain
   number with no bands.
@@ -257,7 +259,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   `hip_rotation.json`); on the video the hip line coloured by the rule's verdict, and — since that line is not the
   measurement — a dial of what is: seen from above (the world landmarks), the direction other hip → punching hip at
   the start (dashed white) and at impact, against the facing angle (grey), labelled with both angles; their difference
-  is the rule's number (checked to 0.14° on 5,352 punches, 2026-10-02). The impact → end step is in the CSV but not shown.
+  is the rule's number (checked to 0.14° on 5,352 punches, 2026-10-02). The impact → end step is in the CSV but not shown
+  (blank when the end frame hides a hip: only the start and impact frames decide whether a punch is judged, since 2026-10-06).
 - **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
   turn of the punching shoulder against a set range per punch type (lead jab 5–30°, lead hook 35–70°, lead uppercut
   25–60°, lead body shot 40–75°, rear cross 30–60°, rear hook 40–75°, rear uppercut 30–75°, rear body shot 50–75°),
@@ -283,7 +286,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   not the punches.
 
 - **Slip far enough** / **Slip not too much** (rules 14 and 15, `slip_distance/`; 15 was "Slips compact" until 2026-10-03): per slip, how far the head travelled sideways from where it started, in
-  torso lengths, with a white tick at the furthest frame. Rolls and ducks are not measured. Judged front-on / back-on only. Two timeline rows, one per rule, each slip coloured by that
+  torso lengths, with a white tick at the furthest frame. Rolls and ducks are not measured. Judged front-on / back-on only;
+  a frame is read when a head point and both hips are visible (the overlay's path too). Two timeline rows, one per rule, each slip coloured by that
   rule's slip score (green 100, orange between, red 0), and two round rows, each the mean of its slip scores: rule 14 "slip far enough" (100 at 0.20 torso of travel or more, 0 with none) and 15 "slip not too much" (100
   up to 0.70, 0 at 1.00). Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
