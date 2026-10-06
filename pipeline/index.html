@@ -970,7 +970,8 @@ function slipLayer(rule) {
 const GUARDCOL = {ok: '#34c759', low: '#ff3b30'};
 const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that hand is throwing'};
 // the three facing buckets of the facing row: within 45° of the camera, within 45° of straight away, or between (a
-// gated rule reads its own window — side-on rules 65–115° since 2026-10-06 — shown beside its badges)
+// gated rule reads its own window — since 2026-10-06 side-on 65–115°, front / back 0–25° + 155–180° — shown beside
+// its badges)
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
 // Which band a frame is in — the facing row's cuts. null when there is no pose or no angle there.
 const faceBand = f => {
@@ -1845,7 +1846,7 @@ const RULE_LAYERS = [
   {
     // elbow tuck (elbow_tuck/): flare = how far the elbow sits OUT past its shoulder (away from the midline; inward
     // counts 0) / torso per arm — the lens's |x shoulder - x elbow| until 2026-10-02 — judged only while the
-    // boxer is within 45 deg of facing / backing the camera and that arm isn't throwing a hook. The row shows the
+    // boxer faces or backs the camera (its camera window, 0-25 + 155-180 deg since 2026-10-06) and that arm isn't throwing a hook. The row shows the
     // judged stretches, coloured by state (tucked / borderline / flared), lead in the top half, rear in
     // the bottom; a hole means the rule could not judge those frames.
     key: 'elbow', label: RN(9), short: 'Elbows tucked', items: true, split: 'arm',

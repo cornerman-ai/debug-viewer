@@ -318,7 +318,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   score, a plain number; under 150 judged frames → not rated. Read `runs.csv` + the stage's `.json`.
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = how far the elbow sits out past its
   shoulder, away from the body's midline, / torso per arm (pulled in counts 0; the lens's |x shoulder − x elbow| until 2026-10-02),
-  judged only while the boxer is within 45° of facing or backing the camera and that arm isn't throwing a hook. The row
+  judged only while the boxer is within 25° of facing or backing the camera (45° until 2026-10-06) and that arm isn't throwing a hook. The row
   is continuous — every frame belongs to a stretch: green tucked (< 0.20), yellow borderline (0.20–0.30), red flared
   (≥ 0.30), and a thin gray strip where the rule cannot judge, with the reason in its tooltip (the boxer is side-on,
   a joint it needs is not visible, or that arm is throwing a hook). Lead in the top half, rear in the bottom. Each
@@ -383,8 +383,9 @@ only rates the round gets the Round score row alone, with no timeline row.
 
 **Isolating one camera angle**: shift-click a band in the facing row (front / side-on / back) and the timeline keeps
 only the stretches the boxer spent in that band at full strength — everything else fades back and stops answering the
-cursor, so a rule's row can be read against the view it is actually judged in. The bands are the ±45° / ±135° cuts
-the front / back rules use; the side-on rules judge 65–115° (since 2026-10-06), inside the side-on band. The chosen band is outlined in the facing row and named in a chip beside the zoom buttons;
+cursor, so a rule's row can be read against the view it is actually judged in. The bands are fixed ±45° / ±135°
+cuts; since 2026-10-06 the gated rules judge narrower windows inside them — side-on 65–115°, front / back 0–25° +
+155–180° — each shown beside its rule's badges. The chosen band is outlined in the facing row and named in a chip beside the zoom buttons;
 shift-click it again, click the chip, or press Esc to clear. Faded is not hidden on purpose — the shape of the round
 stays visible around the selection.
 
