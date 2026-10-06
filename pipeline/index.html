@@ -824,6 +824,32 @@ const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 
                   punching: 'punching', hook: 'hook', video_end: 'video ends', no_side: 'no side'};
 // rules 27 / 29, the variety rows: the share the score reads (the most-used types / type / side) vs everything else
 const VARCOL = {top: '#ff9f0a', other: '#34c759'};
+// rule 26's windows and rule 28's body shots
+const FADECOL = {first: '#0a84ff', last: '#ff9f0a', middle: '#8e8e93'};
+const BODYCOL = '#34c759';
+// Rule 26's compared windows, recomputed as run_output_decay.py cuts them: the punching span from the first punch's
+// start to the last one's (impacts.csv start_time); under thirds_below_span_s it is cut in thirds (first vs last),
+// otherwise the first window_s against the last window_s; a punch belongs to the window its start falls in, the last
+// window keeping the last punch itself. Each punch item gets .win. Memoised per loaded video; null without a snapshot.
+let FADE = null;
+function fadeWins() {
+  const items = S.items.fade || [];
+  if (FADE && FADE.items === items) return FADE;
+  let split, W;
+  try { split = T(26, 'round.windows.thirds_below_span_s'); W = T(26, 'round.windows.window_s'); }
+  catch (err) { if (err instanceof ThMissing) return null; throw err; }
+  const starts = items.map(x => x.t).filter(Number.isFinite).sort((a, b) => a - b);
+  let wins = [];
+  if (starts.length) {
+    const t0 = starts[0], t1 = starts[starts.length - 1], span = t1 - t0;
+    wins = span < split ? [['first', t0, t0 + span * 1 / 3], ['middle', t0 + span * 1 / 3, t0 + span * 2 / 3], ['last', t0 + span * 2 / 3, t0 + span * 3 / 3]]
+                        : [['first', t0, t0 + W], ['last', t1 - W, t1]];
+  }
+  const inW = (t, [name, a, b]) => (a <= t && t < b) || (name === 'last' && t === b);
+  for (const x of items) x.win = (wins.find(w => inW(x.t, w)) || [null])[0];
+  FADE = {items, wins: wins.map(([name, a, b]) => ({name, a, b, n: items.filter(x => x.win === name).length}))};
+  return FADE;
+}
 const ELBOWSKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
                    hook: 'this arm is throwing a hook'};
 function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order
@@ -1344,6 +1370,74 @@ const RULE_LAYERS = [
       if (x.side) { c.fillStyle = x.side === js.same_side.top_side ? VARCOL.top : VARCOL.other; rr(x0, y + h / 2, w, hh, 3); c.fill(); }
       c.globalAlpha = 1;
       if (!x.side) skipStrip(c, x0, w, y + h / 2 + hh / 2, on, 'no_side');                                          // side
+    },
+  },
+  {
+    // rule 26, fading output (output_decay.json, over punch_impact/impacts.csv): the windows it compares, shaded —
+    // first vs last 30 s of the punching span, or first vs last third when the span is under 90 s — with the punches
+    // each window counted (blue first, amber last; a punch belongs to the window its start time falls in). Punches
+    // outside the compared windows are not drawn. The windows are recomputed here from the same start times and the
+    // snapshot's window rule (fadeWins), so the counts equal output_decay.json's.
+    key: 'fade', label: RN(26), short: 'Fading output', items: true,
+    csv: ['punch_impact', 'impacts.csv'], json: ['output_decay', 'output_decay.json'],
+    parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), t: num(r.start_time), type: r.punch_type, hand: r.hand}),
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const D = fadeWins(); if (!D) return `<b>${RN(26)}</b><br><span class="m">${TH_MISSING}</span>`;
+      const js = S.layerSum.fade, w = n => D.wins.find(v => v.name === n), f = w('first'), l = w('last');
+      const where = x.win === 'middle' ? 'in the middle third — not compared' : x.win ? `counted in the ${x.win} window`
+        : 'outside both windows — not counted';
+      return `<b>${RN(26)}</b> · ${fmtT(x.t)}<br>${cap(x.hand)} ${(PUNCH[x.type]?.name || x.type).toLowerCase()} — `
+        + `<span style="color:${FADECOL[x.win] || 'var(--text2)'}">${where}</span><br>`
+        + `<span class="m num">first ${f.a.toFixed(1)}–${f.b.toFixed(1)} s: ${f.n} · last ${l.a.toFixed(1)}–${l.b.toFixed(1)} s: ${l.n}`
+        + ` → drop ${js?.drop == null ? '–' : Math.round(js.drop * 100) + '%'} → ${js?.score ?? 'not rated'}</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const D = fadeWins(); if (!D) return;
+      if (x === D.items[0]) for (const w of D.wins) {         // the windows, once per draw, under the punches
+        const x0 = Math.max(L, tx(w.a)), x1 = tx(w.b); if (x1 <= L) continue;
+        c.fillStyle = FADECOL[w.name]; c.globalAlpha = 0.13; rr(x0, y + 1, Math.max(2, x1 - x0), h - 2, 4); c.fill(); c.globalAlpha = 1;
+        c.font = '600 9px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textAlign = 'left';
+        c.fillStyle = FADECOL[w.name];
+        if (x1 - x0 > 70) c.fillText(w.name === 'middle' ? 'middle · not compared' : `${w.name} · ${w.n} punches`, x0 + 5, y + 7);
+      }
+      if (x.win !== 'first' && x.win !== 'last') return;
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      c.fillStyle = FADECOL[x.win]; c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 11, Math.max(2, x1 - x0 - 1), h - 14, 3); c.fill(); c.globalAlpha = 1;
+    },
+  },
+  {
+    // rule 28, body shots (bodyshots.json, over punch_impact/impacts.csv): the punches it counts — hooks and uppercuts
+    // only, the classifier cannot tell where a jab or a cross landed — body shots solid green (the share the score
+    // wants, 100 from 25 %), head hooks / uppercuts as outlines (they only count in the total). Jab and cross: not drawn.
+    key: 'bodyshot', label: RN(28), short: RN(28), items: true,
+    csv: ['punch_impact', 'impacts.csv'], json: ['bodyshots', 'bodyshots.json'],
+    parseItem: (r, num) => ['hook', 'uppercut', 'hook_or_uppercut'].includes(r.punch_type)
+      ? {sf: num(r.start_frame), ef: num(r.end_frame), type: r.punch_type, hand: r.hand} : null,
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const js = S.layerSum.bodyshot, body = x.type === 'hook_or_uppercut';
+      return `<b>${RN(28)}</b> · ${fmtT(x.sf / S.fps)}<br>${cap(x.hand)} ${body ? 'body shot (a hook or uppercut to the body)'
+        : (PUNCH[x.type]?.name || x.type).toLowerCase() + ' to the head'} — <span style="color:${body ? BODYCOL : 'var(--text2)'}">`
+        + `${body ? 'a body shot' : 'counts only in the total'}</span><br>`
+        + (js ? `<span class="m num">body ${js.n_body} / ${js.n_hooks_uppercuts} hooks + uppercuts = ${pct(js.body_share)} → ${js.score ?? 'not rated'}`
+              + `${THR(() => ` (100 from ${fP(T(28, 'round.score.full'))} %)`)} · jab / cross not counted (${js.n_jab_cross_not_counted})</span>`
+            : '<span class="m">bodyshots.json is missing — rerun this video</span>');
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(3, x1 - x0 - 1);
+      if (x.type === 'hook_or_uppercut') {
+        c.fillStyle = BODYCOL; c.globalAlpha = on ? 1 : 0.9; rr(x0, y + 3, w, h - 6, 4); c.fill(); c.globalAlpha = 1;
+        if (w >= 12) { c.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+          c.fillStyle = 'rgba(0,0,0,0.72)'; c.textAlign = 'center'; c.fillText('B', x0 + w / 2, y + h / 2 + 0.5); }
+      } else {                                                // a head hook / uppercut: the total, not the share
+        c.strokeStyle = css('--text3') || '#aeaeb2'; c.lineWidth = 1.5; c.globalAlpha = on ? 1 : 0.8;
+        rr(x0 + 0.75, y + 5.75, Math.max(2, w - 1.5), h - 11.5, 3); c.stroke(); c.globalAlpha = 1;
+      }
     },
   },
   {
@@ -2103,7 +2197,7 @@ const RULE_LAYERS = [
 // Which Notion rules (by number, renumbered 2026-10-01) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [3], guard: [4], resting: [6], chin_depth: [7], chin_height: [8], elbow: [9], anglechg: [13],
-  varpunch: [27], vardef: [29],
+  varpunch: [27], vardef: [29], fade: [26], bodyshot: [28],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
   rpivot: [33], work: [25],
@@ -2718,6 +2812,8 @@ const SCOPE = {
   anglechg:  {moves: 'combined combos, and the 2 s after each',  angles: 'front, back, side-on'},
   varpunch:  {moves: 'every punch, as a share of the round',      angles: 'front, back, side-on'},
   vardef:    {moves: 'every defensive move, as a share of the round', angles: 'front, back, side-on'},
+  fade:      {moves: 'the punches in the first and the last window', angles: 'front, back, side-on'},
+  bodyshot:  {moves: 'hooks and uppercuts (jab / cross not counted)', angles: 'front, back, side-on'},
   guard:     {moves: 'every frame, per hand, while that hand is not punching', angles: 'front, back, side-on'},
   slip14:    {moves: 'slips only',                              angles: 'front, back'},
   slip15:    {moves: 'slips only',                              angles: 'front, back'},

@@ -10,12 +10,13 @@ A rule is built in the backend (`cornerman-backend/combined_pipeline/rules_creat
 | The rule judges | Where it goes |
 | --- | --- |
 | punches, frames, defensive moves or combos — anything that happens at a point in time | a **timeline layer** (`RULE_LAYERS`) **and** a Round score row |
-| the round as a whole, as a share of moves it counts (the 2 most-used punch types, the most-used defense) | a Round score row, **and** a timeline layer that colours each counted move by its part in the share |
-| the round as a whole with nothing to draw per move (two windows compared, a single count) | the **Round score card only**, no timeline row |
+| the round as a whole, from moves it counts (a share of punch types, two windows of punches) | a Round score row, **and** a timeline layer that draws the counted moves by their part in the number |
+| the round as a whole with nothing to draw per move | the **Round score card only**, no timeline row |
 
 Examples as of 2026-10-06. Timeline + Round score: arm extension, hip rotation, hit height, head off center line,
-elbow tuck, defense after combo, angle change after combo, offensive / combined combos; and, as shares, punch variety
-and defense variety. Round score only: lead / rear hand balance, fading output, body shots.
+elbow tuck, defense after combo, angle change after combo, offensive / combined combos; and, from the moves they
+count, punch variety, defense variety, body shots and fading output. Round score only: lead / rear hand balance (the
+Lead and Rear rows already show its count).
 
 A timeline row for a number that never changes during the video is noise — it draws the same thing everywhere. A
 share is different: its row draws the moves the share is made of, not the number.

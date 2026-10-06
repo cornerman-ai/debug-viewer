@@ -351,12 +351,16 @@ combinations `run_combinations.py` already wrote, the share that are 3 punches o
 from 40 %, linearly between — a plain number, no bands; fewer than 10 combinations → not rated. The mean length, the longest, the spread by
 length and the share of punches thrown outside any combination sit beside it, unjudged.
 
-**Fading output through round** (rule 26, `output_decay/output_decay.json`; "Output through the round" until 2026-10-03; a whole-video rule — no timeline
-row): measured from the first punch to the last. Under 90 s of that span, the span is cut in three equal thirds and
+**Fading output through round** (rule 26, `output_decay/output_decay.json`; "Output through the round" until 2026-10-03; a whole-video rule):
+measured from the first punch to the last. Under 90 s of that span, the span is cut in three equal thirds and
 the last third compared with the first; 90 s or more, the first 30 s from the first punch against the last 30 s up
 to the last punch. 100 up to 15 % fewer punches at the end, linearly to 0 at 40 % fewer, a plain number; under 30
 punches → not rated. The per-window counts, rates and dead shares are shown beside it, unjudged, to separate a
-slower rate from more standing. It needs one continuous round to mean anything.
+slower rate from more standing. It needs one continuous round to mean anything. Its timeline row (since 2026-10-06)
+shades the two windows it compares in that video and draws only the punches each counted — blue in the first, amber
+in the last, each window's count on its band; a short video's middle third is shaded gray, not compared. The windows
+are recomputed in the page from the same punch start times and the video's thresholds snapshot, so the counts are the
+rule's own.
 
 **Dead time** (rule 25, `work_rate/work_rate.json` + `segments.csv`; "Work rate" until 2026-10-03): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
@@ -373,9 +377,11 @@ timeline row (since 2026-10-06) shows what that share is made of: every punch th
 (`punch_impact/impacts.csv`) as a block with its type's letter, amber when the type is one of the 2 most-used, green
 when it is another; hover gives the share and the scale. No punch is right or wrong — it is a round rule.
 
-**Body shots** (`bodyshots/bodyshots.json`, a whole-video rule — no timeline row): under punch variety, body shots /
+**Body shots** (`bodyshots/bodyshots.json`, a whole-video rule): under punch variety, body shots /
 (body + head) over hooks and uppercuts only (the classifier can't split jab / cross into head / body): scored 0 at
 none and 100 from 25 %, linearly between (a plain number); fewer than 10 hooks + uppercuts → not rated. The cut-offs are ours.
+Its timeline row (since 2026-10-06) draws the punches it counts: body shots as solid green blocks ("B"), head hooks and
+uppercuts as outlines (they only count in the total); jab and cross are not drawn.
 
 **Defense variety** (rule 29, `same_defense/same_defense.json`; "Same defense" until 2026-10-03; a whole-video rule): under the defense
 distributions, a score of two halves: 50 for the move — full below 60 % of the most-used type, linearly to 0 at 100 % —
