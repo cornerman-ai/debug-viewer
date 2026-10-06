@@ -86,7 +86,9 @@ fold models averaged) and slips from the Slip exploration lens's rule, both kept
 (within 22.5°, `rolls_slips/moves.csv`, run_all's viewer-only `rolls_slips` stage; no rule reads it, it sits beside
 defense6's row to be judged by eye; hover a block for its score; the defense chips hide its moves too) — and an
 overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
-hover for details; the chips in the side panel hide or show a punch / defense type. On the video: the skeleton, a ring
+hover for details; the chips in the side panel hide or show a punch / defense type. Every row has a switch in the
+**Timelines** tab's Timeline layers card: the base rows (Facing, Lead, Rear, Defense, Rolls + slips) on top, all on by
+default, then the rule rows; the choice is remembered in the browser, and a row the video's folder lacks is greyed out. On the video: the skeleton, a ring
 on the punching wrist around impact, and pills naming the current punch / move.
 
 The side panel has five views, switched at its top:
