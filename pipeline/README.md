@@ -81,7 +81,11 @@ model grows with the square of the length, so long videos take longer than their
 ## Using it
 
 Timeline rows: facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands (each gated rule's own window is its `camera_window_deg` in the thresholds file, 45° by default; a rule with any other window shows its range beside its Front / Side / Back badges, e.g. "Side — 60–105°"), each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
-defense, and an overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
+defense, **Rolls + slips** right under it — rolls from the roll detector (its newest run, fr_none seed 42, the five
+fold models averaged) and slips from the Slip exploration lens's rule, both kept only while the boxer faces the camera
+(within 22.5°, `rolls_slips/moves.csv`, run_all's viewer-only `rolls_slips` stage; no rule reads it, it sits beside
+defense6's row to be judged by eye; hover a block for its score; the defense chips hide its moves too) — and an
+overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
 hover for details; the chips in the side panel hide or show a punch / defense type. On the video: the skeleton, a ring
 on the punching wrist around impact, and pills naming the current punch / move.
 
@@ -100,6 +104,12 @@ The side panel has five views, switched at its top:
   skeleton, the same number the video overlay draws, with the reading it came from.
 - **Round** — the whole video's counts: the punch and defense distributions and the combos (counts and the most-used
   sequences).
+- **Floors** (since 2026-10-06): the house floors from the video's thresholds snapshot are shown where they act. On
+  the skeleton, a joint under the visibility floor (0.30) is drawn hollow and its bones dashed, with a note naming
+  how many the rules skip; the **Now** tab's Frame card ends with **Joint visibility** — a bar per joint (nose, then
+  lead / rear shoulder to ankle), a tick at the floor, red under it, the value beside it; the **Rules** tab's
+  **Floors** line lists visibility, the judged minimum (10 punches / combos / moves, 150 frames) and the torso
+  minimum, plus the rules that change one; **Explanations** says what visibility means.
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
   bad 1, mid 2, good 3, great 4), and the sum over 4 × the rated rules is put on 0–100 (not-rated rules count in
   neither), coloured and labelled on the same tier scale as the rules, with the same bar — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count

@@ -180,6 +180,26 @@
   .ev.off > span:nth-child(2) { color: var(--text2); }
   .ev .evna { font-size: 11px; color: var(--text2); opacity: .8; }
   .evskip { font-size: 11.5px; color: var(--text2); opacity: .8; margin: -1px 0 2px 24px; line-height: 1.35; }
+  /* the Frame card's joint visibility: a bar per joint, the house floor as a tick, red under it */
+  .jvh { display: flex; align-items: baseline; gap: 6px; margin: 10px 0 4px; }
+  .jvh .evh { margin: 0; }
+  .jvh .m { font-size: 11px; color: var(--text2); }
+  .jv { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px 10px; align-items: center; font-size: 11.5px; }
+  .jv .jh { font-size: 10.5px; color: var(--text3); text-align: center; }
+  .jv .jn { color: var(--text2); }
+  .jv .jc { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .jv .jc.wide { grid-column: span 2; }
+  .jv .jb { position: relative; flex: 1; height: 6px; border-radius: 3px; background: var(--fill); min-width: 24px; }
+  .jv .jb i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--text3); }
+  .jv .jb.lo i { background: #EF4444; }
+  .jv .jb b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--text); opacity: .55; }
+  .jv .jv-n { width: 28px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text2); }
+  .jv .jc.lo .jv-n { color: #EF4444; font-weight: 600; }
+  /* the Rules tab's floors: what every rule needs before it reads a joint or rates a round */
+  .floors { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: -2px 0 10px; font-size: 11px; color: var(--text2); }
+  .floors > b { font-weight: 600; margin-right: 2px; }
+  .floors .chip-f { padding: 1px 7px; border-radius: 4px; background: var(--fill); cursor: help; }
+  .floors .per { flex-basis: 100%; color: var(--text3); }
   .cseq { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; font-size: 12px; margin: 2px 0 4px; }
   .cseq .cel { display: inline-flex; align-items: center; gap: 4px; }
   .cseq .csep { color: var(--text2); }
@@ -615,6 +635,9 @@ const DEF = {                         // defenses.csv defense_type
 };
 const styleP = t => PUNCH[t] || {c: '#8e8e93', l: '?', name: t};
 const styleD = t => DEF[t] || {c: '#8e8e93', l: '?', name: t};
+// the Rolls + slips row: defense6's colours per move, the side in the label ("Lead roll"), and where each came from
+const rsStyle = e => ({c: styleD(e.type).c, l: styleD(e.type).l, name: `${cap(e.side)} ${e.type}`});
+const RS_SOURCE = {roll_model: 'roll model (ST-GCN, fr_none)', slip_rule: 'slip lens rule'};
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 // COCO-17 subset of BlazePose-33 for the stick figure, and its bones
 const J = {nose: 0, lsh: 11, rsh: 12, lel: 13, rel: 14, lwr: 15, rwr: 16, lhip: 23, rhip: 24, lkn: 25, rkn: 26, lan: 27, ran: 28};
@@ -761,6 +784,7 @@ const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[
 const STAGES = {
   punches: ['punch_impact', 'impacts.csv'], punchesFallback: ['punch_classification', 'punches.csv'],
   punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
+  rollsSlips: ['rolls_slips', 'moves.csv'],      // the Rolls + slips row: the roll model + the slip lens's rule, beside defense6
   angle: ['facing_angle', 'facing_angle.csv'],
   hit: ['hit_height', 'hit_height.csv'], hitJson: ['hit_height', 'hit_height.json'], hip: ['hip_rotation', 'hip_rotation.csv'],
   arm: ['arm_extension', 'arm_extension.csv'], armJson: ['arm_extension', 'arm_extension.json'],
@@ -2052,7 +2076,7 @@ async function httpList(base) {
 }
 
 // ════════════════════════════ state ════════════════════════════
-const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], skel: null, mirrored: false,
+const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], rollsSlips: [], skel: null, mirrored: false,
            stance: 'orthodox', videoName: '', objectUrl: null, hiddenP: new Set(), hiddenD: new Set()};
 const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover: null, hoverLayer: null, lastFrame: -1,
            faceFilter: null,   // 'front' | 'side-on' | 'back': shift-click a band in the facing row to isolate it,
@@ -2098,8 +2122,9 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th] = await Promise.all([
-    jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json'])]);
+  const [pjs, angleCsv, defCsv, impCsv, th, rsCsv] = await Promise.all([
+    jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
+    lite ? null : txt(STAGES.rollsSlips)]);
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
@@ -2116,6 +2141,11 @@ async function buildVideo(src, sig, lite = false) {
     kind: 'p', sf: +r.start_frame, ef: +r.end_frame, type: r.punch_type, hand: r.hand, target: r.target,
     impact: hasImpact && r.impact_status === 'ok' ? +r.impact_frame : null, impConf: r.impact_conf ? +r.impact_conf : null,
     impStatus: hasImpact ? r.impact_status : 'not run'})).sort((a, b) => a.sf - b.sf);
+  // the Rolls + slips row (rolls_slips/moves.csv): kept only while the boxer faces the camera; empty for a video run
+  // before the stage existed (2026-10-06)
+  N.rollsSlips = (rsCsv ? parseCSV(rsCsv) : []).map(r => ({
+    kind: 'rs', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, score: +r.score,
+    facing: +r.facing_mean, source: r.source})).sort((a, b) => a.sf - b.sf);
   N.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
     kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share,
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
@@ -3082,6 +3112,24 @@ function hpBar(v, t) {
   return `<div class="hp${v == null ? ' empty' : ''}">` +
     (v == null ? '' : `<div class="fill" style="width:${Math.max(0, Math.min(100, v))}%;--c:${t[2]}"></div>`) + ticks + '</div>';
 }
+// The floors every rule shares — the house block of the video's snapshot — and the rules that change one, grouped:
+// "rules 9, 10, 12 torso ≥ 5 px". Nothing without a snapshot (the rule cards then say the file is missing).
+const FLOORWORD = {min_visibility: v => `joint visibility ≥ ${fD(v, 2)}`, min_judged: v => `from ${fN(v)} judged`,
+                   min_judged_frames: v => `from ${fN(v)} frames`, min_torso_px: v => `torso ≥ ${fN(v)} px`};
+function floorsLine() {
+  const h = S.th?.house; if (!h) return '';
+  const by = {};
+  for (const [n, e] of Object.entries(S.th.rules || {}))
+    for (const [k, v] of Object.entries(e.house_overrides || {})) if (FLOORWORD[k]) (by[FLOORWORD[k](v)] ??= []).push(n);
+  const per = Object.entries(by).map(([w, ns]) => `${ns.length > 1 ? 'rules' : 'rule'} ${ns.join(', ')} ${w}`).join(' · ');
+  return `<div class="floors"><b>Floors</b>`
+    + `<span class="chip-f" title="BlazePose's confidence that it sees a joint, 0-1. Under this a rule does not use the joint: `
+    + `a frame or punch that needs it is not judged (the joint is hollow on the skeleton)">${FLOORWORD.min_visibility(h.min_visibility)}</span>`
+    + `<span class="chip-f" title="with fewer judged punches / combos / moves, or frames for a per-frame rule, the rule is not rated">`
+    + `rated from ${fN(h.min_judged)} judged · ${fN(h.min_judged_frames)} frames</span>`
+    + `<span class="chip-f" title="a torso this short in the picture cannot be read">${FLOORWORD.min_torso_px(h.min_torso_px)}</span>`
+    + (per ? `<span class="per">per rule: ${per}</span>` : '') + '</div>';
+}
 function renderRules() {
   const rows = S.ruleRows || [], no = r => NOTION[r.name] ?? 99, meta = r => RULE_META[no(r)] || {group: '–', on: ['–'], angle: '–'};
   const val = r => /^[\d.]+$/.test(r.value) ? +r.value : Infinity;                 // not rated: after every score
@@ -3123,6 +3171,7 @@ function renderRules() {
   } else body = `<div class="grpbox">${list.map(rule).join('')}</div>`;
   $('scoreCard').innerHTML = '<div class="label">Round score</div>' +
     `<div class="tiers">${TIER.map(([lo, name, col], i) => `<span style="color:${col}">${lo}–${i ? TIER[i - 1][0] : 100} ${name}</span>`).join('')}</div>` +
+    floorsLine() +
     `<div class="rsort"><span>Sort by</span>${Object.entries(SORTS).map(([k, s]) => {
       const on = k === V.ruleSort;
       return `<button data-sort="${k}" class="${on ? 'on' : ''}" title="${on ? `${s.dir[+V.ruleDesc]} · click to flip` : s.dir[0]}">` +
@@ -3403,7 +3452,33 @@ function frameCard(el, f) {
                 dead: [`dead time — ${THR(() => `${fN(T(25, 'move.min_dead_gap_s'))} s`, TH_MISSING)} or more with nothing`, BAD]};
     rows.push([25, WK[k] ? {text: WK[k][0], col: WK[k][1]} : {text: 'a short pause — not dead time', col: MIDC}]);
   }
-  el.innerHTML = `<div class="label">Frame · f ${f}</div>` + evList(rows);
+  el.innerHTML = `<div class="label">Frame · f ${f}</div>` + evList(rows) + jointVis(f);
+}
+// The Frame card's joint visibility: how sure BlazePose is of each drawn joint in this frame (0-1), against the house
+// floor every rule reads a joint from (the video's snapshot). Under the floor the joint is skipped by every rule —
+// red here, hollow on the skeleton. Lead / rear through the stance, as the rules name the hands.
+const JV_ROWS = [['Nose', 'nose', 'nose'], ['Shoulder', 'lsh', 'rsh'], ['Elbow', 'lel', 'rel'], ['Wrist', 'lwr', 'rwr'],
+                 ['Hip', 'lhip', 'rhip'], ['Knee', 'lkn', 'rkn'], ['Ankle', 'lan', 'ran']];
+function jointVis(f) {
+  const floor = S.th?.house?.min_visibility, C = S.skelC;
+  if (floor == null || !S.skel || C < 7) return '';
+  const b = f * 33 * C, leadLeft = S.stance !== 'southpaw';
+  let under = 0;
+  const cell = (j, wide) => {
+    const v = S.skel[b + J[j] * C + 6], ok = Number.isFinite(v), lo = !ok || v < floor;
+    under += lo;
+    return `<span class="jc${lo ? ' lo' : ''}${wide ? ' wide' : ''}" title="visibility ${ok ? v.toFixed(3) : 'none (not detected)'}`
+      + `${lo ? ` — under ${fD(floor, 2)}, the rules skip it` : ''}"><span class="jb${lo ? ' lo' : ''}">`
+      + `<i style="width:${ok ? (Math.max(0, Math.min(1, v)) * 100).toFixed(1) : 0}%"></i><b style="left:${floor * 100}%"></b></span>`
+      + `<span class="jv-n">${ok ? v.toFixed(2) : '–'}</span></span>`;
+  };
+  const body = JV_ROWS.map(([name, l, r]) => {
+    const [a, z] = leadLeft ? [l, r] : [r, l];
+    return `<span class="jn">${name}</span>` + (a === z ? cell(a, true) : cell(a) + cell(z));
+  }).join('');
+  return `<div class="jvh"><span class="evh">Joint visibility</span><span class="m">the rules use a joint from `
+    + `${fD(floor, 2)}${under ? ` · ${under} under it` : ''}</span></div>`
+    + `<div class="jv"><span></span><span class="jh">lead</span><span class="jh">rear</span>${body}</div>`;
 }
 const iqr = q => q.map(x => x == null ? '–' : x.toFixed(1)).join('–') + '°';
 // a small scale 0°..max: the IQR as a shaded band, this punch's value as a marker in its verdict color
@@ -3450,10 +3525,27 @@ function drawOverlay(f, punchesNow) {
   PXY = (x, y) => Number.isFinite(x) && Number.isFinite(y)  // a point a rule computes, not a joint of the skeleton
     ? [Z.tx + (R.x + x * R.w) * Z.k, Z.ty + (R.y + y * R.h) * Z.k] : null;
   if (V.skel) {
-    octx.lineCap = 'round'; octx.lineWidth = 3; octx.strokeStyle = 'rgba(255,255,255,0.85)';
-    for (const [a, b] of BONES) { const p = P(a), q = P(b); if (p && q) { octx.beginPath(); octx.moveTo(...p); octx.lineTo(...q); octx.stroke(); } }
-    octx.fillStyle = '#0a84ff';
-    for (const j of Object.values(J)) { const p = P(j); if (p) { octx.beginPath(); octx.arc(p[0], p[1], 3.2, 0, 7); octx.fill(); } }
+    // the rules read a joint only from the house visibility floor (the video's snapshot): under it the joint is drawn
+    // hollow and its bones dashed, so what the rules skip shows on the footage. No snapshot: every joint drawn alike
+    const floor = S.th?.house?.min_visibility, seen = j => floor == null || !(S.skel[base + j * C + 6] < floor);
+    octx.lineCap = 'round'; octx.lineWidth = 3;
+    for (const [a, b] of BONES) {
+      const p = P(a), q = P(b); if (!(p && q)) continue;
+      const on = seen(a) && seen(b);
+      octx.strokeStyle = on ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.45)'; octx.setLineDash(on ? [] : [5, 6]);
+      octx.beginPath(); octx.moveTo(...p); octx.lineTo(...q); octx.stroke();
+    }
+    octx.setLineDash([]);
+    let hollow = 0;
+    for (const j of Object.values(J)) {
+      const p = P(j); if (!p) continue;
+      octx.beginPath(); octx.arc(p[0], p[1], 3.6, 0, 7);
+      if (seen(j)) { octx.fillStyle = '#0a84ff'; octx.fill(); continue; }
+      hollow++; octx.fillStyle = 'rgba(0,0,0,0.45)'; octx.fill();
+      octx.lineWidth = 1.8; octx.strokeStyle = '#fff'; octx.stroke(); octx.lineWidth = 3;
+    }
+    if (hollow) overlayLabel(12, R.H - 20, `○ ${hollow} joint${hollow > 1 ? 's' : ''} under ${fD(floor, 2)} visibility — `
+      + `the rules skip ${hollow > 1 ? 'them' : 'it'}`, '#e5e5ea');
   }
   for (const e of punchesNow) {                            // every punch under the playhead draws, both hands
     LABEL_TAG = punchesNow.length > 1 ? `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()} · ` : '';
@@ -3588,11 +3680,11 @@ function trackLines(name) {
 }
 let TR = {};
 function layout() {
-  TR = {ruler: [0, 24], angle: [30, 190], lead: [228, 30], rear: [262, 30], def: [302, 30]};
+  TR = {ruler: [0, 24], angle: [30, 190], lead: [228, 30], rear: [262, 30], def: [302, 30], rs: [336, 30]};
   const any = LAYERS.some(layerOn);
-  let y = any ? 358 : 342;                                     // 16 px for the "RULES" caption when there are rule rows
+  let y = any ? 392 : 376;                                     // 16 px for the "RULES" caption when there are rule rows
   for (const k of layerOrder()) if (layerOn(k)) { TR[k] = [y, 26]; y += 30; }
-  if (any) TR.rules = 347;
+  if (any) TR.rules = 381;
   TR.bottom = y - (any ? 4 : 10);                              // lowest edge of the scrolling rows
   TR.over = [TR.bottom + 14, 30];
   tctx.font = TRACKFONT;                                     // the gutter is as wide as the longest name line shown
@@ -3674,7 +3766,7 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // track backgrounds + names
-  const names = {angle: 'Facing', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
+  const names = {angle: 'Facing', lead: 'Lead', rear: 'Rear', def: 'Defense', rs: 'Rolls + slips', over: 'Overview', ...LNAME};
   if (TR.rules) {                                             // the rule rows' section caption + divider
     c.fillStyle = text3; c.textAlign = 'left'; c.font = '600 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
     c.fillText('RULES', 8, TR.rules); c.strokeStyle = sep; c.lineWidth = 1;
@@ -3768,6 +3860,8 @@ function drawTimeline(f) {
   for (const e of S.punches) if (!S.hiddenP.has(e.type))
     block(e, e.hand === 'lead' ? TR.lead[0] : TR.rear[0], TR.lead[1], styleP(e.type), e.sf <= f && f <= e.ef);
   for (const e of S.defenses) if (!S.hiddenD.has(e.type)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
+  for (const e of S.rollsSlips) if (!S.hiddenD.has(e.type))
+    block(e, TR.rs[0], TR.rs[1], rsStyle(e), e.sf <= f && f <= e.ef);
   drawLayerRows(c, f, W, text, grid);
   drawFaceVeil(c, W, text);                               // shift-click a facing band: everything else fades back
   // playhead
@@ -3886,6 +3980,9 @@ function draw(force) {
     const a = S.hasAngle && S.pose[f] ? S.angle[f] : null;
     $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
     eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f); comboCard($('comboCard'), f); frameCard($('frameCard'), f);
+    const rsNow = at(S.rollsSlips, f, S.hiddenD);          // a roll and a slip can overlap: the slip rule fires on rolls too
+    if (rsNow.length) $('defCard').insertAdjacentHTML('beforeend', `<div class="evctx">Rolls + slips row: `
+      + rsNow.map(e => `<b>${cap(e.side)} ${e.type}</b> (${RS_SOURCE[e.source] || e.source})`).join(' · ') + '</div>');
     $('clock').textContent = `${fmtT(video.currentTime)} · f ${f}`;
     const hud = [];
     for (const e of pNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}</span>`);
@@ -3926,6 +4023,7 @@ function hit(x, y) {
   if (inRow(TR.lead)) return find(S.punches, S.hiddenP, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, S.hiddenP, e => e.hand === 'rear');
   if (inRow(TR.def)) return find(S.defenses, S.hiddenD, () => true);
+  if (inRow(TR.rs)) return find(S.rollsSlips, S.hiddenD, () => true);
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
     const L_ = RULE[k];
     let e;
@@ -4022,6 +4120,12 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.hand)} ${s.name}</b> <span class="m">target ${e.target}</span><br>
       <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>` +
       (e.impact === null ? `<span class="m">no impact (${e.impStatus})</span>` : `<span class="num">impact f ${e.impact} · conf ${e.impConf.toFixed(2)}</span>`);
+  } else if (e.kind === 'rs') {
+    const s = styleD(e.type);
+    el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.side)} ${e.type}</b> <span class="m">${RS_SOURCE[e.source] || e.source}</span><br>
+      <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>
+      <span class="num">${e.source === 'roll_model' ? `roll probability ${e.score.toFixed(2)}` : `head ${e.score.toFixed(2)} torso off its usual position`}`
+      + ` · facing ${e.facing.toFixed(0)}°</span>`;
   } else {
     const s = styleD(e.type);
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${e.side ? cap(e.side) + ' ' : ''}${s.name}</b><br>
@@ -4305,6 +4409,9 @@ function renderExplain() {
     `the boxer stands from the camera.</li>` +
     `<li><b>Flat picture:</b> everything is read from the flat picture unless a rule says 3D.</li>` +
     `<li><b>Impact</b> is the frame where the punch reaches furthest, not the moment it hits something.</li>` +
+    `<li><b>Visible joints:</b> the skeleton says how sure it is of each joint (0–1). A rule uses a joint only from `
+    + `${S.th?.house ? fD(S.th.house.min_visibility, 2) : '…'}; below that, whatever needs the joint is not judged `
+    + `(the joint is hollow on the skeleton).</li>` +
     `<li><b>Southpaws:</b> a southpaw's video is mirrored before the rules read it, so “lead” is always the boxer's ` +
     `lead hand.</li>` +
     `<li><b>Round score:</b> the average (or share) over everything the rule judged; with too little to judge, the ` +
