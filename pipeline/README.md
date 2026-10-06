@@ -109,9 +109,12 @@ The side panel has five views, switched at its top:
 - **Floors** (since 2026-10-06): the house floors from the video's thresholds snapshot are shown where they act. On
   the skeleton, a joint under the visibility floor (0.30) is drawn hollow and its bones dashed, with a note naming
   how many the rules skip; the **Now** tab's Frame card ends with **Joint visibility** — a bar per joint (nose, then
-  lead / rear shoulder to ankle), a tick at the floor, red under it, the value beside it; the **Rules** tab's
-  **Floors** line lists visibility, the judged minimum (10 punches / combos / moves, 150 frames) and the torso
-  minimum, plus the rules that change one; **Explanations** says what visibility means.
+  lead / rear shoulder to ankle), a tick at the floor, red under it, the value beside it, and a **Visibility /
+  Presence** switch (presence: is the joint in the picture at all — no floor set yet, so no tick); the **Rules** tab's
+  **Floors** line lists visibility, presence, the judged minimum (10 punches / combos / moves, 150 frames) and the
+  torso minimum, plus the rules that change one; **Explanations** says what both mean. Once `min_presence` is set in
+  the thresholds file, every reading the page recomputes (and the hollow joints) drops a joint under it exactly as
+  the pipeline does (`visAt`).
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
   bad 1, mid 2, good 3, great 4), and the sum over 4 × the rated rules is put on 0–100 (not-rated rules count in
   neither), coloured and labelled on the same tier scale as the rules, with the same bar — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count

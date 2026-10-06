@@ -181,9 +181,13 @@
   .ev .evna { font-size: 11px; color: var(--text2); opacity: .8; }
   .evskip { font-size: 11.5px; color: var(--text2); opacity: .8; margin: -1px 0 2px 24px; line-height: 1.35; }
   /* the Frame card's joint visibility: a bar per joint, the house floor as a tick, red under it */
-  .jvh { display: flex; align-items: baseline; gap: 6px; margin: 10px 0 4px; }
+  .jvh { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin: 10px 0 4px; }
   .jvh .evh { margin: 0; }
-  .jvh .m { font-size: 11px; color: var(--text2); }
+  .jvh .m { flex-basis: 100%; font-size: 11px; color: var(--text2); }
+  .jvh .jvseg { display: inline-flex; gap: 2px; margin-left: auto; }
+  .jvh .jvseg button { border: 0; border-radius: 5px; padding: 1px 7px; font: inherit; font-size: 10.5px; background: var(--fill);
+                       color: var(--text2); cursor: pointer; }
+  .jvh .jvseg button.on { background: var(--accent); color: #fff; }
   .jv { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px 10px; align-items: center; font-size: 11.5px; }
   .jv .jh { font-size: 10.5px; color: var(--text3); text-align: center; }
   .jv .jn { color: var(--text2); }
@@ -939,13 +943,13 @@ function slipLayer(rule) {
         let lo = Infinity, hi = -Infinity, ys = 0, n = 0;
         for (let j = 0; j < 11; j++) {
           const x = S.skel[b + j * C], y = S.skel[b + j * C + 1];
-          if (!(S.skel[b + j * C + 6] >= minVis) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+          if (!(visAt(fr, j, rule) >= minVis) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
           lo = Math.min(lo, x); hi = Math.max(hi, x); ys += y; n++;
         }
         const lh = PAT(fr, J.lhip), rh = PAT(fr, J.rhip);
         if (!n || !(lh && rh)) return null;
         for (const j of [J.lsh, J.rsh, J.lhip, J.rhip])          // run_slip_distance.geometry: no reading unless both
-          if (!(S.skel[b + j * C + 6] >= minVis)) return null;    // shoulders and both hips are at >= the house floor
+          if (!(visAt(fr, j, rule) >= minVis)) return null;      // shoulders and both hips are at >= the house floor
         const head = PXY((lo + hi) / 2, ys / n);
         return head ? {head, hipx: (lh[0] + rh[0]) / 2, hipy: (lh[1] + rh[1]) / 2} : null;
       };
@@ -1114,7 +1118,7 @@ function chinLayer(kind) {
       const mL = P(9), mR = P(10); if (!(mL && mR)) return;                  // BlazePose mouth corners
       const no = kind === 'height' ? 8 : 7, minVis = H(no, 'min_visibility'), k = T(no, 'move.chin_coef');
       for (const j of [J.nose, 9, 10, J.lsh, J.rsh])                         // run_chin_tuck.py MIN_VIS, the house floor:
-        if (!(Q(j, 6) >= minVis)) return;                                    // a joint it cannot read, so neither do we
+        if (!(visAt(f, j, no) >= minVis)) return;                            // a joint it cannot read, so neither do we
       const chin = [nose[0] + k * ((mL[0] + mR[0]) / 2 - nose[0]),
                     nose[1] + k * ((mL[1] + mR[1]) / 2 - nose[1])];
       const lead = leadLeft ? lsh : rsh;
@@ -1543,7 +1547,7 @@ const RULE_LAYERS = [
         OV.level(nose[1] + x.drop * t, x0, x1, col);                 // this window's mean, the number that decides
         OV.trail(x.a, f, wr, col);                                   // its wrist so far in the window
         // this frame's own reading, with the rule's gate: nose, shoulders, hips and the wrist at the house visibility
-        const seen = [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, wr].every(j => Q(j, 6) >= minVis);
+        const seen = [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, wr].every(j => visAt(f, j, 2) >= minVis);
         const w = P(wr), now = seen && w ? (w[1] - nose[1]) / t : null;
         if (w) OV.ring(w, seen ? col : '#8e8e93', 11, 3);
         overlayLabel(x0, nose[1] - 16,
@@ -2074,7 +2078,7 @@ const RULE_LAYERS = [
       if (x.score == null) return;
       const l = P(23), rt = P(24); if (!(l && rt)) return;
       const minVis = H(10, 'min_visibility'), h = hocParts();
-      const C = S.skelC, vis = j => S.skel[f * 33 * C + j * C + 6] >= minVis;   // run_head_offcenter.py: head points at the house floor
+      const vis = j => visAt(f, j, 10) >= minVis;                // run_head_offcenter.py: head points at the house floor
       const hd = [...Array(11).keys()].filter(vis).map(P).filter(Boolean); if (!hd.length) return;
       const hx = (Math.min(...hd.map(q => q[0])) + Math.max(...hd.map(q => q[0]))) / 2, hy = hd.reduce((a, q) => a + q[1], 0) / hd.length;
       const cx = (l[0] + rt[0]) / 2, cy = (l[1] + rt[1]) / 2, col = x.verdict === 'off' ? '#34c759' : '#ff3b30', atImpact = Math.abs(f - x.usedF) <= 1;
@@ -3401,7 +3405,8 @@ function hpBar(v, t) {
 }
 // The floors every rule shares — the house block of the video's snapshot — and the rules that change one, grouped:
 // "rules 9, 10, 12 torso ≥ 5 px". Nothing without a snapshot (the rule cards then say the file is missing).
-const FLOORWORD = {min_visibility: v => `joint visibility ≥ ${fD(v, 2)}`, min_judged: v => `from ${fN(v)} judged`,
+const FLOORWORD = {min_visibility: v => `joint visibility ≥ ${fD(v, 2)}`, min_presence: v => `joint presence ≥ ${fD(v, 2)}`,
+                   min_judged: v => `from ${fN(v)} judged`,
                    min_judged_frames: v => `from ${fN(v)} frames`, min_torso_px: v => `torso ≥ ${fN(v)} px`};
 function floorsLine() {
   const h = S.th?.house; if (!h) return '';
@@ -3412,6 +3417,8 @@ function floorsLine() {
   return `<div class="floors"><b>Floors</b>`
     + `<span class="chip-f" title="BlazePose's confidence that it sees a joint, 0-1. Under this a rule does not use the joint: `
     + `a frame or punch that needs it is not judged (the joint is hollow on the skeleton)">${FLOORWORD.min_visibility(h.min_visibility)}</span>`
+    + `<span class="chip-f" title="BlazePose's confidence that a joint is in the picture at all, 0-1. Under this a rule does not use the joint, `
+    + `as if it were hidden; 0 = no floor">${h.min_presence > 0 ? FLOORWORD.min_presence(h.min_presence) : 'presence: no floor'}</span>`
     + `<span class="chip-f" title="with fewer judged punches / combos / moves, or frames for a per-frame rule, the rule is not rated">`
     + `rated from ${fN(h.min_judged)} judged · ${fN(h.min_judged_frames)} frames</span>`
     + `<span class="chip-f" title="a torso this short in the picture cannot be read">${FLOORWORD.min_torso_px(h.min_torso_px)}</span>`
@@ -3741,32 +3748,60 @@ function frameCard(el, f) {
   }
   el.innerHTML = `<div class="label">Frame · f ${f}</div>` + evList(rows) + jointVis(f);
 }
+// The house joint floors as the rules apply them (the video's snapshot). BlazePose scores each joint twice:
+// visibility (is it hidden?) and presence (is it in the picture at all?). The pipeline applies the presence floor
+// once, as a rule stage loads its skeleton (rule_config.load_skeleton): a joint under rule n's min_presence gets
+// visibility 0, and each rule's own visibility check drops it. visAt(fr, j, n) is that visibility, so every reading
+// the page recomputes skips the same joints; presFloor(n) is the floor, 0 (none) for a snapshot from before 2026-10-06.
+const presFloor = n => {
+  const o = n == null ? null : S.th?.rules?.[n]?.house_overrides;
+  return (o && 'min_presence' in o ? o.min_presence : S.th?.house?.min_presence) ?? 0;
+};
+const visAt = (fr, j, n) => {
+  const C = S.skelC, b = (fr * 33 + j) * C;
+  return C >= 8 && S.skel[b + 7] < presFloor(n) ? 0 : S.skel[b + 6];
+};
 // The Frame card's joint visibility: how sure BlazePose is of each drawn joint in this frame (0-1), against the house
 // floor every rule reads a joint from (the video's snapshot). Under the floor the joint is skipped by every rule —
 // red here, hollow on the skeleton. Lead / rear through the stance, as the rules name the hands.
 const JV_ROWS = [['Nose', 'nose', 'nose'], ['Shoulder', 'lsh', 'rsh'], ['Elbow', 'lel', 'rel'], ['Wrist', 'lwr', 'rwr'],
                  ['Hip', 'lhip', 'rhip'], ['Knee', 'lkn', 'rkn'], ['Ankle', 'lan', 'ran']];
+// A switch shows presence instead (remembered per browser); its floor is ticked only once one is set.
+let JV_METRIC = (() => { try { return localStorage.getItem('pipelineViewerJV') === 'pres' ? 'pres' : 'vis'; } catch { return 'vis'; } })();
 function jointVis(f) {
-  const floor = S.th?.house?.min_visibility, C = S.skelC;
-  if (floor == null || !S.skel || C < 7) return '';
-  const b = f * 33 * C, leadLeft = S.stance !== 'southpaw';
+  const vFloor = S.th?.house?.min_visibility, C = S.skelC;
+  if (vFloor == null || !S.skel || C < 7) return '';
+  const b = f * 33 * C, leadLeft = S.stance !== 'southpaw', pres = JV_METRIC === 'pres' && C >= 8, pFloor = presFloor();
+  const floor = pres ? pFloor : vFloor, word = pres ? 'presence' : 'visibility';
   let under = 0;
   const cell = (j, wide) => {
-    const v = S.skel[b + J[j] * C + 6], ok = Number.isFinite(v), lo = !ok || v < floor;
+    const vis = S.skel[b + J[j] * C + 6], pr = C >= 8 ? S.skel[b + J[j] * C + 7] : NaN, v = pres ? pr : vis;
+    const ok = Number.isFinite(v), lo = pres ? floor > 0 && !(v >= floor) : !ok || v < floor;
     under += lo;
-    return `<span class="jc${lo ? ' lo' : ''}${wide ? ' wide' : ''}" title="visibility ${ok ? v.toFixed(3) : 'none (not detected)'}`
-      + `${lo ? ` — under ${fD(floor, 2)}, the rules skip it` : ''}"><span class="jb${lo ? ' lo' : ''}">`
-      + `<i style="width:${ok ? (Math.max(0, Math.min(1, v)) * 100).toFixed(1) : 0}%"></i><b style="left:${floor * 100}%"></b></span>`
-      + `<span class="jv-n">${ok ? v.toFixed(2) : '–'}</span></span>`;
+    const both = `visibility ${Number.isFinite(vis) ? vis.toFixed(3) : '–'} · presence ${Number.isFinite(pr) ? pr.toFixed(3) : '–'}`;
+    return `<span class="jc${lo ? ' lo' : ''}${wide ? ' wide' : ''}" title="${ok ? both : 'not detected'}`
+      + `${lo ? ` — ${word} under ${fD(floor, 2)}, the rules skip it` : ''}"><span class="jb${lo ? ' lo' : ''}">`
+      + `<i style="width:${ok ? (Math.max(0, Math.min(1, v)) * 100).toFixed(1) : 0}%"></i>`
+      + (floor > 0 ? `<b style="left:${floor * 100}%"></b>` : '') + `</span><span class="jv-n">${ok ? v.toFixed(2) : '–'}</span></span>`;
   };
   const body = JV_ROWS.map(([name, l, r]) => {
     const [a, z] = leadLeft ? [l, r] : [r, l];
     return `<span class="jn">${name}</span>` + (a === z ? cell(a, true) : cell(a) + cell(z));
   }).join('');
-  return `<div class="jvh"><span class="evh">Joint visibility</span><span class="m">the rules use a joint from `
-    + `${fD(floor, 2)}${under ? ` · ${under} under it` : ''}</span></div>`
+  const note = pres && !(pFloor > 0) ? 'presence: is the joint in the picture at all — no floor set yet (min_presence 0)'
+    : `the rules use a joint from ${word} ${fD(floor, 2)}${under ? ` · ${under} under it` : ''}`;
+  return `<div class="jvh"><span class="evh">Joint ${word}</span><span class="jvseg">`
+    + `<button data-jv="vis" class="${pres ? '' : 'on'}" title="is the joint hidden?">Visibility</button>`
+    + `<button data-jv="pres" class="${pres ? 'on' : ''}" title="is the joint in the picture at all?">Presence</button></span>`
+    + `<span class="m">${note}</span></div>`
     + `<div class="jv"><span></span><span class="jh">lead</span><span class="jh">rear</span>${body}</div>`;
 }
+$('frameCard').addEventListener('click', e => {           // the switch: re-draw the card on the other score
+  const btn = e.target.closest('[data-jv]'); if (!btn) return;
+  JV_METRIC = btn.dataset.jv;
+  try { localStorage.setItem('pipelineViewerJV', JV_METRIC); } catch {}
+  if (S.skel) frameCard($('frameCard'), frameNow());
+});
 const iqr = q => q.map(x => x == null ? '–' : x.toFixed(1)).join('–') + '°';
 // a small scale 0°..max: the IQR as a shaded band, this punch's value as a marker in its verdict color
 function iqrBar(val, q, col, good) {
@@ -3814,7 +3849,7 @@ function drawOverlay(f, punchesNow) {
   if (V.skel) {
     // the rules read a joint only from the house visibility floor (the video's snapshot): under it the joint is drawn
     // hollow and its bones dashed, so what the rules skip shows on the footage. No snapshot: every joint drawn alike
-    const floor = S.th?.house?.min_visibility, seen = j => floor == null || !(S.skel[base + j * C + 6] < floor);
+    const floor = S.th?.house?.min_visibility, seen = j => floor == null || !(visAt(f, j) < floor);
     octx.lineCap = 'round'; octx.lineWidth = 3;
     for (const [a, b] of BONES) {
       const p = P(a), q = P(b); if (!(p && q)) continue;
@@ -4708,7 +4743,8 @@ function renderExplain() {
     `<li><b>Impact</b> is the frame where the punch reaches furthest, not the moment it hits something.</li>` +
     `<li><b>Visible joints:</b> the skeleton says how sure it is of each joint (0–1). A rule uses a joint only from `
     + `${S.th?.house ? fD(S.th.house.min_visibility, 2) : '…'}; below that, whatever needs the joint is not judged `
-    + `(the joint is hollow on the skeleton).</li>` +
+    + `(the joint is hollow on the skeleton). It also says whether the joint is in the picture at all (presence)`
+    + `${presFloor() > 0 ? `; a joint under presence ${fD(presFloor(), 2)} is skipped the same way` : ' — no floor on that yet'}.</li>` +
     `<li><b>Southpaws:</b> a southpaw's video is mirrored before the rules read it, so “lead” is always the boxer's ` +
     `lead hand.</li>` +
     `<li><b>Round score:</b> the average (or share) over everything the rule judged; with too little to judge, the ` +
