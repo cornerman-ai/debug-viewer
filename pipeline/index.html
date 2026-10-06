@@ -637,7 +637,7 @@ const DEF = {                         // defenses.csv defense_type
 };
 const styleP = t => PUNCH[t] || {c: '#8e8e93', l: '?', name: t};
 const styleD = t => DEF[t] || {c: '#8e8e93', l: '?', name: t};
-// the Rolls + slips row: defense6's colours per move, the side in the label ("Lead roll"), and where each came from
+// the Defense 2.0 row (rolls + slips): defense6's colours per move, the side in the label ("Lead roll"), and where each came from
 const rsStyle = e => ({c: styleD(e.type).c, l: styleD(e.type).l, name: `${cap(e.side)} ${e.type}`});
 const RS_SOURCE = {roll_model: 'roll model (ST-GCN, fr_none)', slip_rule: 'slip lens rule'};
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
@@ -786,7 +786,7 @@ const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[
 const STAGES = {
   punches: ['punch_impact', 'impacts.csv'], punchesFallback: ['punch_classification', 'punches.csv'],
   punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
-  rollsSlips: ['rolls_slips', 'moves.csv'],      // the Rolls + slips row: the roll model + the slip lens's rule, beside defense6
+  rollsSlips: ['rolls_slips', 'moves.csv'],      // the Defense 2.0 row: the roll model + the slip lens's rule, beside defense6
   angle: ['facing_angle', 'facing_angle.csv'],
   hit: ['hit_height', 'hit_height.csv'], hitJson: ['hit_height', 'hit_height.json'], hip: ['hip_rotation', 'hip_rotation.csv'],
   arm: ['arm_extension', 'arm_extension.csv'], armJson: ['arm_extension', 'arm_extension.json'],
@@ -2146,7 +2146,8 @@ async function buildVideo(src, sig, lite = false) {
     kind: 'p', sf: +r.start_frame, ef: +r.end_frame, type: r.punch_type, hand: r.hand, target: r.target,
     impact: hasImpact && r.impact_status === 'ok' ? +r.impact_frame : null, impConf: r.impact_conf ? +r.impact_conf : null,
     impStatus: hasImpact ? r.impact_status : 'not run'})).sort((a, b) => a.sf - b.sf);
-  // the Rolls + slips row (rolls_slips/moves.csv): kept only while the boxer faces the camera; empty for a video run
+  // the Defense 2.0 row (rolls_slips/moves.csv; "Rolls + slips" for its first hours): kept only while the boxer faces
+  // the camera; empty for a video run
   // before the stage existed (2026-10-06)
   N.rollsSlips = (rsCsv ? parseCSV(rsCsv) : []).map(r => ({
     kind: 'rs', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, score: +r.score,
@@ -2543,7 +2544,7 @@ const BASE_ROWS = [
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
-  ['rs', 'Rolls + slips', 'rolls from the roll model and slips from the slip lens\u2019s rule, facing the camera within 22.5°', () => S.hasRS],
+  ['rs', 'Defense 2.0', 'rolls from the roll model and slips from the slip lens\u2019s rule, facing the camera within 22.5°', () => S.hasRS],
 ];
 const baseOn = k => !!V.base[k] && !!BASE_ROWS.find(r => r[0] === k)?.[3]();
 function buildBase() {
@@ -3713,7 +3714,7 @@ function trackLines(name) {
   return best;
 }
 let TR = {}, laneTop = 0;                                       // laneTop: the first row under the facing row
-// each base row's height and the gap under it: lead / rear and defense / rolls + slips sit close as pairs
+// each base row's height and the gap under it: lead / rear and defense / defense 2.0 sit close as pairs
 const BASE_GEOM = {angle: [190, 8], lead: [30, 4], rear: [30, 10], def: [30, 4], rs: [30, 10]};
 function layout() {
   TR = {ruler: [0, 24]};
@@ -3805,7 +3806,7 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // track backgrounds + names
-  const names = {angle: 'Facing', lead: 'Lead', rear: 'Rear', def: 'Defense', rs: 'Rolls + slips', over: 'Overview', ...LNAME};
+  const names = {angle: 'Facing', lead: 'Lead', rear: 'Rear', def: 'Defense', rs: 'Defense 2.0', over: 'Overview', ...LNAME};
   if (TR.rules) {                                             // the rule rows' section caption + divider
     c.fillStyle = text3; c.textAlign = 'left'; c.font = '600 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
     c.fillText('RULES', 8, TR.rules); c.strokeStyle = sep; c.lineWidth = 1;
@@ -4024,7 +4025,7 @@ function draw(force) {
     $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
     eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f); comboCard($('comboCard'), f); frameCard($('frameCard'), f);
     const rsNow = at(S.rollsSlips, f, S.hiddenD);          // a roll and a slip can overlap: the slip rule fires on rolls too
-    if (rsNow.length) $('defCard').insertAdjacentHTML('beforeend', `<div class="evctx">Rolls + slips row: `
+    if (rsNow.length) $('defCard').insertAdjacentHTML('beforeend', `<div class="evctx">Defense 2.0: `
       + rsNow.map(e => `<b>${cap(e.side)} ${e.type}</b> (${RS_SOURCE[e.source] || e.source})`).join(' · ') + '</div>');
     $('clock').textContent = `${fmtT(video.currentTime)} · f ${f}`;
     const hud = [];

@@ -81,13 +81,13 @@ model grows with the square of the length, so long videos take longer than their
 ## Using it
 
 Timeline rows: facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands (each gated rule's own window is its `camera_window_deg` in the thresholds file, 45° by default; a rule with any other window shows its range beside its Front / Side / Back badges, e.g. "Side — 60–105°"), each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
-defense, **Rolls + slips** right under it — rolls from the roll detector (its newest run, fr_none seed 42, the five
+defense, **Defense 2.0** right under it (rolls + slips; the `rolls_slips` stage) — rolls from the roll detector (its newest run, fr_none seed 42, the five
 fold models averaged) and slips from the Slip exploration lens's rule, both kept only while the boxer faces the camera
 (within 22.5°, `rolls_slips/moves.csv`, run_all's viewer-only `rolls_slips` stage; no rule reads it, it sits beside
 defense6's row to be judged by eye; hover a block for its score; the defense chips hide its moves too) — and an
 overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
 hover for details; the chips in the side panel hide or show a punch / defense type. Every row has a switch in the
-**Timelines** tab's Timeline layers card: the base rows (Facing, Lead, Rear, Defense, Rolls + slips) on top, all on by
+**Timelines** tab's Timeline layers card: the base rows (Facing, Lead, Rear, Defense, Defense 2.0) on top, all on by
 default, then the rule rows; the choice is remembered in the browser, and a row the video's folder lacks is greyed out. On the video: the skeleton, a ring
 on the punching wrist around impact, and pills naming the current punch / move.
 
