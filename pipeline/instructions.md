@@ -15,8 +15,8 @@ A rule is built in the backend (`cornerman-backend/combined_pipeline/rules_creat
 
 Examples as of 2026-10-06. Timeline + Round score: arm extension, hip rotation, hit height, head off center line,
 elbow tuck, defense after combo, angle change after combo, offensive / combined combos; and, from the moves they
-count, punch variety, defense variety, body shots and fading output. Round score only: lead / rear hand balance (the
-Lead and Rear rows already show its count).
+count, punch variety, defense variety, body shots, fading output and lead / rear hand balance. Round score only:
+none — since 2026-10-06 every rule has a row.
 
 A timeline row for a number that never changes during the video is noise — it draws the same thing everywhere. A
 share is different: its row draws the moves the share is made of, not the number.

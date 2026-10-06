@@ -341,12 +341,14 @@ the facing has turned so far against the 45° needed.
   only until the next punch starts, if that comes first. Round = 100 at 70 % of combos covered or more, 0 at none,
   linearly in between; a plain number, no bands (fewer than 10 combos → not rated).
 
-**Lead/rear hand balance** (rule 5, `hand_balance/hand_balance.json`; "Hand balance" until 2026-10-03; a whole-video rule — no timeline row): the share of punches
+**Lead/rear hand balance** (rule 5, `hand_balance/hand_balance.json`; "Hand balance" until 2026-10-03; a whole-video rule): the share of punches
 thrown with the rear hand, scored 100 from 25 % to 40 % (60 % until 2026-10-05) and falling linearly to 0 at 0 % (all lead) and at 100 % (all
 rear); a plain number, no bands; fewer than 10 punches → not rated. The band is off-centre on purpose: the lead hand should throw more, the jab
-being the most thrown punch. Each hand's punch types sit beside it, unjudged.
+being the most thrown punch. Each hand's punch types sit beside it, unjudged. Its timeline row (since 2026-10-06) has
+a lane per hand over every punch it counts — lead blue on top, rear amber below (the share the score reads), the
+punch's letter on each — so the split, and where in the round one hand takes over, can be seen.
 
-**Combination length** (`combo_length/combo_length.json`, a whole-video rule — no timeline row): over the offensive
+**Combination length** (`combo_length/combo_length.json`, a whole-video rule; its combos are the Offensive combos row, shared with rule 30): over the offensive
 combinations `run_combinations.py` already wrote, the share that are 3 punches or more, scored 0 at none and 100
 from 40 %, linearly between — a plain number, no bands; fewer than 10 combinations → not rated. The mean length, the longest, the spread by
 length and the share of punches thrown outside any combination sit beside it, unjudged.

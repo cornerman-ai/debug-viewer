@@ -827,6 +827,7 @@ const VARCOL = {top: '#ff9f0a', other: '#34c759'};
 // rule 26's windows and rule 28's body shots
 const FADECOL = {first: '#0a84ff', last: '#ff9f0a', middle: '#8e8e93'};
 const BODYCOL = '#34c759';
+const HANDCOL = {lead: '#0a84ff', rear: '#ff9f0a'};   // rule 5's lanes: the rear share is what its score reads
 // Rule 26's compared windows, recomputed as run_output_decay.py cuts them: the punching span from the first punch's
 // start to the last one's (impacts.csv start_time); under thirds_below_span_s it is cut in thirds (first vs last),
 // otherwise the first window_s against the last window_s; a punch belongs to the window its start falls in, the last
@@ -1437,6 +1438,37 @@ const RULE_LAYERS = [
       } else {                                                // a head hook / uppercut: the total, not the share
         c.strokeStyle = css('--text3') || '#aeaeb2'; c.lineWidth = 1.5; c.globalAlpha = on ? 1 : 0.8;
         rr(x0 + 0.75, y + 5.75, Math.max(2, w - 1.5), h - 11.5, 3); c.stroke(); c.globalAlpha = 1;
+      }
+    },
+  },
+  {
+    // rule 5, lead/rear hand balance (hand_balance.json, over punch_impact/impacts.csv — every punch it counts): a
+    // two-lane row, lead punches in the top lane (blue), rear punches in the bottom one (amber — the rear share is
+    // what the score reads, full marks 25-40 %), the punch's letter on it. No punch is right or wrong: the lanes show
+    // the split and where in the round one hand takes over.
+    key: 'handbal', label: RN(5), short: 'Hand balance', items: true, split: 'hand',
+    csv: ['punch_impact', 'impacts.csv'], json: ['hand_balance', 'hand_balance.json'],
+    parseItem: (r, num) => r.hand === 'lead' || r.hand === 'rear'
+      ? {sf: num(r.start_frame), ef: num(r.end_frame), hand: r.hand, type: r.punch_type} : null,
+    summary: () => '',
+    card: () => '',
+    tip: (e, x) => {
+      const js = S.layerSum.handbal, range = v => Array.isArray(v) ? v.map(fP).join('–') : fP(v);
+      return `<b>${RN(5)}</b> · ${fmtT(x.sf / S.fps)}<br>${cap(x.hand)} ${(PUNCH[x.type]?.name || x.type).toLowerCase()} — `
+        + `<span style="color:${HANDCOL[x.hand]}">a ${x.hand}-hand punch</span><br>`
+        + (js ? `<span class="m num">rear ${js.n_rear} / ${js.n_punches} punches = ${pct(js.rear_share)} → ${js.score ?? 'not rated'}`
+              + `${js.side ? ` (${js.side})` : ''}${THR(() => ` · full marks ${range(T(5, 'round.score.full'))} % rear, 0 at `
+              + `${T(5, 'round.score.zero').map(fP).join(' % and ')} %`)}</span>`
+            : '<span class="m">hand_balance.json is missing — rerun this video</span>');
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1), hh = h / 2 - 3;
+      const top = x.hand === 'lead', yy = top ? y + 3 : y + h / 2;
+      c.fillStyle = HANDCOL[x.hand]; c.globalAlpha = on ? 1 : 0.85; rr(x0, yy, w, hh, 3); c.fill(); c.globalAlpha = 1;
+      if (w >= 11) {
+        c.font = '600 9px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+        c.fillStyle = 'rgba(0,0,0,0.72)'; c.textAlign = 'center'; c.fillText(PUNCH[x.type]?.l || '?', x0 + w / 2, yy + hh / 2 + 0.5);
       }
     },
   },
@@ -2197,7 +2229,7 @@ const RULE_LAYERS = [
 // Which Notion rules (by number, renumbered 2026-10-01) each timeline layer judges — shown beside its switch.
 const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [3], guard: [4], resting: [6], chin_depth: [7], chin_height: [8], elbow: [9], anglechg: [13],
-  varpunch: [27], vardef: [29], fade: [26], bodyshot: [28],
+  varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
   rpivot: [33], work: [25],
@@ -2814,6 +2846,7 @@ const SCOPE = {
   vardef:    {moves: 'every defensive move, as a share of the round', angles: 'front, back, side-on'},
   fade:      {moves: 'the punches in the first and the last window', angles: 'front, back, side-on'},
   bodyshot:  {moves: 'hooks and uppercuts (jab / cross not counted)', angles: 'front, back, side-on'},
+  handbal:   {moves: 'every punch, by hand',                      angles: 'front, back, side-on'},
   guard:     {moves: 'every frame, per hand, while that hand is not punching', angles: 'front, back, side-on'},
   slip14:    {moves: 'slips only',                              angles: 'front, back'},
   slip15:    {moves: 'slips only',                              angles: 'front, back'},
