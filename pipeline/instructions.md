@@ -87,11 +87,11 @@ contradict each other or the viewer:
 
 - `combined_pipeline/pipeline_notes/rule_explanations.md` — what the rule measures and the fault it catches. Two lines, no numbers
   unless the number *is* the rule.
-- `combined_pipeline/pipeline_notes/changes.md` — only what differs from the app or the lens, and anything tried and dropped.
+- `combined_pipeline/pipeline_notes/rule_cards.md` — every rule in six lines: what it reads, its camera angle, its row
+  here, how one punch (frame, combo, move) is scored and how the round is; every number as in the thresholds file.
 - `combined_pipeline/pipeline_notes/threshold_source.md` — every number, marked **lens** or **ours**, with where it came from.
 
-A new rule adds a row to all three. A changed threshold changes it in `threshold_source.md` and, if the reasoning
-moved with it, in `changes.md`.
+A new rule adds a row to all three. A changed threshold changes it in `threshold_source.md` and in `rule_cards.md`.
 
 ## 4. Before pushing
 

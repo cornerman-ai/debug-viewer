@@ -232,7 +232,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   its shoulder, drawn at each frame's wrist x and that frame's shoulder height — so a dot is under it exactly when the
   rule counted it (0 of 12,628 dots differ, 2026-10-02). Until then it was a straight image segment between the two end
   positions, which ignored the shoulder and the timing and contradicted the verdict on a quarter of the dots. Round = 100 with no punch not okay, linearly to 0 at 70 % not okay, a plain number. Rebuilt 2026-10-01 — the earlier versions are in
-  `combined_pipeline/pipeline_notes/changes.md`. Reads `punches.csv` + `hand_return_path.json`.
+  `run_hand_return_path.py`'s docstring. Reads `punches.csv` + `hand_return_path.json`.
 - **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the hand
   that is NOT throwing, read at impact −1, impact and impact +1 frames and weighted ¼ · ½ · ¼ — how far it sits below
   the nose. Scored 100 up to 0.25 torso (an absolute line: a boxer who holds his hands low all round must not pass),
