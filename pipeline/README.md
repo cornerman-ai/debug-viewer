@@ -96,7 +96,8 @@ Under Lead, Rear, Defense and Defense 2.0, one small switch per punch / move typ
 count (since 2026-10-07): off hides that type on that row only (lead jabs, not rear ones) — its blocks, hover, the pills
 and the ↑ / ↓ jumps — and is remembered across videos; the Round tab's chips still hide a type on every row, for the
 current video. On the video: the skeleton, a ring
-on the punching wrist around impact, and pills naming the current punch / move.
+on the punching wrist around impact (dashed, with its visibility and "may be a guess", when the wrist is under 0.6 —
+see Hand return path), and pills naming the current punch / move.
 
 The side panel has five views, switched at its top:
 
@@ -237,8 +238,12 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   sooner — against the straight line (chord) between its first and last frame. Not okay — a U — when every frame between the ends sits under the chord; okay otherwise; no grade per
   punch. The block covers the measured window itself (impact → end + 0.15 s), lead windows on the top half of the row
   and rear on the bottom (a cross's window runs into the next jab's all the time), a white edge where each window
-  starts, green okay, red not okay, labelled with the frames under the chord. Overlapping windows each draw on the
-  video, on their own wrist, labelled by hand. On the video, for every frame of that window: the wrist's whole line, the
+  starts, green okay, red not okay, labelled with the frames under the chord. Each window draws on the video on its
+  own wrist, its label always naming the punch ("Lead jab · okay · 0/4 under the chord"). A wrist under visibility 0.6
+  is drawn hollow (an end) or as a hollow dot (a frame between), and the label gives the ends' visibility and "may be a
+  guess": a hand BlazePose cannot see (side-on, the far hand behind the head or the body) still gets a position, on the
+  chest, back or hip (by eye on the shelf's window ends, 2026-10-07: off the hand in 8 of 12 under 0.5, 6 of 12 at
+  0.5–0.6, 1 of 12 at 0.6–0.8). Display only: the rule still reads every wrist from the house floor (0.30). On the video, for every frame of that window: the wrist's whole line, the
   two ends (grey dots), each frame between them as a red (under) or green dot tied by a thin line to the chord, and
   where the wrist is now. The chord (dashed white) is the rule's own: a straight line in time of the wrist's height above
   its shoulder, drawn at each frame's wrist x and that frame's shoulder height — so a dot is under it exactly when the

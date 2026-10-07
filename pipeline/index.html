@@ -1858,16 +1858,21 @@ const RULE_LAYERS = [
           for (let k = 0; k < K; k++) {
             const q = PAT(a.ws + k, wr), sh = PAT(a.ws + k, sj); if (!(q && sh)) continue;
             const r = [q[0], sh[1] - (g0 + (g1 - g0) * k / (K - 1))]; ref.push(r);
-            if (k > 0 && k < K - 1) { const dc = a.mask[k - 1] === '1' ? '#ff3b30' : '#34c759'; OV.line(r, q, dc, 1.5); OV.dot(q, dc, 3.5); }
+            if (k > 0 && k < K - 1) { const dc = a.mask[k - 1] === '1' ? '#ff3b30' : '#34c759'; OV.line(r, q, dc, 1.5);
+              wristGuess(a.ws + k, wr) ? OV.hollow(q, dc, 4) : OV.dot(q, dc, 3.5); }
           }
           octx.save(); octx.strokeStyle = '#ffffff'; octx.lineWidth = 2; octx.setLineDash([5, 4]); octx.beginPath();
           ref.forEach((pt, i) => i ? octx.lineTo(...pt) : octx.moveTo(...pt)); octx.stroke(); octx.restore();
         }
-        if (st) OV.dot(st, '#8e8e93', 5);
-        if (en) OV.dot(en, '#8e8e93', 5);
-        const w = P(wr); if (w) OV.ring(w, col, 9, 2.5);                    // where the wrist is now
-        const name = es.length > 1 ? `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()} · ` : '';
-        if (st) overlayLabel(st[0] + 14, st[1] - 18, `${name}${a.verdict === 'fail' ? 'not okay — a U' : 'okay'} · ${a.below}/${a.between} under the chord`, col);
+        const gs = wristGuess(a.ws, wr), ge = wristGuess(a.we, wr);       // an end the hand was hidden on: a guess
+        if (st) gs ? OV.hollow(st, '#8e8e93', 6) : OV.dot(st, '#8e8e93', 5);
+        if (en) ge ? OV.hollow(en, '#8e8e93', 6) : OV.dot(en, '#8e8e93', 5);
+        const w = P(wr); if (w) OV.ring(w, col, 9, 2.5, wristGuess(f, wr) ? [4, 3] : null);   // where the wrist is now
+        const name = `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()} · `;  // always: windows of both
+                                                                                               // hands overlap all the time
+        const vv = fr => visAt(fr, wr).toFixed(2);
+        const warn = gs || ge ? ` · wrist visibility ${[gs && `start ${vv(a.ws)}`, ge && `end ${vv(a.we)}`].filter(Boolean).join(', ')} — may be a guess` : '';
+        if (st) overlayLabel(st[0] + 14, st[1] - 18, `${name}${a.verdict === 'fail' ? 'not okay — a U' : 'okay'} · ${a.below}/${a.between} under the chord${warn}`, col);
       }
     },
   },
@@ -3761,6 +3766,12 @@ const presFloor = n => {
   const o = n == null ? null : S.th?.rules?.[n]?.house_overrides;
   return o && 'min_presence' in o ? o.min_presence : S.th?.house?.min_presence;
 };
+// A wrist BlazePose cannot see (side-on, the far hand behind the head or the body) still gets a position: a guess on
+// the chest, back or hip, with low visibility. On the rule 16 window ends of the shelf, by eye (2026-10-07, 12 per band):
+// off the hand in 8 of 12 under 0.5, 6 of 12 at 0.5-0.6, 1 of 12 at 0.6-0.8. DISPLAY ONLY: under GUESS_VIS the viewer
+// draws the wrist hollow / dashed and says so; the rules still read every joint from the house floor.
+const GUESS_VIS = 0.6;
+const wristGuess = (fr, j) => { const v = visAt(fr, j); return Number.isFinite(v) && v < GUESS_VIS; };
 const visAt = (fr, j, n) => {
   const C = S.skelC, b = (fr * 33 + j) * C;
   return C >= 8 && S.skel[b + 7] < presFloor(n) ? 0 : S.skel[b + 6];
@@ -3879,13 +3890,15 @@ function drawOverlay(f, punchesNow) {
   LABEL_TAG = '';
   drawFrameOverlays(f, P);                                // per-frame rules: not tied to a punch under the playhead
   // impact: a ring on the punching wrist, strongest on the impact frame, fading over ±3 frames
-  for (const e of punchesNow.concat(S.punches.filter(p => p.impact !== null && Math.abs(p.impact - f) <= 3 && !hid(p)))) {
+  for (const e of new Set(punchesNow.concat(S.punches.filter(p => p.impact !== null && Math.abs(p.impact - f) <= 3 && !hid(p))))) {
     if (e.impact === null) continue;
     const d = Math.abs(e.impact - f); if (d > 3) continue;
     const leadLeft = S.stance !== 'southpaw', wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr, p = P(wr); if (!p) continue;
-    const a = 1 - d / 4;
-    octx.strokeStyle = styleP(e.type).c; octx.globalAlpha = a; octx.lineWidth = 4;
-    octx.beginPath(); octx.arc(p[0], p[1], 16 + (3 - d) * 5, 0, 7); octx.stroke();
+    const a = 1 - d / 4, guess = wristGuess(f, wr);          // a hidden wrist: BlazePose's guess, drawn dashed
+    octx.save(); octx.strokeStyle = styleP(e.type).c; octx.globalAlpha = guess ? a * 0.6 : a; octx.lineWidth = 4;
+    if (guess) octx.setLineDash([6, 5]);
+    octx.beginPath(); octx.arc(p[0], p[1], 16 + (3 - d) * 5, 0, 7); octx.stroke(); octx.restore();
+    if (guess) { overlayLabel(p[0] + 22, p[1] + 4, `${cap(e.hand)} wrist visibility ${visAt(f, wr).toFixed(2)} — may be a guess`, '#8e8e93'); continue; }
     octx.globalAlpha = a * 0.35; octx.fillStyle = styleP(e.type).c; octx.beginPath(); octx.arc(p[0], p[1], 12, 0, 7); octx.fill();
     octx.globalAlpha = 1;
   }
@@ -3975,9 +3988,14 @@ const OV = {
     octx.save(); octx.fillStyle = col; octx.beginPath(); octx.arc(p[0], p[1], r, 0, 7); octx.fill();
     octx.strokeStyle = 'rgba(0,0,0,0.35)'; octx.lineWidth = 1.5; octx.stroke(); octx.restore();
   },
-  ring(p, col, r = 14, w = 3) {
+  ring(p, col, r = 14, w = 3, dash = null) {
     if (!p) return;
-    octx.save(); octx.strokeStyle = col; octx.lineWidth = w;
+    octx.save(); octx.strokeStyle = col; octx.lineWidth = w; if (dash) octx.setLineDash(dash);
+    octx.beginPath(); octx.arc(p[0], p[1], r, 0, 7); octx.stroke(); octx.restore();
+  },
+  hollow(p, col, r = 5) {                                  // a point that is probably a guess (see GUESS_VIS)
+    if (!p) return;
+    octx.save(); octx.strokeStyle = col; octx.lineWidth = 2; octx.setLineDash([2, 2]);
     octx.beginPath(); octx.arc(p[0], p[1], r, 0, 7); octx.stroke(); octx.restore();
   },
   // a horizontal rule across the body, the way every guard-height style limit reads
