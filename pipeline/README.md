@@ -91,7 +91,11 @@ defense6's row to be judged by eye; hover a block for its score; the defense chi
 overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
 hover for details; the chips in the side panel hide or show a punch / defense type. Every row has a switch in the
 **Timelines** tab's Timeline layers card: the base rows (Facing, Lead, Rear, Defense, Defense 2.0) on top, all on by
-default, then the rule rows; the choice is remembered in the browser, and a row the video's folder lacks is greyed out. On the video: the skeleton, a ring
+default, then the rule rows; the choice is remembered in the browser, and a row the video's folder lacks is greyed out.
+Under Lead, Rear, Defense and Defense 2.0, one small switch per punch / move type the video has on that row, with its
+count (since 2026-10-07): off hides that type on that row only (lead jabs, not rear ones) — its blocks, hover, the pills
+and the ↑ / ↓ jumps — and is remembered across videos; the Round tab's chips still hide a type on every row, for the
+current video. On the video: the skeleton, a ring
 on the punching wrist around impact, and pills naming the current punch / move.
 
 The side panel has five views, switched at its top:

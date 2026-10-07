@@ -370,6 +370,15 @@
   .layer:first-of-type { border-top: 0; padding-top: 0; }
   .layer .toggle { color: var(--text); font-size: 13px; font-weight: 500; justify-content: space-between; width: 100%; }
   .layer .toggle.disabled { opacity: 0.4; pointer-events: none; }
+  .layer .subs { display: flex; flex-wrap: wrap; gap: 5px 14px; margin-top: 3px; }
+  .layer .subs:empty { display: none; }
+  .layer.off .subs { opacity: 0.45; }
+  .layer .toggle.sub { width: auto; justify-content: flex-start; gap: 5px; font-size: 12px; font-weight: 400; color: var(--text2); }
+  .layer .toggle.sub .sw { width: 24px; height: 14px; border-radius: 7px; }
+  .layer .toggle.sub .sw::after { width: 10px; height: 10px; }
+  .layer .toggle.sub.on .sw::after { transform: translateX(10px); }
+  .layer .toggle.sub i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+  .layer .toggle.sub .n { color: var(--text3); font-size: 11px; }
   .layer .lsum { color: var(--text2); font-size: 11.5px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
   .layer .lsum i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 0; }
   .layer .lsum .m, .lsum .m { color: var(--text3); }
@@ -1517,7 +1526,7 @@ const RULE_LAYERS = [
     frameOverlay(f, P, leadLeft, Q, torso) {               // inside the 0.25 s before a punch: what the rule reads
       // windows overlap other punches all the time (a cross starting while the jab is out), so every window that
       // holds this frame draws, each on its own wrist, each label named by hand
-      const es = S.punches.filter(p => p.drop?.verdict && f >= p.drop.a && f <= p.drop.b && !S.hiddenP.has(p.type)); if (!es.length) return;
+      const es = S.punches.filter(p => p.drop?.verdict && f >= p.drop.a && f <= p.drop.b && !hid(p)); if (!es.length) return;
       const nose = P(J.nose), sh = P(J.lsh), sh2 = P(J.rsh), t = torso(); if (!(nose && sh && sh2 && t)) return;
       const low = T(2, 'move.score.full'), zero = T(2, 'move.score.zero'), minVis = H(2, 'min_visibility');
       const x0 = Math.min(sh[0], sh2[0]) - 50, x1 = Math.max(sh[0], sh2[0]) + 50;
@@ -1816,7 +1825,7 @@ const RULE_LAYERS = [
     },
     frameOverlay(f, P, leadLeft) {                         // every window holding this frame: impact → end + 0.15 s
       const es = S.punches.filter(p => (p.hrp?.verdict === 'pass' || p.hrp?.verdict === 'fail') && f >= p.hrp.ws && f <= p.hrp.we
-                                       && !S.hiddenP.has(p.type));
+                                       && !hid(p));
       for (const e of es) {
         const a = e.hrp, lead = (e.hand === 'lead') === leadLeft, wr = lead ? J.lwr : J.rwr, sj = lead ? J.lsh : J.rsh;
         const col = a.verdict === 'fail' ? '#ff3b30' : '#34c759';
@@ -2281,6 +2290,12 @@ try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLay
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
 V.base = {angle: true, lead: true, rear: true, def: true, rs: true};
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
+// the sub-switches under Lead / Rear / Defense / Defense 2.0: the types hidden on that row only, kept across videos (the
+// Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
+V.sub = {lead: [], rear: [], def: [], rs: []};
+try { Object.assign(V.sub, JSON.parse(localStorage.getItem('pipelineViewerSub') || '{}')); } catch {}
+const hid = e => e.kind === 'p' ? S.hiddenP.has(e.type) || !!V.sub[e.hand]?.includes(e.type)
+  : S.hiddenD.has(e.type) || V.sub[e.kind === 'rs' ? 'rs' : 'def'].includes(e.type);
 const video = $('video');
 
 // ════════════════════════════ loading ════════════════════════════
@@ -2739,16 +2754,27 @@ const BASE_ROWS = [
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
   ['rs', 'Defense 2.0', 'rolls from the roll model and slips from the slip lens\u2019s rule, kept while the boxer faces the camera', () => S.hasRS],
 ];
+// the rows with a sub-switch per type: [the type table, the events, which of them sit on this row]
+const SUB_ROWS = {lead: () => [PUNCH, S.punches, e => e.hand === 'lead'], rear: () => [PUNCH, S.punches, e => e.hand === 'rear'],
+                  def: () => [DEF, S.defenses, () => true], rs: () => [DEF, S.rollsSlips, () => true]};
 const baseOn = k => !!V.base[k] && !!BASE_ROWS.find(r => r[0] === k)?.[3]();
 function buildBase() {
   const list = $('baseList');
   if (!list.children.length) {                             // the switches, once
     list.innerHTML = BASE_ROWS.map(([k, name, what]) => `<div class="layer"><label class="toggle" data-base="${k}"><span>${name}</span>` +
-      `<span class="sw"></span></label><div class="lsum"><span class="m">${what}</span></div><div class="lsum" id="bsum-${k}"></div></div>`).join('');
+      `<span class="sw"></span></label><div class="lsum"><span class="m">${what}</span></div><div class="lsum" id="bsum-${k}"></div>` +
+      (SUB_ROWS[k] ? `<div class="subs" id="bsub-${k}"></div>` : '') + '</div>').join('');
+    list.onclick = e => {                                  // a sub-switch: one type on one row
+      const t = e.target.closest('.toggle.sub'); if (!t) return;
+      e.preventDefault(); const k = t.dataset.row, ty = t.dataset.type, h = V.sub[k];
+      h.includes(ty) ? h.splice(h.indexOf(ty), 1) : h.push(ty); t.classList.toggle('on', !h.includes(ty));
+      try { localStorage.setItem('pipelineViewerSub', JSON.stringify(V.sub)); } catch {}
+      V.lastFrame = -1; draw(true);
+    };
     list.querySelectorAll('.toggle[data-base]').forEach(t => t.onclick = e => {
       e.preventDefault(); const k = t.dataset.base;
       if (!BASE_ROWS.find(r => r[0] === k)[3]()) return;
-      V.base[k] = !V.base[k]; t.classList.toggle('on', V.base[k]);
+      V.base[k] = !V.base[k]; t.classList.toggle('on', V.base[k]); t.closest('.layer').classList.toggle('off', !V.base[k]);
       try { localStorage.setItem('pipelineViewerBase', JSON.stringify(V.base)); } catch {}
       layout(); resize(); draw(true);
     });
@@ -2756,6 +2782,13 @@ function buildBase() {
   for (const [k, , , has] of BASE_ROWS) {
     const t = list.querySelector(`.toggle[data-base="${k}"]`), ok = !!has();
     t.classList.toggle('disabled', !ok); t.classList.toggle('on', ok && !!V.base[k]);
+    t.closest('.layer').classList.toggle('off', !(ok && V.base[k]));
+    if (SUB_ROWS[k]) {                                     // one switch per type this video has on the row, with its count
+      const [table, arr, row] = SUB_ROWS[k](), n = ty => arr.filter(e => e.type === ty && row(e)).length;
+      $(`bsub-${k}`).innerHTML = !ok ? '' : Object.entries(table).filter(([ty]) => n(ty)).map(([ty, st]) =>
+        `<label class="toggle sub${V.sub[k].includes(ty) ? '' : ' on'}" data-row="${k}" data-type="${ty}"><span class="sw"></span>`
+        + `<i style="background:${st.c}"></i>${st.name}<span class="n num">${n(ty)}</span></label>`).join('');
+    }
     $(`bsum-${k}`).innerHTML = !ok ? '<span>not in this folder</span>'
       : k === 'rs' && S.rsSum?.facing_window_deg   // the stage's own window (configs/defense_compare.json, written into its json)
         ? `<span>kept while |facing| is ${S.rsSum.facing_window_deg.map(([a, b]) => a ? `${fN(a)}–${fN(b)}°` : `≤ ${fN(b)}°`).join(' or ')}</span>` : '';
@@ -3771,7 +3804,7 @@ function layerSections(e) {
   return layerOrder().map(k => RULE[k]).filter(L => layerOn(L.key)).map(L => THR(() => L.card(e, L.items
     ? (S.items[L.key] || []).find(it => it.els?.some(m => m.kind === 'punch' && m.sf === e.sf)) : e[L.key]))).join('');
 }
-const at = (arr, f, hidden) => arr.filter(e => e.sf <= f && f <= e.ef && !hidden.has(e.type));
+const at = (arr, f) => arr.filter(e => e.sf <= f && f <= e.ef && !hid(e));
 
 // ════════════════════════════ video overlay ════════════════════════════
 const ov = $('overlay'), octx = ov.getContext('2d');
@@ -3828,7 +3861,7 @@ function drawOverlay(f, punchesNow) {
   LABEL_TAG = '';
   drawFrameOverlays(f, P);                                // per-frame rules: not tied to a punch under the playhead
   // impact: a ring on the punching wrist, strongest on the impact frame, fading over ±3 frames
-  for (const e of punchesNow.concat(S.punches.filter(p => p.impact !== null && Math.abs(p.impact - f) <= 3 && !S.hiddenP.has(p.type)))) {
+  for (const e of punchesNow.concat(S.punches.filter(p => p.impact !== null && Math.abs(p.impact - f) <= 3 && !hid(p)))) {
     if (e.impact === null) continue;
     const d = Math.abs(e.impact - f); if (d > 3) continue;
     const leadLeft = S.stance !== 'southpaw', wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr, p = P(wr); if (!p) continue;
@@ -4141,10 +4174,10 @@ function drawTimeline(f) {
   };
   for (const e of S.punches) {                                // each lane only when its row is on
     const row = e.hand === 'lead' ? TR.lead : TR.rear;
-    if (row && !S.hiddenP.has(e.type)) block(e, row[0], row[1], styleP(e.type), e.sf <= f && f <= e.ef);
+    if (row && !hid(e)) block(e, row[0], row[1], styleP(e.type), e.sf <= f && f <= e.ef);
   }
-  if (TR.def) for (const e of S.defenses) if (!S.hiddenD.has(e.type)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
-  if (TR.rs) for (const e of S.rollsSlips) if (!S.hiddenD.has(e.type))
+  if (TR.def) for (const e of S.defenses) if (!hid(e)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
+  if (TR.rs) for (const e of S.rollsSlips) if (!hid(e))
     block(e, TR.rs[0], TR.rs[1], rsStyle(e), e.sf <= f && f <= e.ef);
   drawLayerRows(c, f, W, text, grid);
   drawFaceVeil(c, W, text);                               // shift-click a facing band: everything else fades back
@@ -4164,8 +4197,8 @@ function drawTimeline(f) {
   c.restore();
   // overview: the whole video, events as ticks, the visible window as a lens
   const [oy, oh] = TR.over;
-  for (const e of S.punches) if (!S.hiddenP.has(e.type)) { c.fillStyle = styleP(e.type).c; c.fillRect(ox(e.sf / fps), oy + 5, Math.max(1, ox((e.ef + 1) / fps) - ox(e.sf / fps)), 9); }
-  for (const e of S.defenses) if (!S.hiddenD.has(e.type)) { c.fillStyle = styleD(e.type).c; c.fillRect(ox(e.sf / fps), oy + 17, Math.max(1, ox((e.ef + 1) / fps) - ox(e.sf / fps)), 8); }
+  for (const e of S.punches) if (!hid(e)) { c.fillStyle = styleP(e.type).c; c.fillRect(ox(e.sf / fps), oy + 5, Math.max(1, ox((e.ef + 1) / fps) - ox(e.sf / fps)), 9); }
+  for (const e of S.defenses) if (!hid(e)) { c.fillStyle = styleD(e.type).c; c.fillRect(ox(e.sf / fps), oy + 17, Math.max(1, ox((e.ef + 1) / fps) - ox(e.sf / fps)), 8); }
   const vx0 = ox(V.t0), vx1 = ox(V.t1);
   c.fillStyle = 'rgba(128,128,128,0.16)'; rr(vx0, oy, Math.max(4, vx1 - vx0), oh, 6); c.fill();
   c.strokeStyle = acc; c.lineWidth = 1.5; rr(vx0, oy + 0.75, Math.max(4, vx1 - vx0), oh - 1.5, 6); c.stroke();
@@ -4219,7 +4252,7 @@ function skipStrip(c, x, w, y, on, why) {
 function drawLayerRows(c, f, W, text, grid) {
   const fps = S.fps, font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   const span = e => { const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps); return [x0, Math.max(2, x1 - x0 - 1)]; };
-  const vis = e => !S.hiddenP.has(e.type) && tx((e.ef + 1) / fps) >= L && tx(e.sf / fps) <= L + W;
+  const vis = e => !hid(e) && tx((e.ef + 1) / fps) >= L && tx(e.sf / fps) <= L + W;
   const tag = (x, w, y, h, t) => { if (w < (t.length <= 1 ? 14 : 30)) return; c.font = font; c.fillStyle = 'rgba(0,0,0,0.75)'; c.textAlign = 'left'; c.fillText(t, x + 6, y + h / 2 + 0.5); };
   const ring = (e, k, x, y, w, h) => {
     const [s0, s1] = RULE[k]?.window && e[k] ? [e[k].a, e[k].b] : [e.sf, e.ef];      // a window layer rings its window
@@ -4260,17 +4293,17 @@ function draw(force) {
   const f = frameNow();
   if (f !== V.lastFrame || force) {
     V.lastFrame = f;
-    const pNow = at(S.punches, f, S.hiddenP), dNow = at(S.defenses, f, S.hiddenD);
+    const pNow = at(S.punches, f), dNow = at(S.defenses, f);
     const a = S.hasAngle && S.pose[f] ? S.angle[f] : null;
     $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
     eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f); comboCard($('comboCard'), f); frameCard($('frameCard'), f);
-    const rsNow = at(S.rollsSlips, f, S.hiddenD);          // a roll and a slip can overlap: the slip rule fires on rolls too
+    const rsNow = at(S.rollsSlips, f);          // a roll and a slip can overlap: the slip rule fires on rolls too
     if (rsNow.length) $('defCard').insertAdjacentHTML('beforeend', `<div class="evctx">Defense 2.0: `
       + rsNow.map(e => `<b>${cap(e.side)} ${e.type}</b> (${RS_SOURCE[e.source] || e.source})`).join(' · ') + '</div>');
     $('clock').textContent = `${fmtT(video.currentTime)} · f ${f}`;
     const hud = [];
     for (const e of pNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}</span>`);
-    if (S.punches.some(e => e.impact === f && !S.hiddenP.has(e.type))) hud.push('<span class="pill impact">IMPACT</span>');
+    if (S.punches.some(e => e.impact === f && !hid(e))) hud.push('<span class="pill impact">IMPACT</span>');
     for (const e of dNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleD(e.type).c}"></span>${e.side ? cap(e.side) + ' ' : ''}${styleD(e.type).name}</span>`);
     $('hud').innerHTML = hud.join('');
     drawOverlay(f, pNow);
@@ -4299,15 +4332,15 @@ function hit(x, y) {
   const inRow = r => !!r && y >= r[0] && y <= r[0] + r[1];   // a row that is off has no place
   // overlapping blocks: the rightmost one wins (the latest start — also the one drawn on top); blocks the cursor is
   // really inside beat the ±1-frame slack that only makes thin blocks easier to hit
-  const find = (arr, hidden, pred) => {
-    const ok = arr.filter(e => !hidden.has(e.type) && pred(e));
+  const find = (arr, pred) => {
+    const ok = arr.filter(e => !hid(e) && pred(e));
     const last = xs => xs.reduce((b, e) => (!b || e.sf >= b.sf ? e : b), null);
     return last(ok.filter(e => f >= e.sf && f <= e.ef)) || last(ok.filter(e => f >= e.sf - 1 && f <= e.ef + 1));
   };
-  if (inRow(TR.lead)) return find(S.punches, S.hiddenP, e => e.hand === 'lead');
-  if (inRow(TR.rear)) return find(S.punches, S.hiddenP, e => e.hand === 'rear');
-  if (inRow(TR.def)) return find(S.defenses, S.hiddenD, () => true);
-  if (inRow(TR.rs)) return find(S.rollsSlips, S.hiddenD, () => true);
+  if (inRow(TR.lead)) return find(S.punches, e => e.hand === 'lead');
+  if (inRow(TR.rear)) return find(S.punches, e => e.hand === 'rear');
+  if (inRow(TR.def)) return find(S.defenses, () => true);
+  if (inRow(TR.rs)) return find(S.rollsSlips, () => true);
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
     const L_ = RULE[k];
     let e;
@@ -4323,7 +4356,7 @@ function hit(x, y) {
       const at = S.punches.filter(p => p[k]?.verdict && f >= p[k].a && f <= p[k].b);
       e = at.find(p => p.hand === side) || at[0];
     } else {
-      e = find(S.punches, S.hiddenP, p => !!p[k]);
+      e = find(S.punches, p => !!p[k]);
     }
     V.hoverLayer = e ? k : null; return e || null;
   }
@@ -4473,7 +4506,7 @@ document.addEventListener('keydown', e => {
   if (!S.src || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
   if ($('upl').style.display !== 'none' || $('ovr').style.display !== 'none' || VP.open) return;   // a window is open
   if (e.code === 'Escape' && V.faceFilter) { e.preventDefault(); setFaceFilter(null); return; }
-  const f = frameNow(), events = S.punches.filter(p => !S.hiddenP.has(p.type)).concat(S.defenses.filter(d => !S.hiddenD.has(d.type))).sort((a, b) => a.sf - b.sf);
+  const f = frameNow(), events = S.punches.filter(p => !hid(p)).concat(S.defenses.filter(d => !hid(d))).sort((a, b) => a.sf - b.sf);
   if (e.code === 'Space') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
   else if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
     e.preventDefault(); video.pause(); seekFrame(f + (e.code === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? Math.round(S.fps) : 1));
@@ -4483,7 +4516,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault(); zoomAt(stage.clientWidth / 2, stage.clientHeight / 2, /Equal|Add/.test(e.code) ? 1.25 : 0.8);
   } else if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); resetZoom(); }
   else if (e.code === 'KeyI') {
-    const p = at(S.punches, f, S.hiddenP).find(x => x.impact !== null) || S.punches.find(x => x.impact !== null && x.impact > f && !S.hiddenP.has(x.type));
+    const p = at(S.punches, f).find(x => x.impact !== null) || S.punches.find(x => x.impact !== null && x.impact > f && !hid(x));
     if (p) { video.pause(); seekFrame(p.impact); }
   }
 });
