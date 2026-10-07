@@ -78,7 +78,9 @@ Numbers in those lines come from the data, never hardcoded. The whole-video JSON
 A rule's wording in the viewer is part of the rule. Every time the backend rule changes — a threshold, a window, what
 it is measured on, which frames it skips — update its **Round score row in the same commit**: the `what`, `on`, `th`
 (the rule line and the bands) and `calc` lines, plus the timeline tooltip if it repeats the rule. Then re-run the
-stage on both test videos so the numbers in the row come from the new rule, and check the row in the browser.
+stage on the test videos (`run_all.py --stages <stage> --force`) so the numbers in the row come from the new rule, and
+check the row in the browser. The backend half of a rule change, step by step:
+`combined_pipeline/pipeline_notes/how_to_change_a_rule.md` and `how_to_change_a_threshold.md`.
 
 A row that still explains the old rule is worse than no row: it is read as the current truth.
 
