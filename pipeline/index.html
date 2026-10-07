@@ -918,17 +918,24 @@ const stanceTh = kind => { const C = STANCE[kind], full = fD(stanceFull(kind), 2
                   bands: [[`≥ ${full}`, '100'], [`0 → ${full}`, '0 → 100 (linear)']],
                   pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a'}},
           round: {label: 'per round', rule: C.roundRule}}; };
-// slip distance (slip_distance/moves.csv): how far the head travelled sideways during a SLIP, from where it started
-// to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose. One script,
-// two rules, two timeline rows: 14 "slip far enough" (100 from 0.20 torso, 0 with no travel) and 15 "slip not too much"
-// (100 up to 0.70, 0 at 1.00). Each row is coloured by its own slip score: green at 100, orange between, red at 0.
+// slip distance (slip_distance/moves.csv): how far the head travelled during a SLIP against the hips, from where it
+// started to its furthest point, in torso lengths — sideways (x) and up-down (y), each on its own (since 2026-10-07; x
+// only before). Rolls and ducks are not measured — a roll travels on purpose. One script, two rules, two timeline rows:
+// 14 "slip far enough" (per axis 100 from 0.20 torso, 0 with no travel) and 15 "slip not too much" (per axis 100 up to
+// 0.50, 0 at 1.00); the slip scores the lower of its two axes. Each row is coloured by its own slip score: green at 100,
+// orange between, red at 0; the white tick is the furthest frame of the axis that set the score.
 const angleCol = v => v >= 100 ? '#34c759' : v > 0 ? '#ff9f0a' : '#ff3b30';   // rule 13's combo score: 100 / 50 / 0
+// rule 14 / 15's per-axis line, said once when x and y share it
+const slipAxes = (n, f) => { const x = f('x'), y = f('y'); return x === y ? `${x}, sideways and up-down alike` : `sideways ${x}, up-down ${y}`; };
+const slipScale = n => slipAxes(n, a => n === 14 ? `100 from ${fD(T(14, `move.score_${a}.full`), 2)} torso of travel, 0 with no travel`
+  : `100 up to ${fD(T(15, `move.score_${a}.full`), 2)} torso of travel, 0 at ${fD(T(15, `move.score_${a}.zero`), 2)}`) + '; the slip scores the lower axis';
+// a slip's travel on both axes, for labels: "x 0.37 · y 0.20 torso"
+const slipTr = it => `x ${it.tx.toFixed(2)}${it.ty == null ? '' : ` · y ${it.ty.toFixed(2)}`} torso`;
 const slipCol = v => v == null ? '#8e8e93' : v >= 100 ? '#34c759' : v <= 0 ? '#ff3b30' : '#ff9f0a';
 function slipLayer(rule) {
   const key = `slip${rule}`, sk = `s${rule}`;
   const label = RN(rule);
-  const scale = () => THR(() => rule === 14 ? `100 from ${fD(T(14, 'move.score.full'), 2)} torso of travel, 0 with no travel`
-    : `100 up to ${fD(T(15, 'move.score.full'), 2)} torso of travel, 0 at ${fD(T(15, 'move.score.zero'), 2)}`);
+  const scale = () => THR(() => slipScale(rule));
   return {
     key, label, short: label, items: true,
     frameOverlay(f, P) {                                   // the head's path through the slip, and its furthest point
@@ -940,61 +947,71 @@ function slipLayer(rule) {
       const read = fr => {
         if (!S.skel || fr < 0 || fr >= S.skel.length / (33 * C)) return null;
         const b = fr * 33 * C;
-        let lo = Infinity, hi = -Infinity, ys = 0, n = 0;
+        let lo = Infinity, hi = -Infinity, ylo = Infinity, yhi = -Infinity, n = 0;
         for (let j = 0; j < 11; j++) {
           const x = S.skel[b + j * C], y = S.skel[b + j * C + 1];
           if (!(visAt(fr, j, rule) >= minVis) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
-          lo = Math.min(lo, x); hi = Math.max(hi, x); ys += y; n++;
+          lo = Math.min(lo, x); hi = Math.max(hi, x); ylo = Math.min(ylo, y); yhi = Math.max(yhi, y); n++;
         }
         const lh = PAT(fr, J.lhip), rh = PAT(fr, J.rhip);
         if (!n || !(lh && rh)) return null;
         for (const j of [J.lhip, J.rhip])                        // run_slip_distance.geometry: no reading unless both
           if (!(visAt(fr, j, rule) >= minVis)) return null;      // hips are at >= the house floor (the shoulders only
                                                                  // enter the video's torso unit, since 2026-10-06)
-        const head = PXY((lo + hi) / 2, ys / n);
+        const head = PXY((lo + hi) / 2, (ylo + yhi) / 2);
         return head ? {head, hipx: (lh[0] + rh[0]) / 2, hipy: (lh[1] + rh[1]) / 2} : null;
       };
       const here = read(f); if (!here) return;
       if (rule === 15 && layerOn('slip14')) {                 // both rows on: rule 14 drew the path, rule 15 adds its label
         overlayLabel(here.head[0] + 16, here.head[1] + 6,
-          `rule 15: travelled ${it.travel.toFixed(2)} torso → ${it.s15 == null ? '–' : Math.floor(it.s15)}`, col);
+          `rule 15: ${slipTr(it)} → ${it.s15 == null ? '–' : Math.floor(it.s15)}`, col);
         return;
       }
       OV.line([here.hipx, here.hipy], [here.hipx, here.head[1]], '#8e8e93', 1.5, [4, 4]);   // the line it is read from
       octx.save(); octx.strokeStyle = col; octx.lineWidth = 2.5; octx.lineCap = 'round'; octx.beginPath();
-      let base = null, started = false;                     // the path, drawn as sideways travel, hips held still
+      let base = null, started = false;                     // the path: the head against the hips, hips held still
+      const rel = r => [here.hipx + (r.head[0] - r.hipx), here.hipy + (r.head[1] - r.hipy)];
       for (let fr = it.sf; fr <= Math.min(f, it.ef); fr++) {
         const r = read(fr); if (!r) continue;
         if (!base) base = r;
-        const q = [here.hipx + (r.head[0] - r.hipx), r.head[1]];
+        const q = rel(r);
         started ? octx.lineTo(...q) : octx.moveTo(...q); started = true;
       }
       if (started) octx.stroke();
       octx.restore();
       if (base) {                                           // the rule's baseline: the first READABLE frame
-        const b0 = [here.hipx + (base.head[0] - base.hipx), base.head[1]];
+        const b0 = rel(base);                               // and the two travels from it, x then y
         OV.ring(b0, '#8e8e93', 8, 2);
-        OV.line([b0[0], here.head[1]], [here.head[0], here.head[1]], col, 2, [3, 3]);
+        OV.line(b0, [here.head[0], b0[1]], col, 2, [3, 3]);
+        OV.line([here.head[0], b0[1]], here.head, col, 2, [3, 3]);
       }
-      const pk = read(it.peakF);
-      if (pk && f >= it.peakF) OV.ring([here.hipx + (pk.head[0] - pk.hipx), pk.head[1]], col, 11, 3);
+      for (const pf of [it.peakX, it.peakY]) {              // the furthest frame on each axis
+        const pk = pf == null ? null : read(pf);
+        if (pk && f >= pf) OV.ring(rel(pk), col, 11, 3);
+      }
       OV.dot(here.head, col, 4.5);
       overlayLabel(here.head[0] + 16, here.head[1] + (rule === 14 ? -18 : 6),
-                   `rule ${rule}: travelled ${it.travel.toFixed(2)} torso → ${it[sk] == null ? '–' : Math.floor(it[sk])}`, col);
+                   `rule ${rule}: ${slipTr(it)} → ${it[sk] == null ? '–' : Math.floor(it[sk])}`, col);
     },
     csv: ['slip_distance', 'moves.csv'], json: ['slip_distance', 'slip_distance.json'],
     parseItem: (r, num) => r.verdict ? {type: r.defense_type, side: r.side, sf: num(r.start_frame), ef: num(r.end_frame),
-      travel: num(r.travel), peakF: num(r.peak_frame), verdict: r.verdict, s14: num(r.score_far_enough), s15: num(r.score_compact)} : null,
+      // per axis (since 2026-10-07); an older folder has x only, as travel / peak_frame
+      tx: num(r.travel_x ?? r.travel), ty: num(r.travel_y), peakX: num(r.peak_frame_x ?? r.peak_frame), peakY: num(r.peak_frame_y),
+      s14x: num(r.score_far_enough_x), s14y: num(r.score_far_enough_y), s15x: num(r.score_compact_x), s15y: num(r.score_compact_y),
+      verdict: r.verdict, s14: num(r.score_far_enough), s15: num(r.score_compact)} : null,
     card: () => '',
     tip: (e, x) => `<b>${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type} · rule ${rule}: ${x[sk] == null ? '–' : x[sk].toFixed(0)}</b> · ` +
-      `${fmtT(x.sf / S.fps)}<br><span class="num">the head travelled <b>${x.travel.toFixed(2)}</b> torso from where it started</span><br>` +
+      `${fmtT(x.sf / S.fps)}<br><span class="num">the head travelled <b>${x.tx.toFixed(2)}</b> torso sideways`
+      + (x.ty == null ? '' : ` (→ ${x[sk + 'x'].toFixed(0)}) and <b>${x.ty.toFixed(2)}</b> up-down (→ ${x[sk + 'y'].toFixed(0)})`)
+      + ` from where it started</span><br>` +
       `<span class="m">${scale()}</span>`,
     row(e, x, {c, y, h, span, tag, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
       c.fillStyle = slipCol(x[sk]); c.globalAlpha = on ? 1 : 0.9;
       rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
-      if (x.peakF != null) { const xi = tx((x.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
+      const pkF = x.ty == null || x[sk + 'x'] <= x[sk + 'y'] ? x.peakX : x.peakY;    // the axis that set the score
+      if (pkF != null) { const xi = tx((pkF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
         c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       tag(x0, w, y, h, x[sk] == null ? '' : `${x[sk].toFixed(0)}`);
     },
@@ -3058,13 +3075,13 @@ function ruleCard() {
   const slipOn = `${sl?.n_slips} slips · ${sl?.judged_slips} judged, the rest skipped (side-on, where the camera cannot `
                + `see the head move sideways) · rolls and ducks are not measured`;
   const slipEvent = {
-    short: () => { const s = fD(T(14, 'move.score.full'), 2);
-      return {label: 'per slip', rule: `travel = how far the head got from where it started, in torso lengths: 100 at ${s} `
-                                    + 'or more, linearly down to 0 with no travel',
+    short: () => { const s = fD(T(14, 'move.score_x.full'), 2);
+      return {label: 'per slip', rule: 'travel = how far the head got from where it started, against the hips, in torso '
+                                    + `lengths, sideways and up-down each scored: ${slipScale(14)}`,
             bands: [[`≥ ${s}`, '100'], [`0 → ${s}`, '0 → 100 (linear)']], pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a'}}; },
-    far:   () => { const fa = fD(T(15, 'move.score.full'), 2), z = fD(T(15, 'move.score.zero'), 2);
-      return {label: 'per slip', rule: 'travel = how far the head got from where it started, in torso lengths: 100 up to '
-                                    + `${fa}, linearly down to 0 at ${z}`,
+    far:   () => { const fa = fD(T(15, 'move.score_x.full'), 2), z = fD(T(15, 'move.score_x.zero'), 2);
+      return {label: 'per slip', rule: 'travel = how far the head got from where it started, against the hips, in torso '
+                                    + `lengths, sideways and up-down each scored: ${slipScale(15)}`,
             bands: [[`≤ ${fa}`, '100'], [`${fa} → ${z}`, '100 → 0 (linear)'], [`≥ ${z}`, '0']],
             pal: {'100': '#34c759', '100 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}}; }};
   const slipRound = n => ({label: 'per round', rule: `the mean slip score — a plain number, no bands; fewer than ${NJ(n)} judged slips: not rated`});
@@ -3072,8 +3089,8 @@ function ruleCard() {
                                            [RN(15), sl?.compact, 'far', 'too far']]) {
     if (!part) continue;
     add(name, part.score ?? 'not rated', part.score == null ? '#8e8e93' : 'var(--text)', {
-      what: fault === 'short' ? 'when he slips, does the head move far enough sideways off his hips?'
-                              : 'when he slips, does the head stay near his hips instead of travelling too far?',
+      what: fault === 'short' ? 'when he slips, does the head move far enough off his hips, sideways and down?'
+                              : 'when he slips, does the head stay near his hips instead of travelling too far either way?',
       on: slipOn, th: THR(() => ({event: slipEvent[fault](), round: slipRound(fault === 'short' ? 14 : 15)}), thMiss),
       calc: sl.judged_slips ? `mean of ${sl.judged_slips} slip scores = ${part.mean_score ?? '–'} · ${part.with_fault} ${word}`
                             : 'no slip could be read front-on'});
@@ -3585,7 +3602,8 @@ function defenseRules(e) {
     const why = THR(() => !n ? 'no_facing' : camSkip(14, Math.atan2(sx, cx) * 180 / Math.PI) || 'the head or the hips are not visible', TH_MISSING);
     rows = [[14, {skip: why}], [15, {skip: why}]];
   }
-  return evList(rows) + (it ? `<div class="evctx num">the head travelled ${it.travel.toFixed(2)} torso sideways</div>` : '');
+  return evList(rows) + (it ? `<div class="evctx num">the head travelled ${it.tx.toFixed(2)} torso sideways`
+    + (it.ty == null ? '' : `, ${it.ty.toFixed(2)} up-down`) + '</div>' : '');
 }
 // the combo(s) under the playhead: offensive (punches only) and combined (punches + defensive moves)
 function comboCard(el, f) {
@@ -4647,11 +4665,11 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [13, `Whether the boxer turns to face a new direction — ${fN(T(13, 'move.min_change_deg'))}° or more — within ${fN(T(13, 'move.window_after_s'))} seconds after a combination. It is a turn, not footwork: a sidestep that keeps the same facing counts as no change.`,
        'every combination of punches and defensive moves', `full marks when ${say(T(13, 'round.score.full'), [[0.5, 'half of them']], v => `${fP(v)} % of them`)} end in a turn, zero at none`,
        'Changing angle after an attack avoids the return fire and opens new lines.'],
-  [14, 'How far the head moves sideways, relative to the hips, during a slip. It doesn’t check which way the head went or whether it left a punch’s line.',
-       'slips only', `full marks from ${fD(T(14, 'move.score.full'), 2)} torso of travel, zero with none`,
+  [14, 'How far the head moves during a slip, relative to the hips — sideways and up-down, each on its own; the slip scores the weaker of the two. It doesn’t check which way the head went or whether it left a punch’s line.',
+       'slips only', slipAxes(14, a => `full marks from ${fD(T(14, `move.score_${a}.full`), 2)} torso of travel, zero with none`),
        'A slip that barely moves the head doesn’t take it out of the way.'],
-  [15, 'The same as rule 14 — sideways head travel during a slip — but checking that the slip isn’t too big.',
-       'slips only', `full marks up to ${fD(T(15, 'move.score.full'), 2)} torso of travel, zero at ${fD(T(15, 'move.score.zero'), 2)}`,
+  [15, 'The same as rule 14 — head travel during a slip, sideways and up-down — but checking that the slip isn’t too big either way.',
+       'slips only', slipAxes(15, a => `full marks up to ${fD(T(15, `move.score_${a}.full`), 2)} torso of travel, zero at ${fD(T(15, `move.score_${a}.zero`), 2)}`),
        'An oversized slip carries the head far off the hips: slow to come back and out of position to counter.'],
   [16, 'Whether the hand sinks on its way back after a jab or cross. It follows the wrist’s height above its shoulder from impact until just after the punch ends, and flags the punch when that height sags below a straight line the whole way. Sideways loops aren’t seen.',
        'jabs and crosses', `full marks when no punch sags, zero when ${fP(T(16, 'round.score.zero'))} % do`,

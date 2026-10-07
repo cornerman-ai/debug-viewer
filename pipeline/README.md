@@ -298,11 +298,12 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   noise inflates its variety. These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
-- **Slip far enough** / **Slip not too much** (rules 14 and 15, `slip_distance/`; 15 was "Slips compact" until 2026-10-03): per slip, how far the head travelled sideways from where it started, in
-  torso lengths, with a white tick at the furthest frame. Rolls and ducks are not measured. Judged front-on / back-on only;
-  a frame is read when a head point and both hips are visible (the overlay's path too). Two timeline rows, one per rule, each slip coloured by that
-  rule's slip score (green 100, orange between, red 0), and two round rows, each the mean of its slip scores: rule 14 "slip far enough" (100 at 0.20 torso of travel or more, 0 with none) and 15 "slip not too much" (100
-  up to 0.70, 0 at 1.00). Reads `moves.csv` + `slip_distance.json`.
+- **Slip far enough** / **Slip not too much** (rules 14 and 15, `slip_distance/`; 15 was "Slips compact" until 2026-10-03): per slip, how far the head travelled against the hips from where it started, in
+  torso lengths, sideways (x) and up-down (y) each scored on its own, the slip taking the lower (since 2026-10-07; x only
+  before), with a white tick at the furthest frame of the axis that set the score. Rolls and ducks are not measured. Judged front-on / back-on only;
+  a frame is read when a head point and both hips are visible (the overlay's path too: the head against the hips, both axes, with a ring at each axis's furthest frame). Two timeline rows, one per rule, each slip coloured by that
+  rule's slip score (green 100, orange between, red 0), and two round rows, each the mean of its slip scores: rule 14 "slip far enough" (per axis 100 at 0.20 torso of travel or more, 0 with none) and 15 "slip not too much" (per axis 100
+  up to 0.50, 0 at 1.00). Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
   hand is not punching — low above 0.50 for the lead hand, 0.30 for the rear, and 0.30 for both inside a detected
   defensive move (since 2026-10-05; 0 at 0.70 throughout). Continuous row, lead in the top half,
