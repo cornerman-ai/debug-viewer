@@ -343,10 +343,12 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   Reads `runs.csv` + `elbow_tuck.json`.
 
 **Angle change after combo** (rule 13, `angle_change/combos.csv` + `angle_change.json`; "Angle change" until 2026-10-03): per combined combo, the
-mean facing during it against the most different smoothed facing in the 2 s after it; a turn of ≥ 45° counts as a
-change. Round = 100 at half the combos changed or more, 0 at none, linear between — a plain number, no bands;
-fewer than 10 readable combos → not rated. Its timeline row (since 2026-10-06) is one block per combo — green when
-he turned, red when he stayed, the turn in degrees on it — with a thin tail over the 2 s the rule reads; a combo it
+mean facing during it against the most different smoothed facing in the 2 s after it; a turn of ≥ 45° scores the combo
+100, else a turn of ≥ 45° inside the combo itself (between any two of its 0.5 s-smoothed facings) 50 (since
+2026-10-07), else 0. Round = the mean combo score / 100 as the changed share: 100 at half or more, 0 at none, linear
+between — a plain number, no bands; fewer than 10 readable combos → not rated. Its timeline row (since 2026-10-06) is
+one block per combo — green (100) when he turned after it, orange (50) when only inside it, red (0) when he stayed, the
+turn after it in degrees on it — with a thin tail over the 2 s the rule reads; a combo it
 could not read — no facing angle during it or in the 2 s after it (no pose, or the video ends) — is a gray dashed strip
 ("no facing"). Inside a combo or its window the overlay says how far
 the facing has turned so far against the 45° needed.

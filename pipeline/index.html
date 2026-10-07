@@ -913,6 +913,7 @@ const stanceTh = kind => { const C = STANCE[kind], full = fD(stanceFull(kind), 2
 // to its furthest point, in torso lengths. Rolls and ducks are not measured — a roll travels on purpose. One script,
 // two rules, two timeline rows: 14 "slip far enough" (100 from 0.20 torso, 0 with no travel) and 15 "slip not too much"
 // (100 up to 0.70, 0 at 1.00). Each row is coloured by its own slip score: green at 100, orange between, red at 0.
+const angleCol = v => v >= 100 ? '#34c759' : v > 0 ? '#ff9f0a' : '#ff3b30';   // rule 13's combo score: 100 / 50 / 0
 const slipCol = v => v == null ? '#8e8e93' : v >= 100 ? '#34c759' : v <= 0 ? '#ff3b30' : '#ff9f0a';
 function slipLayer(rule) {
   const key = `slip${rule}`, sk = `s${rule}`;
@@ -1250,31 +1251,36 @@ const RULE_LAYERS = [
   },
   {
     // rule 13, angle change after combo (angle_change/combos.csv): one block per combined combo (punches + defensive
-    // moves) over the combo itself — green when the facing turned >= the rule's change within the window after it,
-    // red when it stayed, the turn in degrees on the block — and a thin tail over that window, where the rule looks.
+    // moves) over the combo itself, coloured by its score — green (100) when the facing turned >= the rule's change
+    // within the window after it, orange (the rule's inside_score, 50) when it turned that much only inside the combo,
+    // red (0) when it stayed — the turn after it in degrees on the block, and a thin tail over that window.
     // A combo the rule could not read (no facing during it or in the window after it: no pose, or the video ends) is
     // a gray dashed strip.
     key: 'anglechg', label: RN(13), short: 'Angle change', items: true,
     csv: ['angle_change', 'combos.csv'], json: ['angle_change', 'angle_change.json'],
     parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), seq: r.sequence, during: num(r.facing_during),
-      after: num(r.facing_after), deg: num(r.change_deg), changed: r.changed}),
+      after: num(r.facing_after), deg: num(r.change_deg), changed: r.changed, inside: num(r.inside_deg),
+      score: r.score === undefined ? (r.changed === 'yes' ? 100 : r.changed === 'no' ? 0 : null) : num(r.score)}),
     card: () => '',
     tip: (e, x) => {
       const fac = v => fN(+(S.mirrored ? -v : v).toFixed(1));            // shown as the facing row shows it
-      const st = x.changed === 'yes' ? 'moved to a new angle' : x.changed === 'no' ? 'stayed on the same line'
+      const st = x.score === 100 ? 'moved to a new angle after it · 100'
+        : x.score > 0 ? `turned only inside the combo, not after it · ${fN(x.score)}`
+        : x.score === 0 ? 'stayed on the same line · 0'
         : 'not judged — no facing angle during it or in the window after it (no pose, or the video ends)';
       return `<b>${RN(13)}</b> · ${fmtT(x.sf / S.fps)}<br><span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>`
         + (x.deg == null ? `<span class="m">${st}</span>`
           : `<span class="num">facing ${fac(x.during)}° during it → most different ${fac(x.after)}° in the `
-            + `${THR(() => `${fN(T(13, 'move.window_after_s'))} s`)} after · turned <b>${x.deg.toFixed(1)}°</b></span><br>`
-            + `<span style="color:${x.changed === 'yes' ? '#34c759' : '#ff3b30'}">${st}</span>`
+            + `${THR(() => `${fN(T(13, 'move.window_after_s'))} s`)} after · turned <b>${x.deg.toFixed(1)}°</b>`
+            + (x.inside == null ? ' · too short to read a turn inside it' : ` · inside it <b>${x.inside.toFixed(1)}°</b>`) + `</span><br>`
+            + `<span style="color:${angleCol(x.score)}">${st}</span>`
             + ` <span class="m">(${THR(() => `a turn of ≥ ${fN(T(13, 'move.min_change_deg'))}° counts`)})</span>`);
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(3, x1 - x0 - 1);
       if (x.changed !== 'yes' && x.changed !== 'no') { skipStrip(c, x0, w, y + h / 2, on, 'no_facing'); return; }
-      const col = x.changed === 'yes' ? '#34c759' : '#ff3b30';
+      const col = angleCol(x.score);
       let win = null; try { win = T(13, 'move.window_after_s'); } catch (err) { if (!(err instanceof ThMissing)) throw err; }
       if (win) {                                           // the window the rule reads, as a thin tail
         const t1 = tx((x.ef + 1) / fps + win);
@@ -2912,12 +2918,15 @@ function ruleCard() {
   if (ac) add(RN(13), ac.score ?? 'not rated', ac.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'after a combination, does he turn to face a new angle? (a turn of the facing direction, not footwork)',
     on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (no facing angle during the combo or in the window after it: no pose, or the video ends)`,
-    th: THR(() => ({event: {label: 'per combo', rule: `a turn of ≥ ${fN(T(13, 'move.min_change_deg'))}° from the combo’s mean facing (smoothed over ${fN(T(13, 'move.smooth_window_s'))} s), `
-                        + `reached within ${fN(T(13, 'move.window_after_s'))} s of its last frame, counts as a change`},
-         round: {label: 'per round', rule: 'the share of readable combos that changed angle, scored 0 at none and 100 '
+    th: THR(() => ({event: {label: 'per combo', rule: `100 for a turn of ≥ ${fN(T(13, 'move.min_change_deg'))}° from the combo’s mean facing (smoothed over ${fN(T(13, 'move.smooth_window_s'))} s), `
+                        + `reached within ${fN(T(13, 'move.window_after_s'))} s of its last frame; ${fN(T(13, 'move.inside_score'))} when not, but the facing turned ≥ ${fN(T(13, 'move.min_change_deg'))}° `
+                        + `inside the combo (between any two of its smoothed facings); 0 otherwise`},
+         round: {label: 'per round', rule: 'the mean combo score as a share of readable combos that changed angle (a turn only inside counts '
+                        + `${fN(T(13, 'move.inside_score'))} / 100), scored 0 at none and 100 `
                         + `from ${say(T(13, 'round.score.full'), [[0.5, 'half of them']], v => `${fP(v)} % of them`)}, linearly between — a plain number, no bands; fewer than ${NJ(13)} readable combos: not rated`,
                  bands: [[`≥ ${fP(T(13, 'round.score.full'))} %`, '100'], [`0 → ${fP(T(13, 'round.score.full'))} %`, '0 → 100']], pal: {'100': '#34c759', '0 → 100': '#ff9f0a'}}}), thMiss),
-    calc: `${ac.n_changed} turned / ${ac.n_readable} combos = ${pct(ac.changed_share)} → ${ac.score ?? '–'}`});
+    calc: ac.n_inside == null ? `${ac.n_changed} turned / ${ac.n_readable} combos = ${pct(ac.changed_share)} → ${ac.score ?? '–'}`
+      : `(${ac.n_changed} turned after × 100 + ${ac.n_inside} only inside × ${fN(ac.thresholds?.inside_score ?? 50)}) / ${ac.n_readable} combos = ${pct(ac.changed_share)} → ${ac.score ?? '–'}`});
   scored('arm', RN(21), q => ({
     what: 'does the arm reach full extension on a straight punch?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown head-on or with no facing, the boxer too far from the camera, or the arm hidden at its furthest reach)`,
@@ -3568,9 +3577,12 @@ function comboCard(el, f) {
       }
     } else {
       const a = (S.angleCombos || []).find(x => +x.start_frame === c.sf);
+      const asc = a?.score === undefined ? (a?.changed === 'yes' ? 100 : 0) : +a.score;   // older outputs: yes / no
       if (a) rows.push([13, a.changed === '' ? {skip: 'no_facing'}
-        : {text: a.changed === 'yes' ? `changed angle — ${(+a.change_deg).toFixed(0)}° after` : `kept the angle — ${(+a.change_deg).toFixed(0)}° after`,
-           col: a.changed === 'yes' ? GOOD : BAD}]);
+        : {text: asc >= 100 ? `changed angle — ${(+a.change_deg).toFixed(0)}° after · 100`
+             : asc > 0 ? `turned only inside — ${(+a.inside_deg).toFixed(0)}° inside, ${(+a.change_deg).toFixed(0)}° after · ${asc}`
+             : `kept the angle — ${(+a.change_deg).toFixed(0)}° after · 0`,
+           col: angleCol(asc)}]);
       const r = reps(kind, c);
       if (r != null) rows.push([31, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: 'var(--text)'}]);
     }
