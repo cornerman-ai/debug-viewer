@@ -697,13 +697,10 @@ function H(n, k) {
 }
 // A gated rule's camera window: the |facing angle| ranges in degrees it judges (0 = facing the camera, 90 = side-on,
 // 180 = back to it; both sides alike), any shape - e.g. side-on [[60, 105]], front only [[0, 30]] - every rule gating
-// on the angle itself (rule_config.camera_window / in_window, both ends included). A snapshot from before 2026-10-05
-// has only the house's camera_cut_deg: the same window, rebuilt from it.
+// on the angle itself (rule_config.camera_window / in_window, both ends included). Every gated rule carries its window.
 function camWindow(n) {
-  const view = T(n, 'camera'), w = S.th?.rules?.[n]?.camera_window_deg;
-  if (w) return w;
-  const a = H(n, 'camera_cut_deg');
-  return view === 'side_on' ? [[a, 180 - a]] : [[0, a], [180 - a, 180]];
+  T(n, 'camera');                                          // a gated rule; one without a camera gate throws ThMissing
+  return T(n, 'camera_window_deg');
 }
 // whether a facing angle (degrees, any sign or turn) is inside rule n's window - the backend's in_window
 const inCam = (n, deg) => {
@@ -718,15 +715,14 @@ function camSkip(n, deg) {
   const view = T(n, 'camera');
   return inCam(n, deg) ? null : view === 'front_back' ? 'side_on' : 'front_on';
 }
-// The window beside the Front / Side / Back badges, only once a rule's window differs from the 45 deg default
-// (" — 60–105°", any shape); '' for the default, an ungated rule, or no snapshot.
+// The window beside the Front / Side / Back badges (" — 65–115°", any shape), for every gated rule; '' for an ungated
+// rule or no snapshot.
 const camRange = n => camWindow(n).map(([lo, hi]) => `${fN(lo)}–${fN(hi)}°`).join(' + ');   // "60–105°"
 function camNote(n) {
   try {
     const view = S.th?.rules?.[n]?.camera;
     if (!view) return '';
-    const w = camWindow(n), def = view === 'side_on' ? [[45, 135]] : [[0, 45], [135, 180]];
-    return JSON.stringify(w) === JSON.stringify(def) ? '' : ` — ${camRange(n)}`;
+    return ` — ${camRange(n)}`;
   } catch { return ''; }
 }
 // rules 19 / 20: where the cost above the range is all spent, "twice the upper bound" while that is 2 x
@@ -749,9 +745,9 @@ const restFrames = () => { const m = T(6, 'move.frames_around_impact');
 const restOffs = () => restFrames()?.map(([o]) => o) ?? null;
 const restWeights = () => restFrames().map(([, w]) => fG(w)).join(' · ');
 const guardFull = hand => T(4, `move.score.full.${hand}`);                        // rule 4: full marks up to here
-// rule 4 at frame f: inside a detected defensive move each hand's full-marks line is full_in_defensive_move (since
-// 2026-10-05; an older snapshot has none: the normal line, as that video was scored). The zero line never changes.
-const guardDef = f => !!S.th?.rules?.[4]?.move?.full_in_defensive_move && (S.defenses || []).some(d => f >= d.sf && f <= d.ef);
+// rule 4 at frame f: inside a detected defensive move each hand's full-marks line is full_in_defensive_move. The zero
+// line never changes.
+const guardDef = f => (S.defenses || []).some(d => f >= d.sf && f <= d.ef);
 const guardLine = (hand, f) => guardDef(f) ? T(4, `move.full_in_defensive_move.${hand}`) : guardFull(hand);
 // rule 9's linear stretch, zero - full flare: rounded so 0.50 - 0.15 is the 0.35 the score always divided by
 const elbowSpan = (zero, full) => +(zero - full).toFixed(12);
@@ -792,10 +788,9 @@ const STAGES = {
   punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
   rollsSlips: ['rolls_slips', 'moves.csv'],      // the Defense 2.0 row: the roll model + the slip lens's rule, beside defense6
   angle: ['facing_angle', 'facing_angle.csv'],
-  hit: ['hit_height', 'hit_height.csv'], hitJson: ['hit_height', 'hit_height.json'], hip: ['hip_rotation', 'hip_rotation.csv'],
-  arm: ['arm_extension', 'arm_extension.csv'], armJson: ['arm_extension', 'arm_extension.json'],
 };
-// rule verdicts → semantic Apple colors (green = fine, orange = too little, red = wrong / too much, gray = not judged)
+// verdict pills and tooltips → semantic Apple colors (green = pass / on target / inside the range, red = fail / off
+// target; hip and shoulder rotation name the side of the range: orange = too little, red = too much; gray = not judged)
 const VERD = {good: '#34c759', pass: '#34c759', bad_low: '#ff9500', bad_high: '#ff3b30', fail: '#ff3b30',
               skip: '#8e8e93', unclear: '#8e8e93', on_target: '#34c759', off_target: '#ff3b30'};
 const VNAME = {good: 'good', pass: 'pass', bad_low: 'too little', bad_high: 'too much', fail: 'fail', skip: 'skipped',
@@ -804,28 +799,25 @@ const VNAME = {good: 'good', pass: 'pass', bad_low: 'too little', bad_high: 'too
 const ZONE = {head: ['H', 'head'], body: ['B', 'body'], shoulder: ['S', 'shoulder'], over_head: ['↑', 'over the head'],
               below_belt: ['↓', 'below the belt']};
 // ════════════════════════════ rule layers ════════════════════════════
-// ONE entry per rule. To add a rule, add an entry here: its toggle, file loading, summary, timeline row, punch-card
-// section, tooltip and video overlay all come from it — no other code changes. An entry:
+// ONE entry per rule row: its toggle, file loading, timeline row, punch-card section, tooltip and video overlay all
+// come from it. The other places a rule lives (its name, Round row, Explanations row, Now line...) are listed in
+// instructions.md. An entry:
 //   key, label (the toggle), short (the timeline row's name), csv / json: [stage folder, file] in the video folder,
 //   parse(row, num)      → this punch's data from its CSV row (joined by start frame + hand), or null to leave it out
-//   summary(P, json, u)  → the rule's counts (u: dot(color, text), count(punches, key-fn)); kept for reuse, the
-//                          panel does not render it now — the Round view shows only the scores
 //   card(e, x)           → the punch card's section (x = e[key], may be undefined)
 //   tip(e, x, u)         → the tooltip body when hovering the rule's row (u: head line, v(verdict))
 //   row(e, x, g)         → draws the punch's block in the rule's row (g: canvas, row y / h, span, tag, ring, tx, fps)
 //   overlay(e, x, f, P, leadLeft) → optional: draws on the video for the punch under the playhead
-// ── combinations (not a rule): two kinds with the same rule — no pause > 0.3 s between elements, however long
+// ── combinations — the rows of rules 24 and 30 (offensive) and 31 (combined): one grouping for both kinds — no pause
+//    longer than rules 30 / 31's max_gap_s between elements, however long
 //    each lasts. offensive = punches only, combined = punches + defensive moves. An "items" layer: its
 //    rows are the combinations themselves (combinations/<kind>.csv), one plain line each, not the punches ──
 const COMBO = {offensive: '#0a84ff', combined: '#bf5af2'};
-// combo diversity (offensive and combined, each on its own combos): 100 below a 40 % top-3 share, linear to 0 at
-// 100 %; < 10 combos not rated
-const ELBOWSTATE = {tucked: '#34c759', borderline: '#ffcc00', flared: '#ff3b30'};   // per-stretch colour on the row
-// stretches the rule cannot judge: a flat gray strip, the reason in the tooltip
+const ELBOWSTATE = {tucked: '#34c759', flared: '#ff3b30'};   // per-stretch colour on the row: tucked = 100, flared = below
 // Why a frame is gray. The long form goes in the tooltip; SKIPWORD is the short one written on the strip, so the
 // reason is readable without hovering. Every gray state on every row has an entry here.
 const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 'side-on', front_on: 'front-on',
-                  punching: 'punching', hook: 'hook', video_end: 'video ends', no_side: 'no side'};
+                  punching: 'punching', hook: 'hook / body', no_facing: 'no facing', no_side: 'no side'};
 // rules 27 / 29, the variety rows: the share the score reads (the most-used types / type / side) vs everything else
 const VARCOL = {top: '#ff9f0a', other: '#34c759'};
 // rule 26's windows and rule 28's body shots
@@ -855,8 +847,9 @@ function fadeWins() {
   FADE = {items, wins: wins.map(([name, a, b]) => ({name, a, b, n: items.filter(x => x.win === name).length}))};
   return FADE;
 }
+// elbow tuck's stretches it cannot judge (a gray strip on its row): the long form, for the tooltip
 const ELBOWSKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
-                   hook: 'this arm is throwing a hook'};
+                   hook: 'this arm is throwing a hook or a body shot'};
 function comboEls(r) {                                   // the "kind|hand|type|start_frame ; ..." column → elements in order
   return r.elements.split(' ; ').map(t => { const [kind, hand, type, sf] = t.split('|'); return {kind, hand, type, sf: +sf}; });
 }
@@ -871,11 +864,6 @@ function comboLayer(kind, label, short, what) {
     csv: ['combinations', `${kind}.csv`], json: ['combinations', 'combinations.json'],
     parseItem: (r, num) => ({id: num(r.combo_id), sf: num(r.start_frame), ef: num(r.end_frame), n: num(r.n_elements),
       nP: num(r.n_punches), nD: num(r.n_defenses), seq: r.sequence, els: comboEls(r)}),
-    summary(P, js, {dot}) {
-      const k = js?.[kind]; if (!k) return '';
-      return dot(COMBO[kind], `${k.n_combinations} combinations`) + `<span>${k.n_different} different</span>` +
-        (kind === 'combined' ? `<span>${k.n_with_defense} with a defensive move</span>` : '');
-    },
     card: (e, x) => `<div class="sub"><div class="h">${label}</div>` + (!x ? '<div class="empty">not in a combination</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elements</span><b>${x.nP} punches${x.nD ? ` + ${x.nD} defense` : ''}</b>
        <span>Repeats in the video</span><b>${reps(x)}×</b></div>
@@ -914,6 +902,8 @@ const STANCE = {
           scope: {moves: 'every frame', angles: 'side-on'}},
 };
 const stanceFull = kind => T(STANCE[kind].no, STANCE[kind].full);      // 100 from here (torso / leg lengths)
+const stanceZero = kind => T(STANCE[kind].no, 'move.score.zero');      // 0 here
+const stanceScore = (kind, v) => { const f = stanceFull(kind), z = stanceZero(kind); return 100 * Math.min(1, Math.max(0, (v - z) / (f - z))); };
 const stanceTh = kind => { const C = STANCE[kind], full = fD(stanceFull(kind), 2);     // the Rules tab's thresholds
   return {event: {label: 'per frame', rule: C.rule,
                   bands: [[`≥ ${full}`, '100'], [`0 → ${full}`, '0 → 100 (linear)']],
@@ -985,7 +975,6 @@ function slipLayer(rule) {
     csv: ['slip_distance', 'moves.csv'], json: ['slip_distance', 'slip_distance.json'],
     parseItem: (r, num) => r.verdict ? {type: r.defense_type, side: r.side, sf: num(r.start_frame), ef: num(r.end_frame),
       travel: num(r.travel), peakF: num(r.peak_frame), verdict: r.verdict, s14: num(r.score_far_enough), s15: num(r.score_compact)} : null,
-    summary: () => '',
     card: () => '',
     tip: (e, x) => `<b>${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type} · rule ${rule}: ${x[sk] == null ? '–' : x[sk].toFixed(0)}</b> · ` +
       `${fmtT(x.sf / S.fps)}<br><span class="num">the head travelled <b>${x.travel.toFixed(2)}</b> torso from where it started</span><br>` +
@@ -1034,7 +1023,6 @@ function stanceLayer(kind) {
     csv: [C.stage, 'runs.csv'], json: [C.stage, C.json],
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
       min: num(r[`min_${C.metric}`]), mean: num(r[`mean_${C.metric}`])}),
-    summary: () => '',
     card: () => '',
     frameOverlay(f, P, leadLeft, Q, torso) {               // the gap between the ankles, in this rule's own unit
       const it = OV.at(`stance_${kind}`, f);
@@ -1060,7 +1048,7 @@ function stanceLayer(kind) {
         if (legs.length === 2) unit = gap / ((legs[0] + legs[1]) / 2);   // the rule needs both legs, or it looks away
       }
       if (judged && unit != null) overlayLabel((la[0] + ra[0]) / 2 - 30, y + 18,
-        `${unit.toFixed(2)} ${kind === 'width' ? 'torso' : 'leg'} → ${Math.floor(100 * Math.min(1, unit / stanceFull(kind)))}`, col);
+        `${unit.toFixed(2)} ${kind === 'width' ? 'torso' : 'leg'} → ${Math.floor(stanceScore(kind, unit))}`, col);
     },
     tip: (e, x) => {
       const t = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
@@ -1109,7 +1097,6 @@ function chinLayer(kind) {
     key: `chin_${kind}`, label: C.label, short: C.short, items: true,
     csv: [C.stage, 'runs.csv'], json: [C.stage, C.json],
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame)}),
-    summary: () => '',
     card: () => '',
     frameOverlay(f, P, leadLeft, Q, torso) {               // the skeleton chin, and the line this axis reads it against
       const it = OV.at(`chin_${kind}`, f);
@@ -1188,7 +1175,6 @@ function bladeLayer(kind) {
     key: `blade_${kind}`, label: C.label, short: C.short, items: true,
     csv: [C.stage, 'runs.csv'], json: [C.stage, `${C.stage}.json`],
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), score: num(r.mean_score)}),
-    summary: () => '',
     card: () => '',
     frameOverlay(f, P, leadLeft, Q) {                      // the line itself, its turn out of the image plane, its score
       const it = OV.at(`blade_${kind}`, f);
@@ -1239,7 +1225,6 @@ const RULE_LAYERS = [
          delay: num(r.delay_s), seq: r.sequence, endF: num(r.end_frame)}
       : {covered: false, sf: num(r.end_frame), ef: Math.max(num(r.end_frame), Math.round(num(r.window_end_time) * fps) - 1),
          seq: r.sequence, endF: num(r.end_frame), cut: r.cut_by_punch === '1'},
-    summary: () => '',
     card: () => '',
     tip: (e, x) => x.covered
       ? `<b>Covered · ${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type}</b> · ${fmtT(x.sf / S.fps)}<br>` +
@@ -1267,17 +1252,17 @@ const RULE_LAYERS = [
     // rule 13, angle change after combo (angle_change/combos.csv): one block per combined combo (punches + defensive
     // moves) over the combo itself — green when the facing turned >= the rule's change within the window after it,
     // red when it stayed, the turn in degrees on the block — and a thin tail over that window, where the rule looks.
-    // A combo the rule could not read (the video ends inside its window) is a gray dashed strip.
+    // A combo the rule could not read (no facing during it or in the window after it: no pose, or the video ends) is
+    // a gray dashed strip.
     key: 'anglechg', label: RN(13), short: 'Angle change', items: true,
     csv: ['angle_change', 'combos.csv'], json: ['angle_change', 'angle_change.json'],
     parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), seq: r.sequence, during: num(r.facing_during),
       after: num(r.facing_after), deg: num(r.change_deg), changed: r.changed}),
-    summary: () => '',
     card: () => '',
     tip: (e, x) => {
       const fac = v => fN(+(S.mirrored ? -v : v).toFixed(1));            // shown as the facing row shows it
       const st = x.changed === 'yes' ? 'moved to a new angle' : x.changed === 'no' ? 'stayed on the same line'
-        : 'not judged — the video ends inside the window after it';
+        : 'not judged — no facing angle during it or in the window after it (no pose, or the video ends)';
       return `<b>${RN(13)}</b> · ${fmtT(x.sf / S.fps)}<br><span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>`
         + (x.deg == null ? `<span class="m">${st}</span>`
           : `<span class="num">facing ${fac(x.during)}° during it → most different ${fac(x.after)}° in the `
@@ -1288,7 +1273,7 @@ const RULE_LAYERS = [
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(3, x1 - x0 - 1);
-      if (x.changed !== 'yes' && x.changed !== 'no') { skipStrip(c, x0, w, y + h / 2, on, 'video_end'); return; }
+      if (x.changed !== 'yes' && x.changed !== 'no') { skipStrip(c, x0, w, y + h / 2, on, 'no_facing'); return; }
       const col = x.changed === 'yes' ? '#34c759' : '#ff3b30';
       let win = null; try { win = T(13, 'move.window_after_s'); } catch (err) { if (!(err instanceof ThMissing)) throw err; }
       if (win) {                                           // the window the rule reads, as a thin tail
@@ -1321,7 +1306,6 @@ const RULE_LAYERS = [
     key: 'varpunch', label: RN(27), short: RN(27), items: true,
     csv: ['punch_impact', 'impacts.csv'], json: ['same_punches', 'same_punches.json'],
     parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), type: r.punch_type, hand: r.hand}),
-    summary: () => '',
     card: () => '',
     tip: (e, x) => {
       const js = S.layerSum.varpunch, nm = t => PUNCH[t]?.name || t;
@@ -1352,7 +1336,6 @@ const RULE_LAYERS = [
     key: 'vardef', label: RN(29), short: RN(29), items: true, split: 'lane', halves: ['move', 'side'],
     csv: ['defense_classification', 'defenses.csv'], json: ['same_defense', 'same_defense.json'],
     parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), type: r.defense_type, side: r.side}),
-    summary: () => '',
     card: () => '',
     tip: (e, x) => {
       const js = S.layerSum.vardef, nm = t => (DEF[t]?.name || t || '').toLowerCase();
@@ -1387,7 +1370,6 @@ const RULE_LAYERS = [
     key: 'fade', label: RN(26), short: 'Fading output', items: true,
     csv: ['punch_impact', 'impacts.csv'], json: ['output_decay', 'output_decay.json'],
     parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), t: num(r.start_time), type: r.punch_type, hand: r.hand}),
-    summary: () => '',
     card: () => '',
     tip: (e, x) => {
       const D = fadeWins(); if (!D) return `<b>${RN(26)}</b><br><span class="m">${TH_MISSING}</span>`;
@@ -1422,7 +1404,6 @@ const RULE_LAYERS = [
     csv: ['punch_impact', 'impacts.csv'], json: ['bodyshots', 'bodyshots.json'],
     parseItem: (r, num) => ['hook', 'uppercut', 'hook_or_uppercut'].includes(r.punch_type)
       ? {sf: num(r.start_frame), ef: num(r.end_frame), type: r.punch_type, hand: r.hand} : null,
-    summary: () => '',
     card: () => '',
     tip: (e, x) => {
       const js = S.layerSum.bodyshot, body = x.type === 'hook_or_uppercut';
@@ -1455,7 +1436,6 @@ const RULE_LAYERS = [
     csv: ['punch_impact', 'impacts.csv'], json: ['hand_balance', 'hand_balance.json'],
     parseItem: (r, num) => r.hand === 'lead' || r.hand === 'rear'
       ? {sf: num(r.start_frame), ef: num(r.end_frame), hand: r.hand, type: r.punch_type} : null,
-    summary: () => '',
     card: () => '',
     tip: (e, x) => {
       const js = S.layerSum.handbal, range = v => Array.isArray(v) ? v.map(fP).join('–') : fP(v);
@@ -1484,7 +1464,6 @@ const RULE_LAYERS = [
     key: 'work', label: RN(25), short: RN(25), items: true,
     csv: ['work_rate', 'segments.csv'], json: ['work_rate', 'work_rate.json'],
     parseItem: (r, num) => r.kind === 'pause' ? null : {kind: r.kind, sf: num(r.start_frame), ef: num(r.end_frame), s: num(r.n_seconds)},
-    summary: () => '',
     card: () => '',
     tip: (e, x) => `<b style="color:${WORKKIND[x.kind].c}">●</b> <b>${WORKKIND[x.kind].name}</b> · `
       + `<span class="num">${fmtT(x.sf / S.fps)} · ${x.s.toFixed(2)} s</span><br><span class="m">${WORKKIND[x.kind].why}</span>`,
@@ -1502,15 +1481,14 @@ const RULE_LAYERS = [
   slipLayer(14), slipLayer(15),
   {
     // rule 2, punch starts from low guard (hand_drop/punches.csv): how far the punching wrist sits below the nose, in torso
-    // lengths, averaged over every readable frame of the 0.25 s before the punch starts. Low above 0.40 — the same
-    // absolute line the resting-hand rule uses.
+    // lengths, averaged over every readable frame of the window before the punch starts (move.window_before_s), scored
+    // against its own line (move.score).
     key: 'drop', label: RN(2), short: 'Starts from low guard',
     window: true,                                          // its block, ring and hover cover the 0.25 s BEFORE the punch
     split: 'hand',                                         // lead windows on the top half, rear on the bottom
     csv: ['hand_drop', 'punches.csv'], json: ['hand_drop', 'hand_drop.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), score: num(r.score), a: num(r.win_start), b: num(r.win_end), n: num(r.frames_read)}
       : {verdict: '', skip: r.skip_reason},
-    summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">Hand before the punch</div>` +
       (!x || !x.verdict ? `<div class="empty">${THR(() => `the punching wrist is not visible in the ${fN(T(2, 'move.window_before_s'))} s before this punch`)}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Wrist below the nose</span><b>${x.drop.toFixed(3)} torso, mean of ${x.n} frames</b>
@@ -1559,14 +1537,13 @@ const RULE_LAYERS = [
   {
     // dropping the resting hand while punching (resting_hand/punches.csv): the hand NOT throwing, read at the impact
     // frame and one frame either side of it, weighted and scored by the snapshot's rule 6 (frames_around_impact,
-    // move.score); drop_before / drop_after are its earliest and latest frames (drop_m2 / drop_p2 before 2026-10-05).
+    // move.score); drop_before / drop_after are its earliest and latest frames.
     key: 'resting', label: RN(6), short: 'Resting hand drop',
     csv: ['resting_hand', 'punches.csv'], json: ['resting_hand', 'resting_hand.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), score: num(r.score), rest: r.resting_hand,
-      m2: num(r.drop_before ?? r.drop_m2), d0: num(r.drop_0), p2: num(r.drop_after ?? r.drop_p2), n: num(r.frames_read),
+      m2: num(r.drop_before), d0: num(r.drop_0), p2: num(r.drop_after), n: num(r.frames_read),
       slip: num(r.slip), base: num(r.baseline)}
       : {verdict: '', skip: r.skip_reason, rest: r.resting_hand},
-    summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">The resting hand at this impact</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'no_impact_frame' ? 'no impact frame for this punch'
                                                  : 'the resting wrist is not visible around the impact frame'}</div>` :
@@ -1628,7 +1605,6 @@ const RULE_LAYERS = [
     parse: (r, num) => r.verdict ? {verdict: r.verdict, head: num(r.head_pos), off: num(r.hip_off),
       headOk: r.head_ok === 'yes', hipsOk: r.hips_ok === 'yes', why: r.reason,
       headScore: num(r.head_score), hipsScore: num(r.hips_score), score: num(r.score)} : {verdict: '', skip: r.skip_reason},
-    summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">${RN(1)}</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_side_on' ? `not side-on enough (it judges facing ${THR(() => camRange(1), '…')}) — balance is a fore-aft fault, read from the side`
                                                 : x && x.skip === 'no_impact_frame' ? 'no impact frame'
@@ -1685,7 +1661,6 @@ const RULE_LAYERS = [
     parse: (r, num) => r.verdict ? {verdict: r.verdict, cross: num(r.cross), score: num(r.score), lineNx: num(r.line_nx),
                                     centreNx: num(r.centre_nx), zeroNx: num(r.zero_nx)}
       : {verdict: '', skip: r.skip_reason},
-    summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">${RN(32)}</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'not_front_or_back_on' ? 'thrown side-on — the hook travels across the frame, and side-on that axis points at the camera'
                                                 : x && x.skip === 'body_shot' ? 'a body shot — the classifier cannot tell a body hook from a body uppercut'
@@ -1737,7 +1712,6 @@ const RULE_LAYERS = [
     key: 'rpivot', label: RN(33), short: RN(33),
     csv: ['rear_pivot', 'punches.csv'], json: ['rear_pivot', 'rear_pivot.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, lift: num(r.lift), score: num(r.score)} : {verdict: '', skip: r.skip_reason},
-    summary: () => '',
     card: (e, x) => `<div class="sub"><div class="h">${RN(33)}</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip === 'lead_hand' ? 'a lead-hand punch — the rule reads rear-hand punches only'
                                                 : x && x.skip === 'no_impact_frame' ? 'no impact frame'
@@ -1776,14 +1750,13 @@ const RULE_LAYERS = [
     },
   },
   {
-    // punch speed (punch_speed/punches.csv): start → impact, 100 up to the labelled 30th percentile of its punch type
-    // (8,166 labelled punches), linearly down to 0 at the 80th.
+    // punch speed (punch_speed/punches.csv): start → impact, 100 up to the labelled corpus's full_pctl-th percentile of
+    // its punch type, linearly down to 0 at its zero_pctl-th (move.score).
     key: 'speed', label: RN(23), short: RN(23),
     csv: ['punch_speed', 'punches.csv'], json: ['punch_speed', 'punch_speed.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, dur: num(r.duration), full: num(r.full_up_to), zero: num(r.zero_at), score: num(r.score)}
       : {verdict: '', skip: r.skip_reason},
-    summary: () => '',
-    card: (e, x) => `<div class="sub"><div class="h">Punch speed</div>` +
+    card: (e, x) => `<div class="sub"><div class="h">${RN(23)}</div>` +
       (!x || !x.verdict ? `<div class="empty">${x && x.skip ? x.skip.replace(/_/g, ' ') : 'not judged'}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${(x.dur * 1000).toFixed(0)} ms</b>
         <span>Scale</span><b>100 up to ${(x.full * 1000).toFixed(0)} ms, 0 at ${(x.zero * 1000).toFixed(0)} ms, linear</b>
@@ -1791,7 +1764,7 @@ const RULE_LAYERS = [
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${(x.skip || '').replace(/_/g, ' ')}</span>` :
       `<span class="num">${(x.dur * 1000).toFixed(0)} ms from the first frame to the impact · score <b>${x.score.toFixed(1)}</b></span><br>` +
       `<span class="m">100 up to ${(x.full * 1000).toFixed(0)} ms, 0 at ${(x.zero * 1000).toFixed(0)} ms — ${THR(() => `the ${ord(T(23, 'move.score.full_pctl'))} and ${ord(T(23, 'move.score.zero_pctl'))} `)}` +
-      `percentiles of this punch type across 8,166 labelled punches</span>`),
+      `percentiles of this punch type in the labelled corpus</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;
       const [bx, w] = span(e);
@@ -1814,11 +1787,6 @@ const RULE_LAYERS = [
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, ws: num(r.win_start), we: num(r.win_end),
       a: num(r.win_start), b: num(r.win_end), cut: r.cut_by_next === '1', startH: num(r.start_h), endH: num(r.end_h),
       between: num(r.frames_between), below: num(r.frames_below), mask: r.below_mask || ''} : null,
-    summary(P, js, {dot, count}) {
-      const m = count(P, p => p.hrp?.verdict);
-      return dot(VERD.pass, `${m.pass || 0} okay`) + dot(VERD.fail, `${m.fail || 0} not okay`) +
-        dot(VERD.skip, `${m.skip || 0} skipped`);
-    },
     card: (e, a) => `<div class="sub"><div class="h">${RN(16)} ${a && a.verdict !== 'skip' ? pillV(a.verdict) : ''}</div>` +
       (!a ? '<div class="empty">not judged (jabs and crosses only)</div>' :
        a.verdict === 'skip' ? `<div class="empty">not judged: ${(a.skip || '').replace(/_/g, ' ')}</div>` :
@@ -1876,11 +1844,6 @@ const RULE_LAYERS = [
     csv: ['arm_extension', 'arm_extension.csv'], json: ['arm_extension', 'arm_extension.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, peakF: num(r.peak_frame), peak: num(r.peak_bend),
       deg: num(r.bend_deg), elbow: num(r.elbow_deg), score: num(r.punch_score), full: num(r.full_deg), torsoFrac: num(r.torso_frac), impDeg: num(r.impact_bend_deg), impElbow: num(r.impact_elbow_deg), impVerdict: r.impact_verdict} : null,
-    summary(P, js, {dot, count}) {
-      const m = count(P, p => p.arm?.verdict);
-      return dot(VERD.pass, `${m.pass || 0} pass`) + dot(VERD.fail, `${m.fail || 0} fail`) +
-        dot(VERD.skip, `${(m.skip || 0) + (m.unclear || 0)} skipped`);
-    },
     card: (e, a) => `<div class="sub"><div class="h">${RN(21)} ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
       `<div class="rows num" style="margin-top:0"><span>Elbow angle at the furthest reach</span><b>${a.elbow == null ? '–' : a.elbow.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
        <span>Scale</span><b>${a.full == null ? '–' : `100 at ≥ ${a.full}°, 0 at ≤ ${THR(() => fN(T(21, 'move.score.zero')))}°, linear`}</b>
@@ -1923,21 +1886,16 @@ const RULE_LAYERS = [
     csv: ['shoulder_rotation', 'shoulder_rotation.csv'],
     parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
       vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
-      bsi: r.ref_start_impact_lo !== undefined ? [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)] : null,
+      bsi: [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)],
       qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact), score: num(r.score)}),
-    summary(P, js, {dot, count}) {
-      const h = count(P, p => p.shoulder?.status === 'ok' ? p.shoulder.vsi : null);   // was counting the HIP verdicts
-      return dot(VERD.good, `${h.good || 0} good`) + dot(VERD.bad_low, `${h.bad_low || 0} too little`) +
-        dot(VERD.bad_high, `${h.bad_high || 0} too much`);
-    },
     card: (e, r) => `<div class="sub"><div class="h">${RN(20)} ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
       `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
-       <span>Good range</span><b>${iqr(r.bsi || r.qsi)}</b>
+       <span>Good range</span><b>${iqr(r.bsi)}</b>
        <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}${r.vsi === 'bad_high' ? ` ${THR(() => `(above the range: up to ${fN(T(20, 'move.score.over.points_off'))} off, all ${fN(T(20, 'move.score.over.points_off'))} at ${overAt(20)})`)}` : ''}</b>
        <span>Study IQR, for reference</span><b>${iqr(r.qsi)}</b></div>`) + '</div>',
     tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">no rotation (${r.status})</span>` :
       head + `<span class="num">shoulder rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
-      `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi || r.qsi)}</b></span>` +
+      `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi)}</b></span>` +
       iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
       `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); ${THR(() => `above it up to ${fN(T(20, 'move.score.over.points_off'))} off, all ${fN(T(20, 'move.score.over.points_off'))} at ${overAt(20)}`)} · `
       + `dark: the study's IQR ${iqr(r.qsi)}</span>`,
@@ -1953,7 +1911,7 @@ const RULE_LAYERS = [
       const l = P(11), rt = P(12); if (!(l && rt)) return;
       const col = r.vsi === 'good' ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
       octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
-      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `shoulders start → impact ${r.si.toFixed(1)}° (range ${iqr(r.bsi || r.qsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
+      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `shoulders start → impact ${r.si.toFixed(1)}° (range ${iqr(r.bsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
       rotationTopView(e, r, leadLeft, 11, 12, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 70], col);
     },
   },
@@ -1962,21 +1920,16 @@ const RULE_LAYERS = [
     csv: ['hip_rotation', 'hip_rotation.csv'],
     parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
       vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
-      bsi: r.ref_start_impact_lo !== undefined ? [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)] : null,
+      bsi: [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)],
       qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact), score: num(r.score)}),
-    summary(P, js, {dot, count}) {
-      const h = count(P, p => p.hip?.status === 'ok' ? p.hip.vsi : null);
-      return dot(VERD.good, `${h.good || 0} good`) + dot(VERD.bad_low, `${h.bad_low || 0} too little`) +
-        dot(VERD.bad_high, `${h.bad_high || 0} too much`);
-    },
     card: (e, r) => `<div class="sub"><div class="h">${RN(19)} ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">no rotation (${r?.status || 'not run'})</div>` :
       `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
-       <span>Good range</span><b>${iqr(r.bsi || r.qsi)}</b>
+       <span>Good range</span><b>${iqr(r.bsi)}</b>
        <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}${r.vsi === 'bad_high' ? ` ${THR(() => `(above the range: up to ${fN(T(19, 'move.score.over.points_off'))} off, all ${fN(T(19, 'move.score.over.points_off'))} at ${overAt(19)})`)}` : ''}</b>
        <span>Study IQR, for reference</span><b>${iqr(r.qsi)}</b></div>`) + '</div>',
     tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">no rotation (${r.status})</span>` :
       head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
-      `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi || r.qsi)}</b></span>` +
+      `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi)}</b></span>` +
       iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
       `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); ${THR(() => `above it up to ${fN(T(19, 'move.score.over.points_off'))} off, all ${fN(T(19, 'move.score.over.points_off'))} at ${overAt(19)}`)} · `
       + `dark: the study's IQR ${iqr(r.qsi)}</span>`,
@@ -1992,7 +1945,7 @@ const RULE_LAYERS = [
       const l = P(23), rt = P(24); if (!(l && rt)) return;
       const col = r.vsi === 'good' ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
       octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
-      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `hips start → impact ${r.si.toFixed(1)}° (range ${iqr(r.bsi || r.qsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
+      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `hips start → impact ${r.si.toFixed(1)}° (range ${iqr(r.bsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
       rotationTopView(e, r, leadLeft, 23, 24, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 70], col);
     },
   },
@@ -2001,12 +1954,7 @@ const RULE_LAYERS = [
     csv: ['hit_height', 'hit_height.csv'], json: ['hit_height', 'hit_height.json'],
     // hit height (hit_height/hit_height.csv): every punch type, read at its impact frame against the ghost's zones
     parse: (r, num) => ({verdict: r.verdict, zone: r.zone, land: num(r.land_frame), hf: num(r.height_frac),
-      pen: num(r.penalty), skip: r.skip_reason, match: r.matches_target}),
-    summary(P, js, {dot, count}) {
-      const hr = count(P, p => p.hit?.verdict || null);
-      return dot(VERD.on_target, `${hr.on_target || 0} on target`) + dot(VERD.off_target, `${hr.off_target || 0} off`) +
-        dot(VERD.skip, `${hr.skip || 0} skipped`);
-    },
+      skip: r.skip_reason, match: r.matches_target}),
     card(e, x) {
       const zn = z => z ? (ZONE[z]?.[1] || z) : '–', pct = v => v == null ? '–' : `${(v * 100).toFixed(0)}% of stance height`;
       return `<div class="sub"><div class="h">${RN(22)} ${x?.verdict ? pillV(x.verdict) : ''}</div>` + (!x || !x.verdict ? '<div class="empty">no reading</div>' :
@@ -2048,10 +1996,6 @@ const RULE_LAYERS = [
       comb: num(r.combined_offset),
       max: num(r.max_offset), maxF: num(r.max_frame),
       skip: r.skip_reason, facing: num(r.facing_mean)}),
-    summary(P, js, {dot, count}) {
-      const b = count(P, p => p.hoc?.verdict || null);
-      return dot('#34c759', `${b.off || 0} off the line`) + dot('#ff3b30', `${b.on || 0} on it`);
-    },
     card: (e, x) => `<div class="sub"><div class="h">${RN(10)}</div>` +
       (!x ? '<div class="empty">no reading</div>' :
        x.score == null ? `<div class="empty">not judged${x.skip === 'side_on' ? ' — side-on: the head moves in depth, the camera can\'t see it' : x.skip ? ' (' + x.skip + ')' : ''}</div>` :
@@ -2094,9 +2038,9 @@ const RULE_LAYERS = [
   {
     // elbow tuck (elbow_tuck/): flare = how far the elbow sits OUT past its shoulder (away from the midline; inward
     // counts 0) / torso per arm — the lens's |x shoulder - x elbow| until 2026-10-02 — judged only while the
-    // boxer faces or backs the camera (its camera window, 0-25 + 155-180 deg since 2026-10-06) and that arm isn't throwing a hook. The row shows the
-    // judged stretches, coloured by state (tucked / borderline / flared), lead in the top half, rear in
-    // the bottom; a hole means the rule could not judge those frames.
+    // boxer faces or backs the camera (its camera window, 0-25 + 155-180 deg since 2026-10-06) and that arm isn't
+    // throwing a hook or a body shot. The row is continuous: the judged stretches coloured by state (tucked = full
+    // marks, flared = below), every other frame a gray strip with its reason; lead in the top half, rear in the bottom.
     key: 'elbow', label: RN(9), short: 'Elbows tucked', items: true, split: 'arm',
     frameOverlay(f, P, leadLeft, Q, torso) {               // the sideways gap between each shoulder and its elbow
       const t = torso(); if (!t) return;
@@ -2128,13 +2072,8 @@ const RULE_LAYERS = [
         + (hs.length === 2 ? ` · lead ${(wL * part.lead).toFixed(1)}/${fN(wL)} · rear ${(wR * part.rear).toFixed(1)}/${fN(wR)}` : ` · ${hs[0]} arm alone`), '#e5e5ea');
     },
     csv: ['elbow_tuck', 'runs.csv'], json: ['elbow_tuck', 'elbow_tuck.json'],
-    parseItem: (r, num) => ({arm: r.arm, state: r.state || 'flared', sf: num(r.start_frame), ef: num(r.end_frame),
+    parseItem: (r, num) => ({arm: r.arm, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
       peak: num(r.peak_flare), mean: num(r.mean_flare)}),
-    summary(P, js, {dot}) {
-      if (!js) return '';
-      const a = js.arms, pct = v => v?.flared_share == null ? '–' : `${Math.round(v.flared_share * 100)}%`;   // eslint-disable-line
-      return `<span>lead <b>${pct(a.lead)}</b> flared</span><span>rear <b>${pct(a.rear)}</b></span>`;
-    },
     card: (e, x) => '',                                  // per-frame rule: nothing punch-specific to show
     tip: (e, x) => {
       const one = it => {
@@ -2146,16 +2085,15 @@ const RULE_LAYERS = [
              + `${cap(it.arm)} arm: ${nm}${num}`;
       };
       const rows = (x.both || [x]).slice().sort(a => a.arm === 'lead' ? -1 : 1);
-      return `<b>Elbow tuck</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>')
-           + `<br><span class="m">${THR(() => { const w = fD(T(9, 'move.borderline_from_torso'), 2), fl = fD(T(9, 'move.flared_from_torso'), 2);
-               return `tucked &lt; ${w} · borderline ${w}–${fl} · flared ≥ ${fl}`; })} · front- and back-on only, that arm’s hooks and body shots excluded</span>`;
+      return `<b>${RN(9)}</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>')
+           + `<br><span class="m">${THR(() => `tucked = full marks (flare ≤ ${fD(T(9, 'move.score.full'), 2)}) · flared = below`)} · front- and back-on only, that arm’s hooks and body shots excluded</span>`;
     },
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const top = x.arm === 'lead', f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
       const skip = !!ELBOWSKIP[x.state], w = Math.max(2, x1 - x0), hh = h / 2 - 3;   // no 1 px gap: the row is continuous
       if (skip) { skipStrip(c, x0, w, y + (top ? 3 : h / 2) + hh / 2, on, x.state); return; }
-      c.fillStyle = ELBOWSTATE[x.state] || '#ff9f0a';
+      c.fillStyle = ELBOWSTATE[x.state] || '#8e8e93';
       c.globalAlpha = on ? 1 : 0.85;
       rr(x0, y + (top ? 3 : h / 2), w, hh, 3);
       c.fill(); c.globalAlpha = 1;
@@ -2199,7 +2137,6 @@ const RULE_LAYERS = [
     csv: ['guard_height', 'runs.csv'], json: ['guard_height', 'guard_height.json'],
     parseItem: (r, num) => ({hand: r.hand, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
       max: num(r.max_drop), mean: num(r.mean_drop)}),
-    summary: () => '',
     card: () => '',
     tip: (e, x) => {
       const one = it => {
@@ -2211,7 +2148,7 @@ const RULE_LAYERS = [
                `${cap(it.hand)} hand: ${nm}${num}`;
       };
       const rows = (x.both || [x]).sort(a => a.hand === 'lead' ? -1 : 1);
-      return `<b>Guard height</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>') +
+      return `<b>${RN(4)}</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>') +
         `<br><span class="m">${THR(() => `low below ${fD(guardFull('lead'), 2)} torso under the nose for the lead hand, ${fD(guardFull('rear'), 2)} for the rear`
           + ` (${fD(T(4, 'move.full_in_defensive_move.lead'), 2)} / ${fD(T(4, 'move.full_in_defensive_move.rear'), 2)} during a defensive move)`)}, while that hand is not punching</span>`;
     },
@@ -2378,9 +2315,9 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th, rsCsv] = await Promise.all([
+  const [pjs, angleCsv, defCsv, impCsv, th, rsCsv, rsSum] = await Promise.all([
     jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
-    lite ? null : txt(STAGES.rollsSlips)]);
+    lite ? null : txt(STAGES.rollsSlips), lite ? null : jsn(['rolls_slips', 'rolls_slips.json'])]);
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
@@ -2392,7 +2329,7 @@ async function buildVideo(src, sig, lite = false) {
   N.angle = new Float32Array(N.n); N.pose = new Uint8Array(N.n);
   const sgn = N.mirrored ? -1 : 1;                           // a mirrored run's facing turns the other way on screen
   A.forEach((r, i) => { N.angle[i] = sgn * +r.angle_deg; N.pose[i] = +r.has_pose; });
-  N.hasAngle = A.length > 0; N.hasDef = !!defCsv; N.hasRS = !!rsCsv;
+  N.hasAngle = A.length > 0; N.hasDef = !!defCsv; N.hasRS = !!rsCsv; N.rsSum = rsSum;
   N.punches = (pcsv ? parseCSV(pcsv) : []).map(r => ({
     kind: 'p', sf: +r.start_frame, ef: +r.end_frame, type: r.punch_type, hand: r.hand, target: r.target,
     impact: hasImpact && r.impact_status === 'ok' ? +r.impact_frame : null, impConf: r.impact_conf ? +r.impact_conf : null,
@@ -2746,12 +2683,11 @@ function srow(name, main, color, value, rule) {
     (value ? ` <span class="m">${value}</span>` : '') + '</span></div>';
 }
 
-const count = (arr, f) => arr.reduce((m, x) => { const k = f(x); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 // The Timeline layers card — and the timeline rows, which follow it — sort by rule number (the default, every load)
 // or by the angles each rule judges, grouped under a heading; clicking the active button flips the order.
 const ANGLE_GROUPS = ['Side-on', 'Front, back', 'Every angle'];
 const angleGroup = k => {
-  const a = (SCOPE[k]?.angles || ALL_ANGLES).split(' \u2014')[0];
+  const a = (layerAngles(k) || ALL_ANGLES).split(' \u2014')[0];
   return a === 'side-on' ? 'Side-on' : a === 'front, back' ? 'Front, back' : 'Every angle';
 };
 const LSORTS = {rule: {label: 'rule number', dir: ['1 → 33', '33 → 1']},
@@ -2795,7 +2731,7 @@ const BASE_ROWS = [
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
-  ['rs', 'Defense 2.0', 'rolls from the roll model and slips from the slip lens\u2019s rule, facing the camera within 22.5°', () => S.hasRS],
+  ['rs', 'Defense 2.0', 'rolls from the roll model and slips from the slip lens\u2019s rule, kept while the boxer faces the camera', () => S.hasRS],
 ];
 const baseOn = k => !!V.base[k] && !!BASE_ROWS.find(r => r[0] === k)?.[3]();
 function buildBase() {
@@ -2814,7 +2750,9 @@ function buildBase() {
   for (const [k, , , has] of BASE_ROWS) {
     const t = list.querySelector(`.toggle[data-base="${k}"]`), ok = !!has();
     t.classList.toggle('disabled', !ok); t.classList.toggle('on', ok && !!V.base[k]);
-    $(`bsum-${k}`).innerHTML = ok ? '' : '<span>not in this folder</span>';
+    $(`bsum-${k}`).innerHTML = !ok ? '<span>not in this folder</span>'
+      : k === 'rs' && S.rsSum?.facing_window_deg   // the stage's own window (configs/defense_compare.json, written into its json)
+        ? `<span>kept while |facing| is ${S.rsSum.facing_window_deg.map(([a, b]) => a ? `${fN(a)}–${fN(b)}°` : `≤ ${fN(b)}°`).join(' or ')}</span>` : '';
   }
 }
 function buildLayers() {
@@ -2840,49 +2778,54 @@ function buildLayers() {
   ruleCard();
   layout();
 }
-// the headline verdict of a layer: its round score, nothing else
-// What each layer covers, in two lines under its toggle. "angles" is the facing angle the rule can be read at:
-// front (within 45° of the camera), back (within 45° of straight away), side-on (everything between).
+// What each layer covers, in two lines under its toggle: what it is measured on (here), and the camera views it judges
+// (from the video's snapshot: its rule's camera, side_on / front_back, or none = every angle).
 const ALL_ANGLES = 'front, back, side-on';
+// the camera views rule n judges, from the snapshot: 'side-on', 'front, back' or every angle; null without a snapshot
+const ruleAngles = n => {
+  const r = S.th?.rules?.[n]; if (!r) return null;
+  return r.camera === 'side_on' ? 'side-on' : r.camera === 'front_back' ? 'front, back' : ALL_ANGLES;
+};
+const layerAngles = k => ruleAngles((LAYER_RULES[k] || [])[0]);
 const SCOPE = {
-  defcov:    {moves: 'defensive moves after an offensive combo',  angles: 'front, back, side-on'},
-  anglechg:  {moves: 'combined combos, and the 2 s after each',  angles: 'front, back, side-on'},
-  varpunch:  {moves: 'every punch, as a share of the round',      angles: 'front, back, side-on'},
-  vardef:    {moves: 'every defensive move, as a share of the round', angles: 'front, back, side-on'},
-  fade:      {moves: 'the punches in the first and the last window', angles: 'front, back, side-on'},
-  bodyshot:  {moves: 'hooks and uppercuts (jab / cross not counted)', angles: 'front, back, side-on'},
-  handbal:   {moves: 'every punch, by hand',                      angles: 'front, back, side-on'},
-  guard:     {moves: 'every frame, per hand, while that hand is not punching', angles: 'front, back, side-on'},
-  slip14:    {moves: 'slips only',                              angles: 'front, back'},
-  slip15:    {moves: 'slips only',                              angles: 'front, back'},
-  stance_width: {moves: 'every frame',                          angles: 'front, back'},
-  stance_depth: {moves: 'every frame',                          angles: 'side-on'},
-  drop:      {moves: 'every punch, the hand that throws',       angles: ALL_ANGLES},
-  resting:   {get moves() { return `every punch at impact ±${THR(() => fN(Math.max(...restOffs().map(Math.abs))))} frames, the hand that does not throw`; },
-              angles: ALL_ANGLES},
-  chin_height: {moves: 'every frame outside a punch',           angles: ALL_ANGLES},
-  chin_depth:  {moves: 'every frame outside a punch',           angles: 'side-on'},
-  blade_hips:      {moves: 'every frame outside a punch',       angles: ALL_ANGLES},   // against the opponent, so any view
-  blade_shoulders: {moves: 'every frame outside a punch',       angles: ALL_ANGLES},
-  hrp:       {moves: 'jab, cross',                              angles: 'side-on'},
-  bal:       {moves: 'every punch at its impact frame',         angles: 'side-on'},
-  hookstop:  {moves: 'every head hook at its impact frame',     angles: 'front, back'},
-  rpivot:    {moves: 'every rear-hand punch at its impact frame', angles: 'front, back, side-on'},
-  speed:     {moves: 'every punch with an impact frame',        angles: ALL_ANGLES},
-  arm:       {moves: 'jab, cross',                              angles: 'side-on'},
-  hip:       {moves: 'every punch',                             angles: ALL_ANGLES},
-  shoulder:  {moves: 'every punch',                             angles: ALL_ANGLES},
-  hit:       {moves: 'every punch',                             angles: 'side-on'},
-  hoc:       {moves: 'every punch',                             angles: 'front, back'},
-  elbow:     {moves: 'every frame except that arm’s hooks and body shots', angles: 'front, back'},
-  offensive: {moves: 'punches',                                 angles: ALL_ANGLES},
-  work:      {moves: 'every frame',                             angles: ALL_ANGLES},
-  combined:  {moves: 'punches, defensive moves',                angles: ALL_ANGLES},
+  defcov:    {moves: 'defensive moves after an offensive combo'},
+  anglechg:  {get moves() { return `combined combos, and the ${THR(() => fN(T(13, 'move.window_after_s')))} s after each`; }},
+  varpunch:  {moves: 'every punch, as a share of the round'},
+  vardef:    {moves: 'every defensive move, as a share of the round'},
+  fade:      {moves: 'the punches in the first and the last window'},
+  bodyshot:  {moves: 'hooks and uppercuts (jab / cross not counted)'},
+  handbal:   {moves: 'every punch, by hand'},
+  guard:     {moves: 'every frame, per hand, while that hand is not punching'},
+  slip14:    {moves: 'slips only'},
+  slip15:    {moves: 'slips only'},
+  stance_width: {moves: 'every frame'},
+  stance_depth: {moves: 'every frame'},
+  drop:      {moves: 'every punch, the hand that throws'},
+  resting:   {get moves() { return `every punch at impact ±${THR(() => fN(Math.max(...restOffs().map(Math.abs))))} frames, the hand that does not throw`; }},
+  chin_height: {moves: 'every frame outside a punch'},
+  chin_depth:  {moves: 'every frame outside a punch'},
+  blade_hips:      {moves: 'every frame outside a punch'},   // against the opponent, so any view
+  blade_shoulders: {moves: 'every frame outside a punch'},
+  hrp:       {moves: 'jab, cross'},
+  bal:       {moves: 'every punch at its impact frame'},
+  hookstop:  {moves: 'every head hook at its impact frame'},
+  rpivot:    {moves: 'every rear-hand punch at its impact frame'},
+  speed:     {moves: 'every punch with an impact frame'},
+  arm:       {moves: 'jab, cross'},
+  hip:       {moves: 'every punch'},
+  shoulder:  {moves: 'every punch'},
+  hit:       {moves: 'every punch'},
+  hoc:       {moves: 'every punch'},
+  elbow:     {moves: 'every frame except that arm’s hooks and body shots'},
+  offensive: {moves: 'punches'},
+  work:      {moves: 'every frame'},
+  combined:  {moves: 'punches, defensive moves'},
 };
 // Which camera angles a rule judges, as three badges — lit = judged, struck-through = skipped. Front and back share
 // the facing row's blue, side-on its orange, so the badge reads like the timeline it sits next to.
 const ANGLE_BADGES = [['front', 'Front', '⬤'], ['side-on', 'Side', '◐'], ['back', 'Back', '◯']];
 function angleBadges(angles) {
+  if (angles == null) return '<span class="angs"><span class="angnote">…</span></span>';   // no snapshot: views unknown
   const [list, note] = angles.split(' \u2014');
   const on = new Set(list.split(',').map(s => s.trim()));
   return `<span class="angs">${ANGLE_BADGES.map(([k, label, ic]) =>
@@ -2891,7 +2834,8 @@ function angleBadges(angles) {
 }
 function scopeTxt(key) {
   const c = SCOPE[key];
-  return c ? `<div class="scope"><span>measured on:</span><span>${c.moves}</span><span>angles:</span><span>${angleBadges(c.angles)}</span></div>` : '';
+  const a = layerAngles(key), n = (LAYER_RULES[key] || [])[0];   // the badges + the window, as the Rules tab shows them
+  return c ? `<div class="scope"><span>measured on:</span><span>${c.moves}</span><span>angles:</span><span>${angleBadges(a == null ? null : a + camNote(n))}</span></div>` : '';
 }
 function layerChip(key, js) {
   if (!js) return null;
@@ -2900,9 +2844,6 @@ function layerChip(key, js) {
   if (key === 'hrp') return js.score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.score}`, col: 'var(--text)'};
   if (key === 'arm') return js.score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.score}`, col: 'var(--text)'};
   if (key === 'hoc') return js.round_score == null ? {txt: 'not rated', col: '#8e8e93'} : {txt: `${js.round_score}`, col: 'var(--text)'};
-  if (key === 'offensive') return js.offensive?.diversity ? {txt: js.offensive.diversity.score == null ? 'not rated' : String(js.offensive.diversity.score), col: js.offensive.diversity.score == null ? '#8e8e93' : 'var(--text)'} : null;
-  if (key === 'combined') return js.combined ? {txt: `${js.combined.n_combinations} combos`, col: COMBO.combined} : null;
-  if (key === 'elbow') return {txt: js.score == null ? 'not rated' : String(js.score), col: js.score == null ? '#8e8e93' : 'var(--text)'};
   return null;
 }
 // how many punches each scored rule passed / failed / could not judge
@@ -2932,16 +2873,8 @@ const RULE_META = (() => {
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
               24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P]};
-  const layerOf = {};
-  for (const [k, ns] of Object.entries(LAYER_RULES)) for (const n of ns) layerOf[n] ??= k;
-  // the angle gate from the layer's scope: side-on / front, back / every angle (a rule with no layer judges every angle)
-  const anglesOf = n => SCOPE[layerOf[n]]?.angles || ALL_ANGLES;                 // the layer's scope text, for the badges
-  const gate = n => {
-    const a = anglesOf(n).split(' \u2014')[0];
-    return a === 'side-on' ? 'Side-on' : a === 'front, back' ? 'Front, back' : 'Every angle';
-  };
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
-    [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o, angle: gate(+n), angles: anglesOf(+n)}]));
+    [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
 const ON_ORDER = ['On a punch', 'On a combo', 'On a defensive move', 'On a frame', 'Whole round only'];
 // Each sort runs both ways: click the active button again to flip it. `dir` names the two directions in words.
@@ -2978,7 +2911,7 @@ function ruleCard() {
 
   if (ac) add(RN(13), ac.score ?? 'not rated', ac.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'after a combination, does he turn to face a new angle? (a turn of the facing direction, not footwork)',
-    on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (ending too close to the video’s end to read what follows)`,
+    on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (no facing angle during the combo or in the window after it: no pose, or the video ends)`,
     th: THR(() => ({event: {label: 'per combo', rule: `a turn of ≥ ${fN(T(13, 'move.min_change_deg'))}° from the combo’s mean facing (smoothed over ${fN(T(13, 'move.smooth_window_s'))} s), `
                         + `reached within ${fN(T(13, 'move.window_after_s'))} s of its last frame, counts as a change`},
          round: {label: 'per round', rule: 'the share of readable combos that changed angle, scored 0 at none and 100 '
@@ -2987,7 +2920,7 @@ function ruleCard() {
     calc: `${ac.n_changed} turned / ${ac.n_readable} combos = ${pct(ac.changed_share)} → ${ac.score ?? '–'}`});
   scored('arm', RN(21), q => ({
     what: 'does the arm reach full extension on a straight punch?',
-    on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown too head-on to read the arm, or the boxer too far from the camera)`,
+    on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at the frame of furthest reach, ${q.skip} skipped (thrown head-on or with no facing, the boxer too far from the camera, or the arm hidden at its furthest reach)`,
     th: THR(() => { const full = fN(T(21, 'move.score.full.near')), far = fN(T(21, 'move.score.full.far')), zero = fN(T(21, 'move.score.zero'));
       return {event: {label: 'per punch', rule: `the elbow angle at the frame of furthest reach, scored linearly: 100 at ${full}° `
                         + `or straighter, 0 at ${zero}° or more bent — green at 100, red below. Far from the camera the line `
@@ -2997,7 +2930,9 @@ function ruleCard() {
                  pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a', '0': '#ff3b30'}},
          round: {label: 'per round', rule: `the mean punch score — a plain number, no bands; fewer than ${NJ(21)} judged punches: not rated`}}; }, thMiss),
     calc: `mean punch score over the ${q.pass + q.fail} judged punches`
-          + (S.layerSum.arm?.scored_at ? ` · ${S.layerSum.arm.scored_at['160']} against 160°, ${S.layerSum.arm.scored_at['150']} against 150°` : '')}));
+          + (S.layerSum.arm?.scored_at ? THR(() => { const sa = S.layerSum.arm.scored_at;
+              const nr = Math.round(T(21, 'move.score.full.near')), fr = Math.round(T(21, 'move.score.full.far'));
+              return ` · ${sa[nr] ?? 0} against ${nr}°, ${sa[fr] ?? 0} against ${fr}°`; }) : '')}));
   if (da) add(RN(3), da.score ?? 'not rated', da.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does a defensive move come with, or right after, his combinations?',
     on: `${da.n_combos} offensive combos (punches only) · all judged`,
@@ -3010,16 +2945,16 @@ function ruleCard() {
   if (el) add(RN(9), el.score ?? 'not rated', el.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does the elbow stay in, or flare out to the side?',
     on: `${el.n_frames.toLocaleString()} frames · judged lead ${el.arms.lead.judged_frames.toLocaleString()}, rear ${el.arms.rear.judged_frames.toLocaleString()} · the rest skipped (side-on, a joint not visible, or that arm throwing a hook or a body shot)`,
-    th: THR(() => { const w = fD(T(9, 'move.borderline_from_torso'), 2), fl = fD(T(9, 'move.flared_from_torso'), 2);
+    th: THR(() => { const w = fD(T(9, 'move.score.full'), 2);
       return {event: {label: 'per frame', rule: 'flare = how far the elbow sits out past its own shoulder, away from the '
                         + 'body’s midline, in torso lengths — an elbow pulled in toward the midline counts as 0',
                  note: `frame score: each arm ${fN(T(9, 'move.score.points_per_arm.lead'))} — full up to ${fD(T(9, 'move.score.full'), 2)} flare, linearly to 0 at ${fD(T(9, 'move.score.zero'), 2)}; one arm alone `
-                     + '(the other hidden or throwing a hook or a body shot) is the whole 100. The colours keep the lens’s cut-offs',
-                 bands: [[`< ${w}`, 'tucked'], [`${w}–${fl}`, 'borderline'], [`≥ ${fl}`, 'flared']], pal: ELBOWSTATE},
+                     + '(the other hidden or throwing a hook or a body shot) is the whole 100',
+                 bands: [[`≤ ${w}`, 'tucked'], [`> ${w}`, 'flared']], pal: ELBOWSTATE},
          round: {label: 'per round', rule: 'the mean frame score over every scored frame — a plain number, no bands; '
                         + `fewer than ${NF(9)} scored frames: not rated`}}; }, thMiss),
     calc: `mean of ${el.scored_frames.toLocaleString()} frame scores (${el.both_arms_frames.toLocaleString()} with both arms) · `
-          + `flared: lead ${pct(el.arms.lead.flared_share)}, rear ${pct(el.arms.rear.flared_share)}`});
+          + `below full marks: lead ${pct(el.arms.lead.flared_share)}, rear ${pct(el.arms.rear.flared_share)}`});
   scored('hoc', RN(10), q => ({
     what: 'while punching, is the head off the line through his hips, or sitting on it?',
     on: `${q.pass + q.fail + q.skip} punches · ${q.pass + q.fail} judged, ${q.skip} skipped (thrown side-on, where the camera cannot see the head move sideways)`,
@@ -3064,7 +2999,7 @@ function ruleCard() {
     calc: `top 3 sequences / ${cmb.n_combinations} combos = ${pct(cmb.top3_share)} → ${cmb.diversity.score ?? '–'}`});
   if (sd) add(RN(29), sd.score ?? 'not rated', sd.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he only ever use one move, or always go to one side?',
-    on: `${sd.n_moves} defensive moves · all judged for the move · the side only over the ${sd.n_with_side} that have one (a duck has none)`,
+    on: `${sd.n_moves} defensive moves · all judged for the move · the side only over the ${sd.n_with_side} that have one (ducks and pull-backs have none)`,
     th: THR(() => { const mv = fP(T(29, 'round.move.full')), sd = fP(T(29, 'round.side.full'));
       const mz = fP(T(29, 'round.move.zero')), sz = fP(T(29, 'round.side.zero'));
       const mp = fN(T(29, 'round.move.points')), spt = fN(T(29, 'round.side.points'));
@@ -3116,7 +3051,7 @@ function ruleCard() {
         + `rear ${hd.by_hand.rear.low}/${hd.by_hand.rear.judged}`,
     th: THR(() => { const lo = fD(T(2, 'move.score.full'), 2), z = fD(T(2, 'move.score.zero'), 2);
       return {event: {label: 'per punch', rule: 'how far the punching wrist sits below the nose, in torso lengths, averaged over '
-                        + `every readable frame of the ${fN(T(2, 'move.window_before_s'))} s before the punch — the same absolute line the resting-hand rule uses`,
+                        + `every readable frame of the ${fN(T(2, 'move.window_before_s'))} s before the punch`,
                  bands: [[`≤ ${lo}`, '100'], [`${lo}–${z}`, 'linear 100 → 0'], [`≥ ${z}`, '0']],
                  pal: {'100': '#34c759', 'linear 100 → 0': '#ff9f0a', '0': '#ff3b30'}},
          round: {label: 'per round', rule: 'the mean punch score over the judged punches — a plain number, no bands; '
@@ -3140,8 +3075,8 @@ function ruleCard() {
                         + `fewer than ${NF(4)} scored frames: not rated`}}; }, thMiss),
     calc: `mean of ${gu.scored_frames.toLocaleString()} frame scores (${gu.both_hands_frames.toLocaleString()} with both hands) · `
           + `low: lead ${pct(gu.hands.lead.low_share)}, rear ${pct(gu.hands.rear.low_share)}`
-          + (gu.defense_frames == null ? '' : ` · in defensive moves (${gu.defense_frames.toLocaleString()} frames): low lead `
-             + `${gu.hands.lead.low_in_defense}/${gu.hands.lead.judged_in_defense}, rear ${gu.hands.rear.low_in_defense}/${gu.hands.rear.judged_in_defense}`)});
+          + ` · in defensive moves (${gu.defense_frames.toLocaleString()} frames): low lead `
+          + `${gu.hands.lead.low_in_defense}/${gu.hands.lead.judged_in_defense}, rear ${gu.hands.rear.low_in_defense}/${gu.hands.rear.judged_in_defense}`});
   const stW = S.stanceW, stD = S.stanceD;
   if (stW) add(RN(12), stW.score ?? 'not rated', stW.score == null ? '#8e8e93' : 'var(--text)', {
     what: STANCE.width.what,
@@ -3249,7 +3184,7 @@ function ruleCard() {
     th: THR(() => { const f = ord(T(23, 'move.score.full_pctl')), z = ord(T(23, 'move.score.zero_pctl'));
       // the milliseconds: the reference table's band at those percentiles, as this video's punch_speed.json wrote it
       return {event: {label: 'per punch', rule: 'the time from the punch’s first frame to the impact, against its own type '
-                        + `across 8,166 labelled punches: 100 up to the ${f} percentile (jab ${speedMs('jab', 0)} ms, cross ${speedMs('cross', 0)}, hook ${speedMs('hook', 0)}, `
+                        + `in the labelled corpus: 100 up to the ${f} percentile (jab ${speedMs('jab', 0)} ms, cross ${speedMs('cross', 0)}, hook ${speedMs('hook', 0)}, `
                         + `uppercut ${speedMs('uppercut', 0)}, body shot ${speedMs('hook_or_uppercut', 0)}), linearly down to 0 at the ${z} (jab ${speedMs('jab', 1)}, cross ${speedMs('cross', 1)}, hook ${speedMs('hook', 1)}, `
                         + `uppercut ${speedMs('uppercut', 1)}, body shot ${speedMs('hook_or_uppercut', 1)}) — green at 100, red below`,
                  bands: [[`≤ ${f} percentile`, '100'], [`${f} → ${z}`, '100 → 0 (linear)'], [`≥ ${z}`, '0']],
@@ -3295,7 +3230,8 @@ function ruleCard() {
     th: THR(() => { const full = fD(T(33, 'move.score.full'), 2), zero = fN(T(33, 'move.score.zero'));
       return {event: {label: 'per punch', rule: 'at the impact frame, how far the rear heel sits above the rear toe, in torso '
                         + `lengths: 0 with the heel ${pivotZeroTxt()}, 100 from ${full}, linear between — green at 100, red `
-                        + `below. The stance already carries the heel about ${PLANTED_LIFT} up, so a planted foot scores about ${plantedScore()}, not 0`,
+                        + `below. In a stance the heel already sits about ${PLANTED_LIFT} torso up (the jabs’ median on the ten-video shelf, `
+                        + `measured 2026-09-28), so a planted foot scores about ${plantedScore()}, not 0`,
                  bands: [[`≥ ${full} torso`, '100'], [`${zero} → ${full}`, '0 → 100 (linear)'], [`≤ ${zero}`, '0']],
                  pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a', '0': '#ff3b30'}},
          round: {label: 'per round', rule: `the mean punch score — a plain number, no bands; fewer than ${NJ(33)} judged punches: not rated`}}; }, thMiss),
@@ -3325,7 +3261,7 @@ function ruleCard() {
       return {round: {label: 'per round', rule: `the share of punches thrown with the rear hand, scored: 100 from ${a} % to ${b} %, `
                         + `falling linearly to 0 at ${z0} % (all lead) and at ${z1} % (all rear) — a plain number, no bands; `
                         + `fewer than ${NJ(5)} punches: not rated`,
-                 bands: [[`${a}–${b} %`, '100'], [`0 → ${a} %`, '0 → 100'], [`${b} → 100 %`, '100 → 0']],
+                 bands: [[`${a}–${b} %`, '100'], [`${z0} → ${a} %`, '0 → 100'], [`${b} → ${z1} %`, '100 → 0']],
                  pal: {'100': '#34c759', '0 → 100': '#ff9f0a', '100 → 0': '#ff9f0a'}}}; }, thMiss),
     calc: `${hb.n_rear} rear / ${hb.n_punches} punches = ${pct(hb.rear_share)} → ${hb.score ?? '–'} (${hb.side}) · lead ${hb.n_lead} (`
           + `${Object.entries(hb.by_hand.lead).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${PUNCH[k]?.name || k} ${v}`).join(', ')}`
@@ -3419,14 +3355,14 @@ function floorsLine() {
     + `<span class="chip-f" title="BlazePose's confidence that it sees a joint, 0-1. Under this a rule does not use the joint: `
     + `a frame or punch that needs it is not judged (the joint is hollow on the skeleton)">${FLOORWORD.min_visibility(h.min_visibility)}</span>`
     + `<span class="chip-f" title="BlazePose's confidence that a joint is in the picture at all, 0-1. Under this a rule does not use the joint, `
-    + `as if it were hidden; 0 = no floor">${h.min_presence > 0 ? FLOORWORD.min_presence(h.min_presence) : 'presence: no floor'}</span>`
+    + `as if it were hidden">${FLOORWORD.min_presence(h.min_presence)}</span>`
     + `<span class="chip-f" title="with fewer judged punches / combos / moves, or frames for a per-frame rule, the rule is not rated">`
     + `rated from ${fN(h.min_judged)} judged · ${fN(h.min_judged_frames)} frames</span>`
     + `<span class="chip-f" title="a torso this short in the picture cannot be read">${FLOORWORD.min_torso_px(h.min_torso_px)}</span>`
     + (per ? `<span class="per">per rule: ${per}</span>` : '') + '</div>';
 }
 function renderRules() {
-  const rows = S.ruleRows || [], no = r => NOTION[r.name] ?? 99, meta = r => RULE_META[no(r)] || {group: '–', on: ['–'], angle: '–'};
+  const rows = S.ruleRows || [], no = r => NOTION[r.name] ?? 99, meta = r => RULE_META[no(r)] || {group: '–', on: ['–']};
   const val = r => /^[\d.]+$/.test(r.value) ? +r.value : Infinity;                 // not rated: after every score
   const srt = SORTS[V.ruleSort] || SORTS.rule;
   const d = V.ruleDesc ? -1 : 1;
@@ -3444,7 +3380,7 @@ function renderRules() {
       `<div class="big"><span class="k">${notionNo(r.name)} · ${r.name}</span><span class="${big ? 'n' : 'n small'}" style="color:${t ? t[2] : r.color}">${r.value}` +
       (t ? `<span class="tier" style="color:${t[2]}">${t[1]}</span>` : '') + '</span></div>' +
       hpBar(big ? +r.value : null, t) +
-      `<div class="rmeta">${[meta(r).group, ...meta(r).on].map(x => `<span>${x}</span>`).join('')}${angleBadges(meta(r).angles + camNote(no(r)))}</div>` +
+      `<div class="rmeta">${[meta(r).group, ...meta(r).on].map(x => `<span>${x}</span>`).join('')}${angleBadges(ruleAngles(no(r)) == null ? null : ruleAngles(no(r)) + camNote(no(r)))}</div>` +
       `<div class="exp"><span>measures</span><span>${r.what}</span>` +
       `<span>on</span><span>${r.on}</span>` +
       `<span>thresholds</span><span>${[r.th.event, r.th.round].filter(Boolean).map(g =>
@@ -3623,7 +3559,7 @@ function comboCard(el, f) {
         return {text: long ? `${c.n} punches — a long combination` : `${c.n} punches — short`, col: long ? GOOD : MIDC}; },
         {text: TH_MISSING, col: '#8e8e93'})]);
       const r = reps(kind, c);
-      if (r != null) rows.push([30, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: r > 1 ? MIDC : GOOD}]);
+      if (r != null) rows.push([30, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: 'var(--text)'}]);
       if (S.has.defcov) {
         const d = (S.items.defcov || []).find(x => x.endF === c.ef);
         if (d) rows.push([3, d.covered ? {text: `defended — ${d.side ? d.side + ' ' : ''}${styleD(d.type)?.name.toLowerCase() || d.type} `
@@ -3636,7 +3572,7 @@ function comboCard(el, f) {
         : {text: a.changed === 'yes' ? `changed angle — ${(+a.change_deg).toFixed(0)}° after` : `kept the angle — ${(+a.change_deg).toFixed(0)}° after`,
            col: a.changed === 'yes' ? GOOD : BAD}]);
       const r = reps(kind, c);
-      if (r != null) rows.push([31, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: r > 1 ? MIDC : GOOD}]);
+      if (r != null) rows.push([31, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: 'var(--text)'}]);
     }
     return `<div class="sub"><div class="h">${kind === 'offensive' ? 'Offensive combo' : 'Combined combo'} · ${c.n} elements</div>
       <div class="cseq">${seqHtml(c)}</div>${evList(rows)}</div>`;
@@ -3724,7 +3660,7 @@ function frameCard(el, f) {
     else FR(11, () => {
       const leg = (dist(J2(J.lhip), J2(J.lkn)) + dist(J2(J.lkn), la) + dist(J2(J.rhip), J2(J.rkn)) + dist(J2(J.rkn), ra)) / 2;
       const r = la && ra ? Math.abs(la[0] - ra[0]) / leg : NaN;
-      return Number.isFinite(r) ? {score: 100 * Math.min(1, r / stanceFull('depth')), note: `${r.toFixed(2)} leg lengths apart`} : {skip: 'no reading'};
+      return Number.isFinite(r) ? {score: stanceScore('depth', r), note: `${r.toFixed(2)} leg lengths apart`} : {skip: 'no reading'};
     });
   }
   if (S.has.stance_width) {
@@ -3732,7 +3668,7 @@ function frameCard(el, f) {
     if (st !== 'ok' && st !== 'narrow') rows.push([12, {skip: STANCESKIP[st] || 'no reading'}]);
     else FR(12, () => {
       const r = dist(la, ra) / torso;
-      return Number.isFinite(r) ? {score: 100 * Math.min(1, r / stanceFull('width')), note: `${r.toFixed(2)} torso lengths apart`} : {skip: 'no reading'};
+      return Number.isFinite(r) ? {score: stanceScore('width', r), note: `${r.toFixed(2)} torso lengths apart`} : {skip: 'no reading'};
     });
   }
   // 17 / 18 bladedness: the hip / shoulder line out of the image plane, from the 3D landmarks, on the coach's cuts
@@ -3757,10 +3693,10 @@ function frameCard(el, f) {
 // visibility (is it hidden?) and presence (is it in the picture at all?). The pipeline applies the presence floor
 // once, as a rule stage loads its skeleton (rule_config.load_skeleton): a joint under rule n's min_presence gets
 // visibility 0, and each rule's own visibility check drops it. visAt(fr, j, n) is that visibility, so every reading
-// the page recomputes skips the same joints; presFloor(n) is the floor, 0 (none) for a snapshot from before 2026-10-06.
+// the page recomputes skips the same joints; presFloor(n) is the floor.
 const presFloor = n => {
   const o = n == null ? null : S.th?.rules?.[n]?.house_overrides;
-  return (o && 'min_presence' in o ? o.min_presence : S.th?.house?.min_presence) ?? 0;
+  return o && 'min_presence' in o ? o.min_presence : S.th?.house?.min_presence;
 };
 const visAt = (fr, j, n) => {
   const C = S.skelC, b = (fr * 33 + j) * C;
@@ -3771,7 +3707,7 @@ const visAt = (fr, j, n) => {
 // red here, hollow on the skeleton. Lead / rear through the stance, as the rules name the hands.
 const JV_ROWS = [['Nose', 'nose', 'nose'], ['Shoulder', 'lsh', 'rsh'], ['Elbow', 'lel', 'rel'], ['Wrist', 'lwr', 'rwr'],
                  ['Hip', 'lhip', 'rhip'], ['Knee', 'lkn', 'rkn'], ['Ankle', 'lan', 'ran']];
-// A switch shows presence instead (remembered per browser); its floor is ticked only once one is set.
+// A switch shows presence instead (remembered per browser), against its own floor.
 let JV_METRIC = (() => { try { return localStorage.getItem('pipelineViewerJV') === 'pres' ? 'pres' : 'vis'; } catch { return 'vis'; } })();
 function jointVis(f) {
   const vFloor = S.th?.house?.min_visibility, C = S.skelC;
@@ -3781,20 +3717,19 @@ function jointVis(f) {
   let under = 0;
   const cell = (j, wide) => {
     const vis = S.skel[b + J[j] * C + 6], pr = C >= 8 ? S.skel[b + J[j] * C + 7] : NaN, v = pres ? pr : vis;
-    const ok = Number.isFinite(v), lo = pres ? floor > 0 && !(v >= floor) : !ok || v < floor;
+    const ok = Number.isFinite(v), lo = !ok || v < floor;
     under += lo;
     const both = `visibility ${Number.isFinite(vis) ? vis.toFixed(3) : '–'} · presence ${Number.isFinite(pr) ? pr.toFixed(3) : '–'}`;
     return `<span class="jc${lo ? ' lo' : ''}${wide ? ' wide' : ''}" title="${ok ? both : 'not detected'}`
       + `${lo ? ` — ${word} under ${fD(floor, 2)}, the rules skip it` : ''}"><span class="jb${lo ? ' lo' : ''}">`
       + `<i style="width:${ok ? (Math.max(0, Math.min(1, v)) * 100).toFixed(1) : 0}%"></i>`
-      + (floor > 0 ? `<b style="left:${floor * 100}%"></b>` : '') + `</span><span class="jv-n">${ok ? v.toFixed(2) : '–'}</span></span>`;
+      + `<b style="left:${floor * 100}%"></b></span><span class="jv-n">${ok ? v.toFixed(2) : '–'}</span></span>`;
   };
   const body = JV_ROWS.map(([name, l, r]) => {
     const [a, z] = leadLeft ? [l, r] : [r, l];
     return `<span class="jn">${name}</span>` + (a === z ? cell(a, true) : cell(a) + cell(z));
   }).join('');
-  const note = pres && !(pFloor > 0) ? 'presence: is the joint in the picture at all — no floor set yet (min_presence 0)'
-    : `the rules use a joint from ${word} ${fD(floor, 2)}${under ? ` · ${under} under it` : ''}`;
+  const note = `the rules use a joint from ${word} ${fD(floor, 2)}${under ? ` · ${under} under it` : ''}`;
   return `<div class="jvh"><span class="evh">Joint ${word}</span><span class="jvseg">`
     + `<button data-jv="vis" class="${pres ? '' : 'on'}" title="is the joint hidden?">Visibility</button>`
     + `<button data-jv="pres" class="${pres ? 'on' : ''}" title="is the joint in the picture at all?">Presence</button></span>`
@@ -4139,7 +4074,7 @@ function drawTimeline(f) {
   for (const g of [-180, -90, 0, 90, 180]) {
     c.strokeStyle = g === 0 ? sep : grid; c.lineWidth = 1; c.beginPath(); c.moveTo(L, ymap(g)); c.lineTo(L + W, ymap(g)); c.stroke();
   }
-  // ±45° and ±135°: the cuts every gated rule uses — front / side-on / back
+  // ±45° and ±135°: the facing row's display bands (front / side-on / back colours); each rule judges its own window
   for (const g of [-135, -45, 45, 135]) {
     c.strokeStyle = sep; c.lineWidth = 1;
     c.beginPath(); c.moveTo(L, ymap(g)); c.lineTo(L + W, ymap(g)); c.stroke();
@@ -4627,106 +4562,105 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('ovr').s
 // standard shape per rule — what it measures (plain words, the caveat right after), a grey line (what it judges ·
 // camera view · scoring) and why it matters. Its numbers are the open video's snapshot, read in soft mode: before a
 // video is open (or without its file) each number reads '…' and a note says why. ──
-const ANY = 'any view', SIDE = 'side view only', FRONT = 'front or back view only';
-const explainRows = () => [   // [number, what it measures, judged on, camera view, scoring, why]
+const explainRows = () => [   // [number, what it measures, judged on, scoring, why]; the camera view: the snapshot's
   [1, 'Whether the boxer’s head and hips are still over their feet at impact. Only left-to-right in the picture is read, at that one frame — not weight or centre of mass.',
-      'every punch', SIDE, `head (the nose): full ${fN(T(1, 'move.head.points'))} up to ${fD(T(1, 'move.head.full'), 2)} of the ankle gap past an ankle, 0 at ${fD(T(1, 'move.head.zero'), 2)} · hips: full ${fN(T(1, 'move.hips.points'))} within ${fD(T(1, 'move.hips.full'), 2)} of the feet’s midpoint, ${say(T(1, 'move.hips.zero'), [[0.5, '0 right over an ankle']], v => `0 at ${fD(v, 2)}`)}`,
+      'every punch', `head (the nose): full ${fN(T(1, 'move.head.points'))} up to ${fD(T(1, 'move.head.full'), 2)} of the ankle gap past an ankle, 0 at ${fD(T(1, 'move.head.zero'), 2)} · hips: full ${fN(T(1, 'move.hips.points'))} within ${fD(T(1, 'move.hips.full'), 2)} of the feet’s midpoint, ${say(T(1, 'move.hips.zero'), [[0.5, '0 right over an ankle']], v => `0 at ${fD(v, 2)}`)}`,
       'A head out past the feet, or the hips over one leg, means the boxer is falling into the punch and can’t recover or follow up.'],
   [2, `How low the punching hand sits in ${say(T(2, 'move.window_before_s'), [[0.25, 'the quarter second']], v => `the ${fN(v)} s`)} before it is thrown, from the nose down to the wrist. It is the starting height, not a dip or wind-up.`,
-      'every punch', ANY, `full marks up to ${fD(T(2, 'move.score.full'), 2)} torso below the nose, zero at ${fD(T(2, 'move.score.zero'), 2)}`,
+      'every punch', `full marks up to ${fD(T(2, 'move.score.full'), 2)} torso below the nose, zero at ${fD(T(2, 'move.score.zero'), 2)}`,
       'A punch from a low hand has further to travel and leaves the head open on the way.'],
   [3, `Whether the boxer moves their head — a roll, slip, duck or pull-back — during a combination or within ${fN(T(3, 'move.window_after_s'))} seconds after it (or before their next punch, if that comes sooner). Most moves it finds start during the combination; blocks, parries and footwork aren’t detected.`,
-      `every combination of ${fN(T(30, 'move.min_elements'))}+ punches`, ANY, `full marks when ${fP(T(3, 'round.score.full'))} % of combinations have one, zero at none`,
+      `every combination of ${fN(T(30, 'move.min_elements'))}+ punches`, `full marks when ${fP(T(3, 'round.score.full'))} % of combinations have one, zero at none`,
       'The counter comes as they finish punching; head movement built into the attack is the way out.'],
   [4, 'How low each hand sits while it isn’t punching, from the nose down to the wrist — height only, so a hand held out wide still counts as up.',
-      'every frame', ANY, `full marks up to ${fD(T(4, 'move.score.full.lead'), 2)} torso below the nose for the lead hand and ${fD(T(4, 'move.score.full.rear'), 2)} for the rear, zero at ${fD(T(4, 'move.score.zero'), 2)} · the frame counts lead ${fN(T(4, 'move.score.points.lead'))}, rear ${fN(T(4, 'move.score.points.rear'))}`,
+      'every frame', `full marks up to ${fD(T(4, 'move.score.full.lead'), 2)} torso below the nose for the lead hand and ${fD(T(4, 'move.score.full.rear'), 2)} for the rear, zero at ${fD(T(4, 'move.score.zero'), 2)} · the frame counts lead ${fN(T(4, 'move.score.points.lead'))}, rear ${fN(T(4, 'move.score.points.rear'))}`,
       'Hands that sit low between punches leave the head open.'],
   [5, 'What share of all punches the rear hand throws. It is about which hand does the work, not body balance (that’s rule 1).',
-      'every punch', ANY, `full marks from ${fP(T(5, 'round.score.full.0'))} % to ${fP(T(5, 'round.score.full.1'))} % rear, zero at all-lead or all-rear`,
+      'every punch', `full marks from ${fP(T(5, 'round.score.full.0'))} % to ${fP(T(5, 'round.score.full.1'))} % rear, zero at all-lead or all-rear`,
       'Living on one hand is predictable: jabs alone never commit, rear hands alone have nothing setting them up.'],
   [6, `How low the other hand — the one not punching — sits at impact (averaged with ${fN(restOffs()?.[2])} frames either side). It is that hand’s height at that moment, not how far it dropped.`,
-      'every punch', ANY, `full marks up to ${fD(T(6, 'move.score.full'), 2)} torso below the nose, zero at ${fD(T(6, 'move.score.zero'), 2)}`,
+      'every punch', `full marks up to ${fD(T(6, 'move.score.full'), 2)} torso below the nose, zero at ${fD(T(6, 'move.score.zero'), 2)}`,
       'While one hand punches the other is the guard; if it sags, the counter lands.'],
   [7, 'How far the chin pokes out in front of the lead shoulder, seen from the side. The chin is estimated from the nose and mouth, so leaning the whole head forward also counts as chin out.',
-      'every frame outside punches', SIDE, `full marks with the chin ${say(T(7, 'move.score.full'), [[0, 'at or behind']], v => `up to ${fD(v, 2)} torso in front of`)} the front of the shoulder, zero at ${fD(T(7, 'move.score.zero'), 2)} torso in front`,
+      'every frame outside punches', `full marks with the chin ${say(T(7, 'move.score.full'), [[0, 'at or behind']], v => `up to ${fD(v, 2)} torso in front of`)} the front of the shoulder, zero at ${fD(T(7, 'move.score.zero'), 2)} torso in front`,
       'Behind the shoulder the chin is covered from the side; in front of it, it’s the target.'],
   [8, 'How high the chin sits compared with the top of the lead shoulder — height only, so a raised shoulder counts the same as a lowered chin.',
-      'every frame outside punches', ANY, `full marks ${say(T(8, 'move.score.full'), [[0, 'at or below']], v => `up to ${fD(-v, 2)} torso above`)} the shoulder top, zero at ${fD(T(8, 'move.score.zero') == null ? null : -T(8, 'move.score.zero'), 2)} torso above`,
+      'every frame outside punches', `full marks ${say(T(8, 'move.score.full'), [[0, 'at or below']], v => `up to ${fD(-v, 2)} torso above`)} the shoulder top, zero at ${fD(T(8, 'move.score.zero') == null ? null : -T(8, 'move.score.zero'), 2)} torso above`,
       'Chin down behind the lead shoulder is the basic protection; chin up is an open target.'],
   [9, 'How far each elbow sticks out sideways past its own shoulder, away from the body. An elbow pulled in toward the middle counts as tucked; an arm throwing a hook or a body shot is skipped.',
-      'every frame', FRONT, `per arm: full marks up to ${fD(T(9, 'move.score.full'), 2)} torso out, zero at ${fD(T(9, 'move.score.zero'), 2)} · the frame counts ${fN(T(9, 'move.score.points_per_arm.lead'))} per arm`,
+      'every frame', `per arm: full marks up to ${fD(T(9, 'move.score.full'), 2)} torso out, zero at ${fD(T(9, 'move.score.zero'), 2)} · the frame counts ${fN(T(9, 'move.score.points_per_arm.lead'))} per arm`,
       'A flared elbow opens the ribs to body shots and telegraphs the punch.'],
   [10, 'How far the head sits to the left or right of the hips while punching. It reads position, not movement: either side counts, and stepping with the whole body reads as zero.',
-       `every punch, mostly at impact (${fP(T(10, 'move.combined_offset.weights.impact'))} %) and a little at the ${say(T(10, 'move.combined_offset.q25_at_share'), [[0.25, 'quarter']], v => `${fP(v)} %`)} and ${say(T(10, 'move.combined_offset.q75_at_share'), [[0.75, 'three-quarter']], v => `${fP(v)} %`)} points (${fP(T(10, 'move.combined_offset.weights.q25'))} % each)`, FRONT, `full marks from ${fD(T(10, 'move.score.full'), 2)} torso off the hips’ line, zero right on it`,
+       `every punch, mostly at impact (${fP(T(10, 'move.combined_offset.weights.impact'))} %) and a little at the ${say(T(10, 'move.combined_offset.q25_at_share'), [[0.25, 'quarter']], v => `${fP(v)} %`)} and ${say(T(10, 'move.combined_offset.q75_at_share'), [[0.75, 'three-quarter']], v => `${fP(v)} %`)} points (${fP(T(10, 'move.combined_offset.weights.q25'))} % each)`, `full marks from ${fD(T(10, 'move.score.full'), 2)} torso off the hips’ line, zero right on it`,
        'A head left on the centre line while punching is exactly where the return punch goes.'],
   [11, 'How far one foot is in front of the other, seen from the side, against leg length. A stance that is too long is never penalised.',
-       'every frame', SIDE, `full marks at ${fD(T(11, 'move.score.full'), 2)} leg lengths or more, zero with the feet level`,
+       'every frame', `full marks at ${fD(T(11, 'move.score.full'), 2)} leg lengths or more, zero with the feet level`,
        'One foot well in front of the other is the base for absorbing punches and pushing off.'],
   [12, 'How far apart the ankles are, seen from the front or back — the straight-line distance, so a long, narrow stance can also reach full marks. Too wide is never penalised.',
-       'every frame', FRONT, `full marks at ${fD(T(12, 'move.score.full'), 2)} torso apart or more, zero with the feet together`,
+       'every frame', `full marks at ${fD(T(12, 'move.score.full'), 2)} torso apart or more, zero with the feet together`,
        'Feet too close together leave no base to stay balanced or move from.'],
   [13, `Whether the boxer turns to face a new direction — ${fN(T(13, 'move.min_change_deg'))}° or more — within ${fN(T(13, 'move.window_after_s'))} seconds after a combination. It is a turn, not footwork: a sidestep that keeps the same facing counts as no change.`,
-       'every combination of punches and defensive moves', ANY, `full marks when ${say(T(13, 'round.score.full'), [[0.5, 'half of them']], v => `${fP(v)} % of them`)} end in a turn, zero at none`,
+       'every combination of punches and defensive moves', `full marks when ${say(T(13, 'round.score.full'), [[0.5, 'half of them']], v => `${fP(v)} % of them`)} end in a turn, zero at none`,
        'Changing angle after an attack avoids the return fire and opens new lines.'],
   [14, 'How far the head moves sideways, relative to the hips, during a slip. It doesn’t check which way the head went or whether it left a punch’s line.',
-       'slips only', FRONT, `full marks from ${fD(T(14, 'move.score.full'), 2)} torso of travel, zero with none`,
+       'slips only', `full marks from ${fD(T(14, 'move.score.full'), 2)} torso of travel, zero with none`,
        'A slip that barely moves the head doesn’t take it out of the way.'],
   [15, 'The same as rule 14 — sideways head travel during a slip — but checking that the slip isn’t too big.',
-       'slips only', FRONT, `full marks up to ${fD(T(15, 'move.score.full'), 2)} torso of travel, zero at ${fD(T(15, 'move.score.zero'), 2)}`,
+       'slips only', `full marks up to ${fD(T(15, 'move.score.full'), 2)} torso of travel, zero at ${fD(T(15, 'move.score.zero'), 2)}`,
        'An oversized slip carries the head far off the hips: slow to come back and out of position to counter.'],
   [16, 'Whether the hand sinks on its way back after a jab or cross. It follows the wrist’s height above its shoulder from impact until just after the punch ends, and flags the punch when that height sags below a straight line the whole way. Sideways loops aren’t seen.',
-       'jabs and crosses', SIDE, `full marks when no punch sags, zero when ${fP(T(16, 'round.score.zero'))} % do`,
+       'jabs and crosses', `full marks when no punch sags, zero when ${fP(T(16, 'round.score.zero'))} % do`,
        'A hand that drops on its way home leaves the face open just when the counter comes.'],
   [17, 'How far the hips are turned from square to the opponent, from the 3D skeleton and the facing model: 0° is chest-on, 90° side-on. It penalises standing too square — never too turned.',
-       'every frame outside punches', ANY, `zero at ${fN(T(17, 'move.score.zero'))}° or less, full marks from ${fN(T(17, 'move.score.full'))}° (a coach’s cut-offs)`,
+       'every frame outside punches', `zero at ${fN(T(17, 'move.score.zero'))}° or less, full marks from ${fN(T(17, 'move.score.full'))}° (a coach’s cut-offs)`,
        'Standing square shows the opponent the whole front of the body as a target.'],
   [18, 'The same as rule 17, for the shoulders.',
-       'every frame outside punches', ANY, `zero at ${fN(T(18, 'move.score.zero'))}° or less, full marks from ${fN(T(18, 'move.score.full'))}° (a coach’s cut-offs)`,
+       'every frame outside punches', `zero at ${fN(T(18, 'move.score.zero'))}° or less, full marks from ${fN(T(18, 'move.score.full'))}° (a coach’s cut-offs)`,
        'The upper body can square up while the hips stay turned, or the reverse, so it is judged on its own.'],
   [19, `How much the hips turn from the start of a punch to impact, seen from above in the 3D skeleton, against a normal range for that punch (e.g. ${fIv(T(19, 'move.score.full.rear cross'))}° for a cross, ${fIv(T(19, 'move.score.full.lead jab'))}° for a jab). Only the net turn counts, in either direction.`,
-       'every punch', ANY, `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(19, 'move.score.over.points_off'))}`,
+       'every punch', `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(19, 'move.score.over.points_off'))}`,
        'Power comes from the hips; without the turn the punch is all arm.'],
   [20, `The same as rule 19, for the shoulders, with their own ranges (e.g. ${fIv(T(20, 'move.score.full.rear cross'))}° for a cross). It isn’t compared with the hips.`,
-       'every punch', ANY, `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(20, 'move.score.over.points_off'))}`,
+       'every punch', `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(20, 'move.score.over.points_off'))}`,
        'The shoulders’ turn carries the punch’s reach and weight; the arm alone is short and light.'],
   [21, 'How straight the arm is — the angle at the elbow — at the moment the hand is furthest from the shoulder.',
-       'jabs and crosses', SIDE, `full marks at ${fN(T(21, 'move.score.full.near'))}° or straighter (${fN(T(21, 'move.score.full.far'))}° when the boxer is small in the picture), zero at ${fN(T(21, 'move.score.zero'))}° · very small: not judged`,
+       'jabs and crosses', `full marks at ${fN(T(21, 'move.score.full.near'))}° or straighter (${fN(T(21, 'move.score.full.far'))}° when the boxer is small in the picture), zero at ${fN(T(21, 'move.score.zero'))}° · very small: not judged`,
        'A straight that lands with a bent arm falls short and carries no weight.'],
   [22, 'Whether the punch would land on the head or body of an opponent the boxer’s own size, judged from the height of the punching wrist at impact; over the head, the shoulder area or below the belt is a miss. Height only, and any punch can score on either zone.',
-       'every punch', SIDE, 'the share of punches on target',
+       'every punch', 'the share of punches on target',
        'Punches into the gap between head and body, or over the top, hit nothing.'],
   [23, 'How long the punch takes from its first detected frame to impact, against labelled punches of the same type. It is time only — not how fast the fist moves or how far it travels.',
-       'every punch', ANY, `full marks as quick as the fastest ${fN(T(23, 'move.score.full_pctl'))} % (jab ${speedMs('jab', 0)} ms), zero at the ${ord(T(23, 'move.score.zero_pctl'))} percentile (jab ${speedMs('jab', 1)} ms)`,
+       'every punch', `full marks as quick as the fastest ${fN(T(23, 'move.score.full_pctl'))} % (jab ${speedMs('jab', 0)} ms), zero at the ${ord(T(23, 'move.score.zero_pctl'))} percentile (jab ${speedMs('jab', 1)} ms)`,
        'A slow punch is seen coming and gets blocked or countered.'],
   [24, `What share of the boxer’s combinations have ${fN(T(24, 'move.min_long_combo_elements'))} or more punches. A combination is ${fN(T(30, 'move.min_elements'))}+ punches, each thrown within ${fN(T(30, 'move.max_gap_s'))} s of the last one ending; single punches don’t count at all.`,
-       'every combination', ANY, `full marks from ${fP(T(24, 'round.score.full'))} %, zero at none`,
+       'every combination', `full marks from ${fP(T(24, 'round.score.full'))} %, zero at none`,
        'Longer combinations break through a guard; a boxer stuck at one-twos is easy to read.'],
   [25, `How much of the video is dead time: stretches of ${fN(T(25, 'move.min_dead_gap_s'))} seconds or more with no punch, no defensive move and no quick turn (${fN(T(25, 'move.turn.min_change_deg'))}° in under ${say(T(25, 'move.turn.window_s'), [[1, 'a second']], v => `${fN(v)} s`)}). It isn’t punches per minute.`,
-       'the whole video', ANY, `full marks with no dead time, zero when ${say(T(25, 'round.score.zero'), [[0.5, 'half the video']], v => `${fP(v)} % of the video`)} is dead`,
+       'the whole video', `full marks with no dead time, zero when ${say(T(25, 'round.score.zero'), [[0.5, 'half the video']], v => `${fP(v)} % of the video`)} is dead`,
        'Long stretches of doing nothing hand the round and the initiative to the opponent.'],
   [26, `Whether the boxer still throws at the end as much as at the start, from their first punch to their last: the first third against the last third (the first ${fN(T(26, 'round.windows.window_s'))} s against the last ${fN(T(26, 'round.windows.window_s'))} s from ${fN(T(26, 'round.windows.thirds_below_span_s'))} s up). Total volume isn’t judged.`,
-       'every punch', ANY, `full marks up to ${fP(T(26, 'round.score.full'))} % fewer at the end, zero at ${fP(T(26, 'round.score.zero'))} % fewer`,
+       'every punch', `full marks up to ${fP(T(26, 'round.score.full'))} % fewer at the end, zero at ${fP(T(26, 'round.score.zero'))} % fewer`,
        'Fading late shows conditioning running out, and rounds are often won at the end.'],
   [27, 'What share of all punches are the boxer’s two favourite types — out of jab, cross, head hook, head uppercut and body shot. Lead and rear hooks count as one type, likewise uppercuts.',
-       'every punch', ANY, `full marks at ${fP(T(27, 'round.score.full'))} % or less, zero at ${fP(T(27, 'round.score.zero'))} %`,
+       'every punch', `full marks at ${fP(T(27, 'round.score.full'))} % or less, zero at ${fP(T(27, 'round.score.zero'))} %`,
        'A boxer with two punches is predictable.'],
   [28, 'What share of hooks and uppercuts the punch model labels as body shots. Jabs and crosses are left out (the model can’t tell head from body for straights), and nothing checks where a punch actually lands.',
-       'hooks and uppercuts', ANY, `full marks from ${fP(T(28, 'round.score.full'))} %, zero at none`,
+       'hooks and uppercuts', `full marks from ${fP(T(28, 'round.score.full'))} %, zero at none`,
        'Body work slows the opponent and opens the head; head-hunting alone is easy to defend.'],
   [29, 'Whether the boxer always uses the same defensive move, or always goes to the same side: the share of their most-used move, and the share going to their favourite side (rolls and slips only). Which punch a move answered isn’t considered.',
-       'every defensive move', ANY, `half the score each · move: full marks up to ${fP(T(29, 'round.move.full'))} %, side: up to ${fP(T(29, 'round.side.full'))} %, ${T(29, 'round.move.zero') === T(29, 'round.side.zero') ? `each zero at ${fP(T(29, 'round.move.zero'))} %` : `zero at ${fP(T(29, 'round.move.zero'))} % / ${fP(T(29, 'round.side.zero'))} %`}`,
+       'every defensive move', `half the score each · move: full marks up to ${fP(T(29, 'round.move.full'))} %, side: up to ${fP(T(29, 'round.side.full'))} %, ${T(29, 'round.move.zero') === T(29, 'round.side.zero') ? `each zero at ${fP(T(29, 'round.move.zero'))} %` : `zero at ${fP(T(29, 'round.move.zero'))} % / ${fP(T(29, 'round.side.zero'))} %`}`,
        'One defensive habit, repeated, gets read and timed.'],
   [30, 'What share of combinations are exactly one of the boxer’s three most-used sequences (hand and punch type, in order). One extra or missed punch makes a different sequence.',
-       'combinations of punches', ANY, `full marks below ${fP(T(30, 'round.score.full'))} %, zero at ${fP(T(30, 'round.score.zero'))} %`,
+       'combinations of punches', `full marks below ${fP(T(30, 'round.score.full'))} %, zero at ${fP(T(30, 'round.score.zero'))} %`,
        'The same combination over and over lets the opponent time it.'],
   [31, 'The same as rule 30, with the defensive moves included in the sequence. Noise in the defense model adds variety, so it reads as more varied than rule 30.',
-       'combinations of punches and defensive moves', ANY, `full marks below ${fP(T(31, 'round.score.full'))} %, zero at ${fP(T(31, 'round.score.zero'))} %`,
+       'combinations of punches and defensive moves', `full marks below ${fP(T(31, 'round.score.full'))} %, zero at ${fP(T(31, 'round.score.zero'))} %`,
        'Patterns of attack and defense get read just like punch patterns.'],
   [32, 'How far the hand has travelled across the body at the deepest point of a head hook — whether it stays near the centre line or swings on past the far shoulder. It reads where the hand is at that moment, not whether it actually stops.',
-       'head hooks', FRONT, `full marks at or short of the centre line, zero ${say(T(32, 'move.score.zero'), [[1 / 3, 'a third of a torso']], v => `${fD(v, 2)} torso`)} past the far shoulder`,
+       'head hooks', `full marks at or short of the centre line, zero ${say(T(32, 'move.score.zero'), [[1 / 3, 'a third of a torso']], v => `${fD(v, 2)} torso`)} past the far shoulder`,
        'A hook that swings past the target loses its snap, opens the boxer up and takes the longest way back.'],
-  [33, `How high the rear heel is off the floor (above the toe) at impact on a rear-hand punch. The stance already lifts the heel a little, so a planted foot scores about ${plantedScore()}; turning of the foot isn’t measured.`,
-       'rear-hand punches', ANY, `zero with the heel ${say(T(33, 'move.score.zero'), [[0, 'level with the toe']], v => `${fD(v, 2)} torso above the toe`)}, full marks from ${fD(T(33, 'move.score.full'), 2)} torso up`,
+  [33, `How high the rear heel is off the floor (above the toe) at impact on a rear-hand punch. In a stance the heel is already a little up (about ${PLANTED_LIFT} torso, measured 2026-09-28), so a planted foot scores about ${plantedScore()}; turning of the foot isn’t measured.`,
+       'rear-hand punches', `zero with the heel ${say(T(33, 'move.score.zero'), [[0, 'level with the toe']], v => `${fD(v, 2)} torso above the toe`)}, full marks from ${fD(T(33, 'move.score.full'), 2)} torso up`,
        'The rear heel coming up lets the hips turn through; a flat-footed power punch is all arm.'],
 ];
 function renderExplain() {
@@ -4736,7 +4670,6 @@ function renderExplain() {
   try { EXPLAIN = explainRows(); } finally { TH_SOFT = false; }
   const note = !S.src ? 'open a video to see its numbers' : TH_SOFT_MISSED ? TH_MISSING : '';
   // the camera view as the Rules tab's Front / Side / Back badges, so both tabs say it the same way
-  const angles = {[SIDE]: 'side-on', [FRONT]: 'front, back', [ANY]: ALL_ANGLES};
   // the numbers of a scoring line in bold (with their unit), so the thresholds stand out of the sentence
   const nums = s => String(s).replace(/(\d+(?:\.\d+)?(?:\s?(?:%|°|ms|s)(?![a-z]))?)/g, '<b>$1</b>');
   $('explainCard').innerHTML = `<div class="label">Explanations · ${EXPLAIN.length} rules</div>` +
@@ -4749,14 +4682,14 @@ function renderExplain() {
     `<li><b>Visible joints:</b> the skeleton says how sure it is of each joint (0–1). A rule uses a joint only from `
     + `${S.th?.house ? fD(S.th.house.min_visibility, 2) : '…'}; below that, whatever needs the joint is not judged `
     + `(the joint is hollow on the skeleton). It also says whether the joint is in the picture at all (presence)`
-    + `${presFloor() > 0 ? `; a joint under presence ${fD(presFloor(), 2)} is skipped the same way` : ' — no floor on that yet'}.</li>` +
+    + `; a joint under presence ${S.th?.house ? fD(presFloor(), 2) : '…'} is skipped the same way.</li>` +
     `<li><b>Southpaws:</b> a southpaw's video is mirrored before the rules read it, so “lead” is always the boxer's ` +
     `lead hand.</li>` +
     `<li><b>Round score:</b> the average (or share) over everything the rule judged; with too little to judge, the ` +
     `rule is not rated.</li></ul></div>` +
-    `<div class="grpbox">` + EXPLAIN.map(([n, what, on, view, scoring, why]) => `<div class="xrule">` +
+    `<div class="grpbox">` + EXPLAIN.map(([n, what, on, scoring, why]) => `<div class="xrule">` +
       `<div class="xh"><span class="vn">${n}</span><span>${nameOf[n]}</span>` +
-      `<span class="xang">${angleBadges((angles[view] || ALL_ANGLES) + camNote(n))}</span></div>` +
+      `<span class="xang">${angleBadges(ruleAngles(n) == null ? null : ruleAngles(n) + camNote(n))}</span></div>` +
       `<p class="xwhat">${what}</p>` +
       `<div class="xgrid"><span class="xl">On</span><span>${cap(on)}</span>` +
       `<span class="xl">Scoring</span><span>${nums(scoring)}</span>` +
@@ -4817,7 +4750,7 @@ async function upHealth() {
   try {
     const r = await api('health');
     if (!r.ok) throw new Error();
-    UP.stages = r.data.stages || []; UP.shared = r.data.shared_stages ?? 6; UP.state = 'pick';
+    UP.stages = r.data.stages || []; UP.shared = r.data.shared_stages; UP.state = 'pick';
     try { localStorage.setItem('cornermanUploadServer', '1'); } catch {}
   } catch { UP.state = 'offline'; }
   upRender();
@@ -4826,7 +4759,7 @@ async function upHealth() {
 async function upResume() {
   try {
     const h = await api('health'); if (!h.ok) return;
-    UP.stages = h.data.stages || []; UP.shared = h.data.shared_stages ?? 6;
+    UP.stages = h.data.stages || []; UP.shared = h.data.shared_stages;
     const j = ((await api('jobs')).data || []).find(x => UP_ACTIVE.has(x.status));
     if (!j || UP.job) return;
     Object.assign(UP, {job: j, polledAt: performance.now(), state: 'run', min: true});
@@ -4954,7 +4887,7 @@ function upRows(j) {
     skeleton: ['Skeleton', s => s === 'active' ? `BlazePose on every frame — ${aboutMin(UP_COST.skeleton(D))} for ${mmss(D)} of video`
                          : `BlazePose on every frame${s === 'done' ? took(['skeleton']) : ''}`],
     shared: ['Punches, defense, facing', s => s === 'active' && idx >= 0 ? `${prettyStage(j.stage)} · ${idx + 1} of ${sh}`
-                         : s === 'done' ? `${sh} stages${took(st.slice(0, sh))}` : 'punches, impact, facing angle, defense, combinations'],
+                         : s === 'done' ? `${sh} stages${took(st.slice(0, sh))}` : UP.stages.slice(0, sh).map(prettyStage).join(', ')],
     rules: ['Rules', s => s === 'active' && j?.status === 'checking' ? 'checking every output'
                          : s === 'active' && idx >= sh ? `${prettyStage(j.stage)} · ${idx - sh + 1} of ${nRules}`
                          : s === 'done' ? `${nRules} rule stages${took(st.slice(sh))} — every score in the Rules tab` : `${nRules} rule stages`],
