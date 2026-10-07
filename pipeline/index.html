@@ -921,14 +921,14 @@ const stanceTh = kind => { const C = STANCE[kind], full = fD(stanceFull(kind), 2
 // slip distance (slip_distance/moves.csv): how far the head travelled during a SLIP against the hips, from where it
 // started to its furthest point, in torso lengths — sideways (x) and up-down (y), each on its own (since 2026-10-07; x
 // only before). Rolls and ducks are not measured — a roll travels on purpose. One script, two rules, two timeline rows:
-// 14 "slip far enough" (per axis 100 from 0.20 torso, 0 with no travel) and 15 "slip not too much" (per axis 100 up to
-// 0.50, 0 at 1.00); the slip scores the lower of its two axes. Each row is coloured by its own slip score: green at 100,
-// orange between, red at 0; the white tick is the furthest frame of the axis that set the score.
+// 14 "slip far enough" (per axis 50 points from 0.20 torso, 0 with no travel) and 15 "slip not too much" (per axis 50
+// up to 0.50, 0 at 1.00); the slip score is the sum of its two axes. Each row is coloured by its own slip score: green
+// at 100, orange between, red at 0; the white tick is the furthest frame of the axis with fewer points.
 const angleCol = v => v >= 100 ? '#34c759' : v > 0 ? '#ff9f0a' : '#ff3b30';   // rule 13's combo score: 100 / 50 / 0
 // rule 14 / 15's per-axis line, said once when x and y share it
 const slipAxes = (n, f) => { const x = f('x'), y = f('y'); return x === y ? `${x}, sideways and up-down alike` : `sideways ${x}, up-down ${y}`; };
-const slipScale = n => slipAxes(n, a => n === 14 ? `100 from ${fD(T(14, `move.score_${a}.full`), 2)} torso of travel, 0 with no travel`
-  : `100 up to ${fD(T(15, `move.score_${a}.full`), 2)} torso of travel, 0 at ${fD(T(15, `move.score_${a}.zero`), 2)}`) + '; the slip scores the lower axis';
+const slipScale = n => slipAxes(n, a => n === 14 ? `${fN(T(14, `move.score_${a}.points`))} points from ${fD(T(14, `move.score_${a}.full`), 2)} torso of travel, 0 with no travel`
+  : `${fN(T(15, `move.score_${a}.points`))} points up to ${fD(T(15, `move.score_${a}.full`), 2)} torso of travel, 0 at ${fD(T(15, `move.score_${a}.zero`), 2)}`) + '; the slip score is the sum of the two';
 // a slip's travel on both axes, for labels: "x 0.37 · y 0.20 torso"
 const slipTr = it => `x ${it.tx.toFixed(2)}${it.ty == null ? '' : ` · y ${it.ty.toFixed(2)}`} torso`;
 const slipCol = v => v == null ? '#8e8e93' : v >= 100 ? '#34c759' : v <= 0 ? '#ff3b30' : '#ff9f0a';
@@ -1002,7 +1002,7 @@ function slipLayer(rule) {
     card: () => '',
     tip: (e, x) => `<b>${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type} · rule ${rule}: ${x[sk] == null ? '–' : x[sk].toFixed(0)}</b> · ` +
       `${fmtT(x.sf / S.fps)}<br><span class="num">the head travelled <b>${x.tx.toFixed(2)}</b> torso sideways`
-      + (x.ty == null ? '' : ` (→ ${x[sk + 'x'].toFixed(0)}) and <b>${x.ty.toFixed(2)}</b> up-down (→ ${x[sk + 'y'].toFixed(0)})`)
+      + (x.ty == null ? '' : ` (→ ${fN(+x[sk + 'x'].toFixed(1))} pts) and <b>${x.ty.toFixed(2)}</b> up-down (→ ${fN(+x[sk + 'y'].toFixed(1))} pts)`)
       + ` from where it started</span><br>` +
       `<span class="m">${scale()}</span>`,
     row(e, x, {c, y, h, span, tag, tx, fps}) {
@@ -1010,7 +1010,7 @@ function slipLayer(rule) {
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
       c.fillStyle = slipCol(x[sk]); c.globalAlpha = on ? 1 : 0.9;
       rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
-      const pkF = x.ty == null || x[sk + 'x'] <= x[sk + 'y'] ? x.peakX : x.peakY;    // the axis that set the score
+      const pkF = x.ty == null || x[sk + 'x'] <= x[sk + 'y'] ? x.peakX : x.peakY;    // the axis with fewer points
       if (pkF != null) { const xi = tx((pkF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
         c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       tag(x0, w, y, h, x[sk] == null ? '' : `${x[sk].toFixed(0)}`);
@@ -3078,12 +3078,12 @@ function ruleCard() {
     short: () => { const s = fD(T(14, 'move.score_x.full'), 2);
       return {label: 'per slip', rule: 'travel = how far the head got from where it started, against the hips, in torso '
                                     + `lengths, sideways and up-down each scored: ${slipScale(14)}`,
-            bands: [[`≥ ${s}`, '100'], [`0 → ${s}`, '0 → 100 (linear)']], pal: {'100': '#34c759', '0 → 100 (linear)': '#ff9f0a'}}; },
+            bands: [[`≥ ${s}`, '50 per axis'], [`0 → ${s}`, '0 → 50 (linear)']], pal: {'50 per axis': '#34c759', '0 → 50 (linear)': '#ff9f0a'}}; },
     far:   () => { const fa = fD(T(15, 'move.score_x.full'), 2), z = fD(T(15, 'move.score_x.zero'), 2);
       return {label: 'per slip', rule: 'travel = how far the head got from where it started, against the hips, in torso '
                                     + `lengths, sideways and up-down each scored: ${slipScale(15)}`,
-            bands: [[`≤ ${fa}`, '100'], [`${fa} → ${z}`, '100 → 0 (linear)'], [`≥ ${z}`, '0']],
-            pal: {'100': '#34c759', '100 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}}; }};
+            bands: [[`≤ ${fa}`, '50 per axis'], [`${fa} → ${z}`, '50 → 0 (linear)'], [`≥ ${z}`, '0']],
+            pal: {'50 per axis': '#34c759', '50 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}}; }};
   const slipRound = n => ({label: 'per round', rule: `the mean slip score — a plain number, no bands; fewer than ${NJ(n)} judged slips: not rated`});
   for (const [name, part, fault, word] of [[RN(14), sl?.far_enough, 'short', 'too short'],
                                            [RN(15), sl?.compact, 'far', 'too far']]) {
@@ -4665,11 +4665,11 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [13, `Whether the boxer turns to face a new direction — ${fN(T(13, 'move.min_change_deg'))}° or more — within ${fN(T(13, 'move.window_after_s'))} seconds after a combination. It is a turn, not footwork: a sidestep that keeps the same facing counts as no change.`,
        'every combination of punches and defensive moves', `full marks when ${say(T(13, 'round.score.full'), [[0.5, 'half of them']], v => `${fP(v)} % of them`)} end in a turn, zero at none`,
        'Changing angle after an attack avoids the return fire and opens new lines.'],
-  [14, 'How far the head moves during a slip, relative to the hips — sideways and up-down, each on its own; the slip scores the weaker of the two. It doesn’t check which way the head went or whether it left a punch’s line.',
-       'slips only', slipAxes(14, a => `full marks from ${fD(T(14, `move.score_${a}.full`), 2)} torso of travel, zero with none`),
+  [14, 'How far the head moves during a slip, relative to the hips — sideways and up-down, each on its own for up to half the marks; the slip scores the sum of the two. It doesn’t check which way the head went or whether it left a punch’s line.',
+       'slips only', slipAxes(14, a => `half marks from ${fD(T(14, `move.score_${a}.full`), 2)} torso of travel, zero with none`),
        'A slip that barely moves the head doesn’t take it out of the way.'],
   [15, 'The same as rule 14 — head travel during a slip, sideways and up-down — but checking that the slip isn’t too big either way.',
-       'slips only', slipAxes(15, a => `full marks up to ${fD(T(15, `move.score_${a}.full`), 2)} torso of travel, zero at ${fD(T(15, `move.score_${a}.zero`), 2)}`),
+       'slips only', slipAxes(15, a => `half marks up to ${fD(T(15, `move.score_${a}.full`), 2)} torso of travel, zero at ${fD(T(15, `move.score_${a}.zero`), 2)}`),
        'An oversized slip carries the head far off the hips: slow to come back and out of position to counter.'],
   [16, 'Whether the hand sinks on its way back after a jab or cross. It follows the wrist’s height above its shoulder from impact until just after the punch ends, and flags the punch when that height sags below a straight line the whole way. Sideways loops aren’t seen.',
        'jabs and crosses', `full marks when no punch sags, zero when ${fP(T(16, 'round.score.zero'))} % do`,
