@@ -3367,7 +3367,7 @@ function ruleCard() {
   scored('hit', RN(22), q => ({
     what: 'would the punch land somewhere useful on an opponent his own size?',
     on: `${q.pass + q.fail + q.skip} punches of every type · ${q.pass + q.fail} judged at their impact frame, ${q.skip} skipped (thrown too head-on, no impact frame, or the wrist or the ankles not visible)`,
-    th: {event: {label: 'per punch', rule: 'the wrist’s height at the impact frame on an opponent his own size — jabs, crosses, hooks, uppercuts and body shots alike',
+    th: {event: {label: 'per punch', rule: THR(() => `the wrist’s height at the impact frame on an opponent his own size — jabs, crosses, hooks, uppercuts and body shots alike; the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 2)} of the stance height (0 = floor)`),
                  bands: [['head, body', 'on target'], ['shoulder, over the head, below the belt', 'off target']],
                  pal: {'on target': '#34c759', 'off target': '#ff3b30'}},
          round: {label: 'per round', rule: THR(() => '100 × the share of judged punches on target: 0 with none, 100 with all, '
@@ -4722,7 +4722,7 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [21, `How straight the arm gets — the largest angle at the elbow over the punch (on the frames where the shoulder, elbow and wrist are visible) when that frame is within ${fN(T(21, 'move.max_from_middle_frames'))} frames of the punch's middle frame; otherwise the angle at the middle frame.`,
        'jabs and crosses', `full marks at ${fN(T(21, 'move.score.full.near'))}° or straighter (${fN(T(21, 'move.score.full.far'))}° when the boxer is small in the picture), zero at ${fN(T(21, 'move.score.zero'))}° · very small: not judged`,
        'A straight that lands with a bent arm falls short and carries no weight.'],
-  [22, 'Whether the punch would land on the head or body of an opponent the boxer’s own size, judged from the height of the punching wrist at impact; over the head, the shoulder area or below the belt is a miss. Height only, and any punch can score on either zone.',
+  [22, `Whether the punch would land on the head or body of an opponent the boxer’s own size, judged from the height of the punching wrist at impact (the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 2)} of the stance height); over the head, the shoulder area or below the belt is a miss. Height only, and any punch can score on either zone.`,
        'every punch', 'the share of punches on target',
        'Punches into the gap between head and body, or over the top, hit nothing.'],
   [23, 'How long the punch takes from its first detected frame to impact, against labelled punches of the same type. It is time only — not how fast the wrist moves or how far it travels.',
