@@ -1810,7 +1810,7 @@ const RULE_LAYERS = [
     // hand return path (hand_return_path/punches.csv), rebuilt 2026-10-01: per side-on jab / cross, the wrist's height
     // above its own shoulder from the impact to the punch's end + 0.15 s (cut at the next same-hand punch's start),
     // against the straight line (chord) between its first and last frame. NOT OKAY (a U) when every frame between them
-    // sits under the chord; okay otherwise.
+    // sits under the chord and the deepest is at least move.min_dip_torso under it (since 2026-10-08); okay otherwise.
     key: 'hrp', label: RN(16), short: RN(16),
     window: true,                                          // its block, ring, hover and drawing cover impact → end + 0.15 s
     split: 'hand',                                         // lead windows on the top half, rear on the bottom: a cross's
@@ -1818,18 +1818,19 @@ const RULE_LAYERS = [
     csv: ['hand_return_path', 'punches.csv'], json: ['hand_return_path', 'hand_return_path.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, ws: num(r.win_start), we: num(r.win_end),
       a: num(r.win_start), b: num(r.win_end), cut: r.cut_by_next === '1', startH: num(r.start_h), endH: num(r.end_h),
-      between: num(r.frames_between), below: num(r.frames_below), mask: r.below_mask || ''} : null,
+      between: num(r.frames_between), below: num(r.frames_below), mask: r.below_mask || '', dip: num(r.dip)} : null,
     card: (e, a) => `<div class="sub"><div class="h">${RN(16)} ${a && a.verdict !== 'skip' ? pillV(a.verdict) : ''}</div>` +
       (!a ? '<div class="empty">not judged (jabs and crosses only)</div>' :
        a.verdict === 'skip' ? `<div class="empty">not judged: ${(a.skip || '').replace(/_/g, ' ')}</div>` :
        `<div class="rows num" style="margin-top:0"><span>Window</span><b>f ${a.ws}–${a.we} (impact → end + ${THR(() => `${fN(T(16, 'move.window_after_s'))} s`)}${a.cut ? ', cut at the next punch of this hand' : ''})</b>
         <span>Wrist above its shoulder at the ends</span><b>${a.startH.toFixed(2)} → ${a.endH.toFixed(2)} torso</b>
         <span>Frames between the ends under the chord</span><b>${a.below} of ${a.between}</b>
-        <span>Verdict</span><b>${a.verdict === 'fail' ? 'not okay — a U, every frame under the line' : 'okay'}</b></div>`) + '</div>',
+        <span>Deepest under the chord</span><b>${hrpDip(a)} torso ${THR(() => `(not okay needs ≥ ${fD(T(16, 'move.min_dip_torso'), 2)})`)}</b>
+        <span>Verdict</span><b>${a.verdict === 'fail' ? 'not okay — a U, every frame under the line, deep enough' : 'okay'}</b></div>`) + '</div>',
     tip: (e, a, {head, v}) => head + (a.verdict === 'skip'
       ? `<span class="m">hand return path: not judged (${(a.skip || '').replace(/_/g, ' ')})</span>`
-      : `<span class="num">hand return path: <b>${a.verdict === 'fail' ? 'not okay (a U)' : 'okay'}</b> · ${a.below} of ${a.between} frames under the chord</span><br>` +
-        `<span class="m">not okay when every frame between the two ends sits under the straight line joining them</span>`),
+      : `<span class="num">hand return path: <b>${a.verdict === 'fail' ? 'not okay (a U)' : 'okay'}</b> · ${a.below} of ${a.between} frames under the chord · deepest ${hrpDip(a)} torso</span><br>` +
+        `<span class="m">not okay when every frame between the two ends sits under the straight line joining them, ${THR(() => `the deepest at least ${fD(T(16, 'move.min_dip_torso'), 2)} torso under it`)}</span>`),
     row(e, a, {c, y, h, tag, ring, tx, fps}) {             // the measured window as the block, lead on top, rear below
       if (a.verdict !== 'pass' && a.verdict !== 'fail') return;
       const x0 = Math.max(L, tx(a.ws / fps)), x1 = tx((a.we + 1) / fps); if (x1 <= L) return;
@@ -1872,7 +1873,7 @@ const RULE_LAYERS = [
                                                                                                // hands overlap all the time
         const vv = fr => visAt(fr, wr).toFixed(2);
         const warn = gs || ge ? ` · wrist visibility ${[gs && `start ${vv(a.ws)}`, ge && `end ${vv(a.we)}`].filter(Boolean).join(', ')} — may be a guess` : '';
-        if (st) overlayLabel(st[0] + 14, st[1] - 18, `${name}${a.verdict === 'fail' ? 'not okay — a U' : 'okay'} · ${a.below}/${a.between} under the chord${warn}`, col);
+        if (st) overlayLabel(st[0] + 14, st[1] - 18, `${name}${a.verdict === 'fail' ? 'not okay — a U' : 'okay'} · ${a.below}/${a.between} under the chord · deepest ${hrpDip(a)}${warn}`, col);
       }
     },
   },
@@ -3186,8 +3187,9 @@ function ruleCard() {
       return {event: {label: 'per punch', rule: 'the wrist’s height above its own shoulder from the impact to the punch’s end + '
                         + `${fN(T(16, 'move.window_after_s'))} s (cut at the next punch of the same hand), against the straight line joining its first `
                         + 'and last frame: not okay — a U — when '
-                        + 'every frame between the ends sits under that line; okay otherwise. No grade per punch',
-                 bands: [['some frame on or over the line', 'okay'], ['every frame under it', 'not okay']],
+                        + `every frame between the ends sits under that line and the deepest at least ${fD(T(16, 'move.min_dip_torso'), 2)} torso under it; okay otherwise. No grade per punch`,
+                 bands: [[`some frame on or over the line, or the deepest under ${fD(T(16, 'move.min_dip_torso'), 2)}`, 'okay'],
+                         [`every frame under it, the deepest ≥ ${fD(T(16, 'move.min_dip_torso'), 2)}`, 'not okay']],
                  pal: {okay: '#34c759', 'not okay': '#ff3b30'}},
          round: {label: 'per round', rule: `the share of judged punches not okay: 100 with none, linearly down to 0 at ${z} % `
                         + `— a plain number, no bands; fewer than ${NJ(16)} judged punches: not rated`,
@@ -3828,6 +3830,7 @@ function iqrBar(val, q, col, good) {
     <span class="m num" style="position:absolute;right:0;top:-13px;font-size:10px">${max}°</span>
     <span class="m num" style="position:absolute;left:0;top:-13px;font-size:10px">0°</span></div>`;
 }
+const hrpDip = a => Number.isFinite(a?.dip) ? a.dip.toFixed(2) : '–';   // rule 16's deepest frame under its chord, torso lengths
 const pillV = v => `<span class="verdict" style="background:${VERD[v] || '#8e8e93'}">${VNAME[v] || v}</span>`;
 function layerSections(e) {
   return layerOrder().map(k => RULE[k]).filter(L => layerOn(L.key)).map(L => THR(() => L.card(e, L.items
@@ -4689,7 +4692,7 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [15, 'The same as rule 14 — head travel during a slip, sideways and up-down — but checking that the slip isn’t too big either way.',
        'slips only', slipAxes(15, a => `half marks up to ${fD(T(15, `move.score_${a}.full`), 2)} torso of travel, zero at ${fD(T(15, `move.score_${a}.zero`), 2)}`),
        'An oversized slip carries the head far off the hips: slow to come back and out of position to counter.'],
-  [16, 'Whether the hand sinks on its way back after a jab or cross. It follows the wrist’s height above its shoulder from impact until just after the punch ends, and flags the punch when that height sags below a straight line the whole way. Sideways loops aren’t seen.',
+  [16, `Whether the hand sinks on its way back after a jab or cross. It follows the wrist’s height above its shoulder from impact until just after the punch ends, and flags the punch when that height sags below a straight line the whole way and at least ${fD(T(16, 'move.min_dip_torso'), 2)} torso at its deepest. Sideways loops aren’t seen.`,
        'jabs and crosses', `full marks when no punch sags, zero when ${fP(T(16, 'round.score.zero'))} % do`,
        'A hand that drops on its way home leaves the face open just when the counter comes.'],
   [17, 'How far the hips are turned from square to the opponent, from the 3D skeleton and the facing model: 0° is chest-on, 90° side-on. It penalises standing too square — never too turned.',
