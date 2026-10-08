@@ -292,8 +292,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   verdict's colour and the same dial from above. The round is the mean punch score, no bands.
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — read side-on
   (|facing| 65–115°), the zone the fist is in at its impact frame (the midpoint of the index and pinky knuckle points; with either
-  unseen, the wrist pushed 0.3 of the forearm further — `fist_from` in the CSV; the wrist itself until 2026-10-08) on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt; the head zone starts at 0.88 of the stance height since
-  2026-10-08, 0.08 below the ghost's chin before;
+  unseen, the wrist pushed 0.3 of the forearm further — `fist_from` in the CSV; the wrist itself until 2026-10-08) on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt; the head zone starts at 0.865 of the stance height
+  and the shoulder gap at 0.71 since 2026-10-08 — before, the head zone 0.08 below the ghost's chin, the shoulder gap at its solar plexus;
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
   fist where the rule read it at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. With the layer on, every frame also draws the ghost the rule judges against, from the rule's own
   `hit_height/ghost.csv` (since 2026-10-08): its zone bands across the boxer (green = hit: head, body; red = miss:

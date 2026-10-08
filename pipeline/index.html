@@ -2028,19 +2028,19 @@ const RULE_LAYERS = [
       const G = S.ghost, fl = G?.floor_y?.[f]; if (!Number.isFinite(fl)) return;
       const lh = P(J.lhip), rh = P(J.rhip); if (!(lh && rh)) return;
       const cx = (lh[0] + rh[0]) / 2, Y = k => PXY(0.5, G[k][f])[1];
-      const floor = Y('floor_y'), belt = Y('belt_y'), solar = Y('solar_y'), head = Y('head_from_y'), sh = Y('shoulder_y'),
+      const floor = Y('floor_y'), belt = Y('belt_y'), shf = Y('shoulder_from_y'), head = Y('head_from_y'), sh = Y('shoulder_y'),
             chin = Y('chin_y'), crown = Y('crown_y'), over = Y('over_head_y'), Hh = floor - crown;
       if (!(Hh > 0)) return;
       const x0 = cx - 0.75 * Hh, x1 = cx + 0.75 * Hh, GOOD_A = 'rgba(52,199,89,0.13)', BAD_A = 'rgba(255,59,48,0.12)';
       const bands = [[over - 0.12 * Hh, over, BAD_A, 'over the head'], [over, head, GOOD_A, 'head · hit'],
-                     [head, solar, BAD_A, 'shoulder · miss'], [solar, belt, GOOD_A, 'body · hit'], [belt, floor, BAD_A, 'below the belt']];
+                     [head, shf, BAD_A, 'shoulder · miss'], [shf, belt, GOOD_A, 'body · hit'], [belt, floor, BAD_A, 'below the belt']];
       octx.save(); octx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
       for (const [a, b, col, name] of bands) {
         octx.fillStyle = col; octx.fillRect(x0, a, x1 - x0, b - a);
         octx.fillStyle = 'rgba(255,255,255,0.75)'; octx.fillText(name, x0 + 4, a + 11);
       }
       octx.restore();
-      for (const y of [over, head, solar, belt]) OV.level(y, x0, x1, 'rgba(255,255,255,0.45)', [4, 4]);
+      for (const y of [over, head, shf, belt]) OV.level(y, x0, x1, 'rgba(255,255,255,0.45)', [4, 4]);
       OV.level(floor, x0, x1, 'rgba(255,255,255,0.6)', []);
       // the ghost itself: head from chin to crown, neck, torso from the shoulders to the hips, legs to the floor
       octx.save(); octx.strokeStyle = 'rgba(255,255,255,0.8)'; octx.lineWidth = 2;
@@ -3413,7 +3413,7 @@ function ruleCard() {
   scored('hit', RN(22), q => ({
     what: 'would the punch land somewhere useful on an opponent his own size?',
     on: `${q.pass + q.fail + q.skip} punches of every type · ${q.pass + q.fail} judged at their impact frame, ${q.skip} skipped (thrown too head-on, no impact frame, or neither the knuckles nor the wrist and elbow, or no ankle, visible)`,
-    th: {event: {label: 'per punch', rule: THR(() => `the fist’s height at the impact frame (the index and pinky knuckle points’ midpoint; unseen, the wrist pushed ${fD(T(22, 'move.fist.forearm_extension'), 2)} of the forearm further) on an opponent his own size — jabs, crosses, hooks, uppercuts and body shots alike; the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 2)} of the stance height (0 = floor)`),
+    th: {event: {label: 'per punch', rule: THR(() => `the fist’s height at the impact frame (the index and pinky knuckle points’ midpoint; unseen, the wrist pushed ${fD(T(22, 'move.fist.forearm_extension'), 2)} of the forearm further) on an opponent his own size — jabs, crosses, hooks, uppercuts and body shots alike; the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 3)} of the stance height (0 = floor), the shoulder gap (a miss) at ${fD(T(22, 'move.zones.shoulder_from_stance_h'), 3)}`),
                  bands: [['head, body', 'on target'], ['shoulder, over the head, below the belt', 'off target']],
                  pal: {'on target': '#34c759', 'off target': '#ff3b30'}},
          round: {label: 'per round', rule: THR(() => '100 × the share of judged punches on target: 0 with none, 100 with all, '
@@ -4779,7 +4779,7 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [21, `How straight the arm gets — the largest angle at the elbow over the punch (on the frames where the shoulder, elbow and wrist are visible) when that frame is within ${fN(T(21, 'move.max_from_middle_frames'))} frames of the punch's middle frame; otherwise the angle at the middle frame.`,
        'jabs and crosses', `full marks at ${fN(T(21, 'move.score.full.near'))}° or straighter (${fN(T(21, 'move.score.full.far'))}° when the boxer is small in the picture), zero at ${fN(T(21, 'move.score.zero'))}° · very small: not judged`,
        'A straight that lands with a bent arm falls short and carries no weight.'],
-  [22, `Whether the punch would land on the head or body of an opponent the boxer’s own size, judged from the height of the punching fist (its knuckles) at impact (the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 2)} of the stance height); over the head, the shoulder area or below the belt is a miss. Height only, and any punch can score on either zone.`,
+  [22, `Whether the punch would land on the head or body of an opponent the boxer’s own size, judged from the height of the punching fist (its knuckles) at impact (the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 3)} of the stance height, the shoulder gap at ${fD(T(22, 'move.zones.shoulder_from_stance_h'), 3)}); over the head, the shoulder area or below the belt is a miss. Height only, and any punch can score on either zone.`,
        'every punch', 'the share of punches on target',
        'Punches into the gap between head and body, or over the top, hit nothing.'],
   [23, 'How long the punch takes from its first detected frame to impact, against labelled punches of the same type. It is time only — not how fast the wrist moves or how far it travels.',
