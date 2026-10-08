@@ -266,11 +266,11 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   median guard is shown in the card, unjudged. Round = the mean punch score, a plain number with no bands. Frames
   around the impact and not the punch's window, because punches overlap inside a combination, which would leave most
   punches unjudgeable. Reads `punches.csv` + `resting_hand.json`.
-- **Arm extension** (`arm_extension/`): per jab / cross the elbow angle at the frame of furthest reach, scored
+- **Arm extension** (`arm_extension/`): per jab / cross the punch's largest elbow angle — its straightest frame, among
+  the frames with the shoulder, elbow and wrist visible (since 2026-10-08; the frame of furthest reach before) — scored
   linearly — 100 at 160° or straighter, 0 at 100° — and eased far from the camera: with the torso under ¼ of the
-  frame height full marks start at 150°, under ⅛ the punch is not judged. The furthest reach is found over every frame
-  with a pose and the arm must be visible at that frame (since 2026-10-06): hidden there, the punch is not judged
-  ("the arm is hidden at its furthest reach") instead of being read at a less extended frame. Green at 100 and red below, the score on the block and a white
+  frame height full marks start at 150°, under ⅛ the punch is not judged. With the arm visible on no frame of the
+  punch it is not judged ("the arm is not visible on any frame of the punch"). Green at 100 and red below, the score on the block and a white
   tick at the frame measured; on the video the punching arm in the same colour with this frame's elbow angle (a punch
   the rule did not judge says why: head-on, too far from the camera…). The round is the mean punch score, a plain
   number with no bands.
