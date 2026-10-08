@@ -235,7 +235,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   `hook_stop.json`.
 - **Hand return path** (`hand_return_path/`): per side-on jab / cross, the wrist's height above its own shoulder
   from the impact to the punch's end + 0.15 s — the tail cut at the next punch of the same hand when that starts
-  sooner — against the straight line (chord) between its first and last frame. Not okay — a U — when the frames between the ends sit under the chord, at most 2 of them on or
+  sooner, and the window ended at the last frame before the wrist's visibility first drops under 0.5 (since 2026-10-08:
+  every point of the line is a clearly seen hand; under 4 frames left, the punch is skipped as wrist unsure) — against the straight line (chord) between its first and last frame. Not okay — a U — when the frames between the ends sit under the chord, at most 2 of them on or
   over it (of X frames, at least X − 2 under), and the deepest is at least 0.20 torso under it (both since 2026-10-08;
   every frame had to be under before, and a shallower sag is okay); okay otherwise; no grade per
   punch. The card, tooltip and video label give that deepest frame's distance (`dip` in `punches.csv`). The block covers the measured window itself (impact → end + 0.15 s), lead windows on the top half of the row

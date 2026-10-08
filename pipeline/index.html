@@ -1808,7 +1808,8 @@ const RULE_LAYERS = [
   },
   {
     // hand return path (hand_return_path/punches.csv), rebuilt 2026-10-01: per side-on jab / cross, the wrist's height
-    // above its own shoulder from the impact to the punch's end + 0.15 s (cut at the next same-hand punch's start),
+    // above its own shoulder from the impact to the punch's end + 0.15 s (cut at the next same-hand punch's start, and
+    // ended before the wrist's visibility first drops under move.min_wrist_visibility, since 2026-10-08),
     // against the straight line (chord) between its first and last frame. NOT OKAY (a U) when the frames between them
     // sit under the chord - at most move.max_not_under_frames on or over it - and the deepest at least move.min_dip_torso
     // under it (both since 2026-10-08; every frame had to be under before); okay otherwise.
@@ -1818,12 +1819,12 @@ const RULE_LAYERS = [
                                                            // window runs into the next jab's all the time
     csv: ['hand_return_path', 'punches.csv'], json: ['hand_return_path', 'hand_return_path.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, ws: num(r.win_start), we: num(r.win_end),
-      a: num(r.win_start), b: num(r.win_end), cut: r.cut_by_next === '1', startH: num(r.start_h), endH: num(r.end_h),
+      a: num(r.win_start), b: num(r.win_end), cut: r.cut_by_next === '1', cutW: r.cut_by_wrist === '1', startH: num(r.start_h), endH: num(r.end_h),
       between: num(r.frames_between), below: num(r.frames_below), mask: r.below_mask || '', dip: num(r.dip)} : null,
     card: (e, a) => `<div class="sub"><div class="h">${RN(16)} ${a && a.verdict !== 'skip' ? pillV(a.verdict) : ''}</div>` +
       (!a ? '<div class="empty">not judged (jabs and crosses only)</div>' :
        a.verdict === 'skip' ? `<div class="empty">not judged: ${(a.skip || '').replace(/_/g, ' ')}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Window</span><b>f ${a.ws}–${a.we} (impact → end + ${THR(() => `${fN(T(16, 'move.window_after_s'))} s`)}${a.cut ? ', cut at the next punch of this hand' : ''})</b>
+       `<div class="rows num" style="margin-top:0"><span>Window</span><b>f ${a.ws}–${a.we} (impact → end + ${THR(() => `${fN(T(16, 'move.window_after_s'))} s`)}${a.cut ? ', cut at the next punch of this hand' : ''}${a.cutW ? ', ended where the wrist stopped being clearly seen' : ''})</b>
         <span>Wrist above its shoulder at the ends</span><b>${a.startH.toFixed(2)} → ${a.endH.toFixed(2)} torso</b>
         <span>Frames between the ends under the chord</span><b>${a.below} of ${a.between}</b>
         <span>Deepest under the chord</span><b>${hrpDip(a)} torso ${THR(() => `(not okay needs ≥ ${fD(T(16, 'move.min_dip_torso'), 2)})`)}</b>
@@ -3182,11 +3183,11 @@ function ruleCard() {
   scored('hrp', RN(16), q => ({
     what: 'after a straight lands, does the fist come straight back, or sink into a U on the way home?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged side-on, ${q.skip} skipped (not side-on, `
-        + `no impact frame or facing, ${THR(() => `a window under ${fN(T(16, 'move.min_window_frames'))} frames`)}, the torso, wrist or shoulder out of view, or a tracker `
+        + `no impact frame or facing, ${THR(() => `a window under ${fN(T(16, 'move.min_window_frames'))} frames — the wrist under ${fD(T(16, 'move.min_wrist_visibility'), 2)} visibility at or just after the impact leaves it that short`)}, the torso, wrist or shoulder out of view, or a tracker `
         + `teleport) · hooks and uppercuts arc by design`,
     th: THR(() => { const z = fP(T(16, 'round.score.zero'));
       return {event: {label: 'per punch', rule: 'the wrist’s height above its own shoulder from the impact to the punch’s end + '
-                        + `${fN(T(16, 'move.window_after_s'))} s (cut at the next punch of the same hand), against the straight line joining its first `
+                        + `${fN(T(16, 'move.window_after_s'))} s (cut at the next punch of the same hand, and ended before the wrist's visibility first drops under ${fD(T(16, 'move.min_wrist_visibility'), 2)}), against the straight line joining its first `
                         + 'and last frame: not okay — a U — when '
                         + `the frames between the ends sit under that line — at most ${fN(T(16, 'move.max_not_under_frames'))} on or over it — and the deepest at least ${fD(T(16, 'move.min_dip_torso'), 2)} torso under it; okay otherwise. No grade per punch`,
                  bands: [[`more than ${fN(T(16, 'move.max_not_under_frames'))} frames on or over the line, or the deepest under ${fD(T(16, 'move.min_dip_torso'), 2)}`, 'okay'],
@@ -3511,6 +3512,7 @@ const SKIPTXT = {
   peak_not_visible: 'the arm is hidden at its furthest reach',
   no_head_or_hips: 'the head or the hips are not visible',
   wrist_or_shoulders_not_visible: 'the wrist or a shoulder is not visible at the impact frame',
+  wrist_unsure: 'the wrist is not clearly seen at or just after the impact, so no sure line is left (rule 16)',
 };
 const skipTxt = c => SKIPTXT[c] || (c ? c.replace(/_/g, ' ') : 'not judged');
 const GOOD = '#22C55E', BAD = '#EF4444', MIDC = '#F97316';
@@ -4693,7 +4695,7 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [15, 'The same as rule 14 — head travel during a slip, sideways and up-down — but checking that the slip isn’t too big either way.',
        'slips only', slipAxes(15, a => `half marks up to ${fD(T(15, `move.score_${a}.full`), 2)} torso of travel, zero at ${fD(T(15, `move.score_${a}.zero`), 2)}`),
        'An oversized slip carries the head far off the hips: slow to come back and out of position to counter.'],
-  [16, `Whether the hand sinks on its way back after a jab or cross. It follows the wrist’s height above its shoulder from impact until just after the punch ends, and flags the punch when that height sags below a straight line the whole way (at most ${fN(T(16, 'move.max_not_under_frames'))} frames may miss) and at least ${fD(T(16, 'move.min_dip_torso'), 2)} torso at its deepest. Sideways loops aren’t seen.`,
+  [16, `Whether the hand sinks on its way back after a jab or cross. It follows the wrist’s height above its shoulder from impact until just after the punch ends — or until the wrist stops being clearly seen (visibility ${fD(T(16, 'move.min_wrist_visibility'), 2)}) — and flags the punch when that height sags below a straight line the whole way (at most ${fN(T(16, 'move.max_not_under_frames'))} frames may miss) and at least ${fD(T(16, 'move.min_dip_torso'), 2)} torso at its deepest. Sideways loops aren’t seen.`,
        'jabs and crosses', `full marks when no punch sags, zero when ${fP(T(16, 'round.score.zero'))} % do`,
        'A hand that drops on its way home leaves the face open just when the counter comes.'],
   [17, 'How far the hips are turned from square to the opponent, from the 3D skeleton and the facing model: 0° is chest-on, 90° side-on. It penalises standing too square — never too turned.',
