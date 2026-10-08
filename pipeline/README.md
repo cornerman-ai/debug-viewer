@@ -355,8 +355,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
   — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of
   the camera, or a joint not visible. Width = ankle-to-ankle distance in torso lengths,
-  read front- or back-on; depth = the horizontal ankle gap in leg lengths, read side-on. Each frame scores 100 at 0.50 and
-  above, 0 with the ankles together (or level), linearly between — green at 100, red below. Round = the mean frame
+  read front- or back-on; depth = the horizontal ankle gap in torso lengths, read side-on. Each frame scores 100 from its line (width 0.50,
+  depth 0.73) and above, 0 with the ankles together (or level), linearly between — green at 100, red below. Round = the mean frame
   score, a plain number; under 150 judged frames → not rated. Read `runs.csv` + the stage's `.json`.
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = how far the elbow sits out past its
   shoulder, away from the body's midline, / torso per arm (pulled in counts 0; the lens's |x shoulder − x elbow| until 2026-10-02),

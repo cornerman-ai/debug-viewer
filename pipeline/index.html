@@ -899,14 +899,14 @@ const STANCE = {
           get roundRule() { return `the mean frame score over every judged frame \u2014 a plain number, no bands; fewer than ${H(this.no, 'min_judged_frames')} judged frames: not rated`; },
           scope: {moves: 'every frame', angles: 'front, back'}},
   depth: {label: RN(11), short: RN(11), stage: 'stance_depth', json: 'stance_depth.json',
-          bad: 'shallow', metric: 'depth', unit: 'leg', no: 11, full: 'move.score.full',
+          bad: 'shallow', metric: 'depth', unit: 'torso', no: 11, full: 'move.score.full',
           what: 'is one ankle properly in front of the other, seen from the side?',
-          get rule() { return `depth = the horizontal ankle gap in leg lengths, scored 100 at ${fD(T(11, this.full), 2)} and deeper, 0 with the ankles `
+          get rule() { return `depth = the horizontal ankle gap in torso lengths, scored 100 at ${fD(T(11, this.full), 2)} and deeper, 0 with the ankles `
               + 'level, linearly between \u2014 green at 100, red (shallow) below'; },
           get roundRule() { return `the mean frame score over every judged frame \u2014 a plain number, no bands; fewer than ${H(this.no, 'min_judged_frames')} judged frames: not rated`; },
           scope: {moves: 'every frame', angles: 'side-on'}},
 };
-const stanceFull = kind => T(STANCE[kind].no, STANCE[kind].full);      // 100 from here (torso / leg lengths)
+const stanceFull = kind => T(STANCE[kind].no, STANCE[kind].full);      // 100 from here (torso lengths)
 const stanceZero = kind => T(STANCE[kind].no, 'move.score.zero');      // 0 here
 const stanceScore = (kind, v) => { const f = stanceFull(kind), z = stanceZero(kind); return 100 * Math.min(1, Math.max(0, (v - z) / (f - z))); };
 const stanceTh = kind => { const C = STANCE[kind], full = fD(stanceFull(kind), 2);     // the Rules tab's thresholds
@@ -1063,16 +1063,9 @@ function stanceLayer(kind) {
       }
       let unit = null;
       const judged = !!it && !STANCESKIP[it.state];         // gray on the timeline: draw the gap, state no number
-      if (kind === 'width') { const t = torso(); if (t) unit = gap / t; }
-      else {                                                // depth is measured in leg lengths, not torsos
-        const legs = [[J.lhip, J.lkn, J.lan], [J.rhip, J.rkn, J.ran]].map(([h, k, a]) => {
-          const ph = P(h), pk = P(k), pa = P(a);
-          return ph && pk && pa ? Math.hypot(ph[0] - pk[0], ph[1] - pk[1]) + Math.hypot(pk[0] - pa[0], pk[1] - pa[1]) : null;
-        }).filter(Boolean);
-        if (legs.length === 2) unit = gap / ((legs[0] + legs[1]) / 2);   // the rule needs both legs, or it looks away
-      }
+      const t = torso(); if (t) unit = gap / t;             // both rules: torso lengths
       if (judged && unit != null) overlayLabel((la[0] + ra[0]) / 2 - 30, y + 18,
-        `${unit.toFixed(2)} ${kind === 'width' ? 'torso' : 'leg'} → ${Math.floor(stanceScore(kind, unit))}`, col);
+        `${unit.toFixed(2)} torso → ${Math.floor(stanceScore(kind, unit))}`, col);
     },
     tip: (e, x) => {
       const t = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
@@ -3220,7 +3213,7 @@ function ruleCard() {
         + `(front-on, or a joint not visible)`,
     th: THR(() => stanceTh('depth'), thMiss),
     calc: `mean of ${stD.judged_frames.toLocaleString()} frame scores = ${stD.score ?? '–'} · `
-          + `${stD.shallow_frames.toLocaleString()} below 100 (${pct(stD.shallow_share)}) · median ${stD.median_depth} leg`});
+          + `${stD.shallow_frames.toLocaleString()} below 100 (${pct(stD.shallow_share)}) · median ${stD.median_depth} torso`});
   if (sp) add(RN(27), sp.score ?? 'not rated', sp.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he throw anything beyond his two favourite punches?',
     on: `${sp.n_punches} punches · all judged, grouped by punch type`,
@@ -3793,15 +3786,14 @@ function frameCard(el, f) {
     return hs.length === 2 ? {score: wL * part.lead + wR * part.rear, note: `lead ${(wL * part.lead).toFixed(0)}/${fN(wL)} · rear ${(wR * part.rear).toFixed(0)}/${fN(wR)}`}
          : hs.length === 1 ? {score: 100 * part[hs[0]], note: `${hs[0]} arm alone · ${why.join(' · ')}`} : {skip: why.join(' · ')};
   });
-  // 11 / 12 stance: the ankles' gap, 100 from the rule's line (leg lengths fore-aft side-on / torso lengths across front-on)
+  // 11 / 12 stance: the ankles' gap in torso lengths, 100 from the rule's line (fore-aft side-on / across front-on)
   const la = J2(J.lan), ra = J2(J.ran);
   if (S.has.stance_depth) {
     const st = state('stance_depth')?.state;
     if (st !== 'ok' && st !== 'shallow') rows.push([11, {skip: STANCESKIP[st] || 'no reading'}]);
     else FR(11, () => {
-      const leg = (dist(J2(J.lhip), J2(J.lkn)) + dist(J2(J.lkn), la) + dist(J2(J.rhip), J2(J.rkn)) + dist(J2(J.rkn), ra)) / 2;
-      const r = la && ra ? Math.abs(la[0] - ra[0]) / leg : NaN;
-      return Number.isFinite(r) ? {score: stanceScore('depth', r), note: `${r.toFixed(2)} leg lengths apart`} : {skip: 'no reading'};
+      const r = la && ra ? Math.abs(la[0] - ra[0]) / torso : NaN;
+      return Number.isFinite(r) ? {score: stanceScore('depth', r), note: `${r.toFixed(2)} torso lengths apart`} : {skip: 'no reading'};
     });
   }
   if (S.has.stance_width) {
@@ -4760,8 +4752,8 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [10, 'How far the head point — the middle of the visible face landmarks (nose, eyes, ears, mouth) — sits to the left or right of the hip centre while punching. It reads position, not movement: either side counts, and stepping with the whole body reads as zero.',
        `every punch, mostly at impact (${fP(T(10, 'move.combined_offset.weights.impact'))} %) and a little at the ${say(T(10, 'move.combined_offset.q25_at_share'), [[0.25, 'quarter']], v => `${fP(v)} %`)} and ${say(T(10, 'move.combined_offset.q75_at_share'), [[0.75, 'three-quarter']], v => `${fP(v)} %`)} points (${fP(T(10, 'move.combined_offset.weights.q25'))} % each)`, `full marks from ${fD(T(10, 'move.score.full'), 2)} torso off the hip centre’s line, zero right on it`,
        'A head left on the centre line while punching is exactly where the return punch goes.'],
-  [11, 'How far one ankle is in front of the other, seen from the side, against leg length. A stance that is too long is never penalised.',
-       'every frame', `full marks at ${fD(T(11, 'move.score.full'), 2)} leg lengths or more, zero with the ankles level`,
+  [11, 'How far one ankle is in front of the other, seen from the side, in torso lengths. A stance that is too long is never penalised.',
+       'every frame', `full marks at ${fD(T(11, 'move.score.full'), 2)} torso lengths or more, zero with the ankles level`,
        'One foot well in front of the other is the base for absorbing punches and pushing off.'],
   [12, 'How far apart the ankles are, seen from the front or back — the straight-line distance, so a long, narrow stance can also reach full marks. Too wide is never penalised.',
        'every frame', `full marks at ${fD(T(12, 'move.score.full'), 2)} torso apart or more, zero with the ankles together`,
