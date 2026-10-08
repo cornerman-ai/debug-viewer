@@ -1885,17 +1885,17 @@ const RULE_LAYERS = [
   {
     key: 'arm', label: RN(21), short: RN(21),
     csv: ['arm_extension', 'arm_extension.csv'], json: ['arm_extension', 'arm_extension.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, peakF: num(r.peak_frame), peak: num(r.peak_bend),
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, skip: r.skip_reason, peakF: num(r.peak_frame), readAt: r.read_at || '', peak: num(r.peak_bend),
       deg: num(r.bend_deg), elbow: num(r.elbow_deg), score: num(r.punch_score), full: num(r.full_deg), torsoFrac: num(r.torso_frac), impDeg: num(r.impact_bend_deg), impElbow: num(r.impact_elbow_deg), impVerdict: r.impact_verdict} : null,
     card: (e, a) => `<div class="sub"><div class="h">${RN(21)} ${a ? pillV(a.verdict) : ''}</div>` + (!a ? '<div class="empty">not judged (only jabs and crosses)</div>' :
-      `<div class="rows num" style="margin-top:0"><span>Largest elbow angle (the straightest frame)</span><b>${a.elbow == null ? '–' : a.elbow.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
+      `<div class="rows num" style="margin-top:0"><span>${a.readAt === 'impact' ? THR(() => `Elbow angle at impact (the straightest frame was over ${fN(T(21, 'move.max_from_impact_frames'))} frames away)`) : 'Largest elbow angle (the straightest frame, near the impact)'}</span><b>${a.elbow == null ? '–' : a.elbow.toFixed(1) + '°'}${a.peakF != null ? ' · f ' + a.peakF : ''}</b>
        <span>Scale</span><b>${a.full == null ? '–' : `100 at ≥ ${a.full}°, 0 at ≤ ${THR(() => fN(T(21, 'move.score.zero')))}°, linear`}</b>
        <span>Torso / frame height</span><b>${a.torsoFrac == null ? '–' : a.torsoFrac.toFixed(3)} <span class="m">${THR(() => `(≥ ${fD(T(21, 'move.score.far_below_torso_frame_h'), 3)}: ${fN(T(21, 'move.score.full.near'))}° · ≥ ${fD(T(21, 'move.score.min_torso_frame_h'), 3)}: ${fN(T(21, 'move.score.full.far'))}° · below: not judged)`)}</span></b>${a.skip ? `<span>Skipped</span><b>${a.skip === 'arm_not_visible' ? 'the arm is not visible on any frame of the punch' : a.skip.replace(/_/g, ' ')}</b>` : ''}
        ${a.score != null ? `<span>Punch score</span><b>${a.score.toFixed(1)}</b>` : ''}</div>
        <div class="rows num" style="opacity:.6"><span>For comparison, not judged:</span><b></b>
        <span>elbow at the impact frame</span><b>${a.impElbow == null ? '–' : a.impElbow.toFixed(1) + '°'} ${a.impVerdict ? pillV(a.impVerdict) : ''}</b></div>`) + '</div>',
     tip: (e, a, {head, v}) => head + `arm extension ${v(a.verdict)}${a.skip ? ` <span class="m">(${a.skip.replace(/_/g, ' ')})</span>` : ''}<br>` +
-      `<span class="num">elbow <b>${a.elbow == null ? '–' : a.elbow.toFixed(1) + '°'}</b> at its straightest (f ${a.peakF ?? '–'})${a.score != null ? ' · score <b>' + a.score.toFixed(1) + '</b>' : ''}</span><br>` +
+      `<span class="num">elbow <b>${a.elbow == null ? '–' : a.elbow.toFixed(1) + '°'}</b> ${a.readAt === 'impact' ? 'at impact' : 'at its straightest'} (f ${a.peakF ?? '–'})${a.score != null ? ' · score <b>' + a.score.toFixed(1) + '</b>' : ''}</span><br>` +
       `<span class="m num">${a.full == null ? 'not scored' : THR(() => `100 at ≥ ${a.full}°${a.full < T(21, 'move.score.full.near') ? ' (far from the camera)' : ''}, 0 at ≤ ${fN(T(21, 'move.score.zero'))}°, linear`)} · for comparison, not judged: ${a.impElbow == null ? '–' : a.impElbow.toFixed(1) + '°'} at the impact frame</span>`,
     row(e, a, {c, y, h, span, tag, ring, tx, fps}) {       // verdict block, the rule's frame as a white tick
       const judged = a.verdict === 'pass' || a.verdict === 'fail';
@@ -1921,7 +1921,7 @@ const RULE_LAYERS = [
       octx.lineWidth = 2.5; octx.beginPath(); octx.arc(pb[0], pb[1], 18, a0, a1, ccw); octx.stroke();
       const judged = a.verdict === 'pass' || a.verdict === 'fail';
       overlayLabel(pb[0] + 14, pb[1] + 28, `elbow ${(180 - bend).toFixed(0)}°` + (!judged ? ` · not judged (${(a.skip || a.verdict).replace(/_/g, ' ')})`
-        : peak && a.score != null ? ` · straightest frame → ${a.score.toFixed(1)} (full at ${a.full}°)` : ''), col);
+        : peak && a.score != null ? ` · ${a.readAt === 'impact' ? 'at impact' : 'straightest frame'} → ${a.score.toFixed(1)} (full at ${a.full}°)` : ''), col);
     },
   },
   {
@@ -2990,9 +2990,9 @@ function ruleCard() {
       : `(${ac.n_changed} turned after × 100 + ${ac.n_inside} only inside × ${fN(ac.thresholds?.inside_score ?? 50)}) / ${ac.n_readable} combos = ${pct(ac.changed_share)} → ${ac.score ?? '–'}`});
   scored('arm', RN(21), q => ({
     what: 'does the arm reach full extension on a straight punch?',
-    on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at their largest elbow angle, ${q.skip} skipped (thrown head-on or with no facing, the boxer too far from the camera, or the arm not visible on any frame of the punch)`,
+    on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged at their largest elbow angle near the impact (else at impact), ${q.skip} skipped (thrown head-on or with no facing, the boxer too far from the camera, no impact frame, or the arm not visible on any frame of the punch or at the impact read)`,
     th: THR(() => { const full = fN(T(21, 'move.score.full.near')), far = fN(T(21, 'move.score.full.far')), zero = fN(T(21, 'move.score.zero'));
-      return {event: {label: 'per punch', rule: `the punch's largest elbow angle (its straightest frame, shoulder, elbow and wrist visible), scored linearly: 100 at ${full}° `
+      return {event: {label: 'per punch', rule: `the punch's largest elbow angle (its straightest frame, shoulder, elbow and wrist visible) when that frame is within ${fN(T(21, 'move.max_from_impact_frames'))} frames of the impact, else the elbow angle at the impact frame, scored linearly: 100 at ${full}° `
                         + `or straighter, 0 at ${zero}° or more bent — green at 100, red below. Far from the camera the line `
                         + `eases: with the torso under ${fG(T(21, 'move.score.far_below_torso_frame_h'))} of the frame height full marks start at ${far}°, and under ${fG(T(21, 'move.score.min_torso_frame_h'))} the `
                         + 'punch is not judged',
@@ -3513,6 +3513,7 @@ const SKIPTXT = {
   no_reference_for_this_punch_type: 'no reference for this punch type',
   // the joints each reading needs (since 2026-10-06 a rule gates only those, on the frames it reads)
   arm_not_visible: 'the arm (shoulder, elbow, wrist) is not visible on any frame of the punch',
+  arm_not_visible_at_impact: 'the straightest frame is too far from the impact, and the arm is not visible at the impact frame',
   no_head_or_hips: 'no face landmark is visible, or a hip point is not',
   feet_or_body_not_visible: 'the nose, a hip or an ankle is not visible at the impact frame',
   rear_foot_not_visible: 'the rear heel or foot-index (toe-tip) point is not visible at the impact frame',
@@ -4718,7 +4719,7 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [20, `The same as rule 19, for the shoulders, with their own ranges (e.g. ${fIv(T(20, 'move.score.full.rear cross'))}° for a cross). It isn’t compared with the hip line.`,
        'every punch', `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(20, 'move.score.over.points_off'))}`,
        'The shoulders’ turn carries the punch’s reach and weight; the arm alone is short and light.'],
-  [21, 'How straight the arm gets — the largest angle at the elbow over the punch, on the frames where the shoulder, elbow and wrist are visible.',
+  [21, `How straight the arm gets — the largest angle at the elbow over the punch (on the frames where the shoulder, elbow and wrist are visible) when that frame is within ${fN(T(21, 'move.max_from_impact_frames'))} frames of the impact; otherwise the angle at the impact frame.`,
        'jabs and crosses', `full marks at ${fN(T(21, 'move.score.full.near'))}° or straighter (${fN(T(21, 'move.score.full.far'))}° when the boxer is small in the picture), zero at ${fN(T(21, 'move.score.zero'))}° · very small: not judged`,
        'A straight that lands with a bent arm falls short and carries no weight.'],
   [22, 'Whether the punch would land on the head or body of an opponent the boxer’s own size, judged from the height of the punching wrist at impact; over the head, the shoulder area or below the belt is a miss. Height only, and any punch can score on either zone.',
