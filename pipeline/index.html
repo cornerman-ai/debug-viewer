@@ -678,7 +678,7 @@ const RN = no => RULE_NAMES[no];
 // files — so the page shows the numbers THAT video was scored with. T(n, 'move.score.full') reads one (n = the rule
 // number, or 'house'; a dotted path also reaches into a dict / list). H(n, 'min_judged') reads rule n's floor: the
 // house one (the floors every rule shares) unless the rule's house_overrides changes it — rule 26 judges from 30
-// punches, rules 9 / 10 / 12 need a 5 px torso. camSkip(n, facing°) is a rule's camera gate: its `camera` (side_on /
+// punches. camSkip(n, facing°) is a rule's camera gate: its `camera` (side_on /
 // front_back) and its camera_window_deg, any shape. A missing file or key throws ThMissing, and THR(fn) puts the marker
 // in place of the threshold text — never a hardcoded fallback. The formatters print a number the way the text
 // writes it; null (the Explanations tab, soft mode) prints '…'. ──
@@ -1762,7 +1762,7 @@ const RULE_LAYERS = [
       const ls = PAT(e.impact, 11), rs = PAT(e.impact, 12), lh = PAT(e.impact, 23), rh = PAT(e.impact, 24);
       if (!(he && to && ls && rs && lh && rh)) return;
       const torso = Math.hypot((ls[0] + rs[0]) / 2 - (lh[0] + rh[0]) / 2, (ls[1] + rs[1]) / 2 - (lh[1] + rh[1]) / 2);
-      if (!(torso > H(33, 'min_torso_px'))) return;
+      if (!(torso >= H(33, 'min_torso_px'))) return;
       const full = T(33, 'move.score.full');
       const col = x.verdict === 'pivots' ? '#34c759' : '#ff3b30';
       const x0 = Math.min(he[0], to[0]) - 40, x1 = Math.max(he[0], to[0]) + 40;
@@ -3465,7 +3465,7 @@ function hpBar(v, t) {
     (v == null ? '' : `<div class="fill" style="width:${Math.max(0, Math.min(100, v))}%;--c:${t[2]}"></div>`) + ticks + '</div>';
 }
 // The floors every rule shares — the house block of the video's snapshot — and the rules that change one, grouped:
-// "rules 9, 10, 12 torso ≥ 5 px". Nothing without a snapshot (the rule cards then say the file is missing).
+// "rule 26 from 30 judged". Nothing without a snapshot (the rule cards then say the file is missing).
 const FLOORWORD = {min_visibility: v => `joint visibility ≥ ${fD(v, 2)}`, min_presence: v => `joint presence ≥ ${fD(v, 2)}`,
                    min_judged: v => `from ${fN(v)} judged`,
                    min_judged_s: v => `from ${fN(v)} s of frames`, min_torso_px: v => `torso ≥ ${fN(v)} px`};
