@@ -293,16 +293,16 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — read side-on
   (|facing| 65–115°), the zone the fist is in at its impact frame (the midpoint of the index and pinky knuckle points; with either
   unseen, the wrist pushed 0.3 of the forearm further — `fist_from` in the CSV; the wrist itself until 2026-10-08) against the boxer's own skeleton on that frame (the ghost below, whose heights are his: head = above the higher
-  shoulder, body = the middle third from the hip centre to the shoulder centre, misses = the shoulder gap between them and
-  below the body; since 2026-10-08 — before, the zones of a ghost stance built from his limb lengths;
+  shoulder up to the crown (the nose raised 0.6 × its rise over the shoulders), body = the middle third from the hip centre to the shoulder centre, misses = over the head, the shoulder gap
+  between them and below the body; since 2026-10-08 — before, the zones of a ghost stance built from his limb lengths;
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
   fist where the rule read it at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. With the layer on, every frame also draws a ghost opponent for the eye only (dashed, since 2026-10-08): the boxer's own
   skeleton without the arms, mirrored about a vertical line through the nose and moved one arm's reach (upper arm +
   forearm, 90th percentile of both arms over ±1 s) toward the side the lead ankle points to — same height, floor and
   pose, face to face. Mirroring keeps every height, so the rule's zones are this ghost's: its shoulders and hips are the boxer's own.
-  At the ghost's face a bar shows them on that frame — green = hit (head: above the higher shoulder; body: the middle
-  third from the hip centre to the shoulder centre), red = miss (the shoulder gap, below the body) — with dashed
-  borders from the boxer to the ghost; no bar when a shoulder or hip is under the house visibility floor. Round = 100 × the on-target share of the judged punches, a plain number. Until
+  At the ghost's face a bar shows them on that frame — green = hit (head: above the higher shoulder, up to the crown; body: the
+  middle third from the hip centre to the shoulder centre), red = miss (over the head, the shoulder gap, below the body) — with dashed
+  borders from the boxer to the ghost; no bar when a shoulder, hip or the nose is under the house visibility floor. Round = 100 × the on-target share of the judged punches, a plain number. Until
   2026-09-30 it judged jabs and crosses only, at the most-extended frame.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head point
   (the middle of the visible face landmarks: nose, eyes, ears, mouth) is off a vertical line through the hip centre — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
