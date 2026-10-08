@@ -120,7 +120,7 @@ The side panel has five views, switched at its top:
   per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–33 in the Notion
   order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 75–85 good,
   60–75 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under
-  the rule's floor (10 judged punches / combos / moves, 150 frames), and under it four lines — what the
+  the rule's floor (10 judged punches / combos / moves, 5 s of judged frames), and under it four lines — what the
   rule measures, what it was measured on, its thresholds, and the sum that produced the number — and a rated per-punch
   rule a fifth, **fails on**: its failed punches split by punch type, a bar in the punch colours (each type's share of
   the fails) with failed / judged after each type, so a punch that fails out of proportion to how often it is thrown
@@ -151,7 +151,7 @@ under the visibility floor (0.30) is drawn hollow and its bones dashed, with a n
 **Now** tab's Frame card ends with **Joint visibility** — a bar per joint (nose, then lead / rear shoulder to ankle), a
 tick at the floor, red under it, the value beside it, and a **Visibility / Presence** switch (presence: is the joint in
 the picture at all, its floor 0.75 since 2026-10-06); the **Rules** tab's **Floors** line lists visibility, presence,
-the judged minimum (10 punches / combos / moves, 150 frames) and the torso minimum, plus the rules that change one;
+the judged minimum (10 punches / combos / moves, 5 s of judged frames) and the torso minimum, plus the rules that change one;
 **Explanations** says what both mean. Every reading the page recomputes (and the hollow joints) drops a joint under
 the presence floor exactly as the pipeline does (`visAt`).
 
@@ -238,9 +238,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Hand return path** (`hand_return_path/`): per side-on jab / cross, the wrist's height above its own shoulder
   from the impact to the punch's end + 0.15 s — the tail cut at the next punch of the same hand when that starts
   sooner, and the window ended at the last frame before the wrist's visibility first drops under 0.3 after the impact
-  (since 2026-10-08; the impact frame always starts the line, whatever its visibility; under 4 frames left, the punch
-  is skipped as wrist unsure) — against the straight line (chord) between its first and last frame. Not okay — a U — when the frames between the ends sit under the chord, at most 2 of them on or
-  over it (of X frames, at least X − 2 under), and the deepest is at least 0.20 torso under it (both since 2026-10-08;
+  (since 2026-10-08; the impact frame always starts the line, whatever its visibility; under 0.133 s left, the punch
+  is skipped as wrist unsure) — against the straight line (chord) between its first and last frame. Not okay — a U — when the frames between the ends sit under the chord, at most 0.067 s of them on
+  or over it (2 frames at 30 fps), and the deepest is at least 0.20 torso under it (both since 2026-10-08;
   a shallower sag is okay); okay otherwise; no grade per punch. The card, tooltip and video label give that deepest frame's distance (`dip` in `punches.csv`). The block covers the measured window itself (impact → end + 0.15 s), lead windows on the top half of the row
   and rear on the bottom (a cross's window runs into the next jab's all the time), a white edge where each window
   starts, green okay, red not okay, labelled with the frames under the chord. Each window draws on the video on its
@@ -255,8 +255,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   rule counted it (0 of 12,628 dots differ, 2026-10-02). Round = 100 with no punch not okay, linearly to 0 at 70 % not
   okay, a plain number; under 10 judged punches → not rated. Reads `punches.csv` + `hand_return_path.json`.
 - **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the wrist
-  of the hand that is NOT throwing, read at impact −1, impact and impact +1 frames and weighted ¼ · ½ · ¼ — how far it
-  sits below the nose. Scored 100 up to 0.25 torso (an absolute line: a boxer who holds his hands low all round must not pass),
+  of the hand that is NOT throwing, read over the frames within 0.033 s before the impact (their mean), at the impact
+  frame and over the frames within 0.033 s after it (one frame each side at 30 fps; seconds since 2026-10-08), weighted
+  ¼ · ½ · ¼ — how far it sits below the nose. Scored 100 up to 0.25 torso (an absolute line: a boxer who holds his hands low all round must not pass),
   linearly to 0 at 0.60 (since 2026-10-05; was ±2 frames, 0.40 / 0.70); green at 100, red below, with the score on
   the block. The overlay
   draws the 100 / 0 lines and the weighted reading at the impact frame, ticks each of the three readings on that scale
@@ -267,7 +268,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   punches unjudgeable. Reads `punches.csv` + `resting_hand.json`.
 - **Arm extension** (`arm_extension/`): per jab / cross the punch's largest elbow angle — its straightest frame, among
   the frames with the shoulder, elbow and wrist visible (since 2026-10-08; the frame of furthest reach before), if that
-  frame is within 2 frames of the punch's middle frame; otherwise the elbow angle at the middle frame (the arm hidden
+  frame is within 0.067 s of the punch's middle frame; otherwise the elbow angle at the middle frame (the arm hidden
   there: not judged) — scored
   linearly — 100 at 160° or straighter, 0 at 100° — and eased far from the camera: with the torso under ¼ of the
   frame height full marks start at 150°, under ⅛ the punch is not judged. With the arm visible on no frame of the
@@ -351,13 +352,13 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   linearly to 0 at 0.40 in front — green at 100, red below — read side-on
   only. A dashed gray line is everything the rule could not look at: a joint not visible, a punch in flight, or the
   wrong camera angle. Round = the mean frame score over every judged frame, however brief — a plain number, no
-  bands; under 150 judged frames → not rated. Both read joints at visibility 0.30, like every rule. Read `runs.csv` + the stage's `.json`.
+  bands; under 5 s of judged frames → not rated. Both read joints at visibility 0.30, like every rule. Read `runs.csv` + the stage's `.json`.
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
   — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of
   the camera, or a joint not visible. Width = ankle-to-ankle distance in torso lengths,
   read front- or back-on; depth = the horizontal ankle gap in torso lengths, read side-on. Each frame scores 100 from its line (width 0.50,
   depth 0.73) and above, 0 with the ankles together (or level), linearly between — green at 100, red below. Round = the mean frame
-  score, a plain number; under 150 judged frames → not rated. Read `runs.csv` + the stage's `.json`.
+  score, a plain number; under 5 s of judged frames → not rated. Read `runs.csv` + the stage's `.json`.
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = how far the elbow sits out past its
   shoulder, away from the body's midline, / torso per arm (pulled in counts 0; the lens's |x shoulder − x elbow| until 2026-10-02),
   judged only while the boxer is within 25° of facing or backing the camera (45° until 2026-10-06) and that arm isn't
