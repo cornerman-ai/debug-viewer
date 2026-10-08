@@ -299,7 +299,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   fist where the rule read it at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. With the layer on, every frame also draws a ghost opponent for the eye only (dashed, since 2026-10-08): the boxer's own
   skeleton without the arms, mirrored about a vertical line through the nose and moved one arm's reach (upper arm +
   forearm, 90th percentile of both arms over ±1 s) toward the side the lead ankle points to — same height, floor and
-  pose, face to face. Mirroring keeps every height, so the rule's zones are this ghost's: its shoulders and hips are the boxer's own. Round = 100 × the on-target share of the judged punches, a plain number. Until
+  pose, face to face. Mirroring keeps every height, so the rule's zones are this ghost's: its shoulders and hips are the boxer's own.
+  At the ghost's face a bar shows them on that frame — green = hit (head: above the higher shoulder; body: the middle
+  third from the hip centre to the shoulder centre), red = miss (the shoulder gap, below the body) — with dashed
+  borders from the boxer to the ghost; no bar when a shoulder or hip is under the house visibility floor. Round = 100 × the on-target share of the judged punches, a plain number. Until
   2026-09-30 it judged jabs and crosses only, at the most-extended frame.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head point
   (the middle of the visible face landmarks: nose, eyes, ears, mouth) is off a vertical line through the hip centre — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —

@@ -2054,8 +2054,33 @@ const RULE_LAYERS = [
         octx.beginPath(); octx.arc(p[0], p[1], 3.6, 0, 7); octx.fill();
       }
       octx.restore();
-      const g = G(J.nose);
-      overlayLabel(g[0] - 40, g[1] - 26, `ghost · mirrored skeleton · one arm’s reach ahead`, '#e5e5ea');
+      const g = G(J.nose), dir = Math.sign(fwd || 1);
+      // the rule's zones on this frame (levels_at / zone_for): a bar at the ghost's face, green = hit (head: above the
+      // higher shoulder; body: the band of hip centre -> shoulder centre in the video's thresholds), red = miss, with
+      // dashed borders from the boxer to the ghost. Needs both shoulders and both hips at the house floor, as the rule.
+      const band = S.th?.rules?.['22']?.move?.zones?.body_band_hip_to_shoulder;
+      const ls = P(J.lsh), rs = P(J.rsh);
+      if (band && ls && rs && lh && rh && [J.lsh, J.rsh, J.lhip, J.rhip].every(j => seen(f, j))) {
+        const top = Math.min(ls[1], rs[1]), shY = (ls[1] + rs[1]) / 2, hipY = (lh[1] + rh[1]) / 2, span = hipY - shY;
+        if (span > 0) {
+          const bodyTop = hipY - band[1] * span, bodyBot = hipY - band[0] * span;
+          const crown = nose[1] - 0.6 * Math.max(shY - nose[1], 0.15 * span);
+          const ank = [P(J.lan), P(J.ran)].filter(Boolean).map(p => p[1]), low = ank.length ? Math.max(...ank) : hipY + span;
+          const bx = g[0] - dir * 0.15 * reach, x0 = Math.min(nose[0], gx((lh[0] + rh[0]) / 2)), x1 = Math.max(nose[0], gx((lh[0] + rh[0]) / 2));
+          const HIT = '#34c759', MISS = '#ff3b30';
+          for (const y of [top, bodyTop, bodyBot]) OV.level(y, x0, x1, 'rgba(255,255,255,0.5)', [4, 4]);
+          octx.save(); octx.lineCap = 'butt'; octx.lineWidth = 6; octx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+          octx.textAlign = dir > 0 ? 'right' : 'left';
+          for (const [a, b, col, name] of [[crown, top, HIT, 'head'], [top, bodyTop, MISS, 'shoulder'], [bodyTop, bodyBot, HIT, 'body'], [bodyBot, low, MISS, 'below']]) {
+            if (!(b > a)) continue;
+            octx.strokeStyle = col; octx.beginPath(); octx.moveTo(bx, a + 1); octx.lineTo(bx, b - 1); octx.stroke();
+            octx.fillStyle = col; octx.fillText(name, bx - dir * 7, (a + b) / 2 + 3);
+          }
+          octx.restore();
+        }
+      }
+      const feet = [G(J.lan), G(J.ran)].filter(Boolean), fy = feet.length ? Math.max(...feet.map(p => p[1])) : g[1];
+      overlayLabel(g[0] - 60, fy + 18, `ghost · mirrored skeleton · one arm’s reach ahead`, '#e5e5ea');
     },
     overlay(e, x, f, P, leadLeft) {                        // the fist at the impact frame, with its zone
       if (x.land == null || Math.abs(f - x.land) > 2 || !x.verdict || x.verdict === 'skip') return;
