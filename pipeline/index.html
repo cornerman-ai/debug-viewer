@@ -1997,20 +1997,20 @@ const RULE_LAYERS = [
     csv: ['hit_height', 'hit_height.csv'], json: ['hit_height', 'hit_height.json'],
     // hit height (hit_height/hit_height.csv): every punch type, read at its impact frame against the ghost's zones
     parse: (r, num) => ({verdict: r.verdict, zone: r.zone, land: num(r.land_frame), hf: num(r.height_frac),
-      skip: r.skip_reason, match: r.matches_target}),
+      skip: r.skip_reason, match: r.matches_target, from: r.fist_from || '', fx: num(r.fist_nx), fy: num(r.fist_ny)}),
     card(e, x) {
       const zn = z => z ? (ZONE[z]?.[1] || z) : '–', pct = v => v == null ? '–' : `${(v * 100).toFixed(0)}% of stance height`;
       return `<div class="sub"><div class="h">${RN(22)} ${x?.verdict ? pillV(x.verdict) : ''}</div>` + (!x || !x.verdict ? '<div class="empty">no reading</div>' :
         `<div class="rows num" style="margin-top:0">` +
         `<span>Zone at impact</span><b>${x.skip ? 'skipped (' + x.skip.replace(/_/g, ' ') + ')' : zn(x.zone)}</b>` +
-        (x.skip ? '' : `<span>Wrist height</span><b>${pct(x.hf)}${x.land != null ? ' · f ' + x.land : ''}</b>`) +
+        (x.skip ? '' : `<span>Fist height</span><b>${pct(x.hf)}${x.land != null ? ' · f ' + x.land : ''}${x.from === 'forearm' ? ' · from the forearm (knuckles unseen)' : ''}</b>`) +
         (x.match ? `<span>Model's target</span><b>${e.target} · ${x.match === 'yes' ? 'matches' : 'does not match'}</b>` : '') + '</div>') + '</div>';
     },
     tip(e, x, {head, v}) {
       const zn = z => ZONE[z]?.[1] || z;
       return head + (!x.verdict ? `<span class="m">hit height: no reading</span>` :
         x.skip ? `hit height ${v('skip')} <span class="m">(${x.skip.replace(/_/g, ' ')})</span>` :
-        `<span class="num">hit height: <b>${zn(x.zone)}</b> ${v(x.verdict)}</span><br><span class="m num">wrist at ${(x.hf * 100).toFixed(0)}% of stance height · f ${x.land} (the impact frame)</span>` +
+        `<span class="num">hit height: <b>${zn(x.zone)}</b> ${v(x.verdict)}</span><br><span class="m num">fist at ${(x.hf * 100).toFixed(0)}% of stance height · f ${x.land} (the impact frame) · ${x.from === 'forearm' ? 'the wrist pushed along the forearm' : 'the knuckles'}</span>` +
         (x.match ? `<br><span class="m">model's target ${e.target}: ${x.match === 'yes' ? 'matches' : 'no match'}</span>` : ''));
     },
     row(e, x, {c, y, h, span, tag, ring, tx, fps}) {       // the zone at the impact frame, every punch type
@@ -2054,9 +2054,10 @@ const RULE_LAYERS = [
       octx.stroke(); octx.restore();
       overlayLabel(x0, floor + 16, `ghost · his size · ${Math.round((G.floor_y[f] - G.crown_y[f]) * video.videoHeight)} px tall (floor = his lower ankle)`, '#e5e5ea');
     },
-    overlay(e, x, f, P, leadLeft) {                        // the wrist at the impact frame, with its zone
+    overlay(e, x, f, P, leadLeft) {                        // the fist at the impact frame, with its zone
       if (x.land == null || Math.abs(f - x.land) > 2 || !x.verdict || x.verdict === 'skip') return;
-      const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2], q = PAT(x.land, wr); if (!q) return;   // where the rule read it
+      const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2];
+      const q = x.fx != null ? PXY(S.mirrored ? 1 - x.fx : x.fx, x.fy) : PAT(x.land, wr); if (!q) return;   // where the rule read it
       const col = VERD[x.verdict]; octx.strokeStyle = col; octx.lineWidth = 3; octx.setLineDash([5, 4]);
       octx.beginPath(); octx.arc(q[0], q[1], 22, 0, 7); octx.stroke(); octx.setLineDash([]);
       const now = P(wr); if (now && f !== x.land) OV.dot(now, col, 4);   // the wrist now, off the frame that was judged
@@ -3410,8 +3411,8 @@ function ruleCard() {
           + `${dc.first_window} → ${dc.last_window} = ${dc.drop == null ? '–' : dc.drop >= 0 ? `${pct(dc.drop)} fewer` : `${pct(-dc.drop)} more`} → ${dc.score ?? '–'}`});
   scored('hit', RN(22), q => ({
     what: 'would the punch land somewhere useful on an opponent his own size?',
-    on: `${q.pass + q.fail + q.skip} punches of every type · ${q.pass + q.fail} judged at their impact frame, ${q.skip} skipped (thrown too head-on, no impact frame, or the wrist or the ankles not visible)`,
-    th: {event: {label: 'per punch', rule: THR(() => `the wrist’s height at the impact frame on an opponent his own size — jabs, crosses, hooks, uppercuts and body shots alike; the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 2)} of the stance height (0 = floor)`),
+    on: `${q.pass + q.fail + q.skip} punches of every type · ${q.pass + q.fail} judged at their impact frame, ${q.skip} skipped (thrown too head-on, no impact frame, or neither the knuckles nor the wrist and elbow, or no ankle, visible)`,
+    th: {event: {label: 'per punch', rule: THR(() => `the fist’s height at the impact frame (the index and pinky knuckle points’ midpoint; unseen, the wrist pushed ${fD(T(22, 'move.fist.forearm_extension'), 2)} of the forearm further) on an opponent his own size — jabs, crosses, hooks, uppercuts and body shots alike; the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 2)} of the stance height (0 = floor)`),
                  bands: [['head, body', 'on target'], ['shoulder, over the head, below the belt', 'off target']],
                  pal: {'on target': '#34c759', 'off target': '#ff3b30'}},
          round: {label: 'per round', rule: THR(() => '100 × the share of judged punches on target: 0 with none, 100 with all, '
@@ -3563,6 +3564,7 @@ const SKIPTXT = {
   rear_foot_not_visible: 'the rear heel or foot-index (toe-tip) point is not visible at the impact frame',
   hips_not_visible: 'a hip point is not visible on the start or impact frame',
   wrist_or_shoulders_not_visible: 'the wrist or a shoulder is not visible at the impact frame',
+  fist_not_visible: 'neither the knuckles nor the wrist and elbow are visible at the impact frame',
   wrist_unsure: 'the wrist is not seen just after the impact, so no sure line is left (rule 16)',
 };
 const skipTxt = c => SKIPTXT[c] || (c ? c.replace(/_/g, ' ') : 'not judged');
@@ -4766,7 +4768,7 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [21, `How straight the arm gets — the largest angle at the elbow over the punch (on the frames where the shoulder, elbow and wrist are visible) when that frame is within ${fN(T(21, 'move.max_from_middle_frames'))} frames of the punch's middle frame; otherwise the angle at the middle frame.`,
        'jabs and crosses', `full marks at ${fN(T(21, 'move.score.full.near'))}° or straighter (${fN(T(21, 'move.score.full.far'))}° when the boxer is small in the picture), zero at ${fN(T(21, 'move.score.zero'))}° · very small: not judged`,
        'A straight that lands with a bent arm falls short and carries no weight.'],
-  [22, `Whether the punch would land on the head or body of an opponent the boxer’s own size, judged from the height of the punching wrist at impact (the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 2)} of the stance height); over the head, the shoulder area or below the belt is a miss. Height only, and any punch can score on either zone.`,
+  [22, `Whether the punch would land on the head or body of an opponent the boxer’s own size, judged from the height of the punching fist (its knuckles) at impact (the head zone starts at ${fD(T(22, 'move.zones.head_from_stance_h'), 2)} of the stance height); over the head, the shoulder area or below the belt is a miss. Height only, and any punch can score on either zone.`,
        'every punch', 'the share of punches on target',
        'Punches into the gap between head and body, or over the top, hit nothing.'],
   [23, 'How long the punch takes from its first detected frame to impact, against labelled punches of the same type. It is time only — not how fast the wrist moves or how far it travels.',

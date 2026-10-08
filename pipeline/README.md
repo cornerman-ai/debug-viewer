@@ -291,10 +291,11 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   scored like hip rotation — green at 100, red below, the score on the block; on the video the shoulder line in the
   verdict's colour and the same dial from above. The round is the mean punch score, no bands.
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — read side-on
-  (|facing| 65–115°), the zone the wrist is in at its impact frame on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt; the head zone starts at 0.88 of the stance height since
+  (|facing| 65–115°), the zone the fist is in at its impact frame (the midpoint of the index and pinky knuckle points; with either
+  unseen, the wrist pushed 0.3 of the forearm further — `fist_from` in the CSV; the wrist itself until 2026-10-08) on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt; the head zone starts at 0.88 of the stance height since
   2026-10-08, 0.08 below the ghost's chin before;
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
-  wrist where it was at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. With the layer on, every frame also draws the ghost the rule judges against, from the rule's own
+  fist where the rule read it at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. With the layer on, every frame also draws the ghost the rule judges against, from the rule's own
   `hit_height/ghost.csv` (since 2026-10-08): its zone bands across the boxer (green = hit: head, body; red = miss:
   over the head, shoulder, below the belt), the floor line on his lower ankle, and a ghost figure (head from chin to
   crown, torso from the shoulders to the hips, legs to the floor) stood half a body length in front of him. Only the
