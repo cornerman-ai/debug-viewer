@@ -34,7 +34,7 @@ names the exact path it was looked for at.
 
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
 (fps, stance, video name — and `mirrored`: a southpaw's stages ran on his skeleton mirrored to orthodox, so the page
-flips back what carries an image side — the facing angle's sign, hook overswing's x lines, the balance head position,
+flips back what carries an image side — the facing angle's sign, hook overswing's x lines, the balance nose position,
 head-off-center's left / right — and takes lead = his right side; the skeleton it draws is the real one), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
 `*_blazepose_full.npy` skeleton for the stick figure. A missing stage is named in the timeline header; the rest still works.
 Switching videos is safe at any moment — while playing, mid-load, while a skeleton is still downloading: the old
@@ -181,7 +181,7 @@ Every rule with geometry in the frame now draws it. Rules that judge a punch (ar
 shoulder rotation, head off center, punch starts from low guard, resting hand, balance, hand return path, hook overswing, rear-foot heel up)
 draw for the punch under the playhead. Rules that judge frames (guard height, elbow tuck, chin tuck height and depth, stance width and depth, both
 bladedness axes, slip distance) draw on every frame through `frameOverlay`, which gets the raw BlazePose-33
-channels — they need joints (mouth corners, heels, toes) and channels (world x/z) the punch overlays never touch.
+channels — they need joints (mouth corners, heels, foot-index (toe-tip) points) and channels (world x/z) the punch overlays never touch.
 Punch speed has no overlay on purpose: it measures a duration, and a duration has no geometry to draw.
 
 When punches overlap, every punch under the playhead draws its own overlay, and each label is prefixed with its
@@ -212,25 +212,26 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   block, green at 100 and red below. Every angle is judged: a time is not foreshortened. Round = the mean punch
   score, a plain number, from at least 10 judged punches. Reads `punches.csv` + `punch_speed.json`.
 - **Balance at impact** (`balance/`): per punch at the impact frame, read side-on (\|facing\| 65–115°, the rule's
-  `camera_window_deg` since 2026-10-05), a score 0–100 = head (0–50) +
-  hips (0–50), in ankle distances. Head: 50 while the nose is at most 0.20 past an ankle, linearly to 0 at 0.75
-  past it. Hips: 50 while the hip centre is within 0.20 of the ankles' midpoint, linearly to 0 at 0.50 (over an
+  `camera_window_deg` since 2026-10-05), a score 0–100 = nose (0–50) +
+  hip centre (0–50), in ankle distances. Nose: 50 while the nose is at most 0.20 past an ankle, linearly to 0 at 0.75
+  past it. Hip centre: 50 while the hip centre is within 0.20 of the ankles' midpoint, linearly to 0 at 0.50 (over an
   ankle). The block is green when both are inside their green zone (score 100), red otherwise, and carries the
-  score. The overlay draws the base between the ankles, the head's slack as dashed ticks outside it, the hips'
-  ticks, the head and the hips, at the impact frame. Round = the mean punch score, a plain number with no bands,
+  score. The overlay draws the base between the ankles, the nose's slack as dashed ticks outside it, the hip
+  centre's ticks, the nose and the hip centre, at the impact frame. Round = the mean punch score, a plain number with no bands,
   from at least 10 judged punches. Reads `punches.csv` + `balance.json`.
 - **Rear-foot heel up** (rule 33, `rear_pivot/`; "Rear-foot pivot" until 2026-10-03): per rear-hand punch, at the impact frame, how far the rear heel sits above the
-  rear toe in torso lengths, scored 0 with the heel level with the toe and 100 from 0.20, linearly between — green at
-  100, red below, the score on the block (the stance already carries the heel about 0.14 up, so a planted foot scores
-  about 70). The overlay draws the toe's height dashed grey, the 0.20 line in the verdict's colour, the foot and the
-  heel. Every angle is judged; lead-hand punches and a hidden rear foot are not drawn. Round = the mean punch score,
+  rear foot-index (toe-tip) point in torso lengths, scored 0 with the heel level with the foot-index point and 100
+  from 0.20, linearly between — green at 100, red below, the score on the block (the stance already carries the heel
+  about 0.14 up, so a planted foot scores about 70). The overlay draws the foot-index point's height dashed grey, the
+  0.20 line in the verdict's colour, the line from the foot-index point to the heel, and the heel. Every angle is
+  judged; lead-hand punches and a hidden rear heel or foot-index point are not drawn. Round = the mean punch score,
   a plain number, from at least 10. Reads `punches.csv` + `rear_pivot.json`.
-- **Hook overswing** (rule 32, `hook_stop/`; "Hook stop" until 2026-10-03): per head hook, read front-on or back-on, where the fist is at the turnaround — the
+- **Hook overswing** (rule 32, `hook_stop/`; "Hook stop" until 2026-10-03): per head hook, read front-on or back-on, where the wrist is at the turnaround — the
   frame the impact spotter says it stopped going forward. Score 100 at the boxer's centre line or short of it, linearly to 0 at a third of a
   torso past his own far shoulder; green at 100, red below, the score on the block. The far shoulder is his centre
   line plus half his squared-up width (the 90th percentile of his shoulder separation over the clip), not the gap in
   that frame, which collapses when he blades. The overlay draws the centre line (green, 100), the far shoulder
-  (dashed grey), the zero line (red) and the fist. Round = the mean punch score, a plain number, from at
+  (dashed grey), the zero line (red) and the wrist. Round = the mean punch score, a plain number, from at
   least 10 — most hooks on the current footage are thrown side-on and are not judged at all. Reads `punches.csv` +
   `hook_stop.json`.
 - **Hand return path** (`hand_return_path/`): per side-on jab / cross, the wrist's height above its own shoulder
@@ -245,7 +246,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   starts, green okay, red not okay, labelled with the frames under the chord. Each window draws on the video on its
   own wrist, its label always naming the punch ("Lead jab · okay · 0/4 under the chord"). A wrist under visibility 0.6
   is drawn hollow (an end) or as a hollow dot (a frame between), and the label gives the ends' visibility and "may be a
-  guess": a hand BlazePose cannot see (side-on, the far hand behind the head or the body) still gets a position, on the
+  guess": a wrist BlazePose cannot see (side-on, the far wrist behind the head or the body) still gets a position, on the
   chest, back or hip (by eye on the shelf's window ends, 2026-10-07: off the hand in 8 of 12 under 0.5, 6 of 12 at
   0.5–0.6, 1 of 12 at 0.6–0.8). Display only: the rule cuts its window at the wrist's own line (0.30 after the impact, the impact frame exempt), so dots between 0.30 and 0.6 still count. On the video, for every frame of that window: the wrist's whole line, the
   two ends (grey dots), each frame between them as a red (under) or green dot tied by a thin line to the chord, and
@@ -254,9 +255,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   rule counted it (0 of 12,628 dots differ, 2026-10-02). Until then it was a straight image segment between the two end
   positions, which ignored the shoulder and the timing and contradicted the verdict on a quarter of the dots. Round = 100 with no punch not okay, linearly to 0 at 70 % not okay, a plain number. Rebuilt 2026-10-01 — the earlier versions are in
   `run_hand_return_path.py`'s docstring. Reads `punches.csv` + `hand_return_path.json`.
-- **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the hand
-  that is NOT throwing, read at impact −1, impact and impact +1 frames and weighted ¼ · ½ · ¼ — how far it sits below
-  the nose. Scored 100 up to 0.25 torso (an absolute line: a boxer who holds his hands low all round must not pass),
+- **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the wrist
+  of the hand that is NOT throwing, read at impact −1, impact and impact +1 frames and weighted ¼ · ½ · ¼ — how far it
+  sits below the nose. Scored 100 up to 0.25 torso (an absolute line: a boxer who holds his hands low all round must not pass),
   linearly to 0 at 0.60 (since 2026-10-05; was ±2 frames, 0.40 / 0.70); green at 100, red below, with the score on
   the block. The overlay
   draws the 100 / 0 lines and the weighted reading at the impact frame, ticks each of the three readings on that scale
@@ -288,13 +289,13 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   scored like hip rotation — green at 100, red below, the score on the block; on the video the shoulder line in the
   verdict's colour and the same dial from above. The round is the mean punch score, no bands.
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — read side-on
-  (|facing| 65–115°), the zone the fist is in at its impact frame on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt;
+  (|facing| 65–115°), the zone the wrist is in at its impact frame on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt;
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
-  fist where it was at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. Round = 100 × the on-target share of the judged punches, a plain number. Until
+  wrist where it was at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. Round = 100 × the on-target share of the judged punches, a plain number. Until
   2026-09-30 it judged jabs and crosses only, at the most-extended frame.
-- **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head is
-  off a vertical line through the hips — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
-  green at 100, red below, the score on the block — with a tick at the impact frame; on the video the hip line (dashed) and the head's distance from it.
+- **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head point
+  (the middle of the visible face landmarks: nose, eyes, ears, mouth) is off a vertical line through the hip centre — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
+  green at 100, red below, the score on the block — with a tick at the impact frame; on the video the vertical line through the hip centre (dashed) and the head point's distance from it.
 - **Offensive combos** and **Combined combos** (`combinations/`; the rows of rules 24 and 30, and of rule 31): the same
   grouping for both — no pause longer than 0.3 s between elements (rules 30 / 31's `max_gap_s`), however long each lasts. Offensive = punches only; combined = punches and all
   defensive moves in time order (a move may start or end one). Each combination is one plain line from its first
@@ -307,10 +308,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   noise inflates its variety. These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
-- **Slip far enough** / **Slip not too much** (rules 14 and 15, `slip_distance/`; 15 was "Slips compact" until 2026-10-03): per slip, how far the head travelled against the hips from where it started, in
-  torso lengths, sideways (x) and up-down (y) each scored on its own for up to 50 points, summed (since 2026-10-07; x only
+- **Slip far enough** / **Slip not too much** (rules 14 and 15, `slip_distance/`; 15 was "Slips compact" until 2026-10-03): per slip, how far the head point (the middle of the visible face landmarks: nose,
+  eyes, ears, mouth) travelled against the hip centre from where it started, in torso lengths, sideways (x) and up-down (y) each scored on its own for up to 50 points, summed (since 2026-10-07; x only
   before), with a white tick at the furthest frame of the axis with fewer points. Rolls and ducks are not measured. Judged front-on / back-on only;
-  a frame is read when a head point and both hips are visible (the overlay's path too: the head against the hips, both axes, with a ring at each axis's furthest frame). Two timeline rows, one per rule, each slip coloured by that
+  a frame is read when a face landmark and both hip points are visible (the overlay's path too: the head point against the hip centre, both axes, with a ring at each axis's furthest frame). Two timeline rows, one per rule, each slip coloured by that
   rule's slip score (green 100, orange between, red 0), and two round rows, each the mean of its slip scores: rule 14 "slip far enough" (per axis 50 at 0.20 torso of travel or more, 0 with none) and 15 "slip not too much" (per axis 50
   up to 0.50, 0 at 1.00). Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
@@ -331,9 +332,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   judged; a frame with no facing angle is not. Round = the mean frame score, a plain number. Read `runs.csv` + the
   stage's `.json`.
 - **Chin tuck height** (rule 8, `chin_height/`; "Chin height" until 2026-10-03) and **Chin tuck depth** (rule 7, `chin_depth/`; "Chin depth" until 2026-10-03): both per frame outside punches, both
-  continuous rows, both reading the skeleton chin (`nose + 2.25 × nose→mouth` — BlazePose has no jaw landmark).
-  Height is the chin against the top of the lead shoulder (the keypoint raised 0.06 torso) in torso lengths, scored 100 with the chin at or below
-  the shoulder top and linearly to 0 at 0.20 above — green at 100, red below. Depth is the chin against the
+  continuous rows, both reading the chin point, estimated from the nose and the mouth corners (`nose + 2.25 × nose→mouth` — BlazePose has no chin landmark).
+  Height is the chin point against the top of the lead shoulder (the keypoint raised 0.06 torso) in torso lengths, scored 100 with the chin point at or below
+  the shoulder top and linearly to 0 at 0.20 above — green at 100, red below. Depth is the chin point against the
   shoulder's front (the lead keypoint pushed forward 0.10 torso) in torso lengths, scored 100 at or behind it and
   linearly to 0 at 0.40 in front — green at 100, red below — read side-on
   only. A dashed gray line is everything the rule could not look at: a joint not visible, a punch in flight, or the
@@ -343,7 +344,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of
   the camera, or a joint not visible. Width = ankle-to-ankle distance in torso lengths,
   read front-on; depth = the horizontal ankle gap in leg lengths, read side-on. Each frame scores 100 at 0.50 and
-  above, 0 with the feet together (or level), linearly between — green at 100, red below. Round = the mean frame
+  above, 0 with the ankles together (or level), linearly between — green at 100, red below. Round = the mean frame
   score, a plain number; under 150 judged frames → not rated. Read `runs.csv` + the stage's `.json`.
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = how far the elbow sits out past its
   shoulder, away from the body's midline, / torso per arm (pulled in counts 0; the lens's |x shoulder − x elbow| until 2026-10-02),
