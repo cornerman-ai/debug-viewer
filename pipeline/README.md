@@ -304,7 +304,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   borders from the boxer to the ghost; no bar when a shoulder or hip is under the house visibility floor. Round = 100 × the on-target share of the judged punches, a plain number, from at
   least 10 judged punches.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head point
-  (the middle of the visible face landmarks: nose, eyes, ears, mouth) is off a vertical line through the hip centre — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in the video's median torso lengths), scored linearly to 100 at 0.25 torso off —
+  (the middle of the visible face landmarks: nose, eyes, ears, mouth) is off a vertical line through the hip centre — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso lengths, each frame's own torso), scored linearly to 100 at 0.25 torso off —
   green at 100, red below, the score on the block — with a tick at the impact frame; on the video the vertical line through the hip centre (dashed) and the head point's distance from it.
   Round = the mean punch score, a plain number; under 10 judged punches → not rated. Reads `head_offcenter.csv` +
   `head_offcenter.json`.

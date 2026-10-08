@@ -952,9 +952,9 @@ function slipLayer(rule) {
         }
         const lh = PAT(fr, J.lhip), rh = PAT(fr, J.rhip);
         if (!n || !(lh && rh)) return null;
-        for (const j of [J.lhip, J.rhip])                        // run_slip_distance.geometry: no reading unless both
-          if (!(visAt(fr, j, rule) >= minVis)) return null;      // hip points are at >= the house floor (the shoulders only
-                                                                 // enter the video's torso unit, since 2026-10-06)
+        for (const j of [J.lhip, J.rhip, J.lsh, J.rsh])          // run_slip_distance.geometry: no reading unless both
+          if (!(visAt(fr, j, rule) >= minVis)) return null;      // hips and both shoulders (the frame's torso) are at
+                                                                 // >= the house floor
         const head = PXY((lo + hi) / 2, (ylo + yhi) / 2);
         return head ? {head, hipx: (lh[0] + rh[0]) / 2, hipy: (lh[1] + rh[1]) / 2} : null;
       };
@@ -3573,12 +3573,12 @@ const SKIPTXT = {
   // the joints each reading needs (since 2026-10-06 a rule gates only those, on the frames it reads)
   arm_not_visible: 'the arm (shoulder, elbow, wrist) is not visible on any frame of the punch',
   arm_not_visible_at_middle: 'the straightest frame is too far from the punch’s middle, and the arm is not visible at the middle frame',
-  no_head_or_hips: 'no face landmark is visible, or a hip point is not',
+  no_head_or_torso: 'no face landmark is visible, or a hip or shoulder point is not',
   feet_or_body_not_visible: 'the nose, a hip or an ankle is not visible at the impact frame',
   rear_foot_not_visible: 'the rear heel or foot-index (toe-tip) point is not visible at the impact frame',
   hips_not_visible: 'a hip point is not visible on the start or impact frame',
   shoulders_not_visible: 'a shoulder point is not visible on the start or impact frame',
-  wrist_or_shoulders_not_visible: 'the wrist or a shoulder is not visible at the impact frame',
+  wrist_or_torso_not_visible: 'the wrist, a shoulder or a hip is not visible at the impact frame',
   fist_not_visible: 'neither the knuckles nor the wrist and elbow are visible at the impact frame',
   wrist_unsure: 'the wrist is not seen on the impact frame or just after it, so too few frames are left (rule 16)',
 };
