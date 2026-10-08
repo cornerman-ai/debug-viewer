@@ -2059,7 +2059,7 @@ const RULE_LAYERS = [
       const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2];
       const q = x.fx != null ? PXY(S.mirrored ? 1 - x.fx : x.fx, x.fy) : PAT(x.land, wr); if (!q) return;   // where the rule read it
       const col = VERD[x.verdict]; octx.strokeStyle = col; octx.lineWidth = 3; octx.setLineDash([5, 4]);
-      const rr = ringR(P, 0.13, 22);
+      const rr = ringR(P, 0.11, 12);
       octx.beginPath(); octx.arc(q[0], q[1], rr, 0, 7); octx.stroke(); octx.setLineDash([]);
       const now = P(wr); if (now && f !== x.land) OV.dot(now, col, 4);   // the wrist now, off the frame that was judged
       overlayLabel(q[0] + rr + 6, q[1] - rr * 0.8, `${x.hf != null ? x.hf.toFixed(2) + ' · ' : ''}${ZONE[x.zone]?.[1] || x.zone} · ${VNAME[x.verdict]}`, col);
@@ -3841,7 +3841,7 @@ function torsoOnScreen(P) {
   const t = Math.hypot((a[0] + b[0]) / 2 - (c[0] + d[0]) / 2, (a[1] + b[1]) / 2 - (c[1] + d[1]) / 2);
   return t > 0 ? t : null;
 }
-const ringR = (P, share, fallback) => { const t = torsoOnScreen(P); return t ? Math.max(7, share * t) : fallback; };
+const ringR = (P, share, fallback) => { const t = torsoOnScreen(P); return t ? Math.max(5, share * t) : fallback; };
 const wristGuess = (fr, j) => { const v = visAt(fr, j); return Number.isFinite(v) && v < GUESS_VIS; };
 const visAt = (fr, j, n) => {
   const C = S.skelC, b = (fr * 33 + j) * C;
@@ -3969,9 +3969,9 @@ function drawOverlay(f, punchesNow) {
     const a = 1 - d / 4, guess = wristGuess(f, wr);          // a hidden wrist: BlazePose's guess, drawn dashed
     octx.save(); octx.strokeStyle = styleP(e.type).c; octx.globalAlpha = guess ? a * 0.6 : a; octx.lineWidth = 4;
     if (guess) octx.setLineDash([6, 5]);
-    octx.beginPath(); octx.arc(p[0], p[1], ringR(P, 0.16 + (3 - d) * 0.04, 16 + (3 - d) * 5), 0, 7); octx.stroke(); octx.restore();
+    octx.beginPath(); octx.arc(p[0], p[1], ringR(P, 0.10 + (3 - d) * 0.02, 10 + (3 - d) * 2), 0, 7); octx.stroke(); octx.restore();
     if (guess) { overlayLabel(p[0] + 22, p[1] + 4, `${cap(e.hand)} wrist visibility ${visAt(f, wr).toFixed(2)} — may be a guess`, '#8e8e93'); continue; }
-    octx.globalAlpha = a * 0.35; octx.fillStyle = styleP(e.type).c; octx.beginPath(); octx.arc(p[0], p[1], ringR(P, 0.1, 12), 0, 7); octx.fill();
+    octx.globalAlpha = a * 0.35; octx.fillStyle = styleP(e.type).c; octx.beginPath(); octx.arc(p[0], p[1], ringR(P, 0.07, 8), 0, 7); octx.fill();
     octx.globalAlpha = 1;
   }
 }
