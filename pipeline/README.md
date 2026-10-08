@@ -235,8 +235,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   `hook_stop.json`.
 - **Hand return path** (`hand_return_path/`): per side-on jab / cross, the wrist's height above its own shoulder
   from the impact to the punch's end + 0.15 s — the tail cut at the next punch of the same hand when that starts
-  sooner, and the window ended at the last frame before the wrist's visibility first drops under 0.5 (since 2026-10-08:
-  every point of the line is a clearly seen hand; under 4 frames left, the punch is skipped as wrist unsure) — against the straight line (chord) between its first and last frame. Not okay — a U — when the frames between the ends sit under the chord, at most 2 of them on or
+  sooner, and the window ended at the last frame before the wrist's visibility first drops under 0.3 after the impact
+  (since 2026-10-08; the impact frame always starts the line, whatever its visibility; under 4 frames left, the punch
+  is skipped as wrist unsure) — against the straight line (chord) between its first and last frame. Not okay — a U — when the frames between the ends sit under the chord, at most 2 of them on or
   over it (of X frames, at least X − 2 under), and the deepest is at least 0.20 torso under it (both since 2026-10-08;
   every frame had to be under before, and a shallower sag is okay); okay otherwise; no grade per
   punch. The card, tooltip and video label give that deepest frame's distance (`dip` in `punches.csv`). The block covers the measured window itself (impact → end + 0.15 s), lead windows on the top half of the row
@@ -246,7 +247,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   is drawn hollow (an end) or as a hollow dot (a frame between), and the label gives the ends' visibility and "may be a
   guess": a hand BlazePose cannot see (side-on, the far hand behind the head or the body) still gets a position, on the
   chest, back or hip (by eye on the shelf's window ends, 2026-10-07: off the hand in 8 of 12 under 0.5, 6 of 12 at
-  0.5–0.6, 1 of 12 at 0.6–0.8). Display only: the rule still reads every wrist from the house floor (0.30). On the video, for every frame of that window: the wrist's whole line, the
+  0.5–0.6, 1 of 12 at 0.6–0.8). Display only: the rule cuts its window at the wrist's own line (0.30 after the impact, the impact frame exempt), so dots between 0.30 and 0.6 still count. On the video, for every frame of that window: the wrist's whole line, the
   two ends (grey dots), each frame between them as a red (under) or green dot tied by a thin line to the chord, and
   where the wrist is now. The chord (dashed white) is the rule's own: a straight line in time of the wrist's height above
   its shoulder, drawn at each frame's wrist x and that frame's shoulder height — so a dot is under it exactly when the
