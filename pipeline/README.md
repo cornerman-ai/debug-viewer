@@ -9,8 +9,8 @@ punches (`punch_classification/`) with their impact frame drawn on each punch (`
 viewer, files stay on your machine — the page reads them through the browser, nothing is uploaded.
 
 The stage folders are written by the backend's `combined_pipeline/rules_creation/` scripts (`run_punches.py`,
-`run_impact.py`, `run_defense.py`, `run_facing_angle.py`, `run_rolls_slips.py`, and one `run_<rule>.py` per rule
-stage) into Drive `Ambo/data/pipeline_tests/<video>/`.
+`run_impact.py`, `run_facing_angle.py`, `run_punch_facing.py`, `run_defense.py`, `run_rolls_slips.py`, and one
+`run_<rule>.py` per rule stage), driven by `combined_pipeline/run_all.py`, into Drive `Ambo/data/pipeline_tests/<video>/`.
 
 ## Opening it
 
@@ -35,7 +35,7 @@ names the exact path it was looked for at.
 It reads `punch_impact/impacts.csv` (falls back to `punch_classification/punches.csv`), `punch_classification/punches.json`
 (fps, stance, video name — and `mirrored`: a southpaw's stages ran on his skeleton mirrored to orthodox, so the page
 flips back what carries an image side — the facing angle's sign, hook overswing's x lines, the balance nose position,
-head-off-center's left / right — and takes lead = his right side; the skeleton it draws is the real one), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
+head-off-center's left / right, hit height's fist point — and takes lead = his right side; the skeleton it draws is the real one), `defense_classification/defenses.csv`, `facing_angle/facing_angle.csv`, the video, and the
 `*_blazepose_full.npy` skeleton for the stick figure. A missing stage is named in the timeline header; the rest still works.
 Switching videos is safe at any moment — while playing, mid-load, while a skeleton is still downloading: the old
 video pauses at once and stays as it was (dimmed) until the new one has been read in full, in parallel, and swapped
@@ -77,8 +77,8 @@ the server the page calls it directly; opened any other way (the hosted page wit
   never holds a half-run video and the name can be used again.
 
 One job runs at a time; a second upload waits in line ("waiting for “X” to finish first"). Measured 2026-10-02: a
-12 s clip took 29 s end to end, a 45 s clip about a minute; the skeleton runs at about real time and the facing
-model grows with the square of the length, so long videos take longer than their length.
+12 s clip took 29 s end to end, a 45 s clip about a minute; the skeleton runs at about real time, so a video takes
+longer than its own length.
 
 ## Using it
 
@@ -114,14 +114,6 @@ The side panel has five views, switched at its top:
   skeleton, the same number the video overlay draws, with the reading it came from.
 - **Round** — the whole video's counts: the punch and defense distributions and the combos (counts and the most-used
   sequences).
-- **Floors** (since 2026-10-06): the house floors from the video's thresholds snapshot are shown where they act. On
-  the skeleton, a joint under the visibility floor (0.30) is drawn hollow and its bones dashed, with a note naming
-  how many the rules skip; the **Now** tab's Frame card ends with **Joint visibility** — a bar per joint (nose, then
-  lead / rear shoulder to ankle), a tick at the floor, red under it, the value beside it, and a **Visibility /
-  Presence** switch (presence: is the joint in the picture at all, its floor 0.75 since 2026-10-06); the **Rules** tab's
-  **Floors** line lists visibility, presence, the judged minimum (10 punches / combos / moves, 150 frames) and the
-  torso minimum, plus the rules that change one; **Explanations** says what both mean. Every reading the page
-  recomputes (and the hollow joints) drops a joint under the presence floor exactly as the pipeline does (`visAt`).
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
   bad 1, mid 2, good 3, great 4), and the sum over 4 × the rated rules is put on 0–100 (not-rated rules count in
   neither), coloured and labelled on the same tier scale as the rules, with the same bar — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count
@@ -150,9 +142,18 @@ the punch card's sections follow the same order.
 - **Explanations** — one card, static text: every rule in plain words, in one shape — what it actually measures (one
   sentence starting "How…", "Whether…", "What share…" or "The same as rule N…", with the trap its name hides right
   after), a grey line (what it judges · camera view · scoring) and **Why** a coach wants it. Written
-  from the scripts and checked against them on 2026-10-02; when a rule's script changes, its row in `explainRows()`
+  from the scripts and checked against them on 2026-10-08; when a rule's script changes, its row in `explainRows()`
   changes with it. Every number in it is read from the video's thresholds snapshot (before a video is open each reads
   '…').
+
+**Floors**: the house floors from the video's thresholds snapshot are shown where they act. On the skeleton, a joint
+under the visibility floor (0.30) is drawn hollow and its bones dashed, with a note naming how many the rules skip; the
+**Now** tab's Frame card ends with **Joint visibility** — a bar per joint (nose, then lead / rear shoulder to ankle), a
+tick at the floor, red under it, the value beside it, and a **Visibility / Presence** switch (presence: is the joint in
+the picture at all, its floor 0.75 since 2026-10-06); the **Rules** tab's **Floors** line lists visibility, presence,
+the judged minimum (10 punches / combos / moves, 150 frames) and the torso minimum, plus the rules that change one;
+**Explanations** says what both mean. Every reading the page recomputes (and the hollow joints) drops a joint under
+the presence floor exactly as the pipeline does (`visAt`).
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
 are videos, columns are the overall round score and rules 1–33, each cell the 0–100 score tinted in its tier's colour
@@ -224,7 +225,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   from 0.20, linearly between — green at 100, red below, the score on the block (the stance already carries the heel
   about 0.14 up, so a planted foot scores about 70). The overlay draws the foot-index point's height dashed grey, the
   0.20 line in the verdict's colour, the line from the foot-index point to the heel, and the heel. Every angle is
-  judged; lead-hand punches and a hidden rear heel or foot-index point are not drawn. Round = the mean punch score,
+  judged; lead-hand punches and a hidden rear heel, foot-index point or torso are not drawn. Round = the mean punch score,
   a plain number, from at least 10. Reads `punches.csv` + `rear_pivot.json`.
 - **Hook overswing** (rule 32, `hook_stop/`; "Hook stop" until 2026-10-03): per head hook, read front-on or back-on, where the wrist is at the turnaround — the
   frame the impact spotter says it stopped going forward. Score 100 at the boxer's centre line or short of it, linearly to 0 at a third of a
@@ -240,8 +241,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   (since 2026-10-08; the impact frame always starts the line, whatever its visibility; under 4 frames left, the punch
   is skipped as wrist unsure) — against the straight line (chord) between its first and last frame. Not okay — a U — when the frames between the ends sit under the chord, at most 2 of them on or
   over it (of X frames, at least X − 2 under), and the deepest is at least 0.20 torso under it (both since 2026-10-08;
-  every frame had to be under before, and a shallower sag is okay); okay otherwise; no grade per
-  punch. The card, tooltip and video label give that deepest frame's distance (`dip` in `punches.csv`). The block covers the measured window itself (impact → end + 0.15 s), lead windows on the top half of the row
+  a shallower sag is okay); okay otherwise; no grade per punch. The card, tooltip and video label give that deepest frame's distance (`dip` in `punches.csv`). The block covers the measured window itself (impact → end + 0.15 s), lead windows on the top half of the row
   and rear on the bottom (a cross's window runs into the next jab's all the time), a white edge where each window
   starts, green okay, red not okay, labelled with the frames under the chord. Each window draws on the video on its
   own wrist, its label always naming the punch ("Lead jab · okay · 0/4 under the chord"). A wrist under visibility 0.6
@@ -252,9 +252,8 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   two ends (grey dots), each frame between them as a red (under) or green dot tied by a thin line to the chord, and
   where the wrist is now. The chord (dashed white) is the rule's own: a straight line in time of the wrist's height above
   its shoulder, drawn at each frame's wrist x and that frame's shoulder height — so a dot is under it exactly when the
-  rule counted it (0 of 12,628 dots differ, 2026-10-02). Until then it was a straight image segment between the two end
-  positions, which ignored the shoulder and the timing and contradicted the verdict on a quarter of the dots. Round = 100 with no punch not okay, linearly to 0 at 70 % not okay, a plain number. Rebuilt 2026-10-01 — the earlier versions are in
-  `run_hand_return_path.py`'s docstring. Reads `punches.csv` + `hand_return_path.json`.
+  rule counted it (0 of 12,628 dots differ, 2026-10-02). Round = 100 with no punch not okay, linearly to 0 at 70 % not
+  okay, a plain number; under 10 judged punches → not rated. Reads `punches.csv` + `hand_return_path.json`.
 - **Dropping resting hand while punching** (`resting_hand/`; "idle hand" until 2026-09-28): per punch, the wrist
   of the hand that is NOT throwing, read at impact −1, impact and impact +1 frames and weighted ¼ · ½ · ¼ — how far it
   sits below the nose. Scored 100 up to 0.25 torso (an absolute line: a boxer who holds his hands low all round must not pass),
@@ -284,7 +283,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   measurement — a dial of what is: seen from above (the world landmarks), the direction other hip → punching hip at
   the start (dashed white) and at impact, against the facing angle (grey), labelled with both angles; their difference
   is the rule's number (checked to 0.14° on 5,352 punches, 2026-10-02). The impact → end step is in the CSV but not shown
-  (blank when the end frame hides a hip: only the start and impact frames decide whether a punch is judged, since 2026-10-06).
+  (blank when the end frame hides a hip: only the start and impact frames decide whether a punch is judged).
 - **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
   turn of the punching shoulder against a set range per punch type (lead jab 5–30°, lead hook 35–70°, lead uppercut
   25–60°, lead body shot 40–75°, rear cross 30–60°, rear hook 40–75°, rear uppercut 30–75°, rear body shot 50–75°),
@@ -292,21 +291,23 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   verdict's colour and the same dial from above. The round is the mean punch score, no bands.
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — read side-on
   (|facing| 65–115°), the zone the fist is in at its impact frame (the midpoint of the index and pinky knuckle points; with either
-  unseen, the wrist pushed 0.3 of the forearm further — `fist_from` in the CSV; the wrist itself until 2026-10-08) against the boxer's own skeleton on that frame (the ghost below, whose heights are his: head = from the higher
+  unseen, the wrist pushed 0.3 of the forearm further — `fist_from` in the CSV) against the boxer's own skeleton on that frame (the ghost below, whose heights are his: head = from the higher
   shoulder up to 0.28 torso above it, body = the middle third from the hip centre to the shoulder centre, misses = over the head, the shoulder gap
-  between them and below the body; since 2026-10-08 — before, the zones of a ghost stance built from his limb lengths;
+  between them and below the body; since 2026-10-08, a ghost stance built from his limb lengths before;
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
-  fist where the rule read it at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. With the layer on, every frame also draws the ghost opponent (dashed, since 2026-10-08): the boxer's own
+  fist where the rule read it at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. With the layer on, every frame also draws the ghost opponent (dashed): the boxer's own
   skeleton without the arms, mirrored about a vertical line through the nose and moved one arm's reach (upper arm +
   forearm, 90th percentile of both arms over ±1 s) toward the side the lead ankle points to — same height, floor and
   pose, face to face. Mirroring keeps every height, so the rule's zones are this ghost's: its shoulders and hips are the boxer's own.
   At the ghost's face a bar shows them on that frame — green = hit (head: from the higher shoulder up to 0.28 torso above it; body: the
   middle third from the hip centre to the shoulder centre), red = miss (over the head, the shoulder gap, below the body) — with dashed
-  borders from the boxer to the ghost; no bar when a shoulder or hip is under the house visibility floor. Round = 100 × the on-target share of the judged punches, a plain number. Until
-  2026-09-30 it judged jabs and crosses only, at the most-extended frame.
+  borders from the boxer to the ghost; no bar when a shoulder or hip is under the house visibility floor. Round = 100 × the on-target share of the judged punches, a plain number, from at
+  least 10 judged punches.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head point
-  (the middle of the visible face landmarks: nose, eyes, ears, mouth) is off a vertical line through the hip centre — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
+  (the middle of the visible face landmarks: nose, eyes, ears, mouth) is off a vertical line through the hip centre — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in the video's median torso lengths), scored linearly to 100 at 0.25 torso off —
   green at 100, red below, the score on the block — with a tick at the impact frame; on the video the vertical line through the hip centre (dashed) and the head point's distance from it.
+  Round = the mean punch score, a plain number; under 10 judged punches → not rated. Reads `head_offcenter.csv` +
+  `head_offcenter.json`.
 - **Offensive combos** and **Combined combos** (`combinations/`; the rows of rules 24 and 30, and of rule 31): the same
   grouping for both — no pause longer than 0.3 s between elements (rules 30 / 31's `max_gap_s`), however long each lasts. Offensive = punches only; combined = punches and all
   defensive moves in time order (a move may start or end one). Each combination is one plain line from its first
@@ -314,14 +315,14 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   order with their times; the punch card shows the combination holding that punch and how often its sequence repeats.
   Reads `offensive.csv` / `combined.csv` + `combinations.json`; the Round tab's Combos card counts both (how many, how
   many unique, each sequence with its count), and the Rules tab scores their variety as rules 30 (offensive) and 31
-  (combined), each kind on its own combos (the share of combos that are one of the 3 most-used sequences: 100 below
-  40 %, linearly to 0 at 100 %, < 10 combos not rated) — the combined one with the caveat that the defense model's
+  (combined), each kind on its own combos (the share of combos that are one of the 3 most-used sequences: 100 at
+  40 % or less, linearly to 0 at 100 %, < 10 combos not rated) — the combined one with the caveat that the defense model's
   noise inflates its variety. These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
 - **Slip far enough** / **Slip not too much** (rules 14 and 15, `slip_distance/`; 15 was "Slips compact" until 2026-10-03): per slip, how far the head point (the middle of the visible face landmarks: nose,
   eyes, ears, mouth) travelled against the hip centre from where it started, in torso lengths, sideways (x) and up-down (y) each scored on its own for up to 50 points, summed (since 2026-10-07; x only
-  before), with a white tick at the furthest frame of the axis with fewer points. Rolls and ducks are not measured. Judged front-on / back-on only;
+  before), with a white tick at the furthest frame of the axis with fewer points. Rolls, ducks and pull-backs are not measured. Judged front-on / back-on only;
   a frame is read when a face landmark and both hip points are visible (the overlay's path too: the head point against the hip centre, both axes, with a ring at each axis's furthest frame). Two timeline rows, one per rule, each slip coloured by that
   rule's slip score (green 100, orange between, red 0), and two round rows, each the mean of its slip scores: rule 14 "slip far enough" (per axis 50 at 0.20 torso of travel or more, 0 with none) and 15 "slip not too much" (per axis 50
   up to 0.50, 0 at 1.00). Reads `moves.csv` + `slip_distance.json`.
@@ -354,15 +355,14 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
   — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of
   the camera, or a joint not visible. Width = ankle-to-ankle distance in torso lengths,
-  read front-on; depth = the horizontal ankle gap in leg lengths, read side-on. Each frame scores 100 at 0.50 and
+  read front- or back-on; depth = the horizontal ankle gap in leg lengths, read side-on. Each frame scores 100 at 0.50 and
   above, 0 with the ankles together (or level), linearly between — green at 100, red below. Round = the mean frame
   score, a plain number; under 150 judged frames → not rated. Read `runs.csv` + the stage's `.json`.
 - **Elbow tuck** (`elbow_tuck/`): the research lens ported to Python — flare = how far the elbow sits out past its
   shoulder, away from the body's midline, / torso per arm (pulled in counts 0; the lens's |x shoulder − x elbow| until 2026-10-02),
   judged only while the boxer is within 25° of facing or backing the camera (45° until 2026-10-06) and that arm isn't
   throwing a hook or a body shot. The row is continuous — every frame belongs to a stretch: green tucked (flare ≤ 0.15,
-  full marks), red flared (above it, below full marks; until 2026-10-07 the lens's cuts: tucked < 0.20, borderline
-  0.20–0.30, flared ≥ 0.30), and a thin gray strip where the rule cannot judge, with the reason in its tooltip (the
+  full marks), red flared (above it, below full marks), and a thin gray strip where the rule cannot judge, with the reason in its tooltip (the
   boxer is side-on, a joint it needs is not visible, or that arm is throwing a hook or a body shot). Lead in the top half, rear in the bottom. Each
   frame scores 0–100: each arm 50, full up to 0.15 flare and 0 at 0.50, or 100 when only one arm can be judged; the
   overlay labels it ("frame score 65.8 · lead 15.8/50 · rear 50.0/50"). Round = the mean frame score, no bands.
@@ -431,8 +431,8 @@ Its timeline row (since 2026-10-06) draws the punches it counts: body shots as s
 uppercuts as outlines (they only count in the total); jab and cross are not drawn.
 
 **Defense variety** (rule 29, `same_defense/same_defense.json`; "Same defense" until 2026-10-03; a whole-video rule): under the defense
-distributions, a score of two halves: 50 for the move — full below 60 % of the most-used type, linearly to 0 at 100 % —
-and 50 for the side among moves that have one — full below 70 %, linearly to 0 at 100 %; each half needs 10 moves,
+distributions, a score of two halves: 50 for the move — full up to 60 % of the most-used type, linearly to 0 at 100 % —
+and 50 for the side among moves that have one — full up to 70 %, linearly to 0 at 100 %; each half needs 10 moves,
 one alone is the whole score. Its timeline row (since 2026-10-06) has the same two halves as lanes over every move the
 rule counts (`defense_classification/defenses.csv`): **move** — amber when it is the most-used type, green another;
 **side** — amber when it went to the most-used side, green the other side, dashed ("no side") for a duck or a
