@@ -2022,6 +2022,38 @@ const RULE_LAYERS = [
       if (x.zone) tag(bx, w, y, h, x.hf == null ? zn : `${x.hf.toFixed(2)} · ${zn}`);
       ring(e, 'hit', bx, y, w, h);
     },
+    frameOverlay(f, P, leadLeft) {                         // the ghost the rule judges against, on this frame
+      // Its levels are the rule's own (hit_height/ghost.csv: stance_at, the call the rule makes at an impact frame), drawn
+      // at the boxer's hip centre: green bands are hits (head, body), red bands misses. Only heights matter to the rule.
+      const G = S.ghost, fl = G?.floor_y?.[f]; if (!Number.isFinite(fl)) return;
+      const lh = P(J.lhip), rh = P(J.rhip); if (!(lh && rh)) return;
+      const cx = (lh[0] + rh[0]) / 2, Y = k => PXY(0.5, G[k][f])[1];
+      const floor = Y('floor_y'), belt = Y('belt_y'), solar = Y('solar_y'), head = Y('head_from_y'), sh = Y('shoulder_y'),
+            chin = Y('chin_y'), crown = Y('crown_y'), over = Y('over_head_y'), Hh = floor - crown;
+      if (!(Hh > 0)) return;
+      const x0 = cx - 0.75 * Hh, x1 = cx + 0.75 * Hh, GOOD_A = 'rgba(52,199,89,0.13)', BAD_A = 'rgba(255,59,48,0.12)';
+      const bands = [[over - 0.12 * Hh, over, BAD_A, 'over the head'], [over, head, GOOD_A, 'head · hit'],
+                     [head, solar, BAD_A, 'shoulder · miss'], [solar, belt, GOOD_A, 'body · hit'], [belt, floor, BAD_A, 'below the belt']];
+      octx.save(); octx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+      for (const [a, b, col, name] of bands) {
+        octx.fillStyle = col; octx.fillRect(x0, a, x1 - x0, b - a);
+        octx.fillStyle = 'rgba(255,255,255,0.75)'; octx.fillText(name, x0 + 4, a + 11);
+      }
+      octx.restore();
+      for (const y of [over, head, solar, belt]) OV.level(y, x0, x1, 'rgba(255,255,255,0.45)', [4, 4]);
+      OV.level(floor, x0, x1, 'rgba(255,255,255,0.6)', []);
+      // the ghost itself: head from chin to crown, neck, torso from the shoulders to the hips, legs to the floor
+      octx.save(); octx.strokeStyle = 'rgba(255,255,255,0.8)'; octx.lineWidth = 2;
+      const hw = 0.11 * Hh;                                   // drawing width only; the rule reads no widths
+      const lw = P(leadLeft ? J.lwr : J.rwr);                 // stood half a body length in front of him (his lead side),
+      const gx = cx + (lw && lw[0] < cx ? -1 : 1) * 0.45 * Hh; // a drawing choice: the rule has no x
+      octx.beginPath(); octx.arc(gx, (chin + crown) / 2, (chin - crown) / 2, 0, 7); octx.stroke();
+      octx.beginPath(); octx.moveTo(gx, chin); octx.lineTo(gx, sh);
+      octx.moveTo(gx - hw, sh); octx.lineTo(gx + hw, sh); octx.lineTo(gx + 0.7 * hw, belt); octx.lineTo(gx - 0.7 * hw, belt); octx.closePath();
+      octx.moveTo(gx - 0.5 * hw, belt); octx.lineTo(gx - hw, floor); octx.moveTo(gx + 0.5 * hw, belt); octx.lineTo(gx + hw, floor);
+      octx.stroke(); octx.restore();
+      overlayLabel(x0, floor + 16, `ghost · his size · ${Math.round((G.floor_y[f] - G.crown_y[f]) * video.videoHeight)} px tall (floor = his lower ankle)`, '#e5e5ea');
+    },
     overlay(e, x, f, P, leadLeft) {                        // the wrist at the impact frame, with its zone
       if (x.land == null || Math.abs(f - x.land) > 2 || !x.verdict || x.verdict === 'skip') return;
       const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2], q = PAT(x.land, wr); if (!q) return;   // where the rule read it
@@ -2409,6 +2441,18 @@ async function buildVideo(src, sig, lite = false) {
     }),
     ...Object.entries(SUMS).map(async ([k, stage]) => { N[k] = await jsn([stage, `${stage}.json`]); }),
     lite ? null : txt(['angle_change', 'combos.csv']).then(t => { N.angleCombos = t ? parseCSV(t) : []; }),
+    // rule 22's ghost on every frame (hit_height/ghost.csv, written by run_hit_height.py since 2026-10-08): one Float32Array
+    // per level, image y / frame height, NaN where the rule has no ghost (no ankle visible)
+    lite ? null : txt(['hit_height', 'ghost.csv']).then(t => {
+      if (!t) { N.ghost = null; return; }
+      const lines = t.trim().split(String.fromCharCode(10)).map(l => l.trim()), cols = lines[0].split(','), G = {};
+      for (const c of cols.slice(1)) G[c] = new Float32Array(N.n || lines.length - 1).fill(NaN);
+      for (let i = 1; i < lines.length; i++) {
+        const v = lines[i].split(','), f = +v[0];
+        for (let k = 1; k < cols.length; k++) if (v[k] !== '' && f < G[cols[k]].length) G[cols[k]][f] = +v[k];
+      }
+      N.ghost = G;
+    }),
   ]);
   if (!N.n) N.n = Math.max(1, ...N.punches.map(p => p.ef + 1), ...N.defenses.map(d => d.ef + 1));
   N.dur = N.n / N.fps;

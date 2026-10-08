@@ -294,7 +294,11 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   (|facing| 65–115°), the zone the wrist is in at its impact frame on a ghost the boxer's own size (head / shoulder / body / over the head / below the belt; the head zone starts at 0.88 of the stance height since
   2026-10-08, 0.08 below the ghost's chin before;
   on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
-  wrist where it was at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. Round = 100 × the on-target share of the judged punches, a plain number. Until
+  wrist where it was at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. With the layer on, every frame also draws the ghost the rule judges against, from the rule's own
+  `hit_height/ghost.csv` (since 2026-10-08): its zone bands across the boxer (green = hit: head, body; red = miss:
+  over the head, shoulder, below the belt), the floor line on his lower ankle, and a ghost figure (head from chin to
+  crown, torso from the shoulders to the hips, legs to the floor) stood half a body length in front of him. Only the
+  heights come from the rule; where the figure stands and its widths are a drawing choice. Round = 100 × the on-target share of the judged punches, a plain number. Until
   2026-09-30 it judged jabs and crosses only, at the most-extended frame.
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head point
   (the middle of the visible face landmarks: nose, eyes, ears, mouth) is off a vertical line through the hip centre — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso heights), scored linearly to 100 at 0.25 torso off —
