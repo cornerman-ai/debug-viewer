@@ -155,6 +155,11 @@ the judged minimum (10 punches / combos / moves, 5 s of judged frames) and the t
 **Explanations** says what both mean. Every reading the page recomputes (and the hollow joints) drops a joint under
 the presence floor exactly as the pipeline does (`visAt`).
 
+**Stance.** The line under the video's name ends with `stance: orthodox` / `southpaw` — the stance the run used (who
+was mirrored), and in brackets how the backend's `stance` stage decided (`stance/stance.json`: the front foot on its 15
+voting frames, or no answer and taken as orthodox; since 2026-10-09). The All videos table puts the same word before
+each video's name, southpaws in orange.
+
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
 are videos, columns are the overall round score and rules 1–33, each cell the 0–100 score tinted in its tier's colour
 ("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
