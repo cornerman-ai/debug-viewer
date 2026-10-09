@@ -2489,7 +2489,7 @@ async function buildVideo(src, sig, lite = false) {
 // how the stance stage decided (stance/stance.json): its 15 votes, or no answer; nothing for a folder from before it
 const stanceWhy = (st = S.stanceInfo) => !st ? ''
   : st.source === 'classifier' ? ` (front foot on ${st.left_votes + st.right_votes} frames: ${st.left_votes} left, ${st.right_votes} right)`
-  : ` (no answer — ${st.qualifying_frames} clear frames of ${st.k} needed — taken as ${st.stance})`;
+  : ` (no answer — under ${st.min_votes || st.k} clear frames ${st.spacing_s ?? 0} s apart — taken as ${st.stance})`;
 
 // the swap: one synchronous step, so the draw loop never sees half of one video and half of another
 function commitVideo(src, N) {

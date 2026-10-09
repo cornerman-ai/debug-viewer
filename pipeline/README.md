@@ -156,8 +156,8 @@ the judged minimum (10 punches / combos / moves, 5 s of judged frames) and the t
 the presence floor exactly as the pipeline does (`visAt`).
 
 **Stance.** The line under the video's name ends with `stance: orthodox` / `southpaw` — the stance the run used (who
-was mirrored), and in brackets how the backend's `stance` stage decided (`stance/stance.json`: the front foot on its 15
-voting frames, or no answer and taken as orthodox; since 2026-10-09). The All videos table puts the same word before
+was mirrored), and in brackets how the backend's `stance` stage decided (`stance/stance.json`: the front foot on its
+voting frames — up to 15, at least 1 s apart, an odd count — or no answer and taken as orthodox; since 2026-10-09). The All videos table puts the same word before
 each video's name, southpaws in orange.
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
