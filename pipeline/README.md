@@ -158,7 +158,8 @@ the presence floor exactly as the pipeline does (`visAt`).
 **Stance.** The line under the video's name ends with `stance: orthodox` / `southpaw` — the stance the run used (who
 was mirrored), and in brackets how the backend's `stance` stage decided (`stance/stance.json`: the front foot on its
 voting frames — up to 15, at least 1 s apart, an odd count — or no answer and taken as orthodox; since 2026-10-09). The All videos table puts the same word before
-each video's name, southpaws in orange.
+each video's name, southpaws in orange. After it, `gloves: yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand
+points' shape, gloves from 0.50; no rule reads it yet), and in the table `gloves` (blue) / `bare` before the name.
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
 are videos, columns are the overall round score and rules 1–33, each cell the 0–100 score tinted in its tier's colour
