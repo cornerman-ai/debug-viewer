@@ -345,13 +345,16 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   judged; a frame with no facing angle is not. Round = the mean frame score, a plain number. Read `runs.csv` + the
   stage's `.json`.
 - **Chin tuck height** (rule 8, `chin_height/`; "Chin height" until 2026-10-03) and **Chin tuck depth** (rule 7, `chin_depth/`; "Chin depth" until 2026-10-03): both per frame outside punches, both
-  continuous rows, both reading the chin point, estimated from the nose and the mouth corners (`nose + 2.25 × nose→mouth` — BlazePose has no chin landmark).
-  Height is the chin point against the top of the lead shoulder (the keypoint raised 0.06 torso) in torso lengths, scored 100 with the chin point at or below
-  the shoulder top and linearly to 0 at 0.20 above — green at 100, red below. Depth is the chin point against the
+  continuous rows, both reading the chin found on the face (the backend's `face_chin` stage: a face detector, SCRFD,
+  around the nose, then the chin tip of a face-landmark model, 2d106 — BlazePose has no chin landmark; since 2026-10-09,
+  before that `nose + 2.25 × nose→mouth`), drawn as a ring; read from `face_chin/face_chin.csv` (a mirrored run's x
+  flipped back). A frame whose face scores under `face_score_gate` (0.7) has no chin and is not judged.
+  Height is the chin against the top of the lead shoulder (the keypoint raised 0.06 torso) in torso lengths, scored 100 with the chin at or below
+  the shoulder top and linearly to 0 at 0.20 above — green at 100, red below. Depth is the chin against the
   shoulder's front (the lead keypoint pushed forward 0.10 torso) in torso lengths, scored 100 at or behind it and
   linearly to 0 at 0.40 in front — green at 100, red below — read side-on
-  only. A dashed gray line is everything the rule could not look at: a joint not visible, a punch in flight, or the
-  wrong camera angle. Round = the mean frame score over every judged frame, however brief — a plain number, no
+  only. A dashed gray line is everything the rule could not look at: no face, a joint not visible, a punch in flight, or
+  the wrong camera angle. Round = the mean frame score over every judged frame, however brief — a plain number, no
   bands; under 5 s of judged frames → not rated. Both read joints at visibility 0.30, like every rule. Read `runs.csv` + the stage's `.json`.
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
   — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of

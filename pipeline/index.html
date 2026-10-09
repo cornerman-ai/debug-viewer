@@ -1090,12 +1090,12 @@ function stanceLayer(kind) {
 const CHIN = {
   height: {stage: 'chin_height', json: 'chin_height.json', label: RN(8), short: 'Chin below shoulder',
            bad: 'chin up', good: 'tucked',
-           get rule() { return `the chin point (estimated from the nose and the mouth corners; BlazePose has no chin landmark) against the top of the lead shoulder, in torso lengths: 100 ${chinFullTxt(8, 'below')}, 0 at ${fD(-T(8, 'move.score.zero'), 2)} torso above`; }},
+           get rule() { return `the chin, found on the face (a face detector, then a face-landmark model’s chin tip; BlazePose has no chin landmark), against the top of the lead shoulder, in torso lengths: 100 ${chinFullTxt(8, 'below')}, 0 at ${fD(-T(8, 'move.score.zero'), 2)} torso above; a frame whose face scores under ${fD(T(8, 'move.face_score_gate'), 2)} is not judged`; }},
   depth:  {stage: 'chin_depth', json: 'chin_depth.json', label: RN(7), short: 'Chin behind shoulder',
            bad: 'chin out', good: 'tucked',
-           get rule() { return `the chin point (estimated from the nose and the mouth corners; BlazePose has no chin landmark) against the front of the lead shoulder (its keypoint pushed ${fD(T(7, 'move.shoulder_front_torso'), 2)} torso forward), in torso lengths: 100 ${chinFullTxt(7, 'behind')}, 0 at ${fD(T(7, 'move.score.zero'), 2)} torso in front, read side-on only`; }},
+           get rule() { return `the chin, found on the face (a face detector, then a face-landmark model’s chin tip; BlazePose has no chin landmark), against the front of the lead shoulder (its keypoint pushed ${fD(T(7, 'move.shoulder_front_torso'), 2)} torso forward), in torso lengths: 100 ${chinFullTxt(7, 'behind')}, 0 at ${fD(T(7, 'move.score.zero'), 2)} torso in front, read side-on only; a frame whose face scores under ${fD(T(7, 'move.face_score_gate'), 2)} is not judged`; }},
 };
-// the chin point's full-marks line: "at or below it" / "at or behind it" while it is the shoulder line itself (0)
+// the chin's full-marks line: "at or below it" / "at or behind it" while it is the shoulder line itself (0)
 const chinFullTxt = (no, side) => {
   const v = T(no, 'move.score.full');
   return say(v, [[0, `at or ${side} it`]], x => `up to ${fD(Math.abs(x), 2)} torso ${(no === 8 ? x < 0 : x > 0) ? (no === 8 ? 'above' : 'in front of') : side} it`);
@@ -1106,8 +1106,22 @@ const chinHeightScore = hv => { const full = T(8, 'move.score.full'), zero = T(8
 const chinDepthScore = g => { const full = T(7, 'move.score.full'), zero = T(7, 'move.score.zero');
   return 100 * Math.min(1, Math.max(0, 1 - Math.max(g - full, 0) / (zero - full))); };
 const CHINCOL = {over: '#ff3b30', under: '#34c759', out: '#ff3b30', tucked: '#34c759'};
-const CHINSKIP = {no_reading: 'a joint the chin point needs is not visible',
-                  punching: 'a punch is in flight — the chin point is judged between punches',
+// rules 7 / 8's chin: found on the face by the backend's face_chin stage (face_chin/face_chin.csv, image-normalised, a
+// mirrored run's x flipped back to the real frame); null with no face or a face under the rules' face_score_gate
+const faceChinAt = f => {
+  const c = S.faceChin; if (!c || !(f >= 0 && f < c.s.length)) return null;
+  let g; try { g = T(8, 'move.face_score_gate'); } catch (e) { return null; }   // a thresholds copy from before 2026-10-09
+  if (!(c.s[f] >= g)) return null;
+  return [S.mirrored ? 1 - c.x[f] : c.x[f], c.y[f]];
+};
+const faceChinOf = text => {
+  const rows = parseCSV(text), n = rows.length, x = new Float32Array(n), y = new Float32Array(n), sc = new Float32Array(n);
+  rows.forEach((r, i) => { const ok = r.score !== ''; x[i] = ok ? +r.x : NaN; y[i] = ok ? +r.y : NaN; sc[i] = ok ? +r.score : NaN; });
+  return {x, y, s: sc};
+};
+const CHINSKIP = {no_reading: 'a shoulder or hip the rule needs is not visible',
+                  no_face: 'no face found with enough confidence — the chin is not guessed from the skeleton',
+                  punching: 'a punch is in flight — the chin is judged between punches',
                   front_on: 'not side-on — the depth axis points at the camera'};
 function chinLayer(kind) {
   const C = CHIN[kind];
@@ -1116,19 +1130,18 @@ function chinLayer(kind) {
     csv: [C.stage, 'runs.csv'], json: [C.stage, C.json],
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame)}),
     card: () => '',
-    frameOverlay(f, P, leadLeft, Q, torso) {               // the chin point, and the line this axis reads it against
+    frameOverlay(f, P, leadLeft, Q, torso) {               // the chin found on the face, and the line this axis reads it against
       const it = OV.at(`chin_${kind}`, f);
       const col = !it ? '#8e8e93' : CHINCOL[it.state] || '#8e8e93';
-      const nose = P(J.nose), lsh = P(J.lsh), rsh = P(J.rsh);
-      if (!(nose && lsh && rsh)) return;
-      const mL = P(9), mR = P(10); if (!(mL && mR)) return;                  // BlazePose mouth corners
-      const no = kind === 'height' ? 8 : 7, minVis = H(no, 'min_visibility'), k = T(no, 'move.chin_coef');
-      for (const j of [J.nose, 9, 10, J.lsh, J.rsh])                         // run_chin_tuck.py MIN_VIS, the house floor:
+      const lsh = P(J.lsh), rsh = P(J.rsh);
+      if (!(lsh && rsh)) return;
+      const no = kind === 'height' ? 8 : 7, minVis = H(no, 'min_visibility');
+      for (const j of [J.lsh, J.rsh])                                        // run_chin_tuck.py MIN_VIS, the house floor:
         if (!(visAt(f, j, no) >= minVis)) return;                            // a joint it cannot read, so neither do we
-      const chin = [nose[0] + k * ((mL[0] + mR[0]) / 2 - nose[0]),
-                    nose[1] + k * ((mL[1] + mR[1]) / 2 - nose[1])];
+      const fc = faceChinAt(f), chin = fc && PXY(fc[0], fc[1]);
+      if (!chin) return;                                                     // no face at the gate: the rule guesses no chin
       const lead = leadLeft ? lsh : rsh;
-      OV.line(nose, chin, '#8e8e93', 1.5, [3, 3]); OV.ring(chin, col, kind === 'height' ? 9 : 13, 3);  // the formula that stands in for a jaw — one ring per axis
+      OV.ring(chin, col, kind === 'height' ? 9 : 13, 3);                    // the face's chin tip — one ring per axis
       const judged = !!it && !CHINSKIP[it.state];             // gray on the timeline: draw the geometry, state no number
       if (kind === 'height') {
         const t = torso(); if (!t) return;                                  // torso lengths, like the rule
@@ -2362,7 +2375,7 @@ async function httpList(base) {
 }
 
 // ════════════════════════════ state ════════════════════════════
-const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], rollsSlips: [], skel: null, mirrored: false,
+const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], rollsSlips: [], skel: null, faceChin: null, mirrored: false,
            stance: 'orthodox', videoName: '', objectUrl: null, hiddenP: new Set(), hiddenD: new Set()};
 const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover: null, hoverLayer: null, lastFrame: -1,
            faceFilter: null,   // 'front' | 'side-on' | 'back': shift-click a band in the facing row to isolate it,
@@ -2462,6 +2475,7 @@ async function buildVideo(src, sig, lite = false) {
     }),
     ...Object.entries(SUMS).map(async ([k, stage]) => { N[k] = await jsn([stage, `${stage}.json`]); }),
     lite ? null : txt(['angle_change', 'combos.csv']).then(t => { N.angleCombos = t ? parseCSV(t) : []; }),
+    lite ? null : txt(['face_chin', 'face_chin.csv']).then(t => { N.faceChin = t ? faceChinOf(t) : null; }),
   ]);
   if (!N.n) N.n = Math.max(1, ...N.punches.map(p => p.ef + 1), ...N.defenses.map(d => d.ef + 1));
   N.dur = N.n / N.fps;
@@ -3275,10 +3289,10 @@ function ruleCard() {
   }
   const chh = S.layerSum.chin_height;
   if (chh) add(RN(8), chh.score ?? 'not rated', chh.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'does the chin point (estimated from the nose and the mouth corners; BlazePose has no chin landmark) stay below the lead shoulder, or come up above it?',
+    what: 'does the chin, found on the face (a face detector, then a face-landmark model’s chin tip; BlazePose has no chin landmark), stay below the lead shoulder, or come up above it?',
     on: `${chh.n_frames.toLocaleString()} frames · ${chh.judged_frames.toLocaleString()} judged (outside punches, every angle)`,
     th: THR(() => { const full = T(8, 'move.score.full'), z = fD(-T(8, 'move.score.zero'), 2);
-      return {event: {label: 'per frame', rule: `the chin point against the top of the lead shoulder (its keypoint raised ${fD(T(8, 'move.shoulder_top_torso'), 2)} torso), in torso lengths: 100 with the chin point `
+      return {event: {label: 'per frame', rule: `the chin against the top of the lead shoulder (its keypoint raised ${fD(T(8, 'move.shoulder_top_torso'), 2)} torso), in torso lengths: 100 with the chin `
                         + `${say(full, [[0, 'at or below the shoulder top']], v => `up to ${fD(-v, 2)} torso above the shoulder top`)}, linearly down to 0 at ${z} above — green at 100, red below`,
                  bands: [[say(full, [[0, 'at or below']], v => `≤ ${fD(-v, 2)} above`), '100'], [`${fN(-full)} → ${z} above`, '100 → 0 (linear)'], [`≥ ${z} above`, '0']],
                  pal: {'100': '#34c759', '100 → 0 (linear)': '#ff9f0a', '0': '#ff3b30'}},
@@ -3288,11 +3302,11 @@ function ruleCard() {
           + `${chh.over_frames.toLocaleString()} below 100 · median ${chh.median_height_torso} torso`});
   const chd = S.layerSum.chin_depth;
   if (chd) add(RN(7), chd.score ?? 'not rated', chd.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'does the chin point (estimated from the nose and the mouth corners; BlazePose has no chin landmark) sit behind the front of the lead shoulder, or stick out past it?',
+    what: 'does the chin, found on the face (a face detector, then a face-landmark model’s chin tip; BlazePose has no chin landmark), sit behind the front of the lead shoulder, or stick out past it?',
     on: `${chd.n_frames.toLocaleString()} frames · ${chd.judged_frames.toLocaleString()} judged (outside punches and side-on only — `
         + `head-on the depth axis points at the camera)`,
     th: THR(() => { const full = T(7, 'move.score.full'), z = fD(T(7, 'move.score.zero'), 2);
-      return {event: {label: 'per frame', rule: 'the chin point against the shoulder’s front — the lead keypoint pushed forward by '
+      return {event: {label: 'per frame', rule: 'the chin against the shoulder’s front — the lead keypoint pushed forward by '
                         + `${fD(T(7, 'move.shoulder_front_torso'), 2)} torso, because the joint centre sits inside the deltoid — in torso lengths: 100 ${chinFullTxt(7, 'behind')}`
                         + `, linearly down to 0 at ${z} torso in front — green at 100, red below`,
                  bands: [[say(full, [[0, 'at or behind']], v => `≤ ${fD(v, 2)} in front`), '100'], [`${fN(full)} → ${z} torso in front`, '100 → 0 (linear)'], [`≥ ${z}`, '0']],
@@ -3747,16 +3761,14 @@ function frameCard(el, f) {
     return hs.length === 2 ? {score: W4.lead * part.lead + W4.rear * part.rear, note: `lead ${(W4.lead * part.lead).toFixed(0)}/${fN(W4.lead)} · rear ${(W4.rear * part.rear).toFixed(0)}/${fN(W4.rear)}${dm}`}
          : hs.length === 1 ? {score: 100 * part[hs[0]], note: `${hs[0]} hand alone · ${why.join(' · ')}${dm}`} : {skip: why.join(' · ')};
   });
-  // 7 / 8 chin: the chin point = nose + chin_coef x (mouth centre - nose), against the lead shoulder
-  const nose = J2(J.nose);
-  const chinAt = k => nose && J2(9) && J2(10) ? [nose[0] + k * ((J2(9)[0] + J2(10)[0]) / 2 - nose[0]),
-                                                 nose[1] + k * ((J2(9)[1] + J2(10)[1]) / 2 - nose[1])] : null;
+  // 7 / 8 chin: the chin found on the face (face_chin stage), in image pixels, against the lead shoulder
+  const fcN = faceChinAt(f), chinPx = fcN ? [fcN[0] * W, fcN[1] * H] : null;
   const leadSh = J2(leadLeft ? J.lsh : J.rsh);
   if (S.has.chin_depth) {
     const st = state('chin_depth')?.state;
     if (st !== 'tucked' && st !== 'out') rows.push([7, {skip: CHINSKIP[st] || 'no reading'}]);
     else FR(7, () => {
-      const chin = chinAt(T(7, 'move.chin_coef'));
+      const chin = chinPx;
       const a = S.hasAngle && S.pose[f] ? S.angle[f] : NaN, d = Math.sign(Math.sin(a * Math.PI / 180));
       const g = chin && leadSh && d ? d * (chin[0] - (leadSh[0] + d * T(7, 'move.shoulder_front_torso') * torso)) / torso : NaN;
       return Number.isFinite(g) ? {score: chinDepthScore(g), note: `${Math.abs(g).toFixed(2)} torso ${g > 0 ? 'in front of' : 'behind'} the shoulder's front`} : {skip: 'no reading'};
@@ -3766,7 +3778,7 @@ function frameCard(el, f) {
     const st = state('chin_height')?.state;
     if (st !== 'under' && st !== 'over') rows.push([8, {skip: CHINSKIP[st] || 'no reading'}]);
     else FR(8, () => {
-      const chin = chinAt(T(8, 'move.chin_coef'));
+      const chin = chinPx;
       const hv = chin && leadSh ? (chin[1] - (leadSh[1] - T(8, 'move.shoulder_top_torso') * torso)) / torso : NaN;
       return Number.isFinite(hv) ? {score: chinHeightScore(hv), note: `${hv >= 0 ? hv.toFixed(2) + ' torso below' : (-hv).toFixed(2) + ' torso above'} the shoulder top`} : {skip: 'no reading'};
     });
@@ -4741,10 +4753,10 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [6, `How low the wrist of the other hand — the one not punching — sits below the nose at impact (averaged with the frames within ${restWin()} s either side). It is that wrist’s height at that moment, not how far it dropped.`,
       'every punch', `full marks up to ${fD(T(6, 'move.score.full'), 2)} torso below the nose, zero at ${fD(T(6, 'move.score.zero'), 2)}`,
       'While one hand punches the other is the guard; if it sags, the counter lands.'],
-  [7, 'How far the chin point pokes out in front of the lead shoulder, seen from the side. The chin point is estimated from the nose and the mouth corners (BlazePose has no chin landmark), so leaning the whole head forward also counts as chin out.',
-      'every frame outside punches', `full marks with the chin point ${say(T(7, 'move.score.full'), [[0, 'at or behind']], v => `up to ${fD(v, 2)} torso in front of`)} the front of the shoulder, zero at ${fD(T(7, 'move.score.zero'), 2)} torso in front`,
+  [7, 'How far the chin pokes out in front of the lead shoulder, seen from the side. The chin is found on the face in the video (a face detector, then the chin tip of a face-landmark model; BlazePose has no chin landmark); a frame where no face is found with enough confidence is not judged.',
+      'every frame outside punches', `full marks with the chin ${say(T(7, 'move.score.full'), [[0, 'at or behind']], v => `up to ${fD(v, 2)} torso in front of`)} the front of the shoulder, zero at ${fD(T(7, 'move.score.zero'), 2)} torso in front`,
       'Behind the shoulder the chin is covered from the side; in front of it, it’s the target.'],
-  [8, 'How high the chin point (estimated from the nose and the mouth corners; BlazePose has no chin landmark) sits compared with the top of the lead shoulder — height only, so a raised shoulder counts the same as a lowered chin.',
+  [8, 'How high the chin, found on the face in the video (BlazePose has no chin landmark), sits compared with the top of the lead shoulder — height only, so a raised shoulder counts the same as a lowered chin. A frame where no face is found with enough confidence is not judged.',
       'every frame outside punches', `full marks ${say(T(8, 'move.score.full'), [[0, 'at or below']], v => `up to ${fD(-v, 2)} torso above`)} the shoulder top, zero at ${fD(T(8, 'move.score.zero') == null ? null : -T(8, 'move.score.zero'), 2)} torso above`,
       'Chin down behind the lead shoulder is the basic protection; chin up is an open target.'],
   [9, 'How far each elbow sticks out sideways past its own shoulder, away from the body. An elbow pulled in toward the middle counts as tucked; an arm throwing a hook or a body shot is skipped.',
