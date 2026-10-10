@@ -221,7 +221,7 @@
                        font-weight: 500; max-height: 150px; overflow: hidden; text-overflow: ellipsis; }
   .ovr-t th.orh .orn { display: block; text-align: center; color: var(--text); }
   .ovr-t th.sorted .orn, .ovr-t th.sorted .orv { color: var(--accent); }
-  .ovr-t .ost { font-size: 10px; color: var(--text2); margin: 0 2px; } .ovr-t .ost.sp { color: #ff9f0a; font-weight: 600; } .ovr-t .ost.gl { color: #5ac8fa; font-weight: 600; }
+  .ovr-t .ost { font-size: 10px; color: var(--text2); margin: 0 2px; } .ovr-t .ost.sp { color: #ff9f0a; font-weight: 600; } .ovr-t .ost.bw { color: #af52de; font-weight: 600; } .ovr-t .ost.gl { color: #5ac8fa; font-weight: 600; }
   .ovr-t th.on, .ovr-t td.on { position: sticky; left: 0; z-index: 3; background: var(--panel-solid); text-align: left; max-width: 260px;
                                min-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 8px 0 2px; }
   .ovr-t th.oo { position: sticky; left: 262px; z-index: 3; vertical-align: bottom; padding-bottom: 4px; }
@@ -2431,15 +2431,16 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th, rsCsv, rsSum, stj, glj] = await Promise.all([
+  const [pjs, angleCsv, defCsv, impCsv, th, rsCsv, rsSum, stj, glj, bwj] = await Promise.all([
     jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
     lite ? null : txt(STAGES.rollsSlips), lite ? null : jsn(['rolls_slips', 'rolls_slips.json']),
     jsn(['stance', 'stance.json']),                         // the stance stage (2026-10-09): who run_all mirrored, and why
-    jsn(['gloves', 'gloves.json'])]);                       // the gloves stage (2026-10-09): no rule reads it yet
+    jsn(['gloves', 'gloves.json']),                         // the gloves stage (2026-10-09): no rule reads it yet
+    jsn(['bagwork', 'bagwork.json'])]);                     // the bagwork stage (2026-10-10): no rule reads it yet
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
-  const N = {fps: pjs?.run?.fps || 30, stance: pjs?.run?.stance || 'orthodox', mirrored: !!pjs?.run?.mirrored, stanceInfo: stj, glovesInfo: glj,
+  const N = {fps: pjs?.run?.fps || 30, stance: pjs?.run?.stance || 'orthodox', mirrored: !!pjs?.run?.mirrored, stanceInfo: stj, glovesInfo: glj, bagworkInfo: bwj,
              videoName: pjs?.run?.video || `${src.name}.mp4`, hasImpact, missing: [],
              th: th?.rules && th?.house ? th : null};
   const A = angleCsv ? parseCSV(angleCsv) : [];
@@ -2493,6 +2494,9 @@ const stanceWhy = (st = S.stanceInfo) => !st ? ''
   : ` (no answer — under ${st.min_votes || st.k} clear frames ${st.spacing_s ?? 0} s apart — taken as ${st.stance})`;
 
 // the gloves stage (gloves/gloves.json): yes / no from the hand points' shape, or unknown; '–' for a folder from before it
+// the bagwork stage (bagwork/bagwork.json): bag work / shadowboxing with its P(bag), or unknown; '–' before it existed
+const bagworkTxt = (b = S.bagworkInfo) => !b ? '–' : b.bagwork == null ? 'unknown'
+  : `${b.bagwork ? 'bag work' : 'shadowboxing'} (P(bag) ${b.p_bag}${b.model === 'skeleton' ? ', skeleton only' : ''})`;
 const glovesTxt = (g = S.glovesInfo) => !g ? '–' : g.gloves == null ? `unknown (${g.readings} hand readings)`
   : `${g.gloves ? 'yes' : 'no'} (hand shape ${g.hand_shape}, gloves from ${g.cut})`;
 
@@ -2506,8 +2510,8 @@ function commitVideo(src, N) {
   $('title').style.display = $('videoSelect').style.display === 'none' ? '' : 'none';   // the dropdown already names it
   $('subtitle').textContent = `${S.n.toLocaleString()} frames · ${S.fps} fps · ${fmtT(S.dur).replace(/\.\d+$/, '')} · ` +
     `${S.punches.length} punches · ${S.defenses.length} defensive moves · stance: ${S.stance}${stanceWhy()} · ` +
-    `gloves: ${glovesTxt()}`;
-  $('subtitle').title = [S.stanceInfo?.rule, S.glovesInfo?.rule].filter(Boolean).join(' · ');
+    `gloves: ${glovesTxt()} · training: ${bagworkTxt()}`;
+  $('subtitle').title = [S.stanceInfo?.rule, S.glovesInfo?.rule, S.bagworkInfo?.rule].filter(Boolean).join(' · ');
   $('welcome').style.display = 'none'; $('app').classList.add('ready');
   $('banner').textContent = missing.length ? `Not in this folder: ${missing.join(', ')}` : '';
   $('banner').classList.toggle('show', missing.length > 0);
@@ -4692,7 +4696,8 @@ async function overviewLoad(force) {
       OVR.data.push({name, scores: Object.fromEntries(rows.map(r => [NOTION[r.name], /^[\d.]+$/.test(r.value) ? +r.value : null])),
                      overall: overallOf(rows).overall, frames: state.n, punches: state.punches.length,
                      stance: state.stance, stanceWhy: stanceWhy(state.stanceInfo),
-                     gloves: state.glovesInfo?.gloves, glovesWhy: glovesTxt(state.glovesInfo)});
+                     gloves: state.glovesInfo?.gloves, glovesWhy: glovesTxt(state.glovesInfo),
+                     bagwork: state.bagworkInfo?.bagwork, bagworkWhy: bagworkTxt(state.bagworkInfo)});
     } catch (e) { OVR.data.push({name, error: e.message || String(e)}); }
     renderOverview();
   };
@@ -4721,7 +4726,7 @@ function renderOverview() {
       `<span class="orv">${RULE_NAME(n)}${arrow(n)}</span><span class="orn">${n}</span></th>`).join('') + '</tr>';
   const body = sorted.map(d => d.error
     ? `<tr><td class="on" title="${esc(d.name)}">${esc(d.name)}</td><td colspan="34" class="oerr">could not read: ${esc(d.error)}</td></tr>`
-    : `<tr class="${d.name === S.src?.name ? 'cur' : ''}"><td class="on" data-open="${esc(d.name)}" title="open ${esc(d.name)} · ${d.punches} punches · ${d.frames.toLocaleString()} frames · stance: ${d.stance}${esc(d.stanceWhy)} · gloves: ${esc(d.glovesWhy)}"><span class="vn">${(S.videoNames || []).indexOf(d.name) + 1}</span> <span class="ost${d.stance === 'southpaw' ? ' sp' : ''}">${d.stance}</span> <span class="ost${d.gloves ? ' gl' : ''}">${d.gloves == null ? '' : d.gloves ? 'gloves' : 'bare'}</span> ${esc(d.name)}</td>` +
+    : `<tr class="${d.name === S.src?.name ? 'cur' : ''}"><td class="on" data-open="${esc(d.name)}" title="open ${esc(d.name)} · ${d.punches} punches · ${d.frames.toLocaleString()} frames · stance: ${d.stance}${esc(d.stanceWhy)} · gloves: ${esc(d.glovesWhy)} · training: ${esc(d.bagworkWhy)}"><span class="vn">${(S.videoNames || []).indexOf(d.name) + 1}</span> <span class="ost${d.stance === 'southpaw' ? ' sp' : ''}">${d.stance}</span> <span class="ost${d.gloves ? ' gl' : ''}">${d.gloves == null ? '' : d.gloves ? 'gloves' : 'bare'}</span> <span class="ost${d.bagwork ? ' bw' : ''}">${d.bagwork == null ? '' : d.bagwork ? 'bag' : 'shadow'}</span> ${esc(d.name)}</td>` +
       cell(d.overall, `${esc(d.name)} · overall`, true) + nos.map(n => cell(d.scores[n], `${esc(d.name)} · ${n} ${RULE_NAME(n)}`)).join('') + '</tr>').join('');
   const foot = data.some(d => !d.error) ? `<tr class="omed"><td class="on">Median of ${data.filter(d => !d.error).length} videos</td>` +
     cell(median('overall'), 'median · overall', true) + nos.map(n => cell(median(n), `median · ${n} ${RULE_NAME(n)}`)).join('') + '</tr>' : '';
