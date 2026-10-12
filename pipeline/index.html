@@ -3883,7 +3883,9 @@ function frameCard(el, f) {
                 dead: [`dead time — ${THR(() => `${fN(T(25, 'move.min_dead_gap_s'))} s`, TH_MISSING)} or more with nothing`, BAD]};
     rows.push([25, WK[k] ? {text: WK[k][0], col: WK[k][1]} : {text: 'a short pause — not dead time', col: MIDC}]);
   }
-  el.innerHTML = `<div class="label">Frame · f ${f}</div>` + evList(rows) + jointVis(f);
+  const ex = exclAt((f + 0.5) / S.fps);                    // the video's excluded time: no rule judges this frame
+  const shown = ex ? rows.map(([no]) => [no, {skip: `excluded time ${fD(ex[0], 1)}–${fD(ex[1], 1)} s — no rule judges this frame`}]) : rows;
+  el.innerHTML = `<div class="label">Frame · f ${f}</div>` + evList(shown) + jointVis(f);
 }
 // The house joint floors as the rules apply them (the video's snapshot). BlazePose scores each joint twice:
 // visibility (is it hidden?) and presence (is it in the picture at all?). The pipeline applies the presence floor
