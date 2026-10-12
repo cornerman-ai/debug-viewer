@@ -175,6 +175,11 @@ timeline CSVs and the facing curve, which no round score needs (checked equal to
 says. A median row closes the table. Click any column header to sort by it (click again to flip), a video's name to
 open it. Read once per folder (about 80 s for 29 videos over the local server, 2026-10-07) and kept; **Reload** re-reads after a
 pipeline re-run. Esc or a click outside closes it.
+**Export HTML** saves the table as one self-contained file (`ambo_round_scores_<date>.html`, about 22 KB for 56 videos):
+the data and a few lines of sorting inlined, no network, so anyone can open it in a browser offline and sort any column
+(click again to reverse). **Export PDF** opens the same page, sorted as on screen, and the browser's print dialog
+(A3 landscape; choose Save as PDF). A PDF cannot sort - script in a PDF runs in Adobe Acrobat / Reader only, not in
+browsers, Preview or most phone viewers (looked up 2026-10-12) - so the HTML is the file to send; the PDF is for print.
 
 **Thresholds** are not in this page: every number a card, the Explanations tab or an overlay shows is read from the
 video's `pipeline_tests/<stem>/rule_thresholds.json` - the copy of the backend's `combined_pipeline/configs/
