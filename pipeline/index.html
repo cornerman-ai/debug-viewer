@@ -4373,9 +4373,10 @@ function drawEdgeVeil(c, W) {
   for (const [a, b] of spans) {
     const x0 = Math.max(L, tx(a)), x1 = Math.min(L + W, tx(b)); if (x1 <= x0) continue;
     c.fillStyle = 'rgba(142,142,147,0.30)'; c.fillRect(x0, top, x1 - x0, bot - top);
+    c.save(); c.beginPath(); c.rect(x0, top, x1 - x0, bot - top); c.clip();      // the hatching stays inside its band
     c.strokeStyle = 'rgba(142,142,147,0.45)'; c.lineWidth = 1; c.beginPath();
     for (let x = x0 - (bot - top); x < x1; x += 8) { c.moveTo(x, bot); c.lineTo(x + (bot - top), top); }
-    c.stroke();
+    c.stroke(); c.restore();
     if (x1 - x0 > 60) { c.fillStyle = css('--text2'); c.textAlign = 'center'; c.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
       c.fillText(`not judged · ${a === 0 ? 'first' : 'last'} ${fD(edgeS(), 1)} s`, (x0 + x1) / 2, top + 10); }
   }
