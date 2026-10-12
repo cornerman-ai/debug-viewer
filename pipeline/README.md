@@ -146,10 +146,14 @@ the punch card's sections follow the same order.
   changes with it. Every number in it is read from the video's thresholds snapshot (before a video is open each reads
   '…').
 
-**Edges**: the first and last `house.edge_skip_s` of the video (2 s, from the video's thresholds snapshot) are judged by no
-rule; every timeline row and the overview are grey and hatched there ("not judged · first 2 s"), and the video is dimmed
-with the same caption. A combo whose window after it reaches the last seconds is not judged by rules 3 and 13 (a grey
-strip, "reaches the end"), and the Rules tab's Floors line says "first / last 2.0 s not judged".
+**Excluded time**: the stretches of the video no rule judges, read from its `excluded_segments.json` (run_all writes it
+beside the outputs from the backend's `combined_pipeline/configs/excluded_segments.json`: by default the first and last
+2 s, plus any segments set for that video). Everything is still detected and measured there - its punches and moves stay
+on their rows - but every timeline row and the overview are grey and hatched ("not judged · excluded time"), the video is
+dimmed with the stretch's times, a frame rule's row shows a dashed "excluded" strip, and a punch, move or combo that
+reaches into it says "not judged: it reaches into the video's excluded time" (rules 3 and 13 count the window after a
+combo too). The Rules tab's Floors line lists the stretches; count rules note the items they left out. A folder computed
+before the file existed (2026-10-12) is read with its snapshot's `house.edge_skip_s` at both ends instead.
 
 **Floors**: the house floors from the video's thresholds snapshot are shown where they act. On the skeleton, a joint
 under the visibility floor (0.30) is drawn hollow and its bones dashed, with a note naming how many the rules skip; the
