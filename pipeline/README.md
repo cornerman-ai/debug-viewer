@@ -148,7 +148,8 @@ the punch card's sections follow the same order.
 
 **Edges**: the first and last `house.edge_skip_s` of the video (2 s, from the video's thresholds snapshot) are judged by no
 rule; every timeline row and the overview are grey and hatched there ("not judged · first 2 s"), and the video is dimmed
-with the same caption.
+with the same caption. A combo whose window after it reaches the last seconds is not judged by rules 3 and 13 (a grey
+strip, "reaches the end"), and the Rules tab's Floors line says "first / last 2.0 s not judged".
 
 **Floors**: the house floors from the video's thresholds snapshot are shown where they act. On the skeleton, a joint
 under the visibility floor (0.30) is drawn hollow and its bones dashed, with a note naming how many the rules skip; the

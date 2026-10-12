@@ -824,7 +824,8 @@ const ELBOWSTATE = {tucked: '#34c759', flared: '#ff3b30'};   // per-stretch colo
 // Why a frame is gray. The long form goes in the tooltip; SKIPWORD is the short one written on the strip, so the
 // reason is readable without hovering. Every gray state on every row has an entry here.
 const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 'side-on', front_on: 'front-on',
-                  punching: 'punching', hook: 'hook / body', no_facing: 'no facing', no_side: 'no side'};
+                  punching: 'punching', hook: 'hook / body', no_facing: 'no facing', no_side: 'no side',
+                  window_in_edge: 'reaches the end'};
 // rules 27 / 29, the variety rows: the share the score reads (the most-used types / type / side) vs everything else
 const VARCOL = {top: '#ff9f0a', other: '#34c759'};
 // rule 26's windows and rule 28's body shots
@@ -1249,16 +1250,23 @@ const RULE_LAYERS = [
   {
     // defense after combo (defense_after_combo/combos.csv): the defensive move that covered an offensive combo, drawn
     // where the move is. A combo nobody covered draws its search window after the combo as a hollow red box: 2 s, or
-    // cut short where the next punch starts.
+    // cut short where the next punch starts. A combo whose window reaches the video's last edge_skip_s is not judged
+    // (covered blank, skip_reason window_in_edge): a gray strip over its window.
     key: 'defcov', label: RN(3), short: 'Defend after combos', items: true,
     csv: ['defense_after_combo', 'combos.csv'], json: ['defense_after_combo', 'defense_after_combo.json'],
-    parseItem: (r, num, fps) => r.covered === '1'
+    parseItem: (r, num, fps) => r.covered === '' && r.skip_reason
+      ? {covered: null, skip: r.skip_reason, sf: num(r.end_frame), ef: Math.max(num(r.end_frame), Math.round(num(r.window_end_time) * fps) - 1),
+         seq: r.sequence, endF: num(r.end_frame)}
+      : r.covered === '1'
       ? {covered: true, sf: num(r.move_start_frame), ef: num(r.move_end_frame), type: r.move_type, side: r.move_side,
          delay: num(r.delay_s), seq: r.sequence, endF: num(r.end_frame)}
       : {covered: false, sf: num(r.end_frame), ef: Math.max(num(r.end_frame), Math.round(num(r.window_end_time) * fps) - 1),
          seq: r.sequence, endF: num(r.end_frame), cut: r.cut_by_punch === '1'},
     card: () => '',
-    tip: (e, x) => x.covered
+    tip: (e, x) => x.covered === null
+      ? `<b>Not judged</b> · ${fmtT(x.endF / S.fps)}<br><span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>`
+        + `<span class="m">${SKIPTXT[x.skip] || x.skip}</span>`
+      : x.covered
       ? `<b>Covered · ${x.side ? cap(x.side) + ' ' : ''}${styleD(x.type)?.name || x.type}</b> · ${fmtT(x.sf / S.fps)}<br>` +
         `<span class="num">${x.delay >= 0 ? 'starts ' + x.delay.toFixed(2) + ' s after the combo ends' : 'starts during the combo, ' + (-x.delay).toFixed(2) + ' s before it ends'}</span><br>` +
         `<span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span>`
@@ -1268,6 +1276,10 @@ const RULE_LAYERS = [
         + `${x.cut ? 'cut short by the next punch' : THR(() => `the full ${fN(T(3, 'move.window_after_s'))} s`)}</span>`,
     row(e, x, {c, y, h, tx, fps}) {
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      if (x.covered === null) {                           // not judged: a gray strip over its window
+        const x0 = Math.max(L, tx((x.endF + 1) / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+        skipStrip(c, x0, Math.max(3, x1 - x0 - 1), y + h / 2, on, x.skip); return;
+      }
       if (x.covered) {
         const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
         c.fillStyle = '#34c759'; c.globalAlpha = on ? 1 : 0.85;
@@ -1290,7 +1302,7 @@ const RULE_LAYERS = [
     key: 'anglechg', label: RN(13), short: 'Angle change', items: true,
     csv: ['angle_change', 'combos.csv'], json: ['angle_change', 'angle_change.json'],
     parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), seq: r.sequence, during: num(r.facing_during),
-      after: num(r.facing_after), deg: num(r.change_deg), changed: r.changed, inside: num(r.inside_deg),
+      after: num(r.facing_after), deg: num(r.change_deg), changed: r.changed, inside: num(r.inside_deg), skip: r.skip_reason || '',
       score: r.score === undefined ? (r.changed === 'yes' ? 100 : r.changed === 'no' ? 0 : null) : num(r.score)}),
     card: () => '',
     tip: (e, x) => {
@@ -1298,6 +1310,7 @@ const RULE_LAYERS = [
       const st = x.score === 100 ? 'moved to a new angle after it · 100'
         : x.score > 0 ? `turned only inside the combo, not after it · ${fN(x.score)}`
         : x.score === 0 ? 'stayed on the same line · 0'
+        : x.skip === 'window_in_edge' ? `not judged — ${SKIPTXT.window_in_edge.replace('not judged: ', '')}`
         : 'not judged — no facing angle during it or in the window after it (no pose, or the video ends)';
       return `<b>${RN(13)}</b> · ${fmtT(x.sf / S.fps)}<br><span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>`
         + (x.deg == null ? `<span class="m">${st}</span>`
@@ -1310,7 +1323,7 @@ const RULE_LAYERS = [
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(3, x1 - x0 - 1);
-      if (x.changed !== 'yes' && x.changed !== 'no') { skipStrip(c, x0, w, y + h / 2, on, 'no_facing'); return; }
+      if (x.changed !== 'yes' && x.changed !== 'no') { skipStrip(c, x0, w, y + h / 2, on, x.skip || 'no_facing'); return; }
       const col = angleCol(x.score);
       let win = null; try { win = T(13, 'move.window_after_s'); } catch (err) { if (!(err instanceof ThMissing)) throw err; }
       if (win) {                                           // the window the rule reads, as a thin tail
@@ -3063,7 +3076,7 @@ function ruleCard() {
 
   if (ac) add(RN(13), ac.score ?? 'not rated', ac.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'after a combination, does he turn to face a new angle? (a turn of the facing direction, not footwork)',
-    on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (no facing angle during the combo or in the window after it: no pose, or the video ends)`,
+    on: `${ac.n_combos} combined combos (punches + defensive moves) · ${ac.n_readable} judged, ${ac.n_combos - ac.n_readable} skipped (no facing angle during the combo or in the window after it, or that window reaches the video’s last seconds)`,
     th: THR(() => ({event: {label: 'per combo', rule: `100 for a turn of ≥ ${fN(T(13, 'move.min_change_deg'))}° from the combo’s mean facing (smoothed over ${fN(T(13, 'move.smooth_window_s'))} s), `
                         + `reached within ${fN(T(13, 'move.window_after_s'))} s of its last frame; ${fN(T(13, 'move.inside_score'))} when not, but the facing turned ≥ ${fN(T(13, 'move.min_change_deg'))}° `
                         + `inside the combo (between any two of its smoothed facings); 0 otherwise`},
@@ -3090,12 +3103,13 @@ function ruleCard() {
               return ` · ${sa[nr] ?? 0} against ${nr}°, ${sa[fr] ?? 0} against ${fr}°`; }) : '')}));
   if (da) add(RN(3), da.score ?? 'not rated', da.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does a defensive move come with, or right after, his combinations?',
-    on: `${da.n_combos} offensive combos (punches only) · all judged`,
+    on: `${da.n_combos} offensive combos (punches only) · ${da.n_judged ?? da.n_combos} judged`
+        + (da.n_window_in_edge ? `, ${da.n_window_in_edge} not (the window after it reaches the video’s last seconds)` : ''),
     th: THR(() => ({event: {label: 'per combo', rule: `a defensive move starting anywhere from the combo’s first frame to ${fN(T(3, 'move.window_after_s'))} s `
                         + 'after its last one covers it — or only until the next punch starts, if that comes first'},
          round: {label: 'per round', rule: `the share of combos covered, scored 100 at ${fP(T(3, 'round.score.full'))} % or more and 0 at none, `
                         + `linearly in between — a plain number, no bands; fewer than ${NJ(3)} combos: not rated`}}), thMiss),
-    calc: `${da.n_covered} covered / ${da.n_combos} combos = ${pct(da.covered_share)} → ${da.score ?? '–'} · `
+    calc: `${da.n_covered} covered / ${da.n_judged ?? da.n_combos} judged combos = ${pct(da.covered_share)} → ${da.score ?? '–'} · `
           + `${da.n_cut_by_punch} windows cut short by the next punch`});
   if (el) add(RN(9), el.score ?? 'not rated', el.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does the elbow stay in, or flare out to the side?',
@@ -3515,6 +3529,7 @@ function floorsLine() {
     + `<span class="chip-f" title="with fewer judged punches / combos / moves, or frames for a per-frame rule, the rule is not rated">`
     + `rated from ${fN(h.min_judged)} judged · ${fN(h.min_judged_s)} s of frames</span>`
     + `<span class="chip-f" title="a torso this short in the picture cannot be read">${FLOORWORD.min_torso_px(h.min_torso_px)}</span>`
+    + (h.edge_skip_s ? `<span class="chip-f" title="no rule judges the first and last seconds of a video: grey on the timeline">first / last ${fD(h.edge_skip_s, 1)} s not judged</span>` : '')
     + (per ? `<span class="per">per rule: ${per}</span>` : '') + '</div>';
 }
 function renderRules() {
@@ -3589,6 +3604,7 @@ function compass(a) {
 // applies to it — a score in the round score's tier colours, a verdict, or "not judged" and why ──
 const RULE_NAME = no => RULE_NAMES[no] || `rule ${no}`;
 const SKIPTXT = {
+  window_in_edge: 'not judged: the window after it reaches the video’s last seconds, which no rule judges',
   not_side_on: 'thrown front- or back-on; this rule reads side-on only',
   facing_head_on: 'thrown front- or back-on; this rule reads side-on only',
   side_on: 'thrown side-on; this rule reads front- or back-on only',
@@ -3726,14 +3742,14 @@ function comboCard(el, f) {
       if (r != null) rows.push([30, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: 'var(--text)'}]);
       if (S.has.defcov) {
         const d = (S.items.defcov || []).find(x => x.endF === c.ef);
-        if (d) rows.push([3, d.covered ? {text: `defended — ${d.side ? d.side + ' ' : ''}${styleD(d.type)?.name.toLowerCase() || d.type} `
+        if (d) rows.push([3, d.covered === null ? {skip: d.skip} : d.covered ? {text: `defended — ${d.side ? d.side + ' ' : ''}${styleD(d.type)?.name.toLowerCase() || d.type} `
                                          + (d.delay < 0 ? `starting ${(-d.delay).toFixed(2)} s before it ends` : `${d.delay.toFixed(2)} s after`), col: GOOD}
                                        : {text: d.cut ? 'not defended before the next punch' : 'not defended', col: BAD}]);
       }
     } else {
       const a = (S.angleCombos || []).find(x => +x.start_frame === c.sf);
       const asc = a?.score === undefined ? (a?.changed === 'yes' ? 100 : 0) : +a.score;   // older outputs: yes / no
-      if (a) rows.push([13, a.changed === '' ? {skip: 'no_facing'}
+      if (a) rows.push([13, a.changed === '' ? {skip: a.skip_reason || 'no_facing'}
         : {text: asc >= 100 ? `changed angle — ${(+a.change_deg).toFixed(0)}° after · 100`
              : asc > 0 ? `turned only inside — ${(+a.inside_deg).toFixed(0)}° inside, ${(+a.change_deg).toFixed(0)}° after · ${asc}`
              : `kept the angle — ${(+a.change_deg).toFixed(0)}° after · 0`,
@@ -3959,8 +3975,8 @@ function drawOverlay(f, punchesNow) {
   octx.setTransform(dpr, 0, 0, dpr, 0, 0); octx.clearRect(0, 0, R.W, R.H);
   LABELS.length = 0;
   if (inEdge((f + 0.5) / S.fps)) {                          // the first / last edge_skip_s: no rule judges this frame
-    const r = videoRect(); octx.fillStyle = 'rgba(60,60,67,0.45)'; octx.fillRect(r.x, r.y, r.w, r.h);
-    overlayLabel(r.x + 12, r.y + r.h / 2, `not judged · the ${(f + 0.5) / S.fps < edgeS() ? 'first' : 'last'} ${fD(edgeS(), 1)} s of the video`, '#e5e5ea');
+    const r = videoRect(); octx.fillStyle = 'rgba(60,60,67,0.45)'; octx.fillRect(0, 0, r.W, r.H);   // the whole stage: zoom moves the video
+    overlayLabel(12, r.H / 2, `not judged · the ${(f + 0.5) / S.fps < edgeS() ? 'first' : 'last'} ${fD(edgeS(), 1)} s of the video`, '#e5e5ea');
   }
   if (!S.skel || f >= S.skel.length / (33 * S.skelC)) return;
   const C = S.skelC, base = f * 33 * C;
@@ -4781,13 +4797,15 @@ $('ovrReload').onclick = () => overviewLoad(true);
 // viewers — so the shareable file is HTML: the data and a few lines of sorting inlined, no network, opens in any
 // browser offline (click a column to sort, again to reverse). PDF is the same page, static, sorted as on screen,
 // printed landscape (the browser's Save as PDF). ──
+const localStamp = (d = new Date(), p = n => String(n).padStart(2, '0')) =>      // this computer's clock, not UTC
+  `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 function overviewPage(print) {
   const nos = Array.from({length: 33}, (_, i) => i + 1);
   const rows = (OVR.data || []).filter(d => !d.error).map(d => ({
     name: d.name, overall: d.overall, s: nos.map(n => d.scores[n] ?? null),
     tags: [d.stance, d.gloves == null ? '' : d.gloves ? 'gloves' : 'bare', d.bagwork == null ? '' : d.bagwork ? 'bag' : 'shadow'].filter(Boolean)}));
   const payload = {rows, rules: nos.map(n => RULE_NAME(n)), tiers: TIER, sort: OVR.sort, desc: OVR.desc, print,
-                   made: new Date().toISOString().slice(0, 16).replace('T', ' '), edge: S.th?.house?.edge_skip_s ?? null};
+                   made: localStamp(), edge: S.th?.house?.edge_skip_s ?? null};
   const json = JSON.stringify(payload).replace(/</g, '\\u003c');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AMBO — round scores, all videos</title><style>
@@ -4849,7 +4867,7 @@ function overviewExport(kind) {
     w.document.open(); w.document.write(page); w.document.close(); return; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([page], {type: 'text/html'}));
-  a.download = `ambo_round_scores_${new Date().toISOString().slice(0, 10)}.html`;
+  a.download = `ambo_round_scores_${localStamp().slice(0, 10)}.html`;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 $('ovrHtml').onclick = () => overviewExport('html');
