@@ -3958,6 +3958,10 @@ function drawOverlay(f, punchesNow) {
   if (ov.width !== Math.round(R.W * dpr) || ov.height !== Math.round(R.H * dpr)) { ov.width = Math.round(R.W * dpr); ov.height = Math.round(R.H * dpr); }
   octx.setTransform(dpr, 0, 0, dpr, 0, 0); octx.clearRect(0, 0, R.W, R.H);
   LABELS.length = 0;
+  if (inEdge((f + 0.5) / S.fps)) {                          // the first / last edge_skip_s: no rule judges this frame
+    const r = videoRect(); octx.fillStyle = 'rgba(60,60,67,0.45)'; octx.fillRect(r.x, r.y, r.w, r.h);
+    overlayLabel(r.x + 12, r.y + r.h / 2, `not judged · the ${(f + 0.5) / S.fps < edgeS() ? 'first' : 'last'} ${fD(edgeS(), 1)} s of the video`, '#e5e5ea');
+  }
   if (!S.skel || f >= S.skel.length / (33 * S.skelC)) return;
   const C = S.skelC, base = f * 33 * C;
   const P = j => { const x = S.skel[base + j * C], y = S.skel[base + j * C + 1];
@@ -4326,6 +4330,7 @@ function drawTimeline(f) {
     block(e, TR.rs[0], TR.rs[1], rsStyle(e), e.sf <= f && f <= e.ef);
   drawLayerRows(c, f, W, text, grid);
   drawFaceVeil(c, W, text);                               // shift-click a facing band: everything else fades back
+  drawEdgeVeil(c, W);                                     // the first / last edge_skip_s: no rule judges them
   // playhead
   const xp = tx((f + 0.5) / fps);
   c.strokeStyle = ph; c.lineWidth = 1.5; c.beginPath(); c.moveTo(xp, 20); c.lineTo(xp, TR.bottom); c.stroke();
@@ -4343,6 +4348,7 @@ function drawTimeline(f) {
   // overview: the whole video, events as ticks, the visible window as a lens
   const [oy, oh] = TR.over;
   for (const e of S.punches) if (!hid(e)) { c.fillStyle = styleP(e.type).c; c.fillRect(ox(e.sf / fps), oy + 5, Math.max(1, ox((e.ef + 1) / fps) - ox(e.sf / fps)), 9); }
+  for (const [a, b] of edgeSpans()) { c.fillStyle = 'rgba(142,142,147,0.35)'; c.fillRect(ox(a), oy + 2, Math.max(1, ox(b) - ox(a)), oh - 4); }
   for (const e of S.defenses) if (!hid(e)) { c.fillStyle = styleD(e.type).c; c.fillRect(ox(e.sf / fps), oy + 17, Math.max(1, ox((e.ef + 1) / fps) - ox(e.sf / fps)), 8); }
   const vx0 = ox(V.t0), vx1 = ox(V.t1);
   c.fillStyle = 'rgba(128,128,128,0.16)'; rr(vx0, oy, Math.max(4, vx1 - vx0), oh, 6); c.fill();
@@ -4354,6 +4360,27 @@ function drawTimeline(f) {
 // The angle filter's veil. Brushing-and-linking, the data-viz way round: the frames outside the chosen band stay
 // on screen but fade back, so the shape of the round is not lost — and they stop answering the cursor (see hit()).
 // Drawn over the event rows only; the facing row above keeps its full trace, because that row IS the control.
+// The first and last house.edge_skip_s of the video (the video's thresholds snapshot; 2 s since 2026-10-12): no rule
+// judges them - the rule stages read no pose there and keep no punch or defensive move that reaches into them. Grey and
+// hatched on every row, with a caption; nothing drawn without a snapshot or with edge_skip_s 0.
+const edgeS = () => S.th?.house?.edge_skip_s || 0;
+const inEdge = t => { const e = edgeS(); return e > 0 && (t < e || t > S.dur - e); };
+function edgeSpans() { const e = Math.min(edgeS(), S.dur / 2); return e > 0 ? [[0, e], [S.dur - e, S.dur]] : []; }
+function drawEdgeVeil(c, W) {
+  const spans = edgeSpans(); if (!spans.length) return;
+  const top = 20, bot = TR.bottom;
+  c.save(); c.beginPath(); c.rect(L, top, W, bot - top); c.clip();
+  for (const [a, b] of spans) {
+    const x0 = Math.max(L, tx(a)), x1 = Math.min(L + W, tx(b)); if (x1 <= x0) continue;
+    c.fillStyle = 'rgba(142,142,147,0.30)'; c.fillRect(x0, top, x1 - x0, bot - top);
+    c.strokeStyle = 'rgba(142,142,147,0.45)'; c.lineWidth = 1; c.beginPath();
+    for (let x = x0 - (bot - top); x < x1; x += 8) { c.moveTo(x, bot); c.lineTo(x + (bot - top), top); }
+    c.stroke();
+    if (x1 - x0 > 60) { c.fillStyle = css('--text2'); c.textAlign = 'center'; c.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+      c.fillText(`not judged · ${a === 0 ? 'first' : 'last'} ${fD(edgeS(), 1)} s`, (x0 + x1) / 2, top + 10); }
+  }
+  c.restore();
+}
 function drawFaceVeil(c, W, text) {
   if (!V.faceFilter || !S.n) return;
   const fps = S.fps, top = laneTop - 2, bot = TR.bottom;

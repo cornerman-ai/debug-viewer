@@ -146,6 +146,10 @@ the punch card's sections follow the same order.
   changes with it. Every number in it is read from the video's thresholds snapshot (before a video is open each reads
   '…').
 
+**Edges**: the first and last `house.edge_skip_s` of the video (2 s, from the video's thresholds snapshot) are judged by no
+rule; every timeline row and the overview are grey and hatched there ("not judged · first 2 s"), and the video is dimmed
+with the same caption.
+
 **Floors**: the house floors from the video's thresholds snapshot are shown where they act. On the skeleton, a joint
 under the visibility floor (0.30) is drawn hollow and its bones dashed, with a note naming how many the rules skip; the
 **Now** tab's Frame card ends with **Joint visibility** — a bar per joint (nose, then lead / rear shoulder to ankle), a
