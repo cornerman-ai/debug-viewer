@@ -46,7 +46,7 @@ the per-punch ones are joined to the punches by start frame and hand.
 
 Over HTTP (a static server with Range support rooted at the data folder, serving this page from the same origin):
 `index.html?data=<url of data/>&video=<folder name>` — used for testing. The backend's
-`combined_pipeline/pipeline_server.py` is that server (read-only): run it on the machine with the Drive mount and open
+`combined_pipeline/dev_tools/pipeline_server.py` is that server (read-only): run it on the machine with the Drive mount and open
 **http://localhost:8766/**.
 
 ## A new video

@@ -118,7 +118,7 @@ A new rule adds an entry to all four. A changed threshold changes it in `thresho
 ## 6. Before pushing
 
 - The rule's stage is in `STAGES` in the backend's `combined_pipeline/run_all.py`, or a fresh run never makes it.
-- Open a few test videos (`python combined_pipeline/pipeline_server.py` serves them on http://localhost:8766/) and
+- Open a few test videos (`python combined_pipeline/dev_tools/pipeline_server.py` serves them on http://localhost:8766/) and
   check the row, the Rules tab, the Explanations tab and the Now card render with no console errors.
 - Update `README.md`.
 - Push `debug-viewer` main — it deploys to <https://cornerman-ai.github.io/debug-viewer/pipeline/> — and the backend
