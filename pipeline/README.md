@@ -46,39 +46,14 @@ the per-punch ones are joined to the punches by start frame and hand.
 
 Over HTTP (a static server with Range support rooted at the data folder, serving this page from the same origin):
 `index.html?data=<url of data/>&video=<folder name>` — used for testing. The backend's
-`combined_pipeline/pipeline_server.py` is that server, and more: run it on the machine with the Drive mount and the two
-conda envs and open **http://localhost:8766/**.
+`combined_pipeline/pipeline_server.py` is that server (read-only): run it on the machine with the Drive mount and open
+**http://localhost:8766/**.
 
-## Uploading a video
+## A new video
 
-**Upload video** (header) runs a new video through the whole pipeline and opens it when it is done. It needs the
-pipeline server above — the page cannot run Python; without the server the window says how to start it. Opened from
-the server the page calls it directly; opened any other way (the hosted page with Open Folder) it looks for it at
-`http://localhost:8766/`.
-
-- **Pick**: drop a file or choose one — MP4 or MOV, the formats the page plays (anything else, or a file the browser
-  cannot decode, is refused before upload). The window shows it playing, its length, size and resolution, and an
-  estimate of the whole run. Its name becomes the folder in `pipeline_tests`, editable; a name already in use is
-  refused as you type (with a link to open that video).
-- **Run**: the file goes to the server, which copies it to `raw_videos/full_pipeline_test_videos/` and runs
-  `run_all.py --video <name>` — the same command as by hand. The window lists the steps (upload, copy to Google
-  Drive, skeleton, the seven shared stages, the 28 rule stages, ready) with the current one spinning and its stage
-  named ("facing angle · 3 of 7"; both counts come from the server, read off `run_all.STAGES`), a bar with the percentage, the time elapsed and an estimate of the time left
-  (rescaled by how fast the finished steps really ran), run_all's latest log line, and the video playing on the left.
-  Finished steps show how long they took.
-- **Keep browsing**: the window shrinks into a chip in the header ("Analysing · 42 %"); the job runs on the server, so
-  closing the window or even reloading the page stops nothing — a reload picks the job up again. Only an upload still
-  in flight is lost (the page warns before leaving).
-- **Done**: with the window open the video opens by itself; minimised, the chip turns green ("… is ready — open").
-  The dropdown and the All videos table include it from then on.
-- **Refused or failed**: the same video byte for byte under another name is refused after the upload, naming the copy
-  already there. A failed run marks its step red, gives the first error from the log ("the skeleton extraction failed
-  — av.error.InvalidDataError: …") and the log's tail, and the server removes what that job created, so the test set
-  never holds a half-run video and the name can be used again.
-
-One job runs at a time; a second upload waits in line ("waiting for “X” to finish first"). Measured 2026-10-02: a
-12 s clip took 29 s end to end, a 45 s clip about a minute; the skeleton runs at about real time, so a video takes
-longer than its own length.
+The page does not run anything. A new video is run in the backend with `combined_pipeline/brief.py --video <its full
+path>`: the whole pipeline into a folder beside it, and its score card, `brief.txt`. The Upload video button and
+the server's upload were removed 2026-10-12.
 
 ## Using it
 
