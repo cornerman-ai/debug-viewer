@@ -225,6 +225,8 @@
                   color: var(--text2); font-weight: 600; cursor: pointer; }
   .ovr-t .osort:hover { color: var(--accent); } .ovr-t .osort.on { background: var(--accent); color: #fff; }
   .ovr-t th.on { vertical-align: bottom; padding-bottom: 2px; }
+  .ovr-t .osorts { display: flex; flex-wrap: wrap; gap: 4px; white-space: normal; }   /* the three buttons wrap, none is cut off */
+  .ovr-t .osorts .osort { margin: 0; }
   .ovr-t tr.by td.on { color: var(--accent); font-weight: 600; } .ovr-t tr.by td.oc { outline: 2px solid var(--accent); outline-offset: -1px; }
   .ovr-t th.on, .ovr-t td.on { position: sticky; left: 0; z-index: 3; background: var(--panel-solid); text-align: left; max-width: 260px;
                                min-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 8px 0 2px; }
@@ -4712,9 +4714,8 @@ function ovrTableHTML(data, st, names, tiers, num) {
   const by = data.find(d => !d.error && d.name === st.by);
   const cols = !by ? nos : [...nos].sort((a, b) => (by.scores[a] == null) - (by.scores[b] == null) || by.scores[b] - by.scores[a] || a - b);
   const ok = data.filter(d => !d.error).length;
-  const head = `<tr><th class="on"><span class="osort${st.sort === 'num' ? ' on' : ''}" data-num title="the videos in their number order">Videos 1→${ok}</span>` +
-      `<span class="osort${st.sort === 'overall' ? ' on' : ''}" data-overall title="the videos by their overall score, best to worst">Videos by overall</span>` +
-      `<span class="osort${!by ? ' on' : ''}" data-rules title="the rules in their number order">Rules 1→${nos.length}</span></th>` +
+  const head = `<tr><th class="on"><div class="osorts"><span class="osort${st.sort === 'num' ? ' on' : ''}" data-num title="the videos in their number order">Videos 1→${ok}</span>` +
+      `<span class="osort${!by ? ' on' : ''}" data-rules title="the rules in their number order">Rules 1→${nos.length}</span></div></th>` +
     `<th class="oo" data-sort="overall" title="sort the videos by their overall score, best to worst">Overall${arrow('overall')}</th>` +
     cols.map(n => `<th class="orh${st.sort === n ? ' sorted' : ''}" data-sort="${n}" title="${n} · ${esc(names[n - 1])} — click: the videos by it, best to worst">` +
       `<span class="orv">${esc(names[n - 1])}${arrow(n)}</span><span class="orn">${n}</span></th>`).join('') + '</tr>';
@@ -4728,13 +4729,12 @@ function ovrTableHTML(data, st, names, tiers, num) {
   return `<thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot>`;
 }
 // its clicks, the same in both: a rule (or Overall) sorts the videos by it, a video sorts the rules by it, both best to
-// worst; "Videos by overall" = Overall's header; "Videos 1→N" and "Rules 1→33" put them back in number order
+// worst; "Videos 1→N" and "Rules 1→33" put them back in number order
 function ovrTableWire(table, st, rerender) {
   table.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
     st.sort = th.dataset.sort === 'overall' ? 'overall' : +th.dataset.sort; rerender(); });
   table.querySelectorAll('td[data-by]').forEach(td => td.onclick = () => { st.by = td.dataset.by; rerender(); });
   table.querySelector('[data-num]').onclick = () => { st.sort = 'num'; rerender(); };
-  table.querySelector('[data-overall]').onclick = () => { st.sort = 'overall'; rerender(); };
   table.querySelector('[data-rules]').onclick = () => { st.by = null; rerender(); };
 }
 const OVR_HINT = 'click a rule (or Overall) to sort the videos by it, a video to sort the rules by it (best to worst) · Videos 1→N, Rules 1→33: back to number order';
