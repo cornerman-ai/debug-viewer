@@ -4686,52 +4686,66 @@ async function overviewLoad(force) {
   await Promise.all(Array.from({length: 4}, async () => { while (queue.length) await one(queue.shift()); }));
   OVR.loading = false; renderOverview();
 }
-function renderOverview() {
-  const nos = Array.from({length: 33}, (_, i) => i + 1), data = OVR.data || [];
+// The All videos table as HTML - ONE definition for the viewer and the exported file (overviewPage embeds this
+// function's own source, and ovrTableWire's), so the two always look and sort the same. It reads nothing outside its
+// arguments: data [{name, overall, scores: {n: score}, error?}], st {sort, desc, by} (by: the video whose own scores
+// order the rule columns, best to worst), names[n - 1] the rule names, tiers (TIER), num(name) the video's number,
+// cur the open video's name (or null), open: draw the ↗ that opens a video.
+function ovrTableHTML(data, st, names, tiers, num, cur, open) {
+  const nos = names.map((_, i) => i + 1);
+  const tierOf = v => tiers.find(([lo]) => v >= lo);
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const val = (d, k) => k === 'overall' ? d.overall : d.scores?.[k];
   const sorted = [...data].sort((a, b) => {
-    if (OVR.sort === 'name') return (OVR.desc ? -1 : 1) * a.name.localeCompare(b.name);
-    const x = val(a, OVR.sort), y = val(b, OVR.sort);
-    return (x == null) - (y == null) || (OVR.desc ? y - x : x - y) || a.name.localeCompare(b.name);   // not rated last
+    if (st.sort === 'name') return (st.desc ? -1 : 1) * a.name.localeCompare(b.name);
+    const x = val(a, st.sort), y = val(b, st.sort);
+    return (x == null) - (y == null) || (st.desc ? y - x : x - y) || a.name.localeCompare(b.name);   // not rated last
   });
-  const median = k => { const v = data.map(d => val(d, k)).filter(x => x != null).sort((a, b) => a - b);
+  const median = k => { const v = data.filter(d => !d.error).map(d => val(d, k)).filter(x => x != null).sort((a, b) => a - b);
     return v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2) : null; };
   const cell = (v, title, big) => {
     const t = v == null ? null : tierOf(v);
     return v == null ? `<td class="oc na${big ? ' big' : ''}" title="${title}: not rated">–</td>`
       : `<td class="oc${big ? ' big' : ''}" style="--c:${t[2]}" title="${title}: ${v} ${t[1]}">${big ? v.toFixed(1) : Math.round(v)}</td>`;
   };
-  const arrow = k => OVR.sort === k ? (OVR.desc ? ' ↓' : ' ↑') : '';
-  const esc = s => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  // the columns: rule order, or one video's own scores best to worst (OVR.by, its name; a click on it) - not rated last
-  const by = data.find(d => !d.error && d.name === OVR.by);
+  const arrow = k => st.sort === k ? (st.desc ? ' ↓' : ' ↑') : '';
+  const by = data.find(d => !d.error && d.name === st.by);                 // its rules best to worst, not rated last
   const cols = !by ? nos : [...nos].sort((a, b) => (by.scores[a] == null) - (by.scores[b] == null) || by.scores[b] - by.scores[a] || a - b);
   const head = `<tr><th class="on" data-sort="name">Video${arrow('name')}</th><th class="oo" data-sort="overall">Overall${arrow('overall')}</th>` +
-    cols.map(n => `<th class="orh${OVR.sort === n ? ' sorted' : ''}" data-sort="${n}" title="${n} · ${RULE_NAME(n)} — click to sort">` +
-      `<span class="orv">${RULE_NAME(n)}${arrow(n)}</span><span class="orn">${n}</span></th>`).join('') + '</tr>';
+    cols.map(n => `<th class="orh${st.sort === n ? ' sorted' : ''}" data-sort="${n}" title="${n} · ${esc(names[n - 1])} — click to sort">` +
+      `<span class="orv">${esc(names[n - 1])}${arrow(n)}</span><span class="orn">${n}</span></th>`).join('') + '</tr>';
   const body = sorted.map(d => d.error
     ? `<tr><td class="on" title="${esc(d.name)}">${esc(d.name)}</td><td colspan="34" class="oerr">could not read: ${esc(d.error)}</td></tr>`
-    : `<tr class="${[d.name === S.src?.name ? 'cur' : '', d.name === OVR.by ? 'by' : ''].join(' ').trim()}"><td class="on" data-by="${esc(d.name)}" title="${esc(d.name)} — click: its 33 rules from best to worst, again: back to rule order"><span class="oopen" data-open="${esc(d.name)}" title="open this video">↗</span><span class="vn">${(S.videoNames || []).indexOf(d.name) + 1}</span> ${esc(d.name)}${d.name === OVR.by ? ' ↓' : ''}</td>` +
-      cell(d.overall, `${esc(d.name)} · overall`, true) + cols.map(n => cell(d.scores[n], `${esc(d.name)} · ${n} ${RULE_NAME(n)}`)).join('') + '</tr>').join('');
-  const foot = data.some(d => !d.error) ? `<tr class="omed"><td class="on">Median of ${data.filter(d => !d.error).length} videos</td>` +
-    cell(median('overall'), 'median · overall', true) + cols.map(n => cell(median(n), `median · ${n} ${RULE_NAME(n)}`)).join('') + '</tr>' : '';
-  const n = (S.videoNames || []).length;
-  $('ovrStatus').textContent = OVR.loading ? `reading ${data.length} of ${n} videos…` : `${data.length} videos · click a column to sort the videos by it, a video to order its rules best to worst, ↗ to open it`;
-  $('ovrHtml').disabled = $('ovrPdf').disabled = OVR.loading || !data.some(d => !d.error);
-  $('ovrTable').innerHTML = `<thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot>`;
-  $('ovrTable').querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
+    : `<tr class="${[d.name === cur ? 'cur' : '', d.name === st.by ? 'by' : ''].join(' ').trim()}"><td class="on" data-by="${esc(d.name)}" title="${esc(d.name)} — click: its 33 rules from best to worst, again: back to rule order">` +
+      (open ? `<span class="oopen" data-open="${esc(d.name)}" title="open this video">↗</span>` : '') +
+      `<span class="vn">${num(d.name)}</span> ${esc(d.name)}${d.name === st.by ? ' ↓' : ''}</td>` +
+      cell(d.overall, `${esc(d.name)} · overall`, true) + cols.map(n => cell(d.scores[n], `${esc(d.name)} · ${n} ${esc(names[n - 1])}`)).join('') + '</tr>').join('');
+  const ok = data.filter(d => !d.error).length;
+  const foot = ok ? `<tr class="omed"><td class="on">Median of ${ok} videos</td>` +
+    cell(median('overall'), 'median · overall', true) + cols.map(n => cell(median(n), `median · ${n} ${esc(names[n - 1])}`)).join('') + '</tr>' : '';
+  return `<thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot>`;
+}
+// its clicks, the same in both: a header sorts the videos (again: the other way), a video orders the rule columns by its
+// own scores (again: back to rule order), ↗ calls onOpen(name)
+function ovrTableWire(table, st, rerender, onOpen) {
+  table.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
     const k = th.dataset.sort === 'name' || th.dataset.sort === 'overall' ? th.dataset.sort : +th.dataset.sort;
-    if (OVR.sort === k) OVR.desc = !OVR.desc; else { OVR.sort = k; OVR.desc = k !== 'name'; }
-    renderOverview();
+    if (st.sort === k) st.desc = !st.desc; else { st.sort = k; st.desc = k !== 'name'; }
+    rerender();
   });
-  $('ovrTable').querySelectorAll('td[data-by]').forEach(td => td.onclick = () => {
-    OVR.by = OVR.by === td.dataset.by ? null : td.dataset.by;
-    renderOverview();
-  });
-  $('ovrTable').querySelectorAll('[data-open]').forEach(el => el.onclick = e => {
-    e.stopPropagation();
+  table.querySelectorAll('td[data-by]').forEach(td => td.onclick = () => { st.by = st.by === td.dataset.by ? null : td.dataset.by; rerender(); });
+  table.querySelectorAll('[data-open]').forEach(el => el.onclick = e => { e.stopPropagation(); onOpen(el.dataset.open); });
+}
+const OVR_HINT = 'click a column to sort the videos by it, a video to order its rules best to worst';
+function renderOverview() {
+  const data = OVR.data || [], n = (S.videoNames || []).length;
+  $('ovrStatus').textContent = OVR.loading ? `reading ${data.length} of ${n} videos…` : `${data.length} videos · ${OVR_HINT}, ↗ to open it`;
+  $('ovrHtml').disabled = $('ovrPdf').disabled = OVR.loading || !data.some(d => !d.error);
+  $('ovrTable').innerHTML = ovrTableHTML(data, OVR, Array.from({length: 33}, (_, i) => RULE_NAME(i + 1)), TIER,
+                                         name => (S.videoNames || []).indexOf(name) + 1, S.src?.name, true);
+  ovrTableWire($('ovrTable'), OVR, renderOverview, name => {
     $('ovr').style.display = 'none';
-    $('videoSelect').onchange({target: {value: el.dataset.open}});
+    $('videoSelect').onchange({target: {value: name}});
   });
 }
 $('ovrTiers').innerHTML = TIER.map(([lo, name, col], i) => `<span style="color:${col}">${lo}–${i ? TIER[i - 1][0] : 100} ${name}</span>`).join('')
@@ -4746,75 +4760,42 @@ $('ovrReload').onclick = () => overviewLoad(true);
 const localStamp = (d = new Date(), p = n => String(n).padStart(2, '0')) =>      // this computer's clock, not UTC
   `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 function overviewPage(print) {
-  const nos = Array.from({length: 33}, (_, i) => i + 1);
-  const rows = (OVR.data || []).filter(d => !d.error).map(d => ({
-    name: d.name, overall: d.overall, s: nos.map(n => d.scores[n] ?? null)}));
-  const payload = {rows, rules: nos.map(n => RULE_NAME(n)), tiers: TIER, sort: OVR.sort, desc: OVR.desc, by: OVR.by ?? null, print,
+  const data = (OVR.data || []).filter(d => !d.error).map(d => ({name: d.name, overall: d.overall, scores: d.scores}));
+  const nums = Object.fromEntries(data.map(d => [d.name, (S.videoNames || []).indexOf(d.name) + 1]));
+  // the table's own CSS, read off this page at export time: the file looks exactly like the viewer's table
+  const css = [...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules]; } catch { return []; } })
+    .filter(r => r.selectorText && (/(^|[\s,])\.(ovr-t|vn|tiers)\b/.test(r.selectorText) || r.selectorText === '.big'))   // .big: the page-wide
+    .map(r => r.cssText).join('\n');                                              // rule the Overall cells (td.oc.big) take too
+  const payload = {data, nums, names: Array.from({length: 33}, (_, i) => RULE_NAME(i + 1)), tiers: TIER, print,
+                   st: {sort: OVR.sort, desc: OVR.desc, by: OVR.by ?? null}, hint: OVR_HINT,
                    made: localStamp(), excl: exclWords(OVR.data || [])};
   const json = JSON.stringify(payload).replace(/</g, '\\u003c');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AMBO — round scores, all videos</title><style>
-:root { color-scheme: light; } body { font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; margin: 16px; color: #1c1c1e; background: #fff; }
-h1 { font-size: 18px; margin: 0 0 2px; } .m { color: #6e6e73; } .lg span { margin-right: 12px; font-weight: 600; } .lg { margin: 8px 0; }
-.wrap { overflow: auto; max-height: calc(100vh - 120px); } table { border-collapse: separate; border-spacing: 2px; }
-th { position: sticky; top: 0; background: #fff; z-index: 2; color: #6e6e73; font-weight: 600; cursor: pointer; vertical-align: bottom; user-select: none; }
-th.r { min-width: 30px; padding: 0 1px 4px; } th.r .v { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; display: block; margin: 0 auto 4px; font-weight: 500; max-height: 160px; overflow: hidden; text-overflow: ellipsis; }
-th.r .n { display: block; text-align: center; color: #1c1c1e; } th.on .v, th.on .n, th.on.nm { color: #007aff; }
-td.nm, th.nm { position: sticky; left: 0; background: #fff; z-index: 1; text-align: left; min-width: 260px; max-width: 360px; padding: 0 8px 0 2px; }
-th.nm { z-index: 3; } td.c { height: 24px; min-width: 30px; text-align: center; border-radius: 5px; font-weight: 600; font-variant-numeric: tabular-nums; }
-td.na { background: #f2f2f7; color: #aeaeb2; font-weight: 400; } td.big { min-width: 50px; }
-tr.med td { border-top: 1px solid #d1d1d6; } tr.med td.nm { color: #6e6e73; font-weight: 600; }
-td.nm { cursor: pointer; } tr.sel td.nm { color: #007aff; font-weight: 600; } tr.sel td.c { outline: 2px solid #007aff; outline-offset: -1px; }
-.vn { display: inline-block; min-width: 18px; margin-right: 6px; padding: 0 4px; border-radius: 4px; background: #f2f2f7; color: #6e6e73; font-size: 10px; text-align: center; }
-@media print { @page { size: A3 landscape; margin: 8mm; } body { margin: 0; font-size: 9px; } .wrap { overflow: visible; max-height: none; }
-  th, td.nm { position: static; } td.c { height: 16px; min-width: 22px; } th.r { min-width: 22px; } th.r .v { max-height: 120px; }
-  td.nm { min-width: 0; max-width: 300px; } .hint { display: none; } td, th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+:root { color-scheme: light; --panel-solid: #ffffff; --text: #1d1d1f; --text2: #6e6e73; --text3: #aeaeb2;
+  --sep: rgba(60,60,67,0.14); --fill: rgba(120,120,128,0.12); --accent: #007aff; }
+* { box-sizing: border-box; }
+body { font: 13px/1.38 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; letter-spacing: -0.01em; margin: 16px; color: var(--text); background: #fff; }
+h1 { font-size: 18px; margin: 0 0 2px; } .m { color: var(--text2); font-size: 12px; margin-bottom: 6px; }
+.wrap { overflow: auto; max-height: calc(100vh - 110px); }
+${css}
+@media print { @page { size: A3 landscape; margin: 8mm; } body { margin: 0; } .wrap { overflow: visible; max-height: none; }
+  .ovr-t th, .ovr-t td.on, .ovr-t th.oo, .ovr-t td.oc.big { position: static; } .hint { display: none; }
+  td, th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style></head><body><h1>AMBO — round scores, all videos</h1>
-<div class="m" id="sub"></div><div class="lg" id="lg"></div><div class="wrap"><table id="t"></table></div>
+<div class="m" id="sub"></div><div class="tiers" id="lg"></div><div class="wrap"><table class="ovr-t" id="t"></table></div>
 <script>
 const D = ${json};
-const tier = v => D.tiers.find(([lo]) => v >= lo);
-const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-const mix = (hex, a) => { const n = parseInt(hex.slice(1), 16); return \`rgba(\${n >> 16}, \${(n >> 8) & 255}, \${n & 255}, \${a})\`; };
-const cell = (v, big, title) => v == null ? '<td class="c na' + (big ? ' big' : '') + '" title="' + esc(title) + ': not rated">–</td>'
-  : '<td class="c' + (big ? ' big' : '') + '" style="background:' + mix(tier(v)[2], big ? .30 : .24) + (big ? ';color:' + tier(v)[2] : '') + '" title="' + esc(title) + ': ' + v + ' ' + tier(v)[1] + '">' + (big ? v.toFixed(1) : Math.round(v)) + '</td>';
-const val = (r, k) => k === 'overall' ? r.overall : k === 'name' ? r.name : r.s[k - 1];
-const median = k => { const v = D.rows.map(r => val(r, k)).filter(x => x != null).sort((a, b) => a - b);
-  return v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2) : null; };
-// the columns' order: rule number, or one video's own scores best to worst (D.by: its name) - not rated last
-const NUM = Object.fromEntries(D.rows.map((r, i) => [r.name, i + 1]));
-function columns() {
-  const nos = D.rules.map((_, i) => i + 1), r = D.rows.find(x => x.name === D.by);
-  if (!r) return nos;
-  return nos.sort((a, b) => (r.s[a - 1] == null) - (r.s[b - 1] == null) || r.s[b - 1] - r.s[a - 1] || a - b);
-}
+${ovrTableHTML.toString()}
+${ovrTableWire.toString()}
 function render() {
-  const cols = columns();
-  const rows = [...D.rows].sort((a, b) => {
-    if (D.sort === 'name') return (D.desc ? -1 : 1) * a.name.localeCompare(b.name);
-    const x = val(a, D.sort), y = val(b, D.sort);
-    return (x == null) - (y == null) || (D.desc ? y - x : x - y) || a.name.localeCompare(b.name); });
-  const ar = k => D.sort === k ? (D.desc ? ' ↓' : ' ↑') : '';
-  const head = '<tr><th class="nm' + (D.sort === 'name' ? ' on' : '') + '" data-k="name">Video' + ar('name') + '</th><th class="r' + (D.sort === 'overall' ? ' on' : '') + '" data-k="overall"><span class="v">Overall' + ar('overall') + '</span><span class="n">all</span></th>'
-    + cols.map(n => '<th class="r' + (D.sort === n ? ' on' : '') + '" data-k="' + n + '" title="' + n + ' · ' + esc(D.rules[n - 1]) + '"><span class="v">' + esc(D.rules[n - 1]) + ar(n) + '</span><span class="n">' + n + '</span></th>').join('') + '</tr>';
-  const body = rows.map(r => '<tr' + (r.name === D.by ? ' class="sel"' : '') + '><td class="nm" data-v="' + esc(r.name) + '" title="' + esc(r.name)
-    + ' — click: its 33 rules from best to worst, again: back to rule order"><span class="vn">' + NUM[r.name] + '</span>'
-    + esc(r.name) + (r.name === D.by ? ' ↓' : '') + '</td>'
-    + cell(r.overall, true, r.name + ' · overall') + cols.map(n => cell(r.s[n - 1], false, r.name + ' · ' + n + ' ' + D.rules[n - 1])).join('') + '</tr>').join('');
-  const med = '<tr class="med"><td class="nm">Median of ' + D.rows.length + ' videos</td>' + cell(median('overall'), true, 'median · overall')
-    + cols.map(n => cell(median(n), false, 'median · ' + n + ' ' + D.rules[n - 1])).join('') + '</tr>';
-  document.getElementById('t').innerHTML = '<thead>' + head + '</thead><tbody>' + body + '</tbody><tfoot>' + med + '</tfoot>';
-  document.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => {
-    const k = th.dataset.k === 'name' || th.dataset.k === 'overall' ? th.dataset.k : +th.dataset.k;
-    if (D.sort === k) D.desc = !D.desc; else { D.sort = k; D.desc = k !== 'name'; } render(); });
-  document.querySelectorAll('td.nm[data-v]').forEach(td => td.onclick = () => {
-    const v = td.dataset.v;
-    D.by = D.by === v ? null : v;
-    render(); });
+  const t = document.getElementById('t');
+  t.innerHTML = ovrTableHTML(D.data, D.st, D.names, D.tiers, name => D.nums[name], null, false);
+  ovrTableWire(t, D.st, render, () => {});
 }
-document.getElementById('sub').innerHTML = D.rows.length + ' videos · 33 rules, each video\\'s round score 0–100 · made ' + D.made
-  + (D.excl ? ' · ' + D.excl : '')
-  + '<span class="hint"> · click a column to sort the videos by it, again to reverse · click a video to order its 33 rules best to worst, again for rule order · hover a cell for the rule\\'s name</span>';
+document.getElementById('sub').innerHTML = D.data.length + ' videos · 33 rules, each video\\'s round score 0–100 · made ' + D.made
+  + (D.excl ? ' · ' + D.excl : '') + '<span class="hint"> · ' + D.hint + '</span>';
 document.getElementById('lg').innerHTML = D.tiers.map(([lo, n, c], i) => '<span style="color:' + c + '">' + lo + '–' + (i ? D.tiers[i - 1][0] : 100) + ' ' + n + '</span>').join('')
   + '<span style="color:#8e8e93">– not rated</span>';
 render();

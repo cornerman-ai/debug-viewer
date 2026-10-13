@@ -159,7 +159,9 @@ pipeline re-run. Esc or a click outside closes it.
 **Export HTML** saves the table as one self-contained file (`ambo_round_scores_<date>.html`, about 22 KB for 56 videos):
 the data and a few lines of sorting inlined, no network, so anyone can open it in a browser offline and sort any column
 (click again to reverse), and click a video to order the columns by its own scores, best to worst (again: back to
-rule order); it opens in the order the table had. **Export PDF** opens the same page, sorted as on screen, and the browser's print dialog
+rule order); it opens in the order the table had. It is the viewer's table itself - the same function builds and sorts
+it (`ovrTableHTML` / `ovrTableWire`, embedded as they are) and the page's own table styles are copied in at export,
+so it looks and works exactly like the table here, minus the ↗ (there is no viewer to open). **Export PDF** opens the same page, sorted as on screen, and the browser's print dialog
 (A3 landscape; choose Save as PDF). A PDF cannot sort - script in a PDF runs in Adobe Acrobat / Reader only, not in
 browsers, Preview or most phone viewers (looked up 2026-10-12) - so the HTML is the file to send; the PDF is for print.
 
