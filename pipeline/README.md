@@ -141,24 +141,25 @@ the presence floor exactly as the pipeline does (`visAt`).
 
 **Stance.** The line under the video's name ends with `stance: orthodox` / `southpaw` — the stance the run used (who
 was mirrored), and in brackets how the backend's `stance` stage decided (`stance/stance.json`: the front foot on its
-voting frames — up to 15, at least 1 s apart, an odd count — or no answer and taken as orthodox; since 2026-10-09). The All videos table puts the same word before
-each video's name, southpaws in orange. After it, `gloves: yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand
-points' shape, gloves from 0.50; no rule reads it yet), and in the table `gloves` (blue) / `bare` before the name. Then `training: bag work / shadowboxing (P(bag) X)` from the
-`bagwork` stage (`bagwork/bagwork.json`: a logistic regression on how hidden the hands are, the framing and the punches;
-no rule reads it yet), and in the table `bag` (purple) / `shadow`.
+voting frames — up to 15, at least 1 s apart, an odd count — or no answer and taken as orthodox; since 2026-10-09).
+After it, `gloves: yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand points' shape, gloves
+from 0.50; no rule reads it yet), then `training: bag work / shadowboxing (P(bag) X)` from the `bagwork` stage
+(`bagwork/bagwork.json`: a logistic regression on how hidden the hands are, the framing and the punches; no rule reads
+it yet).
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
 are videos, columns are the overall round score and rules 1–33, each cell the 0–100 score tinted in its tier's colour
 ("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
 timeline CSVs and the facing curve, which no round score needs (checked equal to the full read on all 495 cells,
 2026-10-02), and scored by the same code as the Rules tab, so a cell always equals what that video's Round score card
-says. A median row closes the table. Click any column header to sort by it (click again to flip), a video's name to
-open it. Read once per folder (about 80 s for 29 videos over the local server, 2026-10-07) and kept; **Reload** re-reads after a
+says. A median row closes the table; each video is its number and its name. Click any column header to sort the
+videos by it (click again to flip); click a video to order the 33 rule columns by its own scores, best to worst (again:
+back to rule order); ↗ beside the name opens the video. Read once per folder (about 80 s for 29 videos over the local server, 2026-10-07) and kept; **Reload** re-reads after a
 pipeline re-run. Esc or a click outside closes it.
 **Export HTML** saves the table as one self-contained file (`ambo_round_scores_<date>.html`, about 22 KB for 56 videos):
 the data and a few lines of sorting inlined, no network, so anyone can open it in a browser offline and sort any column
-(click again to reverse), and click a video to order the columns by its own scores, best to worst (again: worst
-to best, a third time: back to rule order). **Export PDF** opens the same page, sorted as on screen, and the browser's print dialog
+(click again to reverse), and click a video to order the columns by its own scores, best to worst (again: back to
+rule order); it opens in the order the table had. **Export PDF** opens the same page, sorted as on screen, and the browser's print dialog
 (A3 landscape; choose Save as PDF). A PDF cannot sort - script in a PDF runs in Adobe Acrobat / Reader only, not in
 browsers, Preview or most phone viewers (looked up 2026-10-12) - so the HTML is the file to send; the PDF is for print.
 
