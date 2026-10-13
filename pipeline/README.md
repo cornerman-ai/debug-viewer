@@ -155,7 +155,8 @@ timeline CSVs and the facing curve, which no round score needs (checked equal to
 2026-10-02), and scored by the same code as the Rules tab, so a cell always equals what that video's Round score card
 says. A median row closes the table; each video is its number and its name. It only sorts: a rule's header (or
 Overall) sorts the videos by it, best to worst; a video sorts the 33 rule columns by its scores, best to worst; the two
-buttons in the corner put them back in number order (**Videos 1→N**, **Rules 1→33**). Not rated always goes last. It
+buttons in the corner put them back in number order (**Videos 1→N**, **Rules 1→33**), and **Videos by overall** sorts
+the videos by their overall score, best to worst (as Overall's header does). Not rated always goes last. It
 opens with the videos and the rules in number order. Read once per folder (about 80 s for 29 videos over the local server, 2026-10-07) and kept; **Reload** re-reads after a
 pipeline re-run. Esc or a click outside closes it.
 **Export HTML** saves the table as one self-contained file (`ambo_round_scores_<date>.html`, about 22 KB for 56 videos):
