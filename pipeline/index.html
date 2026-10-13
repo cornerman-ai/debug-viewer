@@ -4755,6 +4755,7 @@ td.nm, th.nm { position: sticky; left: 0; background: #fff; z-index: 1; text-ali
 th.nm { z-index: 3; } td.c { height: 24px; min-width: 30px; text-align: center; border-radius: 5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 td.na { background: #f2f2f7; color: #aeaeb2; font-weight: 400; } td.big { min-width: 50px; } .t { font-size: 10px; color: #6e6e73; margin-right: 4px; }
 tr.med td { border-top: 1px solid #d1d1d6; } tr.med td.nm { color: #6e6e73; font-weight: 600; }
+td.nm { cursor: pointer; } tr.sel td.nm { color: #007aff; font-weight: 600; } tr.sel td.c { outline: 2px solid #007aff; outline-offset: -1px; }
 @media print { @page { size: A3 landscape; margin: 8mm; } body { margin: 0; font-size: 9px; } .wrap { overflow: visible; max-height: none; }
   th, td.nm { position: static; } td.c { height: 16px; min-width: 22px; } th.r { min-width: 22px; } th.r .v { max-height: 120px; }
   td.nm { min-width: 0; max-width: 300px; } .hint { display: none; } td, th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
@@ -4770,26 +4771,41 @@ const cell = (v, big, title) => v == null ? '<td class="c na' + (big ? ' big' : 
 const val = (r, k) => k === 'overall' ? r.overall : k === 'name' ? r.name : r.s[k - 1];
 const median = k => { const v = D.rows.map(r => val(r, k)).filter(x => x != null).sort((a, b) => a - b);
   return v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2) : null; };
+// the columns' order: rule number, or one video's own scores (D.by: its name, D.byDesc: best first) - not rated last
+D.by = null; D.byDesc = true;
+function columns() {
+  const nos = D.rules.map((_, i) => i + 1), r = D.rows.find(x => x.name === D.by);
+  if (!r) return nos;
+  return nos.sort((a, b) => (r.s[a - 1] == null) - (r.s[b - 1] == null)
+    || (D.byDesc ? r.s[b - 1] - r.s[a - 1] : r.s[a - 1] - r.s[b - 1]) || a - b);
+}
 function render() {
+  const cols = columns();
   const rows = [...D.rows].sort((a, b) => {
     if (D.sort === 'name') return (D.desc ? -1 : 1) * a.name.localeCompare(b.name);
     const x = val(a, D.sort), y = val(b, D.sort);
     return (x == null) - (y == null) || (D.desc ? y - x : x - y) || a.name.localeCompare(b.name); });
   const ar = k => D.sort === k ? (D.desc ? ' ↓' : ' ↑') : '';
   const head = '<tr><th class="nm' + (D.sort === 'name' ? ' on' : '') + '" data-k="name">Video' + ar('name') + '</th><th class="r' + (D.sort === 'overall' ? ' on' : '') + '" data-k="overall"><span class="v">Overall' + ar('overall') + '</span><span class="n">all</span></th>'
-    + D.rules.map((r, i) => '<th class="r' + (D.sort === i + 1 ? ' on' : '') + '" data-k="' + (i + 1) + '" title="' + (i + 1) + ' · ' + esc(r) + '"><span class="v">' + esc(r) + ar(i + 1) + '</span><span class="n">' + (i + 1) + '</span></th>').join('') + '</tr>';
-  const body = rows.map(r => '<tr><td class="nm" title="' + esc(r.name) + '">' + r.tags.map(t => '<span class="t">' + esc(t) + '</span>').join('') + esc(r.name) + '</td>'
-    + cell(r.overall, true, r.name + ' · overall') + r.s.map((v, i) => cell(v, false, r.name + ' · ' + (i + 1) + ' ' + D.rules[i])).join('') + '</tr>').join('');
+    + cols.map(n => '<th class="r' + (D.sort === n ? ' on' : '') + '" data-k="' + n + '" title="' + n + ' · ' + esc(D.rules[n - 1]) + '"><span class="v">' + esc(D.rules[n - 1]) + ar(n) + '</span><span class="n">' + n + '</span></th>').join('') + '</tr>';
+  const body = rows.map(r => '<tr' + (r.name === D.by ? ' class="sel"' : '') + '><td class="nm" data-v="' + esc(r.name) + '" title="' + esc(r.name)
+    + ' — click: its rules best to worst, again: worst to best, again: in rule order">' + r.tags.map(t => '<span class="t">' + esc(t) + '</span>').join('')
+    + esc(r.name) + (r.name === D.by ? (D.byDesc ? ' ↓' : ' ↑') : '') + '</td>'
+    + cell(r.overall, true, r.name + ' · overall') + cols.map(n => cell(r.s[n - 1], false, r.name + ' · ' + n + ' ' + D.rules[n - 1])).join('') + '</tr>').join('');
   const med = '<tr class="med"><td class="nm">Median of ' + D.rows.length + ' videos</td>' + cell(median('overall'), true, 'median · overall')
-    + D.rules.map((r, i) => cell(median(i + 1), false, 'median · ' + (i + 1) + ' ' + r)).join('') + '</tr>';
+    + cols.map(n => cell(median(n), false, 'median · ' + n + ' ' + D.rules[n - 1])).join('') + '</tr>';
   document.getElementById('t').innerHTML = '<thead>' + head + '</thead><tbody>' + body + '</tbody><tfoot>' + med + '</tfoot>';
   document.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => {
     const k = th.dataset.k === 'name' || th.dataset.k === 'overall' ? th.dataset.k : +th.dataset.k;
     if (D.sort === k) D.desc = !D.desc; else { D.sort = k; D.desc = k !== 'name'; } render(); });
+  document.querySelectorAll('td.nm[data-v]').forEach(td => td.onclick = () => {
+    const v = td.dataset.v;
+    if (D.by !== v) { D.by = v; D.byDesc = true; } else if (D.byDesc) D.byDesc = false; else D.by = null;
+    render(); });
 }
 document.getElementById('sub').innerHTML = D.rows.length + ' videos · 33 rules, each video\\'s round score 0–100 · made ' + D.made
   + (D.excl ? ' · ' + D.excl : '')
-  + '<span class="hint"> · click a column to sort it, again to reverse · hover a cell for the rule\\'s name</span>';
+  + '<span class="hint"> · click a column to sort the videos by it, again to reverse · click a video to order its rules best to worst, again worst to best, again back · hover a cell for the rule\\'s name</span>';
 document.getElementById('lg').innerHTML = D.tiers.map(([lo, n, c], i) => '<span style="color:' + c + '">' + lo + '–' + (i ? D.tiers[i - 1][0] : 100) + ' ' + n + '</span>').join('')
   + '<span style="color:#8e8e93">– not rated</span>';
 render();

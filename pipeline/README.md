@@ -157,7 +157,8 @@ open it. Read once per folder (about 80 s for 29 videos over the local server, 2
 pipeline re-run. Esc or a click outside closes it.
 **Export HTML** saves the table as one self-contained file (`ambo_round_scores_<date>.html`, about 22 KB for 56 videos):
 the data and a few lines of sorting inlined, no network, so anyone can open it in a browser offline and sort any column
-(click again to reverse). **Export PDF** opens the same page, sorted as on screen, and the browser's print dialog
+(click again to reverse), and click a video to order the columns by its own scores, best to worst (again: worst
+to best, a third time: back to rule order). **Export PDF** opens the same page, sorted as on screen, and the browser's print dialog
 (A3 landscape; choose Save as PDF). A PDF cannot sort - script in a PDF runs in Adobe Acrobat / Reader only, not in
 browsers, Preview or most phone viewers (looked up 2026-10-12) - so the HTML is the file to send; the PDF is for print.
 
