@@ -221,8 +221,10 @@
                        font-weight: 500; max-height: 150px; overflow: hidden; text-overflow: ellipsis; }
   .ovr-t th.orh .orn { display: block; text-align: center; color: var(--text); }
   .ovr-t th.sorted .orn, .ovr-t th.sorted .orv { color: var(--accent); }
-  .ovr-t .oopen { float: right; margin-left: 6px; padding: 0 5px; border-radius: 5px; color: var(--text2); font-weight: 600; }
-  .ovr-t .oopen:hover { background: var(--fill); color: var(--accent); }
+  .ovr-t .osort { display: inline-block; margin: 0 4px 4px 0; padding: 2px 8px; border-radius: 6px; background: var(--fill);
+                  color: var(--text2); font-weight: 600; cursor: pointer; }
+  .ovr-t .osort:hover { color: var(--accent); } .ovr-t .osort.on { background: var(--accent); color: #fff; }
+  .ovr-t th.on { vertical-align: bottom; padding-bottom: 2px; }
   .ovr-t tr.by td.on { color: var(--accent); font-weight: 600; } .ovr-t tr.by td.oc { outline: 2px solid var(--accent); outline-offset: -1px; }
   .ovr-t th.on, .ovr-t td.on { position: sticky; left: 0; z-index: 3; background: var(--panel-solid); text-align: left; max-width: 260px;
                                min-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 8px 0 2px; }
@@ -234,8 +236,6 @@
   .ovr-t td.oc.big { position: sticky; left: 262px; z-index: 1; min-width: 54px; color: var(--c);
                      background: color-mix(in srgb, var(--c) 18%, var(--panel-solid)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 50%, transparent); }
   .ovr-t td.oc.na { background: var(--fill); color: var(--text3); font-weight: 400; }
-  .ovr-t tr.cur td.on { color: var(--accent); }
-  .ovr-t tr.cur td.on::before { content: '▶ '; }
   .ovr-t tr.omed td { border-top: 1px solid var(--sep); }
   .ovr-t tr.omed td.on { color: var(--text2); font-weight: 600; }
   .ovr-t td.oerr { color: var(--text2); font-style: italic; }
@@ -2306,7 +2306,8 @@ async function useHttp(base, want) {
 }
 async function httpList(base) {
   const html = await (await fetch(base + 'pipeline_tests/')).text();
-  return [...html.matchAll(/href="([^"]+)\/"/g)].map(m => decodeURIComponent(m[1])).filter(n => !n.startsWith('.'));
+  // sorted as the folder picker sorts (plain code-point order), so a video has the same number however it was opened
+  return [...html.matchAll(/href="([^"]+)\/"/g)].map(m => decodeURIComponent(m[1])).filter(n => !n.startsWith('.')).sort();
 }
 
 // ════════════════════════════ state ════════════════════════════
@@ -4658,7 +4659,7 @@ function overallOf(rows) {
   const sum = pts.reduce((a, b) => a + b, 0), max = 4 * pts.length;
   return {overall: max ? Math.round(1000 * sum / max) / 10 : null, pts: sum, max, rated: pts.length};
 }
-const OVR = {data: null, loading: false, sort: 'overall', desc: true, by: null};   // by: the video whose rules order the columns
+const OVR = {data: null, loading: false, sort: 'num', by: null};   // sort: 'num' / 'overall' / a rule; by: the video ordering the rules
 async function overviewLoad(force) {
   $('ovr').style.display = '';
   if (OVR.loading || (OVR.data && !force)) return renderOverview();
@@ -4686,18 +4687,19 @@ async function overviewLoad(force) {
 }
 // The All videos table as HTML - ONE definition for the viewer and the exported file (overviewPage embeds this
 // function's own source, and ovrTableWire's), so the two always look and sort the same. It reads nothing outside its
-// arguments: data [{name, overall, scores: {n: score}, error?}], st {sort, desc, by} (by: the video whose own scores
-// order the rule columns, best to worst), names[n - 1] the rule names, tiers (TIER), num(name) the video's number,
-// cur the open video's name (or null), open: draw the ↗ that opens a video.
-function ovrTableHTML(data, st, names, tiers, num, cur, open) {
+// arguments: data [{name, overall, scores: {n: score}, error?}], st {sort, by} - sort: 'num' (the videos in their
+// number order) or 'overall' / a rule number (the videos by it, best to worst); by: null (the rules in number order)
+// or a video's name (the rules by its scores, best to worst) - names[n - 1] the rule names, tiers (TIER), num(name)
+// the video's number. Not rated always goes last.
+function ovrTableHTML(data, st, names, tiers, num) {
   const nos = names.map((_, i) => i + 1);
   const tierOf = v => tiers.find(([lo]) => v >= lo);
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const val = (d, k) => k === 'overall' ? d.overall : d.scores?.[k];
   const sorted = [...data].sort((a, b) => {
-    if (st.sort === 'name') return (st.desc ? -1 : 1) * a.name.localeCompare(b.name);
+    if (st.sort === 'num') return num(a.name) - num(b.name);
     const x = val(a, st.sort), y = val(b, st.sort);
-    return (x == null) - (y == null) || (st.desc ? y - x : x - y) || a.name.localeCompare(b.name);   // not rated last
+    return (x == null) - (y == null) || y - x || num(a.name) - num(b.name);
   });
   const median = k => { const v = data.filter(d => !d.error).map(d => val(d, k)).filter(x => x != null).sort((a, b) => a - b);
     return v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2) : null; };
@@ -4706,45 +4708,41 @@ function ovrTableHTML(data, st, names, tiers, num, cur, open) {
     return v == null ? `<td class="oc na${big ? ' big' : ''}" title="${title}: not rated">–</td>`
       : `<td class="oc${big ? ' big' : ''}" style="--c:${t[2]}" title="${title}: ${v} ${t[1]}">${big ? v.toFixed(1) : Math.round(v)}</td>`;
   };
-  const arrow = k => st.sort === k ? (st.desc ? ' ↓' : ' ↑') : '';
-  const by = data.find(d => !d.error && d.name === st.by);                 // its rules best to worst, not rated last
+  const arrow = k => st.sort === k ? ' ↓' : '';
+  const by = data.find(d => !d.error && d.name === st.by);
   const cols = !by ? nos : [...nos].sort((a, b) => (by.scores[a] == null) - (by.scores[b] == null) || by.scores[b] - by.scores[a] || a - b);
-  const head = `<tr><th class="on" data-sort="name">Video${arrow('name')}</th><th class="oo" data-sort="overall">Overall${arrow('overall')}</th>` +
-    cols.map(n => `<th class="orh${st.sort === n ? ' sorted' : ''}" data-sort="${n}" title="${n} · ${esc(names[n - 1])} — click to sort">` +
+  const ok = data.filter(d => !d.error).length;
+  const head = `<tr><th class="on"><span class="osort${st.sort === 'num' ? ' on' : ''}" data-num title="the videos in their number order">Videos 1→${ok}</span>` +
+      `<span class="osort${!by ? ' on' : ''}" data-rules title="the rules in their number order">Rules 1→${nos.length}</span></th>` +
+    `<th class="oo" data-sort="overall" title="sort the videos by their overall score, best to worst">Overall${arrow('overall')}</th>` +
+    cols.map(n => `<th class="orh${st.sort === n ? ' sorted' : ''}" data-sort="${n}" title="${n} · ${esc(names[n - 1])} — click: the videos by it, best to worst">` +
       `<span class="orv">${esc(names[n - 1])}${arrow(n)}</span><span class="orn">${n}</span></th>`).join('') + '</tr>';
   const body = sorted.map(d => d.error
     ? `<tr><td class="on" title="${esc(d.name)}">${esc(d.name)}</td><td colspan="34" class="oerr">could not read: ${esc(d.error)}</td></tr>`
-    : `<tr class="${[d.name === cur ? 'cur' : '', d.name === st.by ? 'by' : ''].join(' ').trim()}"><td class="on" data-by="${esc(d.name)}" title="${esc(d.name)} — click: its 33 rules from best to worst, again: back to rule order">` +
-      (open ? `<span class="oopen" data-open="${esc(d.name)}" title="open this video">↗</span>` : '') +
-      `<span class="vn">${num(d.name)}</span> ${esc(d.name)}${d.name === st.by ? ' ↓' : ''}</td>` +
+    : `<tr class="${d.name === st.by ? 'by' : ''}"><td class="on" data-by="${esc(d.name)}" title="${esc(d.name)} — click: its rules, best to worst">` +
+      `<span class="vn">${num(d.name)}</span> ${esc(d.name)}</td>` +
       cell(d.overall, `${esc(d.name)} · overall`, true) + cols.map(n => cell(d.scores[n], `${esc(d.name)} · ${n} ${esc(names[n - 1])}`)).join('') + '</tr>').join('');
-  const ok = data.filter(d => !d.error).length;
   const foot = ok ? `<tr class="omed"><td class="on">Median of ${ok} videos</td>` +
     cell(median('overall'), 'median · overall', true) + cols.map(n => cell(median(n), `median · ${n} ${esc(names[n - 1])}`)).join('') + '</tr>' : '';
   return `<thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot>`;
 }
-// its clicks, the same in both: a header sorts the videos (again: the other way), a video orders the rule columns by its
-// own scores (again: back to rule order), ↗ calls onOpen(name)
-function ovrTableWire(table, st, rerender, onOpen) {
+// its clicks, the same in both: a rule (or Overall) sorts the videos by it, a video sorts the rules by it, both best to
+// worst; "Videos 1→N" and "Rules 1→33" put them back in number order
+function ovrTableWire(table, st, rerender) {
   table.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
-    const k = th.dataset.sort === 'name' || th.dataset.sort === 'overall' ? th.dataset.sort : +th.dataset.sort;
-    if (st.sort === k) st.desc = !st.desc; else { st.sort = k; st.desc = k !== 'name'; }
-    rerender();
-  });
-  table.querySelectorAll('td[data-by]').forEach(td => td.onclick = () => { st.by = st.by === td.dataset.by ? null : td.dataset.by; rerender(); });
-  table.querySelectorAll('[data-open]').forEach(el => el.onclick = e => { e.stopPropagation(); onOpen(el.dataset.open); });
+    st.sort = th.dataset.sort === 'overall' ? 'overall' : +th.dataset.sort; rerender(); });
+  table.querySelectorAll('td[data-by]').forEach(td => td.onclick = () => { st.by = td.dataset.by; rerender(); });
+  table.querySelector('[data-num]').onclick = () => { st.sort = 'num'; rerender(); };
+  table.querySelector('[data-rules]').onclick = () => { st.by = null; rerender(); };
 }
-const OVR_HINT = 'click a column to sort the videos by it, a video to order its rules best to worst';
+const OVR_HINT = 'click a rule to sort the videos by it, a video to sort the rules by it (best to worst) · Videos 1→N, Rules 1→33: back to number order';
 function renderOverview() {
   const data = OVR.data || [], n = (S.videoNames || []).length;
-  $('ovrStatus').textContent = OVR.loading ? `reading ${data.length} of ${n} videos…` : `${data.length} videos · ${OVR_HINT}, ↗ to open it`;
+  $('ovrStatus').textContent = OVR.loading ? `reading ${data.length} of ${n} videos…` : `${data.length} videos · ${OVR_HINT}`;
   $('ovrHtml').disabled = $('ovrPdf').disabled = OVR.loading || !data.some(d => !d.error);
   $('ovrTable').innerHTML = ovrTableHTML(data, OVR, Array.from({length: 33}, (_, i) => RULE_NAME(i + 1)), TIER,
-                                         name => (S.videoNames || []).indexOf(name) + 1, S.src?.name, true);
-  ovrTableWire($('ovrTable'), OVR, renderOverview, name => {
-    $('ovr').style.display = 'none';
-    $('videoSelect').onchange({target: {value: name}});
-  });
+                                         name => (S.videoNames || []).indexOf(name) + 1);
+  ovrTableWire($('ovrTable'), OVR, renderOverview);
 }
 $('ovrTiers').innerHTML = TIER.map(([lo, name, col], i) => `<span style="color:${col}">${lo}–${i ? TIER[i - 1][0] : 100} ${name}</span>`).join('')
   + '<span style="color:#8e8e93">– not rated</span>';
@@ -4765,7 +4763,7 @@ function overviewPage(print) {
     .filter(r => r.selectorText && (/(^|[\s,])\.(ovr-t|vn|tiers)\b/.test(r.selectorText) || r.selectorText === '.big'))   // .big: the page-wide
     .map(r => r.cssText).join('\n');                                              // rule the Overall cells (td.oc.big) take too
   const payload = {data, nums, names: Array.from({length: 33}, (_, i) => RULE_NAME(i + 1)), tiers: TIER, print,
-                   st: {sort: OVR.sort, desc: OVR.desc, by: OVR.by ?? null}, hint: OVR_HINT,
+                   st: {sort: OVR.sort, by: OVR.by ?? null}, hint: OVR_HINT,
                    made: localStamp(), excl: exclWords(OVR.data || [])};
   const json = JSON.stringify(payload).replace(/</g, '\\u003c');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -4789,8 +4787,8 @@ ${ovrTableHTML.toString()}
 ${ovrTableWire.toString()}
 function render() {
   const t = document.getElementById('t');
-  t.innerHTML = ovrTableHTML(D.data, D.st, D.names, D.tiers, name => D.nums[name], null, false);
-  ovrTableWire(t, D.st, render, () => {});
+  t.innerHTML = ovrTableHTML(D.data, D.st, D.names, D.tiers, name => D.nums[name]);
+  ovrTableWire(t, D.st, render);
 }
 document.getElementById('sub').innerHTML = D.data.length + ' videos · 33 rules, each video\\'s round score 0–100 · made ' + D.made
   + (D.excl ? ' · ' + D.excl : '') + '<span class="hint"> · ' + D.hint + '</span>';

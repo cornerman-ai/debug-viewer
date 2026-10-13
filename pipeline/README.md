@@ -153,16 +153,16 @@ are videos, columns are the overall round score and rules 1–33, each cell the 
 ("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
 timeline CSVs and the facing curve, which no round score needs (checked equal to the full read on all 495 cells,
 2026-10-02), and scored by the same code as the Rules tab, so a cell always equals what that video's Round score card
-says. A median row closes the table; each video is its number and its name. Click any column header to sort the
-videos by it (click again to flip); click a video to order the 33 rule columns by its own scores, best to worst (again:
-back to rule order); ↗ beside the name opens the video. Read once per folder (about 80 s for 29 videos over the local server, 2026-10-07) and kept; **Reload** re-reads after a
+says. A median row closes the table; each video is its number and its name. It only sorts: a rule's header (or
+Overall) sorts the videos by it, best to worst; a video sorts the 33 rule columns by its scores, best to worst; the two
+buttons in the corner put them back in number order (**Videos 1→N**, **Rules 1→33**). Not rated always goes last. It
+opens with the videos and the rules in number order. Read once per folder (about 80 s for 29 videos over the local server, 2026-10-07) and kept; **Reload** re-reads after a
 pipeline re-run. Esc or a click outside closes it.
 **Export HTML** saves the table as one self-contained file (`ambo_round_scores_<date>.html`, about 22 KB for 56 videos):
 the data and a few lines of sorting inlined, no network, so anyone can open it in a browser offline and sort any column
-(click again to reverse), and click a video to order the columns by its own scores, best to worst (again: back to
-rule order); it opens in the order the table had. It is the viewer's table itself - the same function builds and sorts
-it (`ovrTableHTML` / `ovrTableWire`, embedded as they are) and the page's own table styles are copied in at export,
-so it looks and works exactly like the table here, minus the ↗ (there is no viewer to open). **Export PDF** opens the same page, sorted as on screen, and the browser's print dialog
+in the same four ways as the table here, and opens in the order the table had. It is the viewer's table itself - the
+same function builds and sorts it (`ovrTableHTML` / `ovrTableWire`, embedded as they are) and the page's own table
+styles are copied in at export, so it looks and works exactly like the table here. **Export PDF** opens the same page, sorted as on screen, and the browser's print dialog
 (A3 landscape; choose Save as PDF). A PDF cannot sort - script in a PDF runs in Adobe Acrobat / Reader only, not in
 browsers, Preview or most phone viewers (looked up 2026-10-12) - so the HTML is the file to send; the PDF is for print.
 
