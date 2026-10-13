@@ -14,7 +14,8 @@ The stage folders are written by the backend's `combined_pipeline/rules_creation
 
 ## Opening it
 
-Chrome or Edge (it reads folders with the File System Access API) and Google Drive for desktop. **Open Folder…**:
+Chrome or Edge (it reads folders with the File System Access API) and Google Drive for desktop. **Open Folder…** on the
+start screen (the header has no folder button: reload the page to pick another folder):
 
 - the Ambo **data** folder → a picker of every video folder in `pipeline_tests/`, numbered in alphabetical order (a
   new video shifts the numbers after it; the All videos table shows the same numbers) and searchable: click it or

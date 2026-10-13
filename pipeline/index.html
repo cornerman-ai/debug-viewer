@@ -390,7 +390,6 @@
   </div>
   <div class="sub num" id="subtitle"></div>
   <div class="spacer"></div>
-  <a class="btn" href="../" title="the frame-by-frame rule debug viewer">Rule debug viewer</a>
   <select class="btn" id="videoSelect" style="display:none" title="video folders in pipeline_tests"></select>
   <div class="vpick" id="vpick" style="display:none">
     <button class="btn vpick-btn" id="vpickBtn" title="pick a video — press / to search"><span class="vn" id="vpickNo"></span><span class="vt" id="vpickName"></span></button>
@@ -401,7 +400,6 @@
     </div>
   </div>
   <button class="btn" id="allBtn" style="display:none" title="every video's round scores in one table">All videos</button>
-  <button class="btn" id="openBtn">Open Folder…</button>
 </div>
 
 <div class="welcome" id="welcome">
@@ -2654,7 +2652,7 @@ async function guard(fn) {
   }
 }
 const openFlow = () => guard(async () => { const h = await pickDir(); $('guideCheck').innerHTML = ''; await openHandle(h); });
-$('openBtn').onclick = openFlow; $('welcomeOpen').onclick = openFlow;
+$('welcomeOpen').onclick = openFlow;
 $('linkData').onclick = () => guard(async () => {
   const h = await pickDir();
   if (!(await hasEntry(h, 'raw_videos'))) throw await folderError(h, `“${h.name}” is not the Ambo data folder (no raw_videos inside).`);
