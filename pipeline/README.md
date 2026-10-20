@@ -141,8 +141,13 @@ the judged minimum (10 punches / combos / moves, 5 s of judged frames) and the t
 the presence floor exactly as the pipeline does (`visAt`).
 
 **Stance.** The line under the video's name ends with `stance: orthodox` / `southpaw` — the stance the run used (who
-was mirrored), and in brackets how the backend's `stance` stage decided (`stance/stance.json`: the front foot on its
-voting frames — up to 15, at least 1 s apart, an odd count — or no answer and taken as orthodox; since 2026-10-09).
+was mirrored), and in brackets how the backend's `stance` stage decided (`stance/stance.json`: since 2026-10-20 the
+clear frames each way, the majority deciding — or no answer and taken as orthodox; a folder from 2026-10-09 to 10-20
+shows its 15 voting frames instead). The **Stance** row under Facing (`stance/runs.csv`, since 2026-10-20) is the
+stance on every frame: orthodox (teal) / southpaw (purple) where the feet are clearly apart along the facing direction
+and the hips are turned, a thin grey line where it is unclear — the tooltip says why (no reading / feet together / hips
+square); the pill on the video names the frame's stance. Read on the raw skeleton, so never flipped back. Short flips
+are mostly noise: on the 56 test videos 91 % of the clear frames against the video's stance sit in runs under 1 s.
 After it, `gloves: yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand points' shape, gloves
 from 0.50; no rule reads it yet), then `training: bag work / shadowboxing (P(bag) X)` from the `bagwork` stage
 (`bagwork/bagwork.json`: a logistic regression on how hidden the hands are, the framing and the punches; no rule reads

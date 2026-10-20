@@ -945,6 +945,11 @@ const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that h
 // gated rule reads its own window — since 2026-10-06 side-on 65–115°, front / back 0–25° + 155–180° — shown beside
 // its badges)
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
+// the Stance row (stance/runs.csv, ml/research/stance/stance.py's frame_states): its colours and why a frame is unclear
+const STANCEROW = {orthodox: '#30b0c7', southpaw: '#bf5af2', unclear: '#8e8e93'};
+const STANCEWHY = {no_reading: 'no reading (hips or ankles not seen, or no facing angle)',
+                   feet_together: 'the feet not clearly apart along the facing direction',
+                   hips_square: 'the hips square (turned less than the bladedness cut)'};
 // Which band a frame is in — the facing row's cuts. null when there is no pose or no angle there.
 const faceBand = f => {
   if (!S.hasAngle || !S.pose?.[f]) return null;
@@ -2320,7 +2325,7 @@ const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
-V.base = {angle: true, lead: true, rear: true, def: true, rs: true};
+V.base = {angle: true, stance: true, lead: true, rear: true, def: true, rs: true};
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
 // the sub-switches under Lead / Rear / Defense / Defense 2.0: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
@@ -2368,13 +2373,14 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th, rsCsv, rsSum, stj, glj, bwj, exj] = await Promise.all([
+  const [pjs, angleCsv, defCsv, impCsv, th, rsCsv, rsSum, stj, glj, bwj, exj, stRuns] = await Promise.all([
     jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
     lite ? null : txt(STAGES.rollsSlips), lite ? null : jsn(['rolls_slips', 'rolls_slips.json']),
     jsn(['stance', 'stance.json']),                         // the stance stage (2026-10-09): who run_all mirrored, and why
     jsn(['gloves', 'gloves.json']),                         // the gloves stage (2026-10-09): no rule reads it yet
     jsn(['bagwork', 'bagwork.json']),                       // the bagwork stage (2026-10-10): no rule reads it yet
-    jsn(['excluded_segments.json'])]);                      // the excluded time (2026-10-12): see N.excl below
+    jsn(['excluded_segments.json']),                        // the excluded time (2026-10-12): see N.excl below
+    lite ? null : txt(['stance', 'runs.csv'])]);            // every frame's stance (2026-10-20): the Stance row
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
@@ -2397,6 +2403,10 @@ async function buildVideo(src, sig, lite = false) {
   N.rollsSlips = (rsCsv ? parseCSV(rsCsv) : []).map(r => ({
     kind: 'rs', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, score: +r.score,
     facing: +r.facing_mean, source: r.source})).sort((a, b) => a.sf - b.sf);
+  // the Stance row (stance/runs.csv): the stance on every frame, read on the raw skeleton, so never flipped back
+  N.stanceRuns = (stRuns ? parseCSV(stRuns) : []).map(r => ({
+    kind: 'st', sf: +r.start_frame, ef: +r.end_frame, state: r.state, reason: r.reason}));
+  N.hasStanceRuns = N.stanceRuns.length > 0;
   N.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
     kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share,
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
@@ -2433,7 +2443,12 @@ async function buildVideo(src, sig, lite = false) {
 }
 
 // how the stance stage decided (stance/stance.json): its 15 votes, or no answer; nothing for a folder from before it
+// (before 2026-10-20), or since then the majority of every clear frame
 const stanceWhy = (st = S.stanceInfo) => !st ? ''
+  : st.orthodox_frames != null ? (st.source === 'classifier'
+    ? ` (clear frames: ${st.orthodox_frames.toLocaleString()} orthodox, ${st.southpaw_frames.toLocaleString()} southpaw)`
+    : ` (no answer — ${st.orthodox_frames + st.southpaw_frames ? `clear frames ${st.orthodox_frames} orthodox, ${st.southpaw_frames} southpaw, ` : ''}`
+      + `under ${st.min_votes} of them ${st.spacing_s} s apart or a tie — taken as ${st.stance})`)
   : st.source === 'classifier' ? ` (front foot on ${st.left_votes + st.right_votes} frames: ${st.left_votes} left, ${st.right_votes} right)`
   : ` (no answer — under ${st.min_votes || st.k} clear frames ${st.spacing_s ?? 0} s apart — taken as ${st.stance})`;
 
@@ -2806,6 +2821,7 @@ function sortLayers() {
 // The base rows: [key, the card's name, what it shows, whether this video has it]. Order = top to bottom.
 const BASE_ROWS = [
   ['angle', 'Facing', 'the facing angle, every frame (0° = toward the camera, ±180° = back to it)', () => S.hasAngle],
+  ['stance', 'Stance', 'every frame: orthodox / southpaw when the feet are clearly apart along the facing direction and the hips are turned; grey = unclear', () => S.hasStanceRuns],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
@@ -4091,7 +4107,7 @@ function trackLines(name) {
 }
 let TR = {}, laneTop = 0;                                       // laneTop: the first row under the facing row
 // each base row's height and the gap under it: lead / rear and defense / defense 2.0 sit close as pairs
-const BASE_GEOM = {angle: [190, 8], lead: [30, 4], rear: [30, 10], def: [30, 4], rs: [30, 10]};
+const BASE_GEOM = {angle: [190, 8], stance: [22, 10], lead: [30, 4], rear: [30, 10], def: [30, 4], rs: [30, 10]};
 function layout() {
   TR = {ruler: [0, 24]};
   let y = 30, end = 20;
@@ -4182,7 +4198,7 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // track backgrounds + names
-  const names = {angle: 'Facing', lead: 'Lead', rear: 'Rear', def: 'Defense', rs: 'Defense 2.0', over: 'Overview', ...LNAME};
+  const names = {angle: 'Facing', stance: 'Stance', lead: 'Lead', rear: 'Rear', def: 'Defense', rs: 'Defense 2.0', over: 'Overview', ...LNAME};
   if (TR.rules) {                                             // the rule rows' section caption + divider
     c.fillStyle = text3; c.textAlign = 'left'; c.font = '600 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
     c.fillText('RULES', 8, TR.rules); c.strokeStyle = sep; c.lineWidth = 1;
@@ -4279,6 +4295,18 @@ function drawTimeline(f) {
   for (const e of S.punches) {                                // each lane only when its row is on
     const row = e.hand === 'lead' ? TR.lead : TR.rear;
     if (row && !hid(e)) block(e, row[0], row[1], styleP(e.type), e.sf <= f && f <= e.ef);
+  }
+  if (TR.stance) {                                            // the stance row: one bar per run, unclear thin and grey
+    const [sy, sh] = TR.stance;
+    for (const e of S.stanceRuns) {
+      const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps);
+      if (x1 < L || x0 > L + W) continue;
+      const clear = e.state !== 'unclear', on = V.hover === e || (e.sf <= f && f <= e.ef);
+      c.fillStyle = STANCEROW[e.state]; c.globalAlpha = clear ? (on ? 1 : 0.9) : (on ? 0.7 : 0.4);
+      const hh = clear ? sh - 6 : 4;
+      c.fillRect(x0, sy + (sh - hh) / 2, Math.max(1, x1 - x0), hh);
+    }
+    c.globalAlpha = 1;
   }
   if (TR.def) for (const e of S.defenses) if (!hid(e)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
   if (TR.rs) for (const e of S.rollsSlips) if (!hid(e))
@@ -4432,6 +4460,8 @@ function draw(force) {
     for (const e of pNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}</span>`);
     if (S.punches.some(e => e.impact === f && !hid(e))) hud.push('<span class="pill impact">IMPACT</span>');
     for (const e of dNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleD(e.type).c}"></span>${e.side ? cap(e.side) + ' ' : ''}${styleD(e.type).name}</span>`);
+    const stNow = baseOn('stance') ? S.stanceRuns.find(e => f >= e.sf && f <= e.ef) : null;
+    if (stNow) hud.push(`<span class="pill"><span class="dot" style="background:${STANCEROW[stNow.state]}"></span>${cap(stNow.state)}</span>`);
     $('hud').innerHTML = hud.join('');
     drawOverlay(f, pNow);
     // follow: keep the playhead inside the window, scrolling continuously while playing
@@ -4466,6 +4496,7 @@ function hit(x, y) {
   };
   if (inRow(TR.lead)) return find(S.punches, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, e => e.hand === 'rear');
+  if (inRow(TR.stance)) return S.stanceRuns.find(e => f >= e.sf && f <= e.ef) || null;
   if (inRow(TR.def)) return find(S.defenses, () => true);
   if (inRow(TR.rs)) return find(S.rollsSlips, () => true);
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
@@ -4564,6 +4595,10 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.hand)} ${s.name}</b> <span class="m">target ${e.target}</span><br>
       <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>` +
       (e.impact === null ? `<span class="m">no impact (${e.impStatus})</span>` : `<span class="num">impact f ${e.impact} · conf ${e.impConf.toFixed(2)}</span>`);
+  } else if (e.kind === 'st') {
+    el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${cap(e.state)}</b>` +
+      (e.reason ? `<br><span class="m">${STANCEWHY[e.reason] || e.reason}</span>` : '') +
+      `<br><span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)} · ${(n / fps).toFixed(2)} s</span>`;
   } else if (e.kind === 'rs') {
     const s = styleD(e.type);
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.side)} ${e.type}</b> <span class="m">${RS_SOURCE[e.source] || e.source}</span><br>
