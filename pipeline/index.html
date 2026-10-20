@@ -570,9 +570,6 @@ const DEF = {                         // defenses.csv defense_type
 };
 const styleP = t => PUNCH[t] || {c: '#8e8e93', l: '?', name: t};
 const styleD = t => DEF[t] || {c: '#8e8e93', l: '?', name: t};
-// the Defense 2.0 row (rolls + slips): defense6's colours per move, the side in the label ("Lead roll"), and where each came from
-const rsStyle = e => ({c: styleD(e.type).c, l: styleD(e.type).l, name: `${cap(e.side)} ${e.type}`});
-const RS_SOURCE = {roll_model: 'roll model (ST-GCN, fr_none)', slip_rule: 'slip lens rule'};
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 // COCO-17 subset of BlazePose-33 for the stick figure, and its bones
 const J = {nose: 0, lsh: 11, rsh: 12, lel: 13, rel: 14, lwr: 15, rwr: 16, lhip: 23, rhip: 24, lkn: 25, rkn: 26, lan: 27, ran: 28};
@@ -712,7 +709,6 @@ const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[
 const STAGES = {
   punches: ['punch_impact', 'impacts.csv'], punchesFallback: ['punch_classification', 'punches.csv'],
   punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
-  rollsSlips: ['rolls_slips', 'moves.csv'],      // the Defense 2.0 row: the roll model + the slip lens's rule, beside defense6
   angle: ['facing_angle', 'facing_angle.csv'],
 };
 // verdict pills and tooltips → semantic Apple colors (green = pass / on target / inside the range, red = fail / off
@@ -2318,21 +2314,21 @@ async function httpList(base) {
 }
 
 // ════════════════════════════ state ════════════════════════════
-const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], rollsSlips: [], skel: null, faceChin: null, mirrored: false,
+const S = {src: null, dataDir: null, fps: 30, n: 0, dur: 0, angle: null, pose: null, punches: [], defenses: [], skel: null, faceChin: null, mirrored: false,
            stance: 'orthodox', videoName: '', objectUrl: null, hiddenP: new Set(), hiddenD: new Set()};
 const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover: null, hoverLayer: null, lastFrame: -1,
            faceFilter: null,   // 'front' | 'side-on' | 'back': shift-click a band in the facing row to isolate it,
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
-V.base = {angle: true, stance: true, lead: true, rear: true, def: true, rs: true};
+V.base = {angle: true, stance: true, lead: true, rear: true, def: true};
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
-// the sub-switches under Lead / Rear / Defense / Defense 2.0: the types hidden on that row only, kept across videos (the
+// the sub-switches under Lead / Rear / Defense: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
-V.sub = {lead: [], rear: [], def: [], rs: []};
+V.sub = {lead: [], rear: [], def: []};
 try { Object.assign(V.sub, JSON.parse(localStorage.getItem('pipelineViewerSub') || '{}')); } catch {}
 const hid = e => e.kind === 'p' ? S.hiddenP.has(e.type) || !!V.sub[e.hand]?.includes(e.type)
-  : S.hiddenD.has(e.type) || V.sub[e.kind === 'rs' ? 'rs' : 'def'].includes(e.type);
+  : S.hiddenD.has(e.type) || V.sub.def.includes(e.type);
 const video = $('video');
 
 // ════════════════════════════ loading ════════════════════════════
@@ -2373,9 +2369,8 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th, rsCsv, rsSum, stj, glj, bwj, exj, stRuns] = await Promise.all([
+  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, exj, stRuns] = await Promise.all([
     jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
-    lite ? null : txt(STAGES.rollsSlips), lite ? null : jsn(['rolls_slips', 'rolls_slips.json']),
     jsn(['stance', 'stance.json']),                         // the stance stage (2026-10-09): who run_all mirrored, and why
     jsn(['gloves', 'gloves.json']),                         // the gloves stage (2026-10-09): no rule reads it yet
     jsn(['bagwork', 'bagwork.json']),                       // the bagwork stage (2026-10-10): no rule reads it yet
@@ -2392,17 +2387,11 @@ async function buildVideo(src, sig, lite = false) {
   N.angle = new Float32Array(N.n); N.pose = new Uint8Array(N.n);
   const sgn = N.mirrored ? -1 : 1;                           // a mirrored run's facing turns the other way on screen
   A.forEach((r, i) => { N.angle[i] = sgn * +r.angle_deg; N.pose[i] = +r.has_pose; });
-  N.hasAngle = A.length > 0; N.hasDef = !!defCsv; N.hasRS = !!rsCsv; N.rsSum = rsSum;
+  N.hasAngle = A.length > 0; N.hasDef = !!defCsv;
   N.punches = (pcsv ? parseCSV(pcsv) : []).map(r => ({
     kind: 'p', sf: +r.start_frame, ef: +r.end_frame, type: r.punch_type, hand: r.hand, target: r.target,
     impact: hasImpact && r.impact_status === 'ok' ? +r.impact_frame : null, impConf: r.impact_conf ? +r.impact_conf : null,
     impStatus: hasImpact ? r.impact_status : 'not run'})).sort((a, b) => a.sf - b.sf);
-  // the Defense 2.0 row (rolls_slips/moves.csv; "Rolls + slips" for its first hours): kept only while the boxer faces
-  // the camera; empty for a video run
-  // before the stage existed (2026-10-06)
-  N.rollsSlips = (rsCsv ? parseCSV(rsCsv) : []).map(r => ({
-    kind: 'rs', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, score: +r.score,
-    facing: +r.facing_mean, source: r.source})).sort((a, b) => a.sf - b.sf);
   // the Stance row (stance/runs.csv): the stance on every frame, read on the raw skeleton, so never flipped back
   N.stanceRuns = (stRuns ? parseCSV(stRuns) : []).map(r => ({
     kind: 'st', sf: +r.start_frame, ef: +r.end_frame, state: r.state, reason: r.reason}));
@@ -2825,11 +2814,10 @@ const BASE_ROWS = [
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
-  ['rs', 'Defense 2.0', 'rolls from the roll model and slips from the slip lens\u2019s rule, kept while the boxer faces the camera', () => S.hasRS],
 ];
 // the rows with a sub-switch per type: [the type table, the events, which of them sit on this row]
 const SUB_ROWS = {lead: () => [PUNCH, S.punches, e => e.hand === 'lead'], rear: () => [PUNCH, S.punches, e => e.hand === 'rear'],
-                  def: () => [DEF, S.defenses, () => true], rs: () => [DEF, S.rollsSlips, () => true]};
+                  def: () => [DEF, S.defenses, () => true]};
 const baseOn = k => !!V.base[k] && !!BASE_ROWS.find(r => r[0] === k)?.[3]();
 function buildBase() {
   const list = $('baseList');
@@ -2862,9 +2850,7 @@ function buildBase() {
         `<label class="toggle sub${V.sub[k].includes(ty) ? '' : ' on'}" data-row="${k}" data-type="${ty}"><span class="sw"></span>`
         + `<i style="background:${st.c}"></i>${st.name}<span class="n num">${n(ty)}</span></label>`).join('');
     }
-    $(`bsum-${k}`).innerHTML = !ok ? '<span>not in this folder</span>'
-      : k === 'rs' && S.rsSum?.facing_window_deg   // the stage's own window (configs/defense_compare.json, written into its json)
-        ? `<span>kept while |facing| is ${S.rsSum.facing_window_deg.map(([a, b]) => a ? `${fN(a)}–${fN(b)}°` : `≤ ${fN(b)}°`).join(' or ')}</span>` : '';
+    $(`bsum-${k}`).innerHTML = !ok ? '<span>not in this folder</span>' : '';
   }
 }
 function buildLayers() {
@@ -4106,15 +4092,15 @@ function trackLines(name) {
   return best;
 }
 let TR = {}, laneTop = 0;                                       // laneTop: the first row under the facing row
-// each base row's height and the gap under it: lead / rear and defense / defense 2.0 sit close as pairs
-const BASE_GEOM = {angle: [190, 8], stance: [22, 10], lead: [30, 4], rear: [30, 10], def: [30, 4], rs: [30, 10]};
+// each base row's height and the gap under it: lead / rear sit close as a pair
+const BASE_GEOM = {angle: [190, 8], stance: [22, 10], lead: [30, 4], rear: [30, 10], def: [30, 10]};
 function layout() {
   TR = {ruler: [0, 24]};
   let y = 30, end = 20;
   for (const [k] of BASE_ROWS) if (baseOn(k)) { const [h, gap] = BASE_GEOM[k]; TR[k] = [y, h]; end = y + h; y = end + gap; }
   const any = LAYERS.some(layerOn);
   y = end + (any ? 26 : 10);                                   // 16 px for the "RULES" caption when there are rule rows
-  laneTop = ['lead', 'rear', 'def', 'rs'].map(k => TR[k]?.[0]).find(v => v != null) ?? y;
+  laneTop = ['lead', 'rear', 'def'].map(k => TR[k]?.[0]).find(v => v != null) ?? y;
   for (const k of layerOrder()) if (layerOn(k)) { TR[k] = [y, 26]; y += 30; }
   if (any) TR.rules = end + 15;
   TR.bottom = y - (any ? 4 : 10);                              // lowest edge of the scrolling rows
@@ -4198,7 +4184,7 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // track backgrounds + names
-  const names = {angle: 'Facing', stance: 'Stance', lead: 'Lead', rear: 'Rear', def: 'Defense', rs: 'Defense 2.0', over: 'Overview', ...LNAME};
+  const names = {angle: 'Facing', stance: 'Stance', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
   if (TR.rules) {                                             // the rule rows' section caption + divider
     c.fillStyle = text3; c.textAlign = 'left'; c.font = '600 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
     c.fillText('RULES', 8, TR.rules); c.strokeStyle = sep; c.lineWidth = 1;
@@ -4309,8 +4295,6 @@ function drawTimeline(f) {
     c.globalAlpha = 1;
   }
   if (TR.def) for (const e of S.defenses) if (!hid(e)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
-  if (TR.rs) for (const e of S.rollsSlips) if (!hid(e))
-    block(e, TR.rs[0], TR.rs[1], rsStyle(e), e.sf <= f && f <= e.ef);
   drawLayerRows(c, f, W, text, grid);
   drawFaceVeil(c, W, text);                               // shift-click a facing band: everything else fades back
   drawExclVeil(c, W);                                     // the video's excluded time: no rule judges it
@@ -4452,9 +4436,6 @@ function draw(force) {
     const a = S.hasAngle && S.pose[f] ? S.angle[f] : null;
     $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
     eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f); comboCard($('comboCard'), f); frameCard($('frameCard'), f);
-    const rsNow = at(S.rollsSlips, f);          // a roll and a slip can overlap: the slip rule fires on rolls too
-    if (rsNow.length) $('defCard').insertAdjacentHTML('beforeend', `<div class="evctx">Defense 2.0: `
-      + rsNow.map(e => `<b>${cap(e.side)} ${e.type}</b> (${RS_SOURCE[e.source] || e.source})`).join(' · ') + '</div>');
     $('clock').textContent = `${fmtT(video.currentTime)} · f ${f}`;
     const hud = [];
     for (const e of pNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}</span>`);
@@ -4498,7 +4479,6 @@ function hit(x, y) {
   if (inRow(TR.rear)) return find(S.punches, e => e.hand === 'rear');
   if (inRow(TR.stance)) return S.stanceRuns.find(e => f >= e.sf && f <= e.ef) || null;
   if (inRow(TR.def)) return find(S.defenses, () => true);
-  if (inRow(TR.rs)) return find(S.rollsSlips, () => true);
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
     const L_ = RULE[k];
     let e;
@@ -4599,12 +4579,6 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${cap(e.state)}</b>` +
       (e.reason ? `<br><span class="m">${STANCEWHY[e.reason] || e.reason}</span>` : '') +
       `<br><span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)} · ${(n / fps).toFixed(2)} s</span>`;
-  } else if (e.kind === 'rs') {
-    const s = styleD(e.type);
-    el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.side)} ${e.type}</b> <span class="m">${RS_SOURCE[e.source] || e.source}</span><br>
-      <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>
-      <span class="num">${e.source === 'roll_model' ? `roll probability ${e.score.toFixed(2)}` : `head point (the middle of the nose, eyes and ears) ${e.score.toFixed(2)} torso off its usual position`}`
-      + ` · facing ${e.facing.toFixed(0)}°</span>`;
   } else {
     const s = styleD(e.type);
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${e.side ? cap(e.side) + ' ' : ''}${s.name}</b><br>

@@ -4,12 +4,12 @@
 
 One page, `index.html`, for one full-pipeline test video on one timeline, synced with the video: the base stages —
 punches (`punch_classification/`) with their impact frame drawn on each punch (`punch_impact/`), defensive moves
-(`defense_classification/`), the continuous facing angle (`facing_angle/`) and the Defense 2.0 comparison row
-(`rolls_slips/`) — and every rule's timeline row and round score. No build, no dependencies; like the rule debug
+(`defense_classification/`) and the continuous facing angle (`facing_angle/`) —
+and every rule's timeline row and round score. No build, no dependencies; like the rule debug
 viewer, files stay on your machine — the page reads them through the browser, nothing is uploaded.
 
 The stage folders are written by the backend's `combined_pipeline/rules_creation/` scripts (`run_punches.py`,
-`run_impact.py`, `run_facing_angle.py`, `run_punch_facing.py`, `run_defense.py`, `run_rolls_slips.py`, and one
+`run_impact.py`, `run_facing_angle.py`, `run_punch_facing.py`, `run_defense.py`, and one
 `run_<rule>.py` per rule stage), driven by `combined_pipeline/run_all.py`, into Drive `Ambo/data/pipeline_tests/<video>/`.
 
 ## Opening it
@@ -59,16 +59,12 @@ the server's upload were removed 2026-10-12.
 ## Using it
 
 Timeline rows: facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands (each gated rule judges its own, narrower window — its `camera_window_deg` in the video's thresholds snapshot; there is no default — shown beside its Front / Side / Back badges, e.g. "Side — 65–115°"), each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
-defense, **Defense 2.0** right under it (rolls + slips; the `rolls_slips` stage) — rolls from the roll detector (the run the backend's `configs/defense_compare.json`
-names, fr_none seed 42 today, the five fold models averaged) and slips from the Slip exploration lens's rule, both kept
-only while the boxer faces the camera (the same file's `facing_window_deg`, |facing| ≤ 22.5° today, shown under the
-row's switch; `rolls_slips/moves.csv`, run_all's viewer-only `rolls_slips` stage; no rule reads it, it sits beside
-defense6's row to be judged by eye; hover a block for its score; the defense chips hide its moves too) — and an
+defense — and an
 overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
 hover for details; the chips in the side panel hide or show a punch / defense type. Every row has a switch in the
-**Timelines** tab's Timeline layers card: the base rows (Facing, Lead, Rear, Defense, Defense 2.0) on top, all on by
+**Timelines** tab's Timeline layers card: the base rows (Facing, Lead, Rear, Defense) on top, all on by
 default, then the rule rows; the choice is remembered in the browser, and a row the video's folder lacks is greyed out.
-Under Lead, Rear, Defense and Defense 2.0, one small switch per punch / move type the video has on that row, with its
+Under Lead, Rear and Defense, one small switch per punch / move type the video has on that row, with its
 count (since 2026-10-07): off hides that type on that row only (lead jabs, not rear ones) — its blocks, hover, the pills
 and the ↑ / ↓ jumps — and is remembered across videos; the Round tab's chips still hide a type on every row, for the
 current video. On the video: the skeleton, a ring
