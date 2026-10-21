@@ -158,10 +158,10 @@ export async function walk(rootHandle) {
   // viewer.js picks one (most-recently-modified) by default.
   const predictions = new Map();
 
-  async function visit(dirHandle) {
+  async function visit(dirHandle, path) {
     for await (const entry of dirHandle.values()) {
       if (entry.kind === "directory") {
-        await visit(entry);
+        await visit(entry, `${path}/${entry.name}`);
         continue;
       }
       const name = entry.name;
@@ -184,8 +184,11 @@ export async function walk(rootHandle) {
       const rounds = cacheIndex.get(base);
       if (!rounds.has(round)) rounds.set(round, {});
       const slot = rounds.get(round);
-      if (!slot[engine]) slot[engine] = {};
-      const engineSlot = slot[engine];
+      // One set per FOLDER: several folders hold files under the same round name (the raw shelf, the smoothed
+      // shelves, angle_data's per-frame facing angles), and a round must not mix them - see pickFolder below.
+      if (!slot[engine]) slot[engine] = new Map();
+      if (!slot[engine].has(path)) slot[engine].set(path, {});
+      const engineSlot = slot[engine].get(path);
       if (ext === "npy" && suffix === "_pts")        engineSlot.pts = entry;
       else if (ext === "npy")                        engineSlot.npy = entry;
       else if (suffix === "_meta")                   engineSlot.meta = entry;
@@ -193,13 +196,21 @@ export async function walk(rootHandle) {
     }
   }
 
-  await visit(rootHandle);
+  await visit(rootHandle, "");
 
-  // Same completeness filter the manual picker applies: a round needs its
-  // BlazePose .npy + _meta.json, else it is dropped.
+  // Each round keeps ONE folder's files: the raw shelf (a folder named `blazepose`, Ambo/data/skeleton_data/blazepose)
+  // when it has the round, else the first folder with a complete set. Same completeness filter the manual picker
+  // applies: a round needs its BlazePose .npy + _meta.json, else it is dropped. (Connected at My Drive, the walk also
+  // finds angle_data/<stem>_blazepose_r0.npy, a 1-D facing-angle array, and the smoothed shelves' copies; mixing them
+  // in by last-found loaded the wrong .npy — 2026-10-21.)
+  const complete = g => g.npy && g.meta;
   for (const [base, rounds] of cacheIndex) {
     for (const [round, slot] of rounds) {
-      if (!slot.blazepose?.npy || !slot.blazepose?.meta) rounds.delete(round);
+      const groups = slot.blazepose ? [...slot.blazepose.entries()] : [];
+      const raw = groups.find(([p, g]) => p.split("/").pop() === "blazepose" && complete(g));
+      const pick = raw || groups.find(([, g]) => complete(g));
+      if (pick) slot.blazepose = pick[1];
+      else rounds.delete(round);
     }
     if (rounds.size === 0) cacheIndex.delete(base);
   }

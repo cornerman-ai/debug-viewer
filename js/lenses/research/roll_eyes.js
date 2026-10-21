@@ -10,8 +10,9 @@
 //                from below reads a level face 20-30° down — compare with the guard frames
 //
 // The sidebar lists the round's labeled rolls with the angle at the bottom (the median over the lowest frame ±4)
-// and the guard angle; click one to land on its bottom. The cut-off slider is for eyeballing only: no cut-off has
-// been measured yet.
+// and the guard angle; click one to land on its bottom. Under the video, a strip lined up with the scrubber marks
+// every roll, colored and labeled with that angle. The cut-off slider is for eyeballing only: no cut-off has been
+// measured yet. Only the videos, and the rounds, with a labeled roll are offered (index.json's videos / rounds).
 //
 // Data: ./lens_data/roll_eyes/<stem>.json + index.json, written by the backend's
 // ml/research/roll_eyes/roll_eyes_lens_data.py (rolls = John's labeled rolls, the angle = roll_eyes/head_pitch.py).
@@ -74,6 +75,7 @@ function ensureIndex() {
     .catch(e => { indexError = String(e); })
     .finally(() => {
       mapsKey = "";
+      window.dispatchEvent(new Event("lens-filter-changed"));   // the video list re-filters now the index is in
       if (host) { if (latestState) rebuildMaps(latestState); buildSidebar(); refresh(); }
     });
   return indexPromise;
@@ -91,6 +93,14 @@ function requiresVideo(base) {
   if (indexError) return true;
   if (!index) return false;
   return indexStemFor(base) != null;
+}
+
+// Only the rounds with a labeled roll (index.rounds, per video).
+function requires(slot, { base, round }) {
+  if (!slot?.blazepose) return false;
+  const stem = indexStemFor(base);
+  const rounds = stem && index?.rounds?.[stem];
+  return rounds ? rounds.includes(round) : !!stem;
 }
 
 async function ensureData(stem) {
@@ -327,20 +337,29 @@ function mountStageTimeline() {
   const label = document.createElement("div");
   label.className = "muted small";
   label.style.cssText = "margin-bottom:6px";
-  label.textContent = "Labeled rolls (click to land on the bottom) — colored by the angle at the bottom against the cut-off";
+  label.textContent = "Labeled rolls, lined up with the scrubber (click to land on the bottom) — colored by the angle at the bottom against the cut-off";
   wrap.appendChild(label);
   const canvas = document.createElement("canvas");
   canvas.id = "re-timeline";
-  canvas.style.cssText = "display:block;width:100%;height:34px";
+  canvas.style.cssText = "display:block;width:100%;height:46px";
   wrap.appendChild(canvas);
   slot.appendChild(wrap);
   canvas.addEventListener("click", ev => {
     const n = poseOf(latestState)?.n_frames;
     if (!n || !rounds.length) return;
-    const rect = canvas.getBoundingClientRect();
-    const target = ((ev.clientX - rect.left) / Math.max(1, rect.width)) * (n - 1);
+    const { left, width } = track(canvas);
+    const target = ((ev.clientX - canvas.getBoundingClientRect().left - left) / Math.max(1, width)) * (n - 1);
     seekFrame(rounds.reduce((a, b) => (Math.abs(b.bf - target) < Math.abs(a.bf - target) ? b : a)).bf);
   });
+}
+
+// The scrubber's track inside the canvas, in css px: the strip's x matches the scrubber thumb's (the thumb's centre
+// travels the input's width minus the thumb, THUMB_PX). The whole canvas when the scrubber can't be measured.
+const THUMB_PX = 16;
+function track(canvas) {
+  const c = canvas.getBoundingClientRect(), s = document.getElementById("scrubber")?.getBoundingClientRect();
+  if (!s || !s.width) return { left: 0, width: c.width };
+  return { left: s.left - c.left + THUMB_PX / 2, width: s.width - THUMB_PX };
 }
 
 function drawTimeline(state) {
@@ -356,11 +375,21 @@ function drawTimeline(state) {
   ctx.fillRect(0, 0, cssW, cssH);
   const n = poseOf(state)?.n_frames;
   if (!n) return;
-  const x = f => (f / Math.max(1, n - 1)) * cssW;
+  const { left, width } = track(cv);
+  const x = f => left + (f / Math.max(1, n - 1)) * width;
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  let lastLabelEnd = -Infinity;
   for (const r of rounds) {
     const v = verdictOf(r.roll.pitch);
     ctx.fillStyle = r.roll.noface ? C.noface : v === "na" ? C.gated : v === "down" ? C.down : C.up;
-    ctx.fillRect(x(r.sf), 6, Math.max(3, x(r.ef) - x(r.sf)), cssH - 14);
+    const x0 = x(r.sf), w = Math.max(3, x(r.ef) - x0);
+    ctx.fillRect(x0, 18, w, cssH - 22);
+    // the angle at the bottom above each roll, skipped where it would overlap the previous one
+    const text = r.roll.pitch != null ? `${Math.round(r.roll.pitch)}°` : r.roll.noface ? "no face" : "—";
+    const tw = ctx.measureText(text).width, cx = x0 + w / 2;
+    if (cx - tw / 2 > lastLabelEnd + 3) { ctx.fillText(text, cx, 3); lastLabelEnd = cx + tw / 2; }
   }
   ctx.strokeStyle = C.playhead;
   ctx.lineWidth = 1.5;
@@ -371,6 +400,7 @@ export const RollEyesRule = {
   id: "roll_eyes",
   label: "Roll eyes (eyes up in the roll)",
   requiresVideo,
+  requires,
   mount,
   update,
   draw,
