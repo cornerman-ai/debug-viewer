@@ -47,6 +47,7 @@ import { AudioImpactLensRule } from "./models/audio_impact.js";
 import { ImpactSpotterLensRule } from "./models/impact_spotter.js";
 import { PunchPredictionsRule } from "./models/punch_predictions.js";
 import { RollDuckLensRule } from "./research/roll_duck.js";
+import { RollEyesRule } from "./research/roll_eyes.js";
 import { RollsGtVsPredMatheRule } from "./models/rolls_gt_vs_pred_mathe.js";
 import { RollsGtVsPredAlexRule } from "./models/rolls_gt_vs_pred_alex.js";
 import { RollsGtRule } from "./research/rolls_gt.js";
@@ -81,6 +82,7 @@ export const RULES = [
   PunchClassifierRule,
   PunchPredictionsRule,
   RollDuckLensRule,
+  RollEyesRule,
   RollsGtVsPredAlexRule,
   RollsGtVsPredMatheRule,
   RollsGtRule,
