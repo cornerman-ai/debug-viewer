@@ -1477,23 +1477,22 @@ const RULE_LAYERS = [
     },
   },
   {
-    // rule 34, stance changes (stance_changes/segments.csv): the cleaned timeline - orthodox yellow, southpaw blue,
-    // neutral grey as the Stance row, nothing where there is no data (gap); the counted intervals (orthodox / southpaw
-    // runs of move.min_segment_s or more) at full strength, every other run faint; a white tick where a change starts.
+    // rule 34, stance changes (stance_changes/segments.csv): the stretches held in one stance - runs of consecutive
+    // move.window_s windows with at least move.min_share of their frames in one stance, from the raw per-frame stance
+    // (no smoothing) - orthodox yellow, southpaw blue as the Stance row; a white tick where a change starts.
     key: 'stchg', label: RN(34), short: RN(34), items: true,
     csv: ['stance_changes', 'segments.csv'], json: ['stance_changes', 'stance_changes.json'],
-    parseItem: (r, num) => r.state === 'none' || r.state === 'gap' ? null
-      : {kind: 'sc', state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), counted: r.counted === '1', change: r.change === '1'},
+    parseItem: (r, num) => r.state !== 'orthodox' && r.state !== 'southpaw' ? null
+      : {state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), windows: num(r.windows), change: r.change === '1'},
     card: () => '',
     tip: (e, x) => `<b style="color:${STANCEROW[x.state]}">●</b> <b>${STANCENAME[x.state]}</b> · `
       + `<span class="num">${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(1)} s</span>`
       + (x.change ? '<br><b>a stance change</b>' : '')
-      + `<br><span class="m">${x.counted ? 'counted' : x.state === 'neutral' ? 'neutral: never counted'
-        : THR(() => `under ${fN(T(34, 'move.min_segment_s'))} s: not counted`)} · after the cleaning (short gaps filled, blips and islands removed)</span>`,
+      + `<br><span class="m">${THR(() => `every ${fN(T(34, 'move.window_s'))} s window inside it has at least ${fP(T(34, 'move.min_share'))} % of its frames in this stance`)}</span>`,
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
-      c.fillStyle = STANCEROW[x.state]; c.globalAlpha = x.counted ? (on ? 1 : 0.9) : (on ? 0.6 : 0.35);
+      c.fillStyle = STANCEROW[x.state]; c.globalAlpha = on ? 1 : 0.9;
       rr(x0, y + 3, Math.max(2, x1 - x0), h - 6, 3); c.fill(); c.globalAlpha = 1;
       if (x.change && tx(x.sf / fps) >= L) {                  // where the change happens
         const xc = tx(x.sf / fps);
@@ -2468,7 +2467,7 @@ const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
-V.base = {angle: true, stance: true, stclean: true, lead: true, rear: true, def: true};
+V.base = {angle: true, stance: true, lead: true, rear: true, def: true};
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
 // the sub-switches under Lead / Rear / Defense: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
@@ -2958,7 +2957,6 @@ function sortLayers() {
 const BASE_ROWS = [
   ['angle', 'Facing', 'the facing angle, every frame (0° = toward the camera, ±180° = back to it)', () => S.hasAngle],
   ['stance', 'Stance', 'every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey = neutral (the feet too close to tell), empty = no data (an ankle not seen, no facing angle)', () => S.hasStanceRuns],
-  ['stclean', 'Stance (smoothed)', 'the stance after rule 34’s cleaning — short gaps filled, blips under 1 s and islands under 2 s removed — the timeline rule 34 counts on (stance_changes/segments.csv); same colours, empty = no data', () => !!S.items?.stchg?.length],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
@@ -3372,22 +3370,22 @@ function ruleCard() {
   const sc = S.layerSum.stchg;
   if (sc) add(RN(34), sc.score ?? 'not rated', sc.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he stay in one stance, or keep switching between orthodox and southpaw?',
-    on: `every frame, every angle · after the cleaning: ${sc.cleaned_s ? `orthodox ${sc.cleaned_s.orthodox} s, southpaw ${sc.cleaned_s.southpaw} s, `
-        + `neutral ${sc.cleaned_s.neutral} s, no data ${sc.cleaned_s.gap} s` : '–'} · ${sc.judged_s} s in counted intervals`,
+    on: `every frame, every angle, the raw per-frame stance (no smoothing) · ${sc.raw_frames ? `frames: orthodox ${sc.raw_frames.orthodox.toLocaleString()}, `
+        + `southpaw ${sc.raw_frames.southpaw.toLocaleString()}, neutral ${sc.raw_frames.neutral.toLocaleString()}, no data ${sc.raw_frames.no_data.toLocaleString()}` : '–'} · `
+        + `${sc.judged_s} s covered by held windows`,
     th: THR(() => { const strict = sc.scale === 'strict', key = strict ? 'round.strict.score' : 'round.score';
       const full = T(34, `${key}.full`), zero = T(34, `${key}.zero`), nf = T(34, 'round.score.full'), nz = T(34, 'round.score.zero');
       const sf = T(34, 'round.strict.score.full'), sz = T(34, 'round.strict.score.zero');
       const rs = (T(34, 'round.strict.rules') || []).map(n => `${n} (${RN(n)})`).join(', ');
-      return {round: {label: 'per round', rule: `every frame orthodox, southpaw or neutral (three stances), or no data; cleaned until nothing changes: `
-                        + `no data under ${fN(T(34, 'move.gap_fill_max_s'))} s between one stance takes it, a stance run under ${fN(T(34, 'move.blip_max_s'))} s inside one other stance takes it, `
-                        + `a stance run under ${fN(T(34, 'move.island_max_s'))} s between stretches of no data becomes no data; counted: orthodox / southpaw runs of ${fN(T(34, 'move.min_segment_s'))} s or more `
-                        + `(neutral never); a change is a counted run followed by one of the other stance; `
+      return {round: {label: 'per round', rule: `a ${fN(T(34, 'move.window_s'))} s window sliding one frame at a time is held in a stance when at least `
+                        + `${fP(T(34, 'move.min_share'))} % of all its frames are that stance (neutral and no data count against it); a change is a held window `
+                        + `whose stance differs from the held window before it; `
                         + `100 at ${fN(nf)} changes or fewer, linearly down to 0 at ${fN(nz)}; when any of rules ${rs} scored under ${fN(T(34, 'round.strict.below'))} `
-                        + `in this round, 100 at ${fN(sf)} changes, 0 at ${fN(sz)} instead — a plain number, no bands; no counted run: not rated`
+                        + `in this round, 100 at ${fN(sf)} changes, 0 at ${fN(sz)} instead — a plain number, no bands; no held window: not rated`
                         + ` · this round: the ${strict ? 'strict' : 'normal'} scale`,
                  bands: [[`≤ ${fN(full)} changes`, '100'], [`${fN(full)} → ${fN(zero)}`, '100 → 0'], [`≥ ${fN(zero)}`, '0']],
                  pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}}; }, thMiss),
-    calc: `${sc.segments} counted run${sc.segments === 1 ? '' : 's'} (${sc.stances.join(' → ') || 'none'}) = ${sc.changes} change${sc.changes === 1 ? '' : 's'} → ${sc.score ?? '–'}`
+    calc: `${sc.segments} held stretch${sc.segments === 1 ? '' : 'es'} (${sc.stances.join(' → ') || 'none'}) = ${sc.changes} change${sc.changes === 1 ? '' : 's'} → ${sc.score ?? '–'}`
           + (sc.scale === 'strict' ? ` · strict scale: ${Object.entries(sc.strict_triggers).map(([n, s]) => `rule ${n} scored ${s}`).join(', ')}` : '')});
   scored('hrp', RN(16), q => ({
     what: 'after a straight lands, does the wrist come straight back, or sink into a U on the way home?',
@@ -4296,7 +4294,7 @@ function trackLines(name) {
 }
 let TR = {}, laneTop = 0;                                       // laneTop: the first row under the facing row
 // each base row's height and the gap under it: lead / rear sit close as a pair
-const BASE_GEOM = {angle: [190, 8], stance: [22, 4], stclean: [22, 10], lead: [30, 4], rear: [30, 10], def: [30, 10]};
+const BASE_GEOM = {angle: [190, 8], stance: [22, 10], lead: [30, 4], rear: [30, 10], def: [30, 10]};
 function layout() {
   TR = {ruler: [0, 24]};
   let y = 30, end = 20;
@@ -4387,7 +4385,7 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // track backgrounds + names
-  const names = {angle: 'Facing', stance: 'Stance', stclean: 'Smoothed', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
+  const names = {angle: 'Facing', stance: 'Stance', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
   if (TR.rules) {                                             // the rule rows' section caption + divider
     c.fillStyle = text3; c.textAlign = 'left'; c.font = '600 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
     c.fillText('RULES', 8, TR.rules); c.strokeStyle = sep; c.lineWidth = 1;
@@ -4489,17 +4487,6 @@ function drawTimeline(f) {
     const [sy, sh] = TR.stance;
     for (const e of S.stanceRuns) {
       if (e.reason === 'no_reading') continue;
-      const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps);
-      if (x1 < L || x0 > L + W) continue;
-      const on = V.hover === e || (e.sf <= f && f <= e.ef);
-      c.fillStyle = STANCEROW[e.state]; c.globalAlpha = on ? 1 : 0.9;
-      c.fillRect(x0, sy + 3, Math.max(1, x1 - x0), sh - 6);
-    }
-    c.globalAlpha = 1;
-  }
-  if (TR.stclean) {                                           // the smoothed stance: rule 34's cleaned timeline, full bars, gaps empty
-    const [sy, sh] = TR.stclean;
-    for (const e of S.items.stchg || []) {
       const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps);
       if (x1 < L || x0 > L + W) continue;
       const on = V.hover === e || (e.sf <= f && f <= e.ef);
@@ -4692,7 +4679,6 @@ function hit(x, y) {
   if (inRow(TR.lead)) return find(S.punches, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, e => e.hand === 'rear');
   if (inRow(TR.stance)) return S.stanceRuns.find(e => f >= e.sf && f <= e.ef && e.reason !== 'no_reading') || null;
-  if (inRow(TR.stclean)) return (S.items.stchg || []).find(e => f >= e.sf && f <= e.ef) || null;
   if (inRow(TR.def)) return find(S.defenses, () => true);
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
     const L_ = RULE[k];
@@ -4790,10 +4776,6 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.hand)} ${s.name}</b> <span class="m">target ${e.target}</span><br>
       <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>` +
       (e.impact === null ? `<span class="m">no impact (${e.impStatus})</span>` : `<span class="num">impact f ${e.impact} · conf ${e.impConf.toFixed(2)}</span>`);
-  } else if (e.kind === 'sc') {                             // the Stance (smoothed) row
-    el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${STANCENAME[e.state] || cap(e.state)}</b> <span class="m">smoothed</span>` +
-      `<br><span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)} · ${(n / fps).toFixed(2)} s</span>` +
-      `<br><span class="m">${e.counted ? 'counted by rule 34' : e.state === 'neutral' ? 'neutral: never counted by rule 34' : 'not counted by rule 34 (under 5 s)'}</span>`;
   } else if (e.kind === 'st') {
     el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${STANCENAME[e.state] || cap(e.state)}</b>` +
       (e.reason ? `<br><span class="m">${STANCEWHY[e.reason] || e.reason}</span>` : '') +
@@ -5157,7 +5139,7 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [33, `How high the rear heel is off the floor — above the rear foot-index (toe-tip) point — at impact on a rear-hand punch. In a stance the heel is already a little up (about ${PLANTED_LIFT} torso, measured 2026-09-28), so a planted foot scores about ${plantedScore()}; turning of the foot isn’t measured.`,
        'rear-hand punches', `zero with the heel ${say(T(33, 'move.score.zero'), [[0, 'level with the foot-index point']], v => `${fD(v, 2)} torso above the foot-index point`)}, full marks from ${fD(T(33, 'move.score.full'), 2)} torso up`,
        'The rear heel coming up lets the hips turn through; a flat-footed power punch is all arm.'],
-  [34, `How often the boxer changes stance and stays in the new one. On every frame the foot in front along the direction the boxer faces gives the stance — left = orthodox, right = southpaw, too close to tell = neutral — or there is no data. The timeline is cleaned: no data under ${fN(T(34, 'move.gap_fill_max_s'))} s between the same stance takes it, a stance shorter than ${fN(T(34, 'move.blip_max_s'))} s inside another one takes that one, a stance shorter than ${fN(T(34, 'move.island_max_s'))} s between stretches of no data is dropped. Then only orthodox / southpaw stretches of ${fN(T(34, 'move.min_segment_s'))} s or more count, and a change is one followed by the other stance.`,
+  [34, `How often the boxer changes stance and stays in the new one. On every frame the foot in front along the direction the boxer faces gives the stance (left = orthodox, right = southpaw), used as it is. A ${fN(T(34, 'move.window_s'))} s window slides over the video; it is held in a stance when at least ${fP(T(34, 'move.min_share'))} % of its frames are that stance, so a few misread frames do not matter. A change is a held window in the other stance from the one held before.`,
        'every frame, every angle', `full marks at ${fN(T(34, 'round.score.full'))} changes or fewer, zero at ${fN(T(34, 'round.score.zero'))}; when rule ${(T(34, 'round.strict.rules') || ['…']).join(', ')} scored under ${fN(T(34, 'round.strict.below'))}, full marks at ${fN(T(34, 'round.strict.score.full'))}, zero at ${fN(T(34, 'round.strict.score.zero'))}`,
        'A boxer who drifts from one stance to the other has his lead hand and lead foot on the wrong side without choosing it.'],
   [35, 'Whether the chin stays tucked while a punch lands — rules 7 and 8 on the punch frames they skip. On the frames around each impact the chin, found on the face in the video, is read against the shoulder that should cover it: the punching shoulder on jabs, crosses and hooks, the other one on uppercuts and body shots (the punching shoulder dips to drive them). Height at every angle, depth side-on too; each takes its worst frame, so one frame with the chin up or out costs the punch.',

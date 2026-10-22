@@ -142,9 +142,8 @@ clear frames each way, the majority deciding — or no answer and taken as ortho
 shows its 15 voting frames instead). The **Stance** row under Facing (`stance/runs.csv`, since 2026-10-20) is the
 stance on every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey =
 neutral — the feet less than 0.15 torso apart along the facing direction (a stance of its own, drawn full like the
-other two since 2026-10-22); empty = no data (an ankle not seen, no facing angle). Under it, **Stance (smoothed)** (since 2026-10-22) is the same
-stance after rule 34's cleaning — `stance_changes/segments.csv`, the timeline rule 34 counts on — in the same colours,
-empty where there is no data; its tooltip says whether rule 34 counted the run. The hips are not read (since 2026-10-22; a folder run 2026-10-20 to 10-22 has an `unclear` state, hips square
+other two since 2026-10-22); empty = no data (an ankle not seen, no facing angle).
+The hips are not read (since 2026-10-22; a folder run 2026-10-20 to 10-22 has an `unclear` state, hips square
 among its reasons, drawn grey too). The pill on the video names the frame's stance. Read on the raw skeleton, so never
 flipped back. Short flips are mostly noise.
 After it, `gloves: yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand points' shape, gloves
@@ -440,19 +439,15 @@ in the last, each window's count on its band; a short video's middle third is sh
 are recomputed in the page from the same punch start times and the video's thresholds snapshot, so the counts are the
 rule's own.
 
-**Stance changes** (rule 34, `stance_changes/stance_changes.json` + `segments.csv`, since 2026-10-22): every frame is
-orthodox, southpaw or neutral (three stances, as the Stance row) or no data. The timeline is cleaned, the three steps
-repeated until nothing changes: no data under `move.gap_fill_max_s` (5 s) between the same stance takes that stance (a
-longer gap, or one between two different stances, stays empty); a stance run under `move.blip_max_s` (1 s) inside one
-other stance takes that stance; a stance run under `move.island_max_s` (2 s) between stretches of no data (the video's
-start or end counts as one) becomes no data. Its timeline row is the cleaned timeline: yellow, blue, grey, empty where
-there is no data; the counted runs — orthodox or southpaw, at least `move.min_segment_s` (5 s) — at full strength,
-everything else faint; a white tick where a change starts. A change is a counted run followed by one of the other
-stance (neutral is never counted; two counted runs of the same stance with anything between them are one stance). Score
-= 100 at 2 changes or fewer, linearly to 0 at 5; when rule 19, 20 or 33 scored under 70 in the round (`round.strict`)
-100 at 0 changes, 0 at 2 (1 change = 50); no counted run: not rated. The Round row gives the seconds per state after the
-cleaning and, on the strict scale, which rule put it there. It reads the `facing_angle` stage's angle, so on a video
-whose facing stage predates the current facing model it can differ from the Stance row, which computes its own.
+**Stance changes** (rule 34, `stance_changes/stance_changes.json` + `segments.csv`, since 2026-10-22): the raw
+per-frame stance (the Stance row, no smoothing) under a `move.window_s` (5 s) window sliding one frame at a time; a
+window is held in a stance when at least `move.min_share` (80 %) of all its frames are that stance — neutral and no
+data count against it, so a few misread frames do not break it but a long hole does. Its timeline row draws the
+stretches of consecutive held windows, yellow orthodox / blue southpaw, with a white tick where a change starts; a
+change is a held window in the other stance from the one held before. Score = 100 at 2 changes or fewer, linearly to 0
+at 5; when rule 19, 20 or 33 scored under 70 in the round (`round.strict`) 100 at 0 changes, 0 at 2 (1 change = 50); no
+held window: not rated. It reads the `facing_angle` stage's angle, so on a video whose facing stage predates the current
+facing model it can differ from the Stance row, which computes its own.
 
 **Dead time** (rule 25, `work_rate/work_rate.json` + `segments.csv`; "Work rate" until 2026-10-03): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
