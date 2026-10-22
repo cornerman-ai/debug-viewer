@@ -2945,7 +2945,7 @@ function sortLayers() {
 const BASE_ROWS = [
   ['angle', 'Facing', 'the facing angle, every frame (0° = toward the camera, ±180° = back to it)', () => S.hasAngle],
   ['stance', 'Stance', 'every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey = neutral (the feet too close to tell), empty = no data (an ankle not seen, no facing angle)', () => S.hasStanceRuns],
-  ['activity', 'Activity', 'two lines, each smoothed over about 2 s: green = output, punches + defensive moves per minute; purple = movement, how fast the hips, ankles and wrists move (torso lengths a second, the jitter of standing still taken off) — both near 0 when he just stands', () => S.punches.length > 0 || S.defenses.length > 0 || !!S.skel],
+  ['activity', 'Activity', 'two lines, each smoothed over about 2 s: green = output, punches + defensive moves per minute; purple = movement, how fast the hip centre moves in the picture (torso lengths a second, the jitter of standing still taken off) — both near 0 when he just stands', () => S.punches.length > 0 || S.defenses.length > 0 || !!S.skel],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
@@ -4603,16 +4603,18 @@ function skipStrip(c, x, w, y, on, why) {
 // ── the Activity row: two smoothed curves over the round, for looking at its output and movement by eye ──
 // output: every punch and defensive move as one event at its middle frame, summed under a Gaussian of ACT.sigmaS and
 //   read as events a minute - exactly 0 far from any event.
-// movement: per frame, the mean speed of the hip centre, both ankles and both wrists, each its displacement over the
-//   last ACT.lagS (a quarter second: frame to frame, BlazePose's jitter times 30 a second swamped the hips and ankles)
-//   where it is read at both ends (visibility >= ACT.minVis), in torso lengths a second (the torso = shoulder centre to
-//   hip centre, in pixels, the video's own aspect); speeds over ACT.capS are a tracker jumping and dropped; a 5-frame
-//   median, the same Gaussian (frames without a reading left out), then a fixed noise floor ACT.floor taken off, so
-//   standing still reads about 0. Measured 2026-10-22 on 20 test videos: in rule 25's dead stretches (no punch, no
-//   defensive move) the hips and ankles still move 0.3-0.9 torso/s, about as much as while punching - the boxers bounce
-//   and step - and the quietest videos sit at 0.25-0.3, hence the floor; the wrists split (about 1.0 dead, 1.9 working).
+// movement: per frame, the speed of the hip centre - where the whole body is in the picture, so stepping, circling and
+//   moving around the frame (the user's call, 2026-10-22: the wrists only repeated the punches the output line already
+//   counts) - its displacement over the last ACT.lagS (a quarter second: frame to frame, BlazePose's jitter times 30 a
+//   second swamped it) where both hips are read at both ends (visibility >= ACT.minVis), in torso lengths a second (the
+//   torso = shoulder centre to hip centre, in pixels, the video's own aspect - so the camera's distance does not
+//   matter); speeds over ACT.capS are a tracker jumping and dropped; a 5-frame median, the same Gaussian (frames without
+//   a reading left out), then a fixed noise floor ACT.floor taken off, so standing still reads about 0. Measured
+//   2026-10-22 on 20 test videos: the hip centre moves 0.3-0.9 torso/s in rule 25's dead stretches (no punch, no
+//   defensive move) and about as much while punching - the boxers bounce and step - and the quietest videos sit at
+//   0.27-0.3, hence the floor. Turning in place hardly moves the hip centre: a pivot shows on the Facing row, not here.
 // Fixed scales (ACT.outMax, ACT.movMax), the same for every video, so rounds compare by eye. Viewer only: no rule reads it.
-const ACT = {sigmaS: 2, lagS: 0.25, minVis: 0.5, capS: 20, floor: 0.3, outMax: 120, movMax: 2.5,
+const ACT = {sigmaS: 2, lagS: 0.25, minVis: 0.5, capS: 20, floor: 0.25, outMax: 120, movMax: 1.5,
              outCol: '#30d158', movCol: '#bf5af2', key: null, data: null};
 function gaussSmooth(v, sigma, valid) {                       // a Gaussian over v; valid: per-frame 0/1 (normalised by it)
   const n = v.length, r = Math.ceil(4 * sigma), k = new Float32Array(2 * r + 1);
@@ -4642,7 +4644,7 @@ function activityData() {
     const P = (fr, j) => { const b = (fr * 33 + j) * C;
       return S.skel[b + 6] >= ACT.minVis && Number.isFinite(S.skel[b]) ? [S.skel[b] * vw, S.skel[b + 1] * vh] : null; };
     const mid = (a, b) => a && b ? [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] : null;
-    const pts = fr => [mid(P(fr, 23), P(fr, 24)), P(fr, 27), P(fr, 28), P(fr, 15), P(fr, 16)];
+    const pts = fr => [mid(P(fr, 23), P(fr, 24))];                  // the hip centre only
     const lag = Math.max(1, Math.round(ACT.lagS * fps)), all = [];
     for (let fr = 0; fr < m; fr++) all.push(pts(fr));
     for (let fr = lag; fr < m; fr++) {
@@ -4650,7 +4652,7 @@ function activityData() {
       const torso = sh && hp ? Math.hypot(sh[0] - hp[0], sh[1] - hp[1]) : 0;
       if (torso > 5) {
         let s = 0, k = 0;
-        for (let j = 0; j < 5; j++) if (cur[j] && prev[j]) { s += Math.hypot(cur[j][0] - prev[j][0], cur[j][1] - prev[j][1]) / torso / (lag / fps); k++; }
+        for (let j = 0; j < cur.length; j++) if (cur[j] && prev[j]) { s += Math.hypot(cur[j][0] - prev[j][0], cur[j][1] - prev[j][1]) / torso / (lag / fps); k++; }
         if (k && s / k <= ACT.capS) raw[fr] = s / k;
       }
     }
@@ -4886,7 +4888,7 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b>Activity</b> <span class="m num">${fmtT(e.f / fps)}</span><br>`
       + `<b style="color:${ACT.outCol}">●</b> output <b class="num">${o == null ? '–' : o.toFixed(0)}</b> <span class="m">punches + defensive moves / min</span><br>`
       + `<b style="color:${ACT.movCol}">●</b> movement <b class="num">${m == null || !Number.isFinite(m) ? '–' : m.toFixed(2)}</b> <span class="m">torso lengths / s${A?.mov ? '' : ' (waiting for the video and skeleton)'}</span><br>`
-      + `<span class="m">both smoothed over about ${ACT.sigmaS * 2} s; movement = the hips, ankles and wrists over ${ACT.lagS} s, minus ${ACT.floor} torso/s of standing still; the row's top is ${ACT.outMax}/min and ${ACT.movMax} torso/s</span>`;
+      + `<span class="m">both smoothed over about ${ACT.sigmaS * 2} s; movement = the hip centre over ${ACT.lagS} s, minus ${ACT.floor} torso/s of standing still; the row's top is ${ACT.outMax}/min and ${ACT.movMax} torso/s</span>`;
   } else if (e.kind === 'st') {
     el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${STANCENAME[e.state] || cap(e.state)}</b>` +
       (e.reason ? `<br><span class="m">${STANCEWHY[e.reason] || e.reason}</span>` : '') +

@@ -150,14 +150,15 @@ thin outline.
 
 **Activity** (since 2026-10-22, viewer only, no rule reads it): two lines for looking at a round's output and movement
 by eye. Green, filled = **output**: every punch and defensive move as one event at its middle frame under a Gaussian
-(σ 2 s), in events a minute — exactly 0 far from any. Purple = **movement**: the mean speed of the hip centre, both
-ankles and both wrists, each its displacement over the last 0.25 s where it is seen at both ends (visibility ≥ 0.5), in
-torso lengths a second, speeds over 20 dropped (a tracker jump), a 5-frame median, the same Gaussian, minus a fixed
-0.3 torso/s of standing still. Fixed scales for every video (top = 120 a minute and 2.5 torso/s), so rounds compare by
-eye; the left column names the two lines and the tooltip gives both values. Measured 2026-10-22 on 20 test videos: in
-rule 25's dead stretches the hips and ankles still move 0.3–0.9 torso/s, about as much as while punching (the boxers
-bounce and step), so movement reaches 0 only when he really stands; frame to frame (no 0.25 s lag) BlazePose's jitter
-swamped them.
+(σ 2 s), in events a minute — exactly 0 far from any. Purple = **movement**: the speed of the hip centre — where the whole body is in the picture, so stepping, circling
+and moving around the frame (the hips only since 2026-10-22, the user's call: the wrists repeated the punches the
+output line counts) — its displacement over the last 0.25 s where both hips are seen at both ends (visibility ≥ 0.5),
+in torso lengths a second (so the camera's distance does not matter), speeds over 20 dropped (a tracker jump), a
+5-frame median, the same Gaussian, minus a fixed 0.25 torso/s of standing still. Fixed scales for every video (top =
+120 a minute and 1.5 torso/s), so rounds compare by eye; the left column names the two lines and the tooltip gives both
+values. Measured 2026-10-22 on 20 test videos: the hip centre moves 0.3–0.9 torso/s in rule 25's dead stretches,
+about as much as while punching (the boxers bounce and step), and the quietest videos sit at 0.27–0.3; a busy round
+peaks near 1.5. Turning in place hardly moves the hip centre: a pivot shows on the Facing row, not here.
 The hips are not read (since 2026-10-22; a folder run 2026-10-20 to 10-22 has an `unclear` state, hips square
 among its reasons, drawn grey too). The pill on the video names the frame's stance. Read on the raw skeleton, so never
 flipped back. Short flips are mostly noise.
