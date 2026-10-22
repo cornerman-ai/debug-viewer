@@ -587,7 +587,7 @@ const RULE_NAMES = {
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
-  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact',
+  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Hand drop before the uppercut',
 };
 const RN = no => RULE_NAMES[no];
 const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
@@ -1061,6 +1061,13 @@ const chinImpRule = () => `around the impact (±${fN(T(35, 'move.window_s'))} s,
   + `(${fD(T(35, 'move.depth.shoulder_front_torso'), 2)} torso forward of its joint), 100 at or behind it, 0 at ${fD(T(35, 'move.depth.score.zero'), 2)} in front; `
   + `both read: ${fN(T(35, 'move.height.points'))} / ${fN(T(35, 'move.depth.points'))}, else height alone; a frame whose face scores under `
   + `${fD(T(35, 'move.face_score_gate'), 2)} is not read`;
+// rule 36's reading in words: the forearm's direction, -1 wrist straight above the elbow, 0 level, +1 straight below
+const upDropWords = v => v == null ? '–' : `${v.toFixed(2)}, ${Math.abs(Math.round(Math.asin(Math.max(-1, Math.min(1, v))) * 180 / Math.PI))}° ${v >= 0 ? 'below' : 'above'} level`;
+const upDropRule = () => `head uppercuts: the punching forearm’s direction in world coordinates ((wrist y − elbow y) / forearm length, the arm `
+  + `filtered at ${fN(T(36, 'move.smooth_hz'))} Hz), at its most downward from ${fN(T(36, 'move.window_before_s'))} s before the start (or the end of the `
+  + `same hand’s previous punch, when later) to impact (start + ${fN(T(36, 'move.default_impact_s'))} s without one); 100 up to `
+  + `${fD(T(36, 'move.score.full'), 2)}, linearly to 0 at ${fD(T(36, 'move.score.zero'), 2)}; not judged when the arm’s least visible joint has a median `
+  + `visibility under ${fD(T(36, 'move.min_arm_visibility'), 2)}`;
 const CHINSKIP = {no_reading: 'a shoulder or hip the rule needs is not visible',
                   no_face: 'no face found with enough confidence — the chin is not guessed from the skeleton',
                   punching: 'a punch is in flight — the chin is judged between punches',
@@ -1822,6 +1829,51 @@ const RULE_LAYERS = [
     },
   },
   {
+    // rule 36, hand drop before the uppercut (uppercut_drop/punches.csv): every head uppercut, the punching forearm's
+    // direction in world coordinates ((wrist y - elbow y) / forearm length, the arm's joints filtered at move.smooth_hz),
+    // at its most downward over the window: from move.window_before_s before the start - or the end of the same hand's
+    // previous punch, when later - to impact (start + move.default_impact_s without one). Scored against move.score;
+    // not judged when the arm is not seen (the median of its least visible joint under move.min_arm_visibility).
+    key: 'updrop', label: RN(36), short: 'Uppercut hand drop',
+    window: true,                                          // its block, ring and hover cover the window, start - 0.5 s → impact
+    split: 'hand',                                         // lead windows on the top half, rear on the bottom
+    csv: ['uppercut_drop', 'punches.csv'], json: ['uppercut_drop', 'uppercut_drop.json'],
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, drop: num(r.drop), df: num(r.drop_frame), score: num(r.score),
+      a: num(r.win_start), b: num(r.win_end), trim: r.trimmed === '1', vis: num(r.arm_vis)}
+      : {verdict: '', skip: r.skip_reason, drop: num(r.drop), vis: num(r.arm_vis)},
+    card: (e, x) => `<div class="sub"><div class="h">${RN(36)}</div>` +
+      (!x || !x.verdict ? `<div class="empty">${skipTxt(x?.skip)}${x?.vis != null ? ` (arm visibility ${x.vis.toFixed(2)})` : ''}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Forearm at its lowest</span><b>${upDropWords(x.drop)} (frame ${x.df})</b>
+        <span>Window</span><b>f ${x.a}–${x.b}${x.trim ? ' — starts at the end of this hand’s previous punch' : ''}</b>
+        <span>Score</span><b>${x.score.toFixed(1)} / 100 ${THR(() => `(100 up to ${fD(T(36, 'move.score.full'), 2)}, 0 from ${fD(T(36, 'move.score.zero'), 2)})`)}</b>
+        <span>Arm visibility</span><b>${x.vis.toFixed(2)} (median of its least visible joint)</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${skipTxt(x.skip)}</span>` :
+      `<span class="num"><b>${x.score.toFixed(1)} / 100</b> · ${x.verdict === 'dropped' ? 'hand dropped' : 'hand up'} · the forearm at its lowest: `
+      + `<b>${upDropWords(x.drop)}</b> (frame ${x.df})</span><br>`
+      + `<span class="m">${THR(() => upDropRule())}${x.trim ? ' · this window starts at the end of the same hand’s previous punch' : ''}</span>`),
+    row(e, x, {c, y, h, tag, ring, tx, fps}) {
+      if (!x.verdict) return;                                // not judged: draw nothing
+      const bx = tx(x.a / fps), w = Math.max(2, tx((x.b + 1) / fps) - bx - 1);   // the window, not the punch
+      const hh = h / 2 - 2, yy = e.hand === 'lead' ? y + 2 : y + h / 2;          // lead on top, rear below
+      c.fillStyle = x.verdict === 'dropped' ? '#ff3b30' : '#34c759';
+      rr(bx, yy, w, hh, 3); c.fill();
+      tag(bx, w, yy, hh, x.score.toFixed(1));
+      ring(e, 'updrop', bx, yy - 2, w, hh + 3);
+    },
+    frameOverlay(f, P, leadLeft) {                         // inside a window: the punching forearm the rule reads
+      const es = S.punches.filter(p => p.updrop?.verdict && f >= p.updrop.a && f <= p.updrop.b && !hid(p)); if (!es.length) return;
+      for (const e of es) {
+        const x = e.updrop, left = (e.hand === 'lead') === leadLeft;
+        const el = P(left ? J.lel : J.rel), wr = P(left ? J.lwr : J.rwr); if (!(el && wr)) continue;
+        const col = x.verdict === 'dropped' ? '#ff3b30' : '#34c759';
+        OV.line(el, wr, col, f === x.df ? 6 : 3.5);                  // the forearm, thicker on the frame that decides
+        if (f === x.df) OV.ring(wr, col, 11, 3);
+        overlayLabel(Math.min(el[0], wr[0]) - 40, Math.min(el[1], wr[1]) - 16,
+          `${cap(e.hand)} uppercut · lowest ${x.drop.toFixed(2)} (frame ${x.df}) → ${x.score.toFixed(1)}${f === x.df ? ' ← this frame' : ''}`, col);
+      }
+    },
+  },
+  {
     // punch speed (punch_speed/punches.csv): start → impact, 100 up to the labelled corpus's full_pctl-th percentile of
     // its punch type, linearly down to 0 at its zero_pctl-th (move.score).
     key: 'speed', label: RN(23), short: RN(23),
@@ -2318,7 +2370,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25], stchg: [34], chinimp: [35],
+  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -3006,6 +3058,7 @@ const SCOPE = {
   hookstop:  {moves: 'every head hook at its impact frame'},
   rpivot:    {moves: 'every rear-hand punch at its impact frame'},
   chinimp:   {get moves() { return `every punch at impact ±${THR(() => fN(T(35, 'move.window_s')))} s, the worst frame`; }},
+  updrop:    {get moves() { return `every head uppercut, ${THR(() => fN(T(36, 'move.window_before_s')))} s before it → impact`; }},
   speed:     {moves: 'every punch with an impact frame'},
   arm:       {moves: 'jab, cross'},
   hip:       {moves: 'every punch'},
@@ -3056,7 +3109,7 @@ function scoreCounts(key) {
           fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
 // The Notion "Production rules" numbering (renumbered 2026-10-01: rules 3 and 34 were removed, the rest closed up to
-// 1-33; a new 34, stance changes, and 35, chin tuck on impact, added 2026-10-22): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
+// 1-33; a new 34, stance changes, 35, chin tuck on impact, and 36, hand drop before the uppercut, added 2026-10-22): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
 // enough" and 15 "slip not too much" — each with its own timeline row and round row.
 const NOTION = Object.fromEntries(Object.entries(RULE_NAMES).map(([no, name]) => [name, +no]));   // name -> number
 const notionNo = name => String(NOTION[name] ?? '?');
@@ -3069,7 +3122,7 @@ const RULE_META = (() => {
   const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
-              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P]};
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
@@ -3474,6 +3527,19 @@ function ruleCard() {
                     round: {label: 'per round', rule: `the mean punch score — a plain number, no bands; fewer than ${NJ(35)} judged punches: not rated`}}), thMiss),
     calc: `mean of ${ci.judged_punches} punch scores = ${ci.mean_score ?? '–'} · ${ci.at_100} at 100 · median worst height `
           + `${ci.median_height_torso ?? '–'} torso (− = above the top), median worst depth ${ci.median_gap_torso ?? '–'} torso (+ = in front)`});
+  const ud = S.layerSum.updrop;
+  if (ud) add(RN(36), ud.score ?? 'not rated', ud.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'before the uppercut comes up, does the punching hand stay up, or drop and wind up from low?',
+    on: `${ud.n_uppercuts} head uppercuts · ${ud.judged_uppercuts} judged (window trimmed at the same hand’s previous punch: ${ud.trimmed_windows}), `
+        + `${ud.n_uppercuts - ud.judged_uppercuts} skipped (${ud.skipped?.arm_not_seen ?? 0} with the arm not seen — mostly the far arm of a boxer side-on to `
+        + `the camera — ${ud.skipped?.no_arm_reading ?? 0} with no reading, ${ud.skipped?.excluded ?? 0} in excluded time); body uppercuts are a separate class `
+        + `of the punch model and are not judged`,
+    th: THR(() => ({event: {label: 'per uppercut', rule: upDropRule() + ' — green at 100, red below',
+                            bands: [[`≤ ${fD(T(36, 'move.score.full'), 2)}`, '100'], [`≥ ${fD(T(36, 'move.score.zero'), 2)}`, '0']],
+                            pal: {'100': '#34c759', '0': '#ff3b30'}},
+                    round: {label: 'per round', rule: `the mean uppercut score — a plain number, no bands; fewer than ${NJ(36)} judged uppercuts: not rated`}}), thMiss),
+    calc: `mean of ${ud.judged_uppercuts} uppercut scores = ${ud.mean_score ?? '–'} · ${ud.at_100 ?? '–'} at 100 · ${ud.dropped} dropped · `
+          + `median forearm at its lowest ${ud.median_drop ?? '–'}`});
   const ih = S.layerSum.resting;
   if (ih) add(RN(6), ih.score ?? 'not rated', ih.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'when one hand lands, is the other hand’s wrist still up where a guard belongs?',
@@ -3694,6 +3760,8 @@ const SKIPTXT = {
   wrist_unsure: 'the wrist is not seen on the impact frame or just after it, so too few frames are left (rule 16)',
   no_face: 'no face found with enough confidence on the frames read — the chin is not guessed from the skeleton (rule 35)',
   no_reading: 'a shoulder or hip point is not visible on the frames read (rule 35)',
+  arm_not_seen: 'the punching arm is not seen: the median visibility of its least visible joint over the window is too low — mostly the far arm of a boxer side-on to the camera (rule 36)',
+  no_arm_reading: 'no frame of the window has the punching arm’s elbow and wrist (rule 36)',
 };
 const skipTxt = c => SKIPTXT[c] || (c ? c.replace(/_/g, ' ') : 'not judged');
 const GOOD = '#22C55E', BAD = '#EF4444', MIDC = '#F97316';
@@ -3716,6 +3784,7 @@ const PUNCH_RULES = [
   ['hookstop', p => p.type === 'hook', scored],
   ['rpivot', p => p.hand === 'rear', scored],
   ['chinimp', () => true, scored],
+  ['updrop', p => p.type === 'uppercut', scored],
 ];
 // "fails on", under a per-punch rule's round line: the punches it failed, split by punch type. The bar is each type's
 // share of the failed punches (the punch distribution's order and colours); after each type, failed / judged of that
@@ -5078,6 +5147,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [35, 'Whether the chin stays tucked while a punch lands — rules 7 and 8 on the punch frames they skip. On the frames around each impact the chin, found on the face in the video, is read against the shoulder that should cover it: the punching shoulder on jabs, crosses and hooks, the other one on uppercuts and body shots (the punching shoulder dips to drive them). Height at every angle, depth side-on too; each takes its worst frame, so one frame with the chin up or out costs the punch.',
        `every punch, impact ±${fN(T(35, 'move.window_s'))} s`, `height: full marks at or below the shoulder’s top, zero ${fD(-T(35, 'move.height.score.zero'), 2)} torso above; depth: full marks at or behind its front, zero ${fD(T(35, 'move.depth.score.zero'), 2)} in front; ${fN(T(35, 'move.height.points'))} / ${fN(T(35, 'move.depth.points'))} when both are read, height alone otherwise`,
        'The moment a punch lands is the moment the counter comes back; a chin that lifts or leads then is the one that gets hit.'],
+  [36, 'Whether the punching hand drops before the uppercut. From half a second before each head uppercut — never into the same hand’s previous punch — to its impact, the rule follows the punching forearm and keeps its most downward direction: a forearm that turns to point down means the hand wound down first. An uppercut whose arm the skeleton does not see (usually the far arm of a boxer side-on to the camera) is left out.',
+       `every head uppercut, ${fN(T(36, 'move.window_before_s'))} s before it → impact`, `full marks while the forearm points at most ${fD(T(36, 'move.score.full'), 2)} down (about 29° below level), zero at ${fD(T(36, 'move.score.zero'), 2)} (about 68°); from ${fN(H(36, 'min_judged'))} judged uppercuts`,
+       'An uppercut wound up from the waist is seen coming, and the face is open while the hand travels back up. The lines come from the coach’s ratings of 355 uppercut clips.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));

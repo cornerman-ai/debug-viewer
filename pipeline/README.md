@@ -89,7 +89,7 @@ The side panel has five views, switched at its top:
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
   bad 1, mid 2, good 3, great 4), and the sum over 4 × the rated rules is put on 0–100 (not-rated rules count in
   neither), coloured and labelled on the same tier scale as the rules, with the same bar — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count
-  per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–35 in the Notion
+  per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–36 in the Notion
   order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 75–85 good,
   60–75 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 5 s of judged frames), and under it four lines — what the
@@ -151,7 +151,7 @@ from 0.50; no rule reads it yet), then `training: bag work / shadowboxing (P(bag
 it yet).
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
-are videos, columns are the overall round score and rules 1–35, each cell the 0–100 score tinted in its tier's colour
+are videos, columns are the overall round score and rules 1–36, each cell the 0–100 score tinted in its tier's colour
 ("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
 timeline CSVs and the facing curve, which no round score needs (checked equal to the full read on all 495 cells,
 2026-10-02), and scored by the same code as the Rules tab, so a cell always equals what that video's Round score card
@@ -242,6 +242,16 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   punching shoulder's front when depth was read, and this frame's chin. Skipped: no face on any frame read (about half
   the punches on the test videos — an arm in front of the face), a shoulder or hip hidden, excluded time. Round = the
   mean punch score, from at least 10. Reads `punches.csv` + `chin_impact.json`.
+- **Hand drop before the uppercut** (rule 36, `uppercut_drop/`, since 2026-10-22): per head uppercut (body uppercuts are
+  the punch model's body class and are not judged), the punching forearm's direction in world coordinates — (wrist y −
+  elbow y) / forearm length, the arm filtered at 6 Hz — at its most downward over the window from 0.5 s before the
+  start (or the end of the same hand's previous punch, when later) to impact. 100 up to 0.49 (about 29° below level),
+  0 at 0.93 (about 68°), linear; both lines fitted to Stafford's ratings of 355 uppercut clips. The row draws the window,
+  lead on the top half, rear below — green at 100, red below, the score on the block; the card and tooltip give the
+  lowest reading, its frame and whether the window was trimmed. The overlay draws the punching forearm in the verdict's
+  colour, thicker with a ring on the frame that decides. Skipped: the arm not seen (the median over the window of its
+  least visible joint under 0.5 — mostly the far arm of a side-on boxer), no reading, excluded time. Round = the mean
+  uppercut score, from at least 5. Reads `punches.csv` + `uppercut_drop.json`.
 - **Hook overswing** (rule 32, `hook_stop/`; "Hook stop" until 2026-10-03): per head hook, read front-on or back-on, where the wrist is at the turnaround — the
   frame the impact spotter says it stopped going forward. Score 100 at the boxer's centre line or short of it, linearly to 0 at a third of a
   torso past his own far shoulder; green at 100, red below, the score on the block. The far shoulder is his centre
