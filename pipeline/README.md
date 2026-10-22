@@ -484,11 +484,11 @@ the excluded time in no combined combination (rule 31's: no punch or defensive m
 one orange block each. Score = 100 at a solo share of 40 % or less, linearly to 0 at 100 %; fewer than 10 judged
 punches: not rated.
 
-**Flat-footed in guard** (rule 39, `flat_feet/flat_feet.json` + `runs.csv`, since 2026-10-22): every frame but the
-defensive moves (and 0.15 s around them) — punches count, since the same day — side-on (65–115°), both feet seen at visibility ≥ 0.5, as stretches — red where
+**Flat-footed in guard** (rule 39, `flat_feet/flat_feet.json` + `runs.csv`, since 2026-10-22): every frame,
+punches and defensive moves included (since the same day) — side-on (65–115°), both feet seen at visibility ≥ 0.5, as stretches — red where
 both heels are down (each under 0.06 torso above its toe tip), green where a heel is up, gray where not judged; on the
-video, each foot's heel → toe line in the same colour with the heel's height. Score = 100 at 25 % of that time
-flat-footed or less, linearly to 0 at 60 %; under 5 s judged: not rated.
+video, each foot's heel → toe line in the same colour with the heel's height. Score = 100 at 15 % of that time
+flat-footed or less, linearly to 0 at 45 %; under 5 s judged: not rated.
 
 **Dead time** (rule 25, `work_rate/work_rate.json` + `segments.csv`; "Work rate" until 2026-10-03): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
