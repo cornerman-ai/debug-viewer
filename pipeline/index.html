@@ -587,7 +587,7 @@ const RULE_NAMES = {
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
-  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Hand drop before the uppercut', 37: 'Combos too long', 38: 'Solo punches',
+  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Hand drop before the uppercut', 37: 'Combos too long', 38: 'Solo punches', 39: 'Flat-footed in guard',
 };
 const RN = no => RULE_NAMES[no];
 const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
@@ -969,6 +969,9 @@ function setFaceFilter(band) {                       // null clears it
   V.hover = null; V.dirty = true;
 }
 const STANCECOL = {ok: '#34c759', narrow: '#ff3b30', shallow: '#ff3b30'};
+// rule 39's gray states: why a guard frame is not judged
+const FLATSKIP = {no_pose: 'a heel, a toe tip, a shoulder or a hip is not seen', front_on: 'the boxer is not side-on — from the front the heel and the toe overlap',
+                  punching: 'a punch or a defensive move is within 0.15 s', excluded: EXCLWHY};
 const STANCESKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
                     front_on: 'the boxer is not side-on (front- or back-on)', excluded: EXCLWHY};
 function stanceLayer(kind) {
@@ -2381,6 +2384,38 @@ const RULE_LAYERS = [
     },
   },
   stanceLayer('width'), stanceLayer('depth'),
+  {
+    // rule 39, flat-footed in guard (flat_feet/runs.csv): the guard frames, side-on, as stretches - red where both
+    // heels are down (each under move.heel_down_below torso above its toe tip), green where a heel is up, gray where
+    // the rule does not judge (a punch or move near, not side-on, a foot point not seen, excluded time).
+    key: 'flat', label: RN(39), short: RN(39), items: true,
+    csv: ['flat_feet', 'runs.csv'], json: ['flat_feet', 'flat_feet.json'],
+    parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), min: num(r.min_heel), mean: num(r.mean_heel)}),
+    card: () => '',
+    frameOverlay(f, P, leadLeft, Q, torso) {               // each foot: heel -> toe tip, red when both heels are down
+      const it = OV.at('flat', f); if (!it || FLATSKIP[it.state]) return;
+      const t_ = torso(); const col = it.state === 'flat' ? '#ff3b30' : '#34c759';
+      for (const [heel, toe] of [[29, 31], [30, 32]]) {
+        const a = P(heel), b = P(toe); if (!(a && b)) continue;
+        OV.line(a, b, col, 3);
+        if (t_) overlayLabel(a[0] - 18, a[1] - 10, `${((b[1] - a[1]) / t_).toFixed(2)}`, col);
+      }
+    },
+    tip: (e, x) => {
+      const tt = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
+      if (FLATSKIP[x.state]) return `<b>Not judged</b> ${tt}<br><span>${FLATSKIP[x.state]}</span>`;
+      return `<b>${x.state === 'flat' ? 'Both heels down' : 'A heel up'}</b> ${tt}<br>`
+        + `<span class="num">the higher heel: lowest ${x.min?.toFixed(2)} · mean ${x.mean?.toFixed(2)} torso above its toe tip</span><br>`
+        + `<span class="m">${THR(() => `a heel under ${fD(T(39, 'move.heel_down_below'), 2)} torso above its toe tip is down; both down = flat-footed`)}</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0);
+      if (FLATSKIP[x.state]) { skipStrip(c, x0, w, y + h / 2, on, x.state); return; }
+      c.fillStyle = x.state === 'flat' ? '#ff3b30' : '#34c759'; c.globalAlpha = on ? 1 : 0.85;
+      rr(x0, y + 4, w, h - 8, 3); c.fill(); c.globalAlpha = 1;
+    },
+  },
   chinLayer('height'), chinLayer('depth'),
   bladeLayer('hips'), bladeLayer('shoulders'),
 
@@ -2391,7 +2426,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38],
+  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -3093,6 +3128,7 @@ const SCOPE = {
   stchg:     {moves: 'every frame, every angle'},
   longcombo: {moves: 'combined combinations (punches + defensive moves)'},
   solo:      {moves: 'every punch, as a share of the round'},
+  flat:      {moves: 'every guard frame (no punch or defensive move within 0.15 s)'},
   combined:  {moves: 'punches, defensive moves'},
 };
 // Which camera angles a rule judges, as three badges — lit = judged, struck-through = skipped. Front and back share
@@ -3146,7 +3182,7 @@ const RULE_META = (() => {
   const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
-              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R]};
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R], 39: [F]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
@@ -3615,6 +3651,17 @@ function ruleCard() {
                         + `no bands; fewer than ${NJ(37)} combined combinations: not rated`,
                  bands: [[`≤ ${full}`, '100'], [`${full} → ${zero}`, '100 → 0'], [`≥ ${zero}`, '0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}}; }, thMiss),
     calc: `${lc.n_long} of ${lc.n_combinations} combined combinations have ${THR(() => fN(T(37, 'move.min_elements')))}+ moves (longest ${lc.longest ?? '–'}) → ${lc.score ?? '–'}`});
+  const ff = S.layerSum.flat;
+  if (ff) add(RN(39), ff.score ?? 'not rated', ff.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'between punches, is he up on the balls of his feet, or standing flat on both heels?',
+    on: `${ff.judged_frames.toLocaleString()} guard frames judged (${ff.judged_s} s): side-on, no punch or defensive move within ${THR(() => fN(T(39, 'move.guard_pad_s')))} s, both feet seen`,
+    th: THR(() => { const d = fD(T(39, 'move.heel_down_below'), 2), full = fP(T(39, 'round.score.full')), zero = fP(T(39, 'round.score.zero'));
+      return {event: {label: 'per frame', rule: `a heel under ${d} torso above its toe tip (BlazePose's heel and foot-index points) is down; both heels down = flat-footed`,
+                      bands: [['a heel up', 'up'], ['both heels down', 'flat']], pal: {up: '#34c759', flat: '#ff3b30'}},
+              round: {label: 'per round', rule: `the share of judged frames flat-footed: 100 at ${full} % or less, linearly down to 0 at ${zero} % — a plain number, `
+                        + `no bands; under ${NF(39)} s of judged frames: not rated`,
+                 bands: [[`≤ ${full} %`, '100'], [`${full} → ${zero} %`, '100 → 0'], [`≥ ${zero} %`, '0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}}; }, thMiss),
+    calc: `${ff.flat_frames.toLocaleString()} of ${ff.judged_frames.toLocaleString()} frames flat-footed = ${pct(ff.flat_share)} → ${ff.score ?? '–'}`});
   const sp1 = S.layerSum.solo;
   if (sp1) add(RN(38), sp1.score ?? 'not rated', sp1.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he put his punches together, or throw them one at a time?',
@@ -4027,6 +4074,11 @@ function frameCard(el, f) {
       const r = la && ra ? Math.abs(la[0] - ra[0]) / torso : NaN;
       return Number.isFinite(r) ? {score: stanceScore('depth', r), note: `${r.toFixed(2)} torso lengths apart`} : {skip: 'no reading'};
     });
+  }
+  if (S.has.flat) {                                          // 39 flat-footed: this frame's state from the rule's own runs
+    const st = state('flat')?.state;
+    rows.push([39, !st || FLATSKIP[st] ? {skip: FLATSKIP[st] || 'no reading'}
+                   : {score: st === 'flat' ? 0 : 100, note: st === 'flat' ? 'both heels down' : 'a heel up'}]);
   }
   if (S.has.stance_width) {
     const st = state('stance_width')?.state;
@@ -5353,6 +5405,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [38, `What share of the boxer’s punches are thrown on their own — with no other punch and no defensive move within ${fN(T(31, 'move.max_gap_s'))} s before or after (not in any of rule 31’s combinations).`,
        'every punch', `full marks at ${fP(T(38, 'round.score.full'))} % or less, zero at ${fP(T(38, 'round.score.zero'))} %`,
        'A single punch is easy to read and block; it is the second and third punch that land.'],
+  [39, `Whether the boxer stands flat on both heels between punches. Seen from the side, each heel’s height above its own toe tip (BlazePose’s heel and foot-index points): under ${fD(T(39, 'move.heel_down_below'), 2)} torso lengths the heel is down; both down is flat-footed. Only guard time counts — no punch or defensive move within ${fN(T(39, 'move.guard_pad_s'))} s.`,
+       'guard frames, side-on', `full marks at ${fP(T(39, 'round.score.full'))} % of that time flat-footed or less, zero at ${fP(T(39, 'round.score.zero'))} %`,
+       'Flat on both heels a boxer is slow to move, slow to push off into a punch and easy to catch.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));
