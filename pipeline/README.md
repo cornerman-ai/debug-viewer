@@ -232,17 +232,16 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   0.20 line in the verdict's colour, the line from the foot-index point to the heel, and the heel. Every angle is
   judged; lead-hand punches and a hidden rear heel, foot-index point or torso are not drawn. Round = the mean punch score,
   a plain number, from at least 10. Reads `punches.csv` + `rear_pivot.json`.
-- **Chin tuck on impact** (rule 35, `chin_impact/`, since 2026-10-22): rules 7 and 8 on the punch frames they skip. Per
+- **Chin tuck on impact** (rule 35, `chin_impact/`, since 2026-10-22): rule 8 on the punch frames it skips. Per
   punch, on the frames within ±`window_s` (0.1 s) of the impact, inside the punch, with a face chin at the 0.7 gate:
-  height = the chin against the top of the shoulder that covers it — the punching shoulder on jabs, crosses and hooks
-  (keypoint raised 0.09 torso), the other one on uppercuts and body shots (`dip_punches`; the punching shoulder dips,
-  raised 0.06), 100 at or below it, 0 at 0.20 above; depth (side-on frames, rule 7's window) = the chin against the
-  punching shoulder's front (+0.10 torso), 100 at or behind it, 0 at 0.50 in front. Each axis takes its worst frame;
-  punch score 50 / 50 with a side-on frame, height alone otherwise. Green at 100, red below, the score on the block;
-  the card and tooltip give both worst readings and their frames. The overlay draws the covering shoulder's top, the
-  punching shoulder's front when depth was read, and this frame's chin. Skipped: no face on any frame read (about half
-  the punches on the test videos — an arm in front of the face), a shoulder or hip hidden, excluded time. Round = the
-  mean punch score, from at least 10. Reads `punches.csv` + `chin_impact.json`.
+  the chin against the top of the shoulder that covers it — the punching shoulder on jabs, crosses and hooks (keypoint
+  raised 0.09 torso), the other one on uppercuts and body shots (`dip_punches`; the punching shoulder dips, raised
+  0.06) — at any camera angle; the punch takes its highest-chin frame: 100 at or below the top, 0 at 0.20 above.
+  Height only since 2026-10-22 (a depth half, side-on, was dropped the same day). Green at 100, red below, the score
+  on the block; the card and tooltip give the reading and its frame. The overlay draws the covering shoulder's top
+  and this frame's chin. Skipped: no face on any frame read (about half the punches on the test videos — an arm in
+  front of the face), a shoulder or hip hidden, excluded time. Round = the mean punch score, from at least 10. Reads
+  `punches.csv` + `chin_impact.json`.
 - **Hand drop before the uppercut** (rule 36, `uppercut_drop/`, since 2026-10-22): per head uppercut (body uppercuts are
   the punch model's body class and are not judged), the punching forearm's direction in world coordinates — (wrist y −
   elbow y) / forearm length, the arm filtered at 6 Hz — at its most downward over the window from 0.5 s before the

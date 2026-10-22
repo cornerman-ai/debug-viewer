@@ -1049,17 +1049,14 @@ const faceChinOf = text => {
   rows.forEach((r, i) => { const ok = r.score !== ''; x[i] = ok ? +r.x : NaN; y[i] = ok ? +r.y : NaN; sc[i] = ok ? +r.score : NaN; });
   return {x, y, s: sc};
 };
-// rule 35's readings in words: height h (torso, + = below the top, - = above), depth gap d (torso, + = in front)
+// rule 35's reading in words: height h (torso, + = below the top, - = above)
 const chinImpH = h => h < 0 ? `${(-h).toFixed(3)} torso above` : `${h.toFixed(3)} torso below`;
-const chinImpD = d => d > 0 ? `${d.toFixed(3)} torso in front of` : `${(-d).toFixed(3)} torso behind`;
 const chinImpShoulder = e => (T(35, 'move.dip_punches') || []).includes(e.type)
   ? `${e.hand === 'lead' ? 'rear' : 'lead'} shoulder (an uppercut or body shot: the punching shoulder dips)` : `${e.hand} shoulder`;
-const chinImpRule = () => `around the impact (±${fN(T(35, 'move.window_s'))} s, inside the punch), the worst frame of each axis: `
-  + `height — the chin against the top of the shoulder covering it (the punching one, ${fD(T(35, 'move.height.shoulder_top_torso'), 2)} torso above its joint; `
+const chinImpRule = () => `around the impact (±${fN(T(35, 'move.window_s'))} s, inside the punch), the frame with the highest chin: `
+  + `the chin against the top of the shoulder covering it (the punching one, ${fD(T(35, 'move.height.shoulder_top_torso'), 2)} torso above its joint; `
   + `on uppercuts and body shots the other one, ${fD(T(35, 'move.height.dip_shoulder_top_torso'), 2)} above), 100 at or below it, 0 at `
-  + `${fD(-T(35, 'move.height.score.zero'), 2)} torso above; depth, side-on only — the chin against the punching shoulder’s front `
-  + `(${fD(T(35, 'move.depth.shoulder_front_torso'), 2)} torso forward of its joint), 100 at or behind it, 0 at ${fD(T(35, 'move.depth.score.zero'), 2)} in front; `
-  + `both read: ${fN(T(35, 'move.height.points'))} / ${fN(T(35, 'move.depth.points'))}, else height alone; a frame whose face scores under `
+  + `${fD(-T(35, 'move.height.score.zero'), 2)} torso above, any camera angle; a frame whose face scores under `
   + `${fD(T(35, 'move.face_score_gate'), 2)} is not read`;
 // rule 36's reading in words: the forearm's direction, -1 wrist straight above the elbow, 0 level, +1 straight below
 const upDropWords = v => v == null ? '–' : `${v.toFixed(2)}, ${Math.abs(Math.round(Math.asin(Math.max(-1, Math.min(1, v))) * 180 / Math.PI))}° ${v >= 0 ? 'below' : 'above'} level`;
@@ -1776,21 +1773,18 @@ const RULE_LAYERS = [
     // rule 35, chin tuck on impact (chin_impact/punches.csv): every punch, on the face-chin frames within impact ±
     // move.window_s (clipped to the punch; its middle frame without an impact): the chin's height against the top of the
     // shoulder that covers it — the punching one, the other on move.dip_punches (uppercuts, body shots), whose punching
-    // shoulder dips — and, on side-on frames (rule 7's window), its depth in front of the punching shoulder's front.
-    // Each axis its worst frame; 50 / 50 when both are read (move.*.points), height alone otherwise.
+    // shoulder dips. The worst (highest-chin) frame is the punch's score; height only since 2026-10-22 (depth dropped).
     key: 'chinimp', label: RN(35), short: 'Chin on impact',
     csv: ['chin_impact', 'punches.csv'], json: ['chin_impact', 'chin_impact.json'],
     parse: (r, num) => r.verdict ? {verdict: r.verdict, score: num(r.score), cf: num(r.centre_frame), h: num(r.height),
-      hf: num(r.height_frame), hs: num(r.height_score), d: num(r.depth), df: num(r.depth_frame), ds: num(r.depth_score)}
+      hf: num(r.height_frame)}
       : {verdict: '', skip: r.skip_reason},
     card: (e, x) => `<div class="sub"><div class="h">${RN(35)}</div>` +
       (!x || !x.verdict ? `<div class="empty">${skipTxt(x?.skip)}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Height, worst frame (${x.hf})</span><b>${chinImpH(x.h)} the ${chinImpShoulder(e)}’s top → ${x.hs.toFixed(1)}</b>
-        <span>Depth, worst side-on frame</span><b>${x.d == null ? 'not read — no side-on frame' : `${chinImpD(x.d)} the ${e.hand} shoulder’s front (frame ${x.df}) → ${x.ds.toFixed(1)}`}</b>
-        <span>Punch score</span><b>${x.score.toFixed(1)}${x.d == null ? ' (height alone)' : ' (both axes)'}</b></div>`) + '</div>',
+       `<div class="rows num" style="margin-top:0"><span>Chin, highest frame (${x.hf})</span><b>${chinImpH(x.h)} the ${chinImpShoulder(e)}’s top</b>
+        <span>Punch score</span><b>${x.score.toFixed(1)}</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${skipTxt(x.skip)}</span>` :
-      `<span class="num">score <b>${x.score.toFixed(1)}</b> · worst height: chin ${chinImpH(x.h)} the ${chinImpShoulder(e)}’s top`
-      + (x.d == null ? ' · depth not read (no side-on frame)' : ` · worst depth: ${chinImpD(x.d)} the ${e.hand} shoulder’s front`) + `</span><br>`
+      `<span class="num">score <b>${x.score.toFixed(1)}</b> · at its highest the chin is ${chinImpH(x.h)} the ${chinImpShoulder(e)}’s top</span><br>`
       + `<span class="m">${THR(() => chinImpRule())}</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;
@@ -1805,8 +1799,8 @@ const RULE_LAYERS = [
       const dip = (T(35, 'move.dip_punches') || []).includes(e.type);
       const cover = dip ? (e.hand === 'lead' ? 'rear' : 'lead') : e.hand;  // the shoulder covering the chin (height)
       const sideJ = hand => (hand === 'lead') === leadLeft ? J.lsh : J.rsh;  // orthodox lead = left; a southpaw's run is mirrored
-      const sh = P(sideJ(cover)), ps = P(sideJ(e.hand)), ls = P(J.lsh), rs = P(J.rsh), lh = P(J.lhip), rh = P(J.rhip);
-      if (!(sh && ps && ls && rs && lh && rh)) return;
+      const sh = P(sideJ(cover)), ls = P(J.lsh), rs = P(J.rsh), lh = P(J.lhip), rh = P(J.rhip);
+      if (!(sh && ls && rs && lh && rh)) return;
       for (const j of [J.lsh, J.rsh, J.lhip, J.rhip]) if (!(visAt(f, j, 35) >= H(35, 'min_visibility'))) return;
       const t = Math.hypot((ls[0] + rs[0]) / 2 - (lh[0] + rh[0]) / 2, (ls[1] + rs[1]) / 2 - (lh[1] + rh[1]) / 2);
       if (!(t >= H(35, 'min_torso_px'))) return;
@@ -1814,15 +1808,9 @@ const RULE_LAYERS = [
       const col = x.verdict === 'tucked' ? '#34c759' : '#ff3b30';
       const top = sh[1] - T(35, dip ? 'move.height.dip_shoulder_top_torso' : 'move.height.shoulder_top_torso') * t;
       OV.level(top, Math.min(ls[0], rs[0]) - 45, Math.max(ls[0], rs[0]) + 45, col);   // the covering shoulder's top
-      if (x.d != null) {                                     // depth was read on this punch: the punching shoulder's front
-        const a = S.hasAngle && S.pose?.[f] ? S.angle[f] : NaN, d = Number.isFinite(a) ? Math.sign(Math.sin(a * Math.PI / 180)) : 0;
-        if (d) { const front = ps[0] + d * T(35, 'move.depth.shoulder_front_torso') * t;
-                 OV.line([front, ps[1] - 30], [front, ps[1] + 60], col, 2.5); }
-      }
       if (chin) { OV.ring(chin, col, 10, 3); OV.line([chin[0], top], chin, col, 2, [3, 3]); }
-      overlayLabel(Math.min(ls[0], rs[0]) - 45, top - 16, `score ${x.score.toFixed(1)} · worst height ${x.h.toFixed(2)} torso (frame ${x.hf})`
-        + (x.d == null ? '' : ` · worst depth ${x.d.toFixed(2)} (frame ${x.df})`)
-        + (f === x.hf || f === x.df ? ' ← this frame' : ''), col);
+      overlayLabel(Math.min(ls[0], rs[0]) - 45, top - 16, `score ${x.score.toFixed(1)} · highest chin ${x.h.toFixed(2)} torso (frame ${x.hf})`
+        + (f === x.hf ? ' ← this frame' : ''), col);
     },
   },
   {
@@ -3514,17 +3502,16 @@ function ruleCard() {
           + `median heel ${rp.median_lift} torso above the foot-index point`});
   const ci = S.layerSum.chinimp;
   if (ci) add(RN(35), ci.score ?? 'not rated', ci.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'as the punch lands, does the chin stay tucked behind the shoulder, or come up or poke out?',
-    on: `${ci.n_punches} punches · ${ci.judged_punches} judged around their impact frame (${ci.both_axes_punches} with a side-on frame, on both axes; `
-        + `the rest on height alone), ${ci.n_punches - ci.judged_punches} skipped (${ci.no_face_punches} with no face found on those frames — often an arm `
+    what: 'as the punch lands, does the chin stay down below the shoulder, or come up?',
+    on: `${ci.n_punches} punches · ${ci.judged_punches} judged around their impact frame, at any camera angle, `
+        + `${ci.n_punches - ci.judged_punches} skipped (${ci.no_face_punches} with no face found on those frames — often an arm `
         + `in front of it — ${ci.no_reading_punches} with a shoulder or hip not visible, ${ci.excluded_punches} in excluded time)`,
     th: THR(() => ({event: {label: 'per punch', rule: chinImpRule() + ' — green at 100, red below',
-                            bands: [['height: at or below the top', '100'], [`height: ${fD(-T(35, 'move.height.score.zero'), 2)} torso above`, '0'],
-                                    ['depth: at or behind the front', '100'], [`depth: ${fD(T(35, 'move.depth.score.zero'), 2)} torso in front`, '0']],
+                            bands: [['at or below the shoulder’s top', '100'], [`${fD(-T(35, 'move.height.score.zero'), 2)} torso above`, '0']],
                             pal: {'100': '#34c759', '0': '#ff3b30'}},
                     round: {label: 'per round', rule: `the mean punch score — a plain number, no bands; fewer than ${NJ(35)} judged punches: not rated`}}), thMiss),
     calc: `mean of ${ci.judged_punches} punch scores = ${ci.mean_score ?? '–'} · ${ci.at_100} at 100 · median worst height `
-          + `${ci.median_height_torso ?? '–'} torso (− = above the top), median worst depth ${ci.median_gap_torso ?? '–'} torso (+ = in front)`});
+          + `${ci.median_height_torso ?? '–'} torso (− = above the top)`});
   const ud = S.layerSum.updrop;
   if (ud) add(RN(36), ud.score ?? 'not rated', ud.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'before the uppercut comes up, does the punching hand stay up, or drop and wind up from low?',
@@ -5142,9 +5129,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [34, `How often the boxer changes stance and stays in the new one. On every frame the foot in front along the direction the boxer faces gives the stance (left = orthodox, right = southpaw), used as it is. A ${fN(T(34, 'move.window_s'))} s window slides over the video; it is held in a stance when at least ${fP(T(34, 'move.min_share'))} % of its frames are that stance, so a few misread frames do not matter. A change is a held window in the other stance from the one held before.`,
        'every frame, every angle', `full marks at ${fN(T(34, 'round.score.full'))} changes or fewer, zero at ${fN(T(34, 'round.score.zero'))}; when rule ${(T(34, 'round.strict.rules') || ['…']).join(', ')} scored under ${fN(T(34, 'round.strict.below'))}, full marks at ${fN(T(34, 'round.strict.score.full'))}, zero at ${fN(T(34, 'round.strict.score.zero'))}`,
        'A boxer who drifts from one stance to the other has his lead hand and lead foot on the wrong side without choosing it.'],
-  [35, 'Whether the chin stays tucked while a punch lands — rules 7 and 8 on the punch frames they skip. On the frames around each impact the chin, found on the face in the video, is read against the shoulder that should cover it: the punching shoulder on jabs, crosses and hooks, the other one on uppercuts and body shots (the punching shoulder dips to drive them). Height at every angle, depth side-on too; each takes its worst frame, so one frame with the chin up or out costs the punch.',
-       `every punch, impact ±${fN(T(35, 'move.window_s'))} s`, `height: full marks at or below the shoulder’s top, zero ${fD(-T(35, 'move.height.score.zero'), 2)} torso above; depth: full marks at or behind its front, zero ${fD(T(35, 'move.depth.score.zero'), 2)} in front; ${fN(T(35, 'move.height.points'))} / ${fN(T(35, 'move.depth.points'))} when both are read, height alone otherwise`,
-       'The moment a punch lands is the moment the counter comes back; a chin that lifts or leads then is the one that gets hit.'],
+  [35, 'Whether the chin stays down while a punch lands — rule 8 on the punch frames it skips. On the frames around each impact the chin, found on the face in the video, is read against the top of the shoulder that should cover it: the punching shoulder on jabs, crosses and hooks, the other one on uppercuts and body shots (the punching shoulder dips to drive them). Height only, at every angle; the punch takes its highest-chin frame, so one frame with the chin up costs the punch.',
+       `every punch, impact ±${fN(T(35, 'move.window_s'))} s`, `full marks at or below the shoulder’s top, zero ${fD(-T(35, 'move.height.score.zero'), 2)} torso above`,
+       'The moment a punch lands is the moment the counter comes back; a chin that lifts then is the one that gets hit.'],
   [36, 'Whether the punching hand drops before the uppercut. From half a second before each head uppercut — never into the same hand’s previous punch — to its impact, the rule follows the punching forearm and keeps its most downward direction: a forearm that turns to point down means the hand wound down first. An uppercut whose arm the skeleton does not see (usually the far arm of a boxer side-on to the camera) is left out.',
        `every head uppercut, ${fN(T(36, 'move.window_before_s'))} s before it → impact`, `full marks while the forearm points at most ${fD(T(36, 'move.score.full'), 2)} down (about 29° below level), zero at ${fD(T(36, 'move.score.zero'), 2)} (about 68°); from ${fN(H(36, 'min_judged'))} judged uppercuts`,
        'An uppercut wound up from the waist is seen coming, and the face is open while the hand travels back up. The lines come from the coach’s ratings of 355 uppercut clips.'],
