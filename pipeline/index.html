@@ -1483,7 +1483,7 @@ const RULE_LAYERS = [
     key: 'stchg', label: RN(34), short: RN(34), items: true,
     csv: ['stance_changes', 'segments.csv'], json: ['stance_changes', 'stance_changes.json'],
     parseItem: (r, num) => r.state === 'none' || r.state === 'gap' ? null
-      : {state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), counted: r.counted === '1', change: r.change === '1'},
+      : {kind: 'sc', state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), counted: r.counted === '1', change: r.change === '1'},
     card: () => '',
     tip: (e, x) => `<b style="color:${STANCEROW[x.state]}">●</b> <b>${STANCENAME[x.state]}</b> · `
       + `<span class="num">${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(1)} s</span>`
@@ -2468,7 +2468,7 @@ const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
-V.base = {angle: true, stance: true, lead: true, rear: true, def: true};
+V.base = {angle: true, stance: true, stclean: true, lead: true, rear: true, def: true};
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
 // the sub-switches under Lead / Rear / Defense: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
@@ -2958,6 +2958,7 @@ function sortLayers() {
 const BASE_ROWS = [
   ['angle', 'Facing', 'the facing angle, every frame (0° = toward the camera, ±180° = back to it)', () => S.hasAngle],
   ['stance', 'Stance', 'every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey = neutral (the feet too close to tell), empty = no data (an ankle not seen, no facing angle)', () => S.hasStanceRuns],
+  ['stclean', 'Stance (smoothed)', 'the stance after rule 34’s cleaning — short gaps filled, blips under 1 s and islands under 2 s removed — the timeline rule 34 counts on (stance_changes/segments.csv); same colours, empty = no data', () => !!S.items?.stchg?.length],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
@@ -4295,7 +4296,7 @@ function trackLines(name) {
 }
 let TR = {}, laneTop = 0;                                       // laneTop: the first row under the facing row
 // each base row's height and the gap under it: lead / rear sit close as a pair
-const BASE_GEOM = {angle: [190, 8], stance: [22, 10], lead: [30, 4], rear: [30, 10], def: [30, 10]};
+const BASE_GEOM = {angle: [190, 8], stance: [22, 4], stclean: [22, 10], lead: [30, 4], rear: [30, 10], def: [30, 10]};
 function layout() {
   TR = {ruler: [0, 24]};
   let y = 30, end = 20;
@@ -4386,7 +4387,7 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // track backgrounds + names
-  const names = {angle: 'Facing', stance: 'Stance', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
+  const names = {angle: 'Facing', stance: 'Stance', stclean: 'Smoothed', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
   if (TR.rules) {                                             // the rule rows' section caption + divider
     c.fillStyle = text3; c.textAlign = 'left'; c.font = '600 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
     c.fillText('RULES', 8, TR.rules); c.strokeStyle = sep; c.lineWidth = 1;
@@ -4488,6 +4489,17 @@ function drawTimeline(f) {
     const [sy, sh] = TR.stance;
     for (const e of S.stanceRuns) {
       if (e.reason === 'no_reading') continue;
+      const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps);
+      if (x1 < L || x0 > L + W) continue;
+      const on = V.hover === e || (e.sf <= f && f <= e.ef);
+      c.fillStyle = STANCEROW[e.state]; c.globalAlpha = on ? 1 : 0.9;
+      c.fillRect(x0, sy + 3, Math.max(1, x1 - x0), sh - 6);
+    }
+    c.globalAlpha = 1;
+  }
+  if (TR.stclean) {                                           // the smoothed stance: rule 34's cleaned timeline, full bars, gaps empty
+    const [sy, sh] = TR.stclean;
+    for (const e of S.items.stchg || []) {
       const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps);
       if (x1 < L || x0 > L + W) continue;
       const on = V.hover === e || (e.sf <= f && f <= e.ef);
@@ -4680,6 +4692,7 @@ function hit(x, y) {
   if (inRow(TR.lead)) return find(S.punches, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, e => e.hand === 'rear');
   if (inRow(TR.stance)) return S.stanceRuns.find(e => f >= e.sf && f <= e.ef && e.reason !== 'no_reading') || null;
+  if (inRow(TR.stclean)) return (S.items.stchg || []).find(e => f >= e.sf && f <= e.ef) || null;
   if (inRow(TR.def)) return find(S.defenses, () => true);
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
     const L_ = RULE[k];
@@ -4777,6 +4790,10 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.hand)} ${s.name}</b> <span class="m">target ${e.target}</span><br>
       <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>` +
       (e.impact === null ? `<span class="m">no impact (${e.impStatus})</span>` : `<span class="num">impact f ${e.impact} · conf ${e.impConf.toFixed(2)}</span>`);
+  } else if (e.kind === 'sc') {                             // the Stance (smoothed) row
+    el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${STANCENAME[e.state] || cap(e.state)}</b> <span class="m">smoothed</span>` +
+      `<br><span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)} · ${(n / fps).toFixed(2)} s</span>` +
+      `<br><span class="m">${e.counted ? 'counted by rule 34' : e.state === 'neutral' ? 'neutral: never counted by rule 34' : 'not counted by rule 34 (under 5 s)'}</span>`;
   } else if (e.kind === 'st') {
     el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${STANCENAME[e.state] || cap(e.state)}</b>` +
       (e.reason ? `<br><span class="m">${STANCEWHY[e.reason] || e.reason}</span>` : '') +

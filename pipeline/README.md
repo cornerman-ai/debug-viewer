@@ -142,7 +142,9 @@ clear frames each way, the majority deciding — or no answer and taken as ortho
 shows its 15 voting frames instead). The **Stance** row under Facing (`stance/runs.csv`, since 2026-10-20) is the
 stance on every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey =
 neutral — the feet less than 0.15 torso apart along the facing direction (a stance of its own, drawn full like the
-other two since 2026-10-22); empty = no data (an ankle not seen, no facing angle). The hips are not read (since 2026-10-22; a folder run 2026-10-20 to 10-22 has an `unclear` state, hips square
+other two since 2026-10-22); empty = no data (an ankle not seen, no facing angle). Under it, **Stance (smoothed)** (since 2026-10-22) is the same
+stance after rule 34's cleaning — `stance_changes/segments.csv`, the timeline rule 34 counts on — in the same colours,
+empty where there is no data; its tooltip says whether rule 34 counted the run. The hips are not read (since 2026-10-22; a folder run 2026-10-20 to 10-22 has an `unclear` state, hips square
 among its reasons, drawn grey too). The pill on the video names the frame's stance. Read on the raw skeleton, so never
 flipped back. Short flips are mostly noise.
 After it, `gloves: yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand points' shape, gloves
