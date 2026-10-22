@@ -419,9 +419,12 @@ rule's own.
 
 **Stance changes** (rule 34, `stance_changes/stance_changes.json` + `segments.csv`, since 2026-10-22): its timeline
 row shows the stance segments — yellow orthodox (left foot front), blue southpaw (right foot front), as the Stance row
-— each from its first frame up to the next segment, so the shorter flips inside it are not drawn; a white tick marks
-where a change starts; nothing before the first segment. A frame's stance is the foot in front along the facing, a
-neutral frame keeps the stance before it, and a segment is at least `move.min_segment_s` (5 s) of one stance. Score =
+— each from its first seen frame up to the next segment; a white tick marks where a change starts; nothing before the
+first segment. A frame's stance is the foot in front along the facing; a neutral frame (feet too close, an ankle not
+seen) counts for nothing. A segment is at least `move.min_segment_s` (5 s) of frames seen in one stance: a shorter run
+is erased, shortest first, and the same stance on either side joins up across it (since 2026-10-22, the same day: at
+first a neutral frame took the last seen frame's stance, so one accidental frame before a long unseen stretch became a
+segment). Score =
 100 at 2 changes or fewer, linearly to 0 at 5; when rule 19, 20 or 33 scored under 70 in the round (`round.strict`,
 since 2026-10-22) 100 at 0 changes, 0 at 2 (1 change = 50). The Round row's sum lists the segments in order and, on
 the strict scale, which rule put it there. It reads the

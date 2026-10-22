@@ -1457,21 +1457,21 @@ const RULE_LAYERS = [
     },
   },
   {
-    // rule 34, stance changes (stance_changes/segments.csv): the stance segments - a run of one stance (a neutral frame
-    // keeping the stance before it) of at least move.min_segment_s, consecutive ones of the same stance merged; each
-    // drawn from its first frame up to the next segment, so the shorter flips inside it are not drawn. A segment that
+    // rule 34, stance changes (stance_changes/segments.csv): the stance segments - a run of one stance with at least
+    // move.min_segment_s of SEEN frames (neutral time adds nothing; shorter runs are erased and the same stance either
+    // side joins up across them); each drawn from its first seen frame up to the next segment. A segment that
     // starts a change carries a white tick at its start. Before the first segment nothing is drawn. Yellow / blue as
     // the Stance row (STANCEROW).
     key: 'stchg', label: RN(34), short: RN(34), items: true,
     csv: ['stance_changes', 'segments.csv'], json: ['stance_changes', 'stance_changes.json'],
     parseItem: (r, num) => r.state === 'none' ? null
-      : {state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), js: num(r.judged_s), change: r.change === '1'},
+      : {state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), seen: num(r.seen_s), change: r.change === '1'},
     card: () => '',
     tip: (e, x) => `<b style="color:${STANCEROW[x.state]}">●</b> <b>${STANCENAME[x.state]}</b> · `
       + `<span class="num">${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(1)} s</span>`
       + (x.change ? '<br><b>a stance change</b>' : '')
-      + `<br><span class="m">${THR(() => `a stance segment: at least ${fN(T(34, 'move.min_segment_s'))} s of one stance (neutral frames keep the stance before them); `
-        + `shorter flips inside it are not counted`)}</span>`,
+      + `<br><span class="m">${x.seen != null ? `${x.seen.toFixed(1)} s of it seen in this stance · ` : ''}${THR(() => `a stance segment: at least ${fN(T(34, 'move.min_segment_s'))} s of frames seen in one stance `
+        + `(unseen time adds nothing); shorter flips inside it are erased`)}</span>`,
     row(e, x, {c, y, h, tx, fps}) {
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
@@ -3253,15 +3253,15 @@ function ruleCard() {
   const sc = S.layerSum.stchg;
   if (sc) add(RN(34), sc.score ?? 'not rated', sc.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he stay in one stance, or keep switching between orthodox and southpaw?',
-    on: `${sc.judged_s} s judged with a stance (excluded time left out) · every angle · `
+    on: `${sc.judged_s} s seen with a stance (excluded time left out) · every angle · `
         + `${sc.clear_frames.toLocaleString()} frames with one foot clearly in front (${sc.orthodox_frames.toLocaleString()} left, `
-        + `${sc.southpaw_frames.toLocaleString()} right), the rest neutral and keeping the stance before them`,
+        + `${sc.southpaw_frames.toLocaleString()} right); the rest neutral, which counts for nothing`,
     th: THR(() => { const strict = sc.scale === 'strict', key = strict ? 'round.strict.score' : 'round.score';
       const full = T(34, `${key}.full`), zero = T(34, `${key}.zero`), nf = T(34, 'round.score.full'), nz = T(34, 'round.score.zero');
       const sf = T(34, 'round.strict.score.full'), sz = T(34, 'round.strict.score.zero');
       const rs = (T(34, 'round.strict.rules') || []).map(n => `${n} (${RN(n)})`).join(', ');
-      return {round: {label: 'per round', rule: `a stance segment is at least ${fN(T(34, 'move.min_segment_s'))} s of one stance (a neutral frame keeps the stance `
-                        + `before it; a shorter run is noise and does not count); a change is a segment followed by one of the other stance; `
+      return {round: {label: 'per round', rule: `a stance segment is at least ${fN(T(34, 'move.min_segment_s'))} s of frames seen in one stance (neutral time adds `
+                        + `nothing; a shorter run is erased, shortest first, and the same stance either side joins up across it); a change is a segment followed by one of the other stance; `
                         + `100 at ${fN(nf)} changes or fewer, linearly down to 0 at ${fN(nz)}; when any of rules ${rs} scored under ${fN(T(34, 'round.strict.below'))} `
                         + `in this round, 100 at ${fN(sf)} changes, 0 at ${fN(sz)} instead — a plain number, no bands; under ${NF(34)} s with a stance: not rated`
                         + ` · this round: the ${strict ? 'strict' : 'normal'} scale`,
@@ -4989,7 +4989,7 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [33, `How high the rear heel is off the floor — above the rear foot-index (toe-tip) point — at impact on a rear-hand punch. In a stance the heel is already a little up (about ${PLANTED_LIFT} torso, measured 2026-09-28), so a planted foot scores about ${plantedScore()}; turning of the foot isn’t measured.`,
        'rear-hand punches', `zero with the heel ${say(T(33, 'move.score.zero'), [[0, 'level with the foot-index point']], v => `${fD(v, 2)} torso above the foot-index point`)}, full marks from ${fD(T(33, 'move.score.full'), 2)} torso up`,
        'The rear heel coming up lets the hips turn through; a flat-footed power punch is all arm.'],
-  [34, `How often the boxer changes stance and stays in the new one. On every frame the foot in front along the direction the boxer faces gives the stance (left = orthodox, right = southpaw), a frame with the feet too close to tell keeps the stance before it, and only ${fN(T(34, 'move.min_segment_s'))} s or more of one stance counts as a stance — the shorter flips are mostly the facing angle and the ankles’ depth misread.`,
+  [34, `How often the boxer changes stance and stays in the new one. On every frame the foot in front along the direction the boxer faces gives the stance (left = orthodox, right = southpaw); a frame with the feet too close to tell, or not seen, counts for nothing, and only ${fN(T(34, 'move.min_segment_s'))} s or more of frames seen in one stance counts as a stance — the shorter flips are erased: they are mostly the facing angle and the ankles’ depth misread.`,
        'every frame, every angle', `full marks at ${fN(T(34, 'round.score.full'))} changes or fewer, zero at ${fN(T(34, 'round.score.zero'))}; when rule ${(T(34, 'round.strict.rules') || ['…']).join(', ')} scored under ${fN(T(34, 'round.strict.below'))}, full marks at ${fN(T(34, 'round.strict.score.full'))}, zero at ${fN(T(34, 'round.strict.score.zero'))}`,
        'A boxer who drifts from one stance to the other has his lead hand and lead foot on the wrong side without choosing it.'],
 ];
