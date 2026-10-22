@@ -479,6 +479,11 @@ more, one block from its first frame to its last — red when counted, grey when
 carries its number of moves and the tooltip lists them. Score = 100 at 5 or fewer such combinations, linearly to 0 at
 10; fewer than 10 combined combinations: not rated.
 
+**Solo punches** (rule 38, `solo_punches/solo_punches.json` + `punches.csv`, since 2026-10-22): every punch clear of
+the excluded time in no combined combination (rule 31's: no punch or defensive move within 0.3 s before or after it),
+one orange block each. Score = 100 at a solo share of 40 % or less, linearly to 0 at 100 %; fewer than 10 judged
+punches: not rated.
+
 **Dead time** (rule 25, `work_rate/work_rate.json` + `segments.csv`; "Work rate" until 2026-10-03): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
 their length, empty for the short pauses in between. A frame counts as work when a

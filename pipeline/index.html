@@ -587,7 +587,7 @@ const RULE_NAMES = {
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
-  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Hand drop before the uppercut', 37: 'Combos too long',
+  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Hand drop before the uppercut', 37: 'Combos too long', 38: 'Solo punches',
 };
 const RN = no => RULE_NAMES[no];
 const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
@@ -1518,6 +1518,21 @@ const RULE_LAYERS = [
       tag(x0, w, y, h, `${x.n}`);
     },
   },
+  {
+    // rule 38, solo punches (solo_punches/punches.csv): every judged punch in no combined combination (rule 31's, the
+    // defensive moves included), one orange block each - the punches the share counts.
+    key: 'solo', label: RN(38), short: RN(38), items: true,
+    csv: ['solo_punches', 'punches.csv'], json: ['solo_punches', 'solo_punches.json'],
+    parseItem: (r, num) => r.solo !== '1' ? null : {sf: num(r.start_frame), ef: num(r.end_frame), hand: r.hand, type: r.punch_type},
+    card: () => '',
+    tip: (e, x) => `<b style="color:#ff9f0a">●</b> <b>${cap(x.hand)} ${PUNCH[x.type]?.name || x.type}</b> · <span class="num">${fmtT(x.sf / S.fps)}</span><br>`
+      + `<span class="m">a solo punch: no punch or defensive move within ${THR(() => fN(T(31, 'move.max_gap_s')))} s before or after it</span>`,
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      c.fillStyle = '#ff9f0a'; c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 5, Math.max(3, x1 - x0 - 1), h - 10, 3); c.fill(); c.globalAlpha = 1;
+    },
+  },
   slipLayer(14), slipLayer(15),
   {
     // rule 2, punch starts from low guard (hand_drop/punches.csv): how far the punching wrist sits below the nose, in torso
@@ -2376,7 +2391,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37],
+  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -3077,6 +3092,7 @@ const SCOPE = {
   work:      {moves: 'every frame'},
   stchg:     {moves: 'every frame, every angle'},
   longcombo: {moves: 'combined combinations (punches + defensive moves)'},
+  solo:      {moves: 'every punch, as a share of the round'},
   combined:  {moves: 'punches, defensive moves'},
 };
 // Which camera angles a rule judges, as three badges — lit = judged, struck-through = skipped. Front and back share
@@ -3130,7 +3146,7 @@ const RULE_META = (() => {
   const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
-              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R]};
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
@@ -3599,6 +3615,16 @@ function ruleCard() {
                         + `no bands; fewer than ${NJ(37)} combined combinations: not rated`,
                  bands: [[`≤ ${full}`, '100'], [`${full} → ${zero}`, '100 → 0'], [`≥ ${zero}`, '0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}}; }, thMiss),
     calc: `${lc.n_long} of ${lc.n_combinations} combined combinations have ${THR(() => fN(T(37, 'move.min_elements')))}+ moves (longest ${lc.longest ?? '–'}) → ${lc.score ?? '–'}`});
+  const sp1 = S.layerSum.solo;
+  if (sp1) add(RN(38), sp1.score ?? 'not rated', sp1.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'does he put his punches together, or throw them one at a time?',
+    on: `${sp1.n_punches} punches clear of the excluded time · all judged`,
+    th: THR(() => { const full = fP(T(38, 'round.score.full')), zero = fP(T(38, 'round.score.zero'));
+      return {event: {label: 'per punch', rule: `solo: in no combined combination (rule 31’s — a punch or defensive move within ${fN(T(31, 'move.max_gap_s'))} s before or after makes one)`},
+              round: {label: 'per round', rule: `the share of punches thrown solo: 100 at ${full} % or less, linearly down to 0 at ${zero} % — a plain number, no bands; `
+                        + `fewer than ${NJ(38)} judged punches: not rated`,
+                 bands: [[`≤ ${full} %`, '100'], [`${full} → ${zero} %`, '100 → 0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a'}}}; }, thMiss),
+    calc: `${sp1.n_solo} of ${sp1.n_punches} punches solo = ${pct(sp1.solo_share)} → ${sp1.score ?? '–'}`});
   const dc = S.decay;
   if (dc) add(RN(26), dc.score ?? 'not rated', dc.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he still throw at the end what he threw at the start?',
@@ -5324,6 +5350,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [37, `How many of the boxer’s combinations run on to ${fN(T(37, 'move.min_elements'))} moves or more — punches and defensive moves together, each within ${fN(T(31, 'move.max_gap_s'))} s of the last (rule 31’s combinations).`,
        'combinations of punches and defensive moves', `full marks at ${fN(T(37, 'round.score.full'))} or fewer, zero at ${fN(T(37, 'round.score.zero'))}`,
        'A combination that never stops leaves the boxer out of position and out of breath, and gives the opponent his rhythm.'],
+  [38, `What share of the boxer’s punches are thrown on their own — with no other punch and no defensive move within ${fN(T(31, 'move.max_gap_s'))} s before or after (not in any of rule 31’s combinations).`,
+       'every punch', `full marks at ${fP(T(38, 'round.score.full'))} % or less, zero at ${fP(T(38, 'round.score.zero'))} %`,
+       'A single punch is easy to read and block; it is the second and third punch that land.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));
