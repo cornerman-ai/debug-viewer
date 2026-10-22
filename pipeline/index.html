@@ -740,7 +740,7 @@ const ELBOWSTATE = {tucked: '#34c759', flared: '#ff3b30'};   // per-stretch colo
 // Why a frame is gray. The long form goes in the tooltip; SKIPWORD is the short one written on the strip, so the
 // reason is readable without hovering. Every gray state on every row has an entry here.
 const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 'side-on', front_on: 'front-on',
-                  punching: 'punching', hook: 'hook / body', no_facing: 'no facing', no_side: 'no side',
+                  punching: 'punching', defending: 'defending', hook: 'hook / body', no_facing: 'no facing', no_side: 'no side',
                   excluded: 'excluded', window_in_edge: 'excluded'};   // window_in_edge: rules 3 / 13 run before 2026-10-12's excluded time
 // a frame rule's state in the video's excluded time (S.excl): measured there, never judged
 const EXCLWHY = 'the video’s excluded time — no rule judges it (grey on the timeline)';
@@ -971,7 +971,7 @@ function setFaceFilter(band) {                       // null clears it
 const STANCECOL = {ok: '#34c759', narrow: '#ff3b30', shallow: '#ff3b30'};
 // rule 39's gray states: why a guard frame is not judged
 const FLATSKIP = {no_pose: 'a heel, a toe tip, a shoulder or a hip is not seen', front_on: 'the boxer is not side-on — from the front the heel and the toe overlap',
-                  punching: 'a punch or a defensive move is within 0.15 s', excluded: EXCLWHY};
+                  defending: 'a defensive move is within 0.15 s', excluded: EXCLWHY};
 const STANCESKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
                     front_on: 'the boxer is not side-on (front- or back-on)', excluded: EXCLWHY};
 function stanceLayer(kind) {
@@ -2385,9 +2385,9 @@ const RULE_LAYERS = [
   },
   stanceLayer('width'), stanceLayer('depth'),
   {
-    // rule 39, flat-footed in guard (flat_feet/runs.csv): the guard frames, side-on, as stretches - red where both
+    // rule 39, flat-footed in guard (flat_feet/runs.csv): every frame but defensive moves (punches count), side-on, as stretches - red where both
     // heels are down (each under move.heel_down_below torso above its toe tip), green where a heel is up, gray where
-    // the rule does not judge (a punch or move near, not side-on, a foot point not seen, excluded time).
+    // the rule does not judge (a defensive move near, not side-on, a foot point not seen, excluded time).
     key: 'flat', label: RN(39), short: RN(39), items: true,
     csv: ['flat_feet', 'runs.csv'], json: ['flat_feet', 'flat_feet.json'],
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), min: num(r.min_heel), mean: num(r.mean_heel)}),
@@ -3128,7 +3128,7 @@ const SCOPE = {
   stchg:     {moves: 'every frame, every angle'},
   longcombo: {moves: 'combined combinations (punches + defensive moves)'},
   solo:      {moves: 'every punch, as a share of the round'},
-  flat:      {moves: 'every guard frame (no punch or defensive move within 0.15 s)'},
+  flat:      {moves: 'every frame, punches included, defensive moves not'},
   combined:  {moves: 'punches, defensive moves'},
 };
 // Which camera angles a rule judges, as three badges — lit = judged, struck-through = skipped. Front and back share
@@ -3653,8 +3653,8 @@ function ruleCard() {
     calc: `${lc.n_long} of ${lc.n_combinations} combined combinations have ${THR(() => fN(T(37, 'move.min_elements')))}+ moves (longest ${lc.longest ?? '–'}) → ${lc.score ?? '–'}`});
   const ff = S.layerSum.flat;
   if (ff) add(RN(39), ff.score ?? 'not rated', ff.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'between punches, is he up on the balls of his feet, or standing flat on both heels?',
-    on: `${ff.judged_frames.toLocaleString()} guard frames judged (${ff.judged_s} s): side-on, no punch or defensive move within ${THR(() => fN(T(39, 'move.guard_pad_s')))} s, both feet seen`,
+    what: 'while he boxes, is he up on the balls of his feet, or standing flat on both heels?',
+    on: `${ff.judged_frames.toLocaleString()} frames judged (${ff.judged_s} s): side-on, punches included, no defensive move within ${THR(() => fN(T(39, 'move.defense_pad_s')))} s, both feet seen`,
     th: THR(() => { const d = fD(T(39, 'move.heel_down_below'), 2), full = fP(T(39, 'round.score.full')), zero = fP(T(39, 'round.score.zero'));
       return {event: {label: 'per frame', rule: `a heel under ${d} torso above its toe tip (BlazePose's heel and foot-index points) is down; both heels down = flat-footed`,
                       bands: [['a heel up', 'up'], ['both heels down', 'flat']], pal: {up: '#34c759', flat: '#ff3b30'}},
@@ -5405,8 +5405,8 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [38, `What share of the boxer’s punches are thrown on their own — with no other punch and no defensive move within ${fN(T(31, 'move.max_gap_s'))} s before or after (not in any of rule 31’s combinations).`,
        'every punch', `full marks at ${fP(T(38, 'round.score.full'))} % or less, zero at ${fP(T(38, 'round.score.zero'))} %`,
        'A single punch is easy to read and block; it is the second and third punch that land.'],
-  [39, `Whether the boxer stands flat on both heels between punches. Seen from the side, each heel’s height above its own toe tip (BlazePose’s heel and foot-index points): under ${fD(T(39, 'move.heel_down_below'), 2)} torso lengths the heel is down; both down is flat-footed. Only guard time counts — no punch or defensive move within ${fN(T(39, 'move.guard_pad_s'))} s.`,
-       'guard frames, side-on', `full marks at ${fP(T(39, 'round.score.full'))} % of that time flat-footed or less, zero at ${fP(T(39, 'round.score.zero'))} %`,
+  [39, `Whether the boxer stands flat on both heels while he boxes. Seen from the side, each heel’s height above its own toe tip (BlazePose’s heel and foot-index points): under ${fD(T(39, 'move.heel_down_below'), 2)} torso lengths the heel is down; both down is flat-footed. Punches count; defensive moves (and ${fN(T(39, 'move.defense_pad_s'))} s around them) do not.`,
+       'every frame but defensive moves, side-on', `full marks at ${fP(T(39, 'round.score.full'))} % of that time flat-footed or less, zero at ${fP(T(39, 'round.score.zero'))} %`,
        'Flat on both heels a boxer is slow to move, slow to push off into a punch and easy to catch.'],
 ];
 function renderExplain() {
