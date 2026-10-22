@@ -571,8 +571,9 @@ const DEF = {                         // defenses.csv defense_type
 const styleP = t => PUNCH[t] || {c: '#8e8e93', l: '?', name: t};
 const styleD = t => DEF[t] || {c: '#8e8e93', l: '?', name: t};
 const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
-// COCO-17 subset of BlazePose-33 for the stick figure, and its bones
-const J = {nose: 0, lsh: 11, rsh: 12, lel: 13, rel: 14, lwr: 15, rwr: 16, lhip: 23, rhip: 24, lkn: 25, rkn: 26, lan: 27, ran: 28};
+// COCO-17 subset of BlazePose-33 for the stick figure plus the feet, and its bones
+const J = {nose: 0, lsh: 11, rsh: 12, lel: 13, rel: 14, lwr: 15, rwr: 16, lhip: 23, rhip: 24, lkn: 25, rkn: 26, lan: 27, ran: 28,
+           lhe: 29, rhe: 30, lft: 31, rft: 32};   // + BlazePose heel and foot-index (toe tip): the full foot
 // THE rule names, by number (the Notion "Production rules" order). Every place the page names a rule reads them here —
 // the Rules tab, the Brief, the All videos headers, Explanations, the Now cards, the timeline rows and their cards — so
 // a rename is one entry (plus the docs). Layer keys, stage folders and CSV columns are identifiers and never follow a
@@ -706,7 +707,8 @@ const overAnkle = (txt) => say(T(1, 'move.hips.zero'), [[0.5, txt]], () => '');
 // rules 19 / 20: the per-hand-and-type ranges in the file's order, "lead jab 0–25°, …, rear body shot 25–50°"
 const ivList = n => Object.entries(T(n, 'move.score.full'))
   .map(([k, a]) => `${k.replace('hook_or_uppercut', 'body shot')} ${fIv(a)}°`).join(', ');
-const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12]];
+const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12],
+               [27,29],[29,31],[27,31],[28,30],[30,32],[28,32]];   // each foot: ankle - heel - toe tip
 const STAGES = {
   punches: ['punch_impact', 'impacts.csv'], punchesFallback: ['punch_classification', 'punches.csv'],
   punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
@@ -4244,7 +4246,7 @@ function drawOverlay(f, punchesNow) {
     let hollow = 0;
     for (const j of Object.values(J)) {
       const p = P(j); if (!p) continue;
-      octx.beginPath(); octx.arc(p[0], p[1], 3.6, 0, 7);
+      octx.beginPath(); octx.arc(p[0], p[1], j >= 29 ? 2.6 : 3.6, 0, 7);     // heel and toe tip: smaller, beside the ankle
       if (seen(j)) { octx.fillStyle = '#0a84ff'; octx.fill(); continue; }
       hollow++; octx.fillStyle = 'rgba(0,0,0,0.45)'; octx.fill();
       octx.lineWidth = 1.8; octx.strokeStyle = '#fff'; octx.stroke(); octx.lineWidth = 3;

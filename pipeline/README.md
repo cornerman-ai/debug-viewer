@@ -67,7 +67,7 @@ default, then the rule rows; the choice is remembered in the browser, and a row 
 Under Lead, Rear and Defense, one small switch per punch / move type the video has on that row, with its
 count (since 2026-10-07): off hides that type on that row only (lead jabs, not rear ones) — its blocks, hover, the pills
 and the ↑ / ↓ jumps — and is remembered across videos; the Round tab's chips still hide a type on every row, for the
-current video. On the video: the skeleton, a ring
+current video. On the video: the skeleton (each foot drawn whole since 2026-10-22: ankle, heel and toe tip — BlazePose's heel and foot-index points), a ring
 on the punching wrist around impact (dashed, with its visibility and "may be a guess", when the wrist is under 0.6 —
 see Hand return path), and pills naming the current punch / move.
 
