@@ -3259,7 +3259,7 @@ function ruleCard() {
     th: THR(() => { const strict = sc.scale === 'strict', key = strict ? 'round.strict.score' : 'round.score';
       const full = T(34, `${key}.full`), zero = T(34, `${key}.zero`), nf = T(34, 'round.score.full'), nz = T(34, 'round.score.zero');
       const sf = T(34, 'round.strict.score.full'), sz = T(34, 'round.strict.score.zero');
-      const rs = T(34, 'round.strict.rules').map(n => `${n} (${RN(n)})`).join(', ');
+      const rs = (T(34, 'round.strict.rules') || []).map(n => `${n} (${RN(n)})`).join(', ');
       return {round: {label: 'per round', rule: `a stance segment is at least ${fN(T(34, 'move.min_segment_s'))} s of one stance (a neutral frame keeps the stance `
                         + `before it; a shorter run is noise and does not count); a change is a segment followed by one of the other stance; `
                         + `100 at ${fN(nf)} changes or fewer, linearly down to 0 at ${fN(nz)}; when any of rules ${rs} scored under ${fN(T(34, 'round.strict.below'))} `
@@ -4990,7 +4990,7 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
        'rear-hand punches', `zero with the heel ${say(T(33, 'move.score.zero'), [[0, 'level with the foot-index point']], v => `${fD(v, 2)} torso above the foot-index point`)}, full marks from ${fD(T(33, 'move.score.full'), 2)} torso up`,
        'The rear heel coming up lets the hips turn through; a flat-footed power punch is all arm.'],
   [34, `How often the boxer changes stance and stays in the new one. On every frame the foot in front along the direction the boxer faces gives the stance (left = orthodox, right = southpaw), a frame with the feet too close to tell keeps the stance before it, and only ${fN(T(34, 'move.min_segment_s'))} s or more of one stance counts as a stance — the shorter flips are mostly the facing angle and the ankles’ depth misread.`,
-       'every frame, every angle', `full marks at ${fN(T(34, 'round.score.full'))} changes or fewer, zero at ${fN(T(34, 'round.score.zero'))}; when rule ${T(34, 'round.strict.rules').join(', ')} scored under ${fN(T(34, 'round.strict.below'))}, full marks at ${fN(T(34, 'round.strict.score.full'))}, zero at ${fN(T(34, 'round.strict.score.zero'))}`,
+       'every frame, every angle', `full marks at ${fN(T(34, 'round.score.full'))} changes or fewer, zero at ${fN(T(34, 'round.score.zero'))}; when rule ${(T(34, 'round.strict.rules') || ['…']).join(', ')} scored under ${fN(T(34, 'round.strict.below'))}, full marks at ${fN(T(34, 'round.strict.score.full'))}, zero at ${fN(T(34, 'round.strict.score.zero'))}`,
        'A boxer who drifts from one stance to the other has his lead hand and lead foot on the wrong side without choosing it.'],
 ];
 function renderExplain() {
