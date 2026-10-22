@@ -422,7 +422,9 @@ row shows the stance segments — yellow orthodox (left foot front), blue southp
 — each from its first frame up to the next segment, so the shorter flips inside it are not drawn; a white tick marks
 where a change starts; nothing before the first segment. A frame's stance is the foot in front along the facing, a
 neutral frame keeps the stance before it, and a segment is at least `move.min_segment_s` (5 s) of one stance. Score =
-100 at 2 changes or fewer, linearly to 0 at 5; the Round row's sum lists the segments in order. It reads the
+100 at 2 changes or fewer, linearly to 0 at 5; when rule 19, 20 or 33 scored under 70 in the round (`round.strict`,
+since 2026-10-22) 100 at 0 changes, 0 at 2 (1 change = 50). The Round row's sum lists the segments in order and, on
+the strict scale, which rule put it there. It reads the
 `facing_angle` stage's angle, so on a video whose facing stage predates the current facing model it can differ from the
 Stance row, which computes its own.
 
