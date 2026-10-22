@@ -10,7 +10,7 @@
     --text: #1d1d1f; --text2: #6e6e73; --text3: #aeaeb2; --sep: rgba(60,60,67,0.14); --fill: rgba(120,120,128,0.12);
     --fill2: rgba(120,120,128,0.2); --accent: #007aff; --track: #fbfbfd; --grid: rgba(60,60,67,0.08);
     --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
-    --angle: #007aff; --playhead: #ff3b30;
+    --angle: #007aff; --playhead: #ff3b30; --lane: rgba(120,120,128,0.075);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -18,7 +18,7 @@
       --text: #f5f5f7; --text2: #98989d; --text3: #636366; --sep: rgba(84,84,88,0.5); --fill: rgba(118,118,128,0.24);
       --fill2: rgba(118,118,128,0.36); --accent: #0a84ff; --track: #111113; --grid: rgba(255,255,255,0.07);
       --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
-      --angle: #0a84ff; --playhead: #ff453a;
+      --angle: #0a84ff; --playhead: #ff453a; --lane: rgba(118,118,128,0.16);
     }
   }
   * { box-sizing: border-box; }
@@ -944,7 +944,7 @@ const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that h
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
 // the Stance row (stance/runs.csv, ml/research/stance/stance.py's frame_states): its colours and why a frame is unclear
 // (since 2026-10-22: the left foot in front yellow, the right blue, neutral grey; the hips are not read)
-const STANCEROW = {orthodox: '#ffd60a', southpaw: '#0a84ff', neutral: '#8e8e93', unclear: '#8e8e93'};
+const STANCEROW = {orthodox: '#ffcc00', southpaw: '#0a84ff', neutral: '#aeaeb2', unclear: '#aeaeb2'};
 const STANCENAME = {orthodox: 'Left foot front (orthodox)', southpaw: 'Right foot front (southpaw)', neutral: 'Neutral',
                     unclear: 'Unclear'};                       // unclear: a folder run 2026-10-20 to 10-22
 const STANCECLEAR = s => s === 'orthodox' || s === 'southpaw';
@@ -4282,29 +4282,39 @@ function trackLines(name) {
 }
 let TR = {}, laneTop = 0;                                       // laneTop: the first row under the facing row
 // each base row's height and the gap under it: lead / rear sit close as a pair
-const BASE_GEOM = {angle: [190, 8], stance: [22, 10], activity: [84, 10], lead: [30, 4], rear: [30, 10], def: [30, 10]};
-// The base rows in two groups, each under its own caption on a faint band (the rule rows are the third, RULES):
-// what the body does (facing, stance) and what he does (activity, punches, defense).
-const BASE_GROUP = {angle: 'BODY', stance: 'BODY', activity: 'ACTIONS', lead: 'ACTIONS', rear: 'ACTIONS', def: 'ACTIONS'};
-let TRG = [];                                                   // [[caption, caption y, the group's last row's bottom]]
+// Every lane's height; lanes sit LANE_GAP apart, groups GROUP_GAP apart under a HEAD_H header (2026-10-22 redesign:
+// grouping by space and type, no bands or outlines - the way Apple's own charts and track views read).
+const BASE_GEOM = {angle: 150, stance: 32, activity: 96, lead: 30, rear: 30, def: 30};
+const LANE_GAP = 6, GROUP_GAP = 20, HEAD_H = 24, RULE_H = 28;
+// The base rows in two groups (the rule rows are the third): what the body does and what he does.
+const BASE_GROUP = {angle: 'Body', stance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions'};
+// A row's colour key, under its name in the label column, where its colours carry the meaning.
+const STANCE_KEY = () => [[STANCEROW.orthodox, 'left'], [STANCEROW.southpaw, 'right'], [STANCEROW.neutral, 'neutral']];
+const LANE_KEY = () => ({angle: [[FACECOL.front, 'front / back'], [FACECOL['side-on'], 'side-on']], stance: STANCE_KEY(),
+  activity: [[ACT.outCol, 'output / min'], [ACT.movCol, 'movement']]});
+const LANE_FONT = (w, s) => `${w} ${s}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif`;
+let TRG = [];                                                   // [[header, its baseline y, first group?]]
 function layout() {
-  TR = {ruler: [0, 24]}; TRG = [];
-  let y = 30, end = 20, grp = null;
+  TR = {ruler: [0, 28]}; TRG = [];
+  let y = 34, grp = null;
+  const head = name => { if (TRG.length) y += GROUP_GAP - LANE_GAP; TRG.push([name, y + 11, TRG.length === 0]); y += HEAD_H; };
   for (const [k] of BASE_ROWS) if (baseOn(k)) {
-    if (BASE_GROUP[k] !== grp) { grp = BASE_GROUP[k]; if (TRG.length) y += 6; TRG.push([grp, y + 5, y]); y += 16; }
-    const [h, gap] = BASE_GEOM[k]; TR[k] = [y, h]; end = y + h; y = end + gap; TRG[TRG.length - 1][2] = end;
+    if (BASE_GROUP[k] !== grp) { grp = BASE_GROUP[k]; head(grp); }
+    TR[k] = [y, BASE_GEOM[k]]; y += BASE_GEOM[k] + LANE_GAP;
   }
-  const any = LAYERS.some(layerOn);
-  y = end + (any ? 26 : 10);                                   // 16 px for the "RULES" caption when there are rule rows
   laneTop = ['lead', 'rear', 'def'].map(k => TR[k]?.[0]).find(v => v != null) ?? y;
-  for (const k of layerOrder()) if (layerOn(k)) { TR[k] = [y, 26]; y += 30; }
-  if (any) TR.rules = end + 15;
-  TR.bottom = y - (any ? 4 : 10);                              // lowest edge of the scrolling rows
-  TR.over = [TR.bottom + 14, 30];
-  tctx.font = TRACKFONT;                                     // the gutter is as wide as the longest name line shown
-  const wide = LAYERS.filter(layerOn).flatMap(k => trackLines(LNAME[k])).map(t => tctx.measureText(t).width);
-  L = Math.max(78, Math.ceil(Math.max(0, ...wide)) + 24);
-  tl.style.height = `${TR.over[0] + TR.over[1] + 4}px`;
+  if (LAYERS.some(layerOn)) {
+    head('Rules');
+    for (const k of layerOrder()) if (layerOn(k)) { TR[k] = [y, RULE_H]; y += RULE_H + LANE_GAP; }
+  }
+  TR.bottom = y - LANE_GAP;                                    // lowest edge of the scrolling rows
+  TR.over = [TR.bottom + GROUP_GAP, 30];
+  tctx.font = LANE_FONT(500, 11.5);                           // the label column fits the longest name and colour key
+  const wide = LAYERS.filter(layerOn).flatMap(k => trackLines(LNAME[k])).map(s => tctx.measureText(s).width);
+  tctx.font = LANE_FONT(500, 10.5);
+  const stanceKey = STANCE_KEY().reduce((w, [, word]) => w + tctx.measureText(word).width + 21, 0);   // the one key on a line
+  L = Math.max(150, Math.ceil(Math.max(0, ...wide, stanceKey)) + 34);
+  tl.style.height = `${TR.over[0] + TR.over[1] + 6}px`;
 }
 layout();
 let TW = 0, TH = 0;
@@ -4379,85 +4389,76 @@ function drawTimeline(f) {
   c.clearRect(0, 0, TW, TH);
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
-  // track backgrounds + names
-  const names = {angle: 'Facing', stance: 'Stance', activity: 'Activity', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
-  // the groups: a faint band behind each, its caption and a divider (BODY, ACTIONS, then RULES)
-  const groups = TRG.map(([g, cy, gEnd]) => [g, cy, gEnd + 4]);
-  if (TR.rules) groups.push(['RULES', TR.rules, TR.bottom + 2]);
-  for (const [g, cy, gEnd] of groups) {
-    c.fillStyle = 'rgba(120,120,128,0.06)'; rr(2, cy - 9, TW - 4, gEnd - cy + 9, 8); c.fill();
-    c.fillStyle = text3; c.textAlign = 'left'; c.font = '700 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-    c.fillText(g, 10, cy); const gw = c.measureText(g).width;
-    c.strokeStyle = sep; c.lineWidth = 1; c.beginPath(); c.moveTo(18 + gw, cy + 0.5); c.lineTo(L + W, cy + 0.5); c.stroke();
+  // the label column, the group headers and the lanes (2026-10-22 redesign: space and type do the grouping)
+  const names = {angle: 'Facing', stance: 'Stance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', over: 'Overview', ...LNAME};
+  const lane = css('--lane') || 'rgba(120,120,128,0.075)', F = LANE_FONT, KEY = LANE_KEY();
+  const step = niceStep(V.t1 - V.t0, W), ticks = [];
+  for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) ticks.push(t);
+  c.strokeStyle = sep; c.lineWidth = 1;                        // the ruler's hairline
+  c.beginPath(); c.moveTo(0, TR.ruler[1] + 0.5); c.lineTo(TW, TR.ruler[1] + 0.5); c.stroke();
+  for (const [g, gy, first] of TRG) {
+    if (!first) { c.strokeStyle = sep; c.beginPath(); c.moveTo(16, gy - 17.5); c.lineTo(L + W, gy - 17.5); c.stroke(); }
+    c.fillStyle = text2; c.textAlign = 'left'; c.font = F(600, 10.5);
+    if ('letterSpacing' in c) c.letterSpacing = '0.8px';
+    c.fillText(g.toUpperCase(), 16, gy);
+    if ('letterSpacing' in c) c.letterSpacing = '0px';
   }
-  c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   for (const [k, v] of Object.entries(TR)) {
-    if (k === 'ruler' || k === 'bottom' || k === 'rules') continue;
+    if (k === 'ruler' || k === 'bottom') continue;
     const [y, h] = v;
-    c.fillStyle = track; rr(L, y, W, h, 7); c.fill();
-    c.strokeStyle = 'rgba(120,120,128,0.18)'; c.lineWidth = 1; rr(L + 0.5, y + 0.5, W - 1, h - 1, 7); c.stroke();
-    c.fillStyle = RULE[k] || k === 'over' ? text2 : text; c.textAlign = 'right';
-    const nl = RULE[k] ? trackLines(names[k]) : [names[k]];   // a rule row's Notion name, on two lines if long
-    c.font = RULE[k] || k === 'over' ? TRACKFONT : '600 11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-    if (k === 'activity') {                                  // its name on top, then a key for each of its two lines
-      c.fillText(names[k], L - 12, y + 12);
-      c.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-      for (const [i, [col, label]] of [[ACT.outCol, 'output'], [ACT.movCol, 'movement']].entries()) {
-        const ly = y + 32 + i * 16, w = c.measureText(label).width;
-        c.fillStyle = col; c.fillText(label, L - 12, ly);
-        c.strokeStyle = col; c.lineWidth = 2.5; c.beginPath(); c.moveTo(L - 34 - w, ly); c.lineTo(L - 18 - w, ly); c.stroke();
+    c.fillStyle = lane; rr(L, y, W, h, 6); c.fill();
+    if (V.hoverRow === k) { c.fillStyle = 'rgba(120,120,128,0.07)'; rr(L, y, W, h, 6); c.fill(); }   // the lane under the mouse
+    c.strokeStyle = grid; c.lineWidth = 1; c.beginPath();    // the time grid, inside the lanes only
+    for (const tt of ticks) { const x = Math.round(tx(tt)) + 0.5; c.moveTo(x, y + 3); c.lineTo(x, y + h - 3); }
+    c.stroke();
+    const quiet = RULE[k] || k === 'over', key = KEY[k];
+    c.textAlign = 'left'; c.fillStyle = quiet ? text2 : text; c.font = quiet ? F(500, 11.5) : F(600, 12.5);
+    if (key) {                                               // the name, then its colour key
+      const tall = h >= 60, ny = tall ? y + 14 : y + h / 2 - 7;
+      c.fillText(names[k], 16, ny);
+      c.font = F(500, 10.5); let kx = 16, ky = ny + 16;
+      for (const [col, word] of key) {
+        c.fillStyle = col; c.beginPath(); c.arc(kx + 4, ky, 3.5, 0, 2 * Math.PI); c.fill();
+        c.fillStyle = text2; c.fillText(word, kx + 11, ky);
+        if (tall) ky += 15; else kx += 11 + c.measureText(word).width + 10;
       }
-      c.font = TRACKFONT; continue;
+      continue;
     }
-    const say = x => nl.forEach((t, i) => c.fillText(t, x, y + h / 2 + (i - (nl.length - 1) / 2) * 12));
-    if (RULE[k]?.split) {                                    // a split row: its name, then lead / rear per half
-      say(L - 12);
-      c.fillStyle = text3; c.font = '500 8.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-      const [h1, h2] = RULE[k].halves || ['lead', 'rear'];      // a split row names its halves (lead / rear by default)
-      c.textAlign = 'left'; c.fillText(h1, L + 4, y + h / 4 + 1); c.fillText(h2, L + 4, y + 3 * h / 4 - 1);
-      c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textAlign = 'right';
-    } else {
-      say(k === 'angle' ? L - 36 : L - 12);
+    const nl = RULE[k] ? trackLines(names[k]) : [names[k]];
+    nl.forEach((s, i) => c.fillText(s, 16, y + h / 2 + (i - (nl.length - 1) / 2) * 13));
+    if (RULE[k]?.split) {                                    // a split row names its halves (lead / rear by default)
+      c.fillStyle = text3; c.font = F(500, 8.5);
+      const [h1, h2] = RULE[k].halves || ['lead', 'rear'];
+      c.fillText(h1, L + 5, y + h / 4 + 1); c.fillText(h2, L + 5, y + 3 * h / 4 - 1);
     }
   }
-  // ruler + vertical grid
-  const step = niceStep(V.t1 - V.t0, W);
-  c.textAlign = 'center';
-  for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) {
-    const x = tx(t);
-    c.strokeStyle = grid; c.lineWidth = 1; c.beginPath(); c.moveTo(x, 30); c.lineTo(x, TR.bottom); c.stroke();
-    c.fillStyle = text3; c.fillText(step < 1 ? t.toFixed(2) + ' s' : fmtT(t).replace(/\.\d+$/, ''), x, 12);
-  }
+  c.textAlign = 'center'; c.font = F(500, 10.5); c.fillStyle = text3;   // the ruler's times
+  for (const tt of ticks) c.fillText(step < 1 ? tt.toFixed(2) + ' s' : fmtT(tt).replace(/\.\d+$/, ''), tx(tt), 14);
+  c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   c.save(); c.beginPath(); c.rect(L, 0, W, TR.over[0] - 4); c.clip();
-  // angle track (when the Facing row is on)
+  // angle track (when the Facing row is on): soft bands for the three views, a quiet line at 0°
   const [ay, ah] = TR.angle || [0, 0], ymap = a => ay + ah / 2 - a / 180 * (ah / 2 - 6);
   c.textAlign = 'left';
   if (TR.angle) {
-  for (const g of [-180, -90, 0, 90, 180]) {
-    c.strokeStyle = g === 0 ? sep : grid; c.lineWidth = 1; c.beginPath(); c.moveTo(L, ymap(g)); c.lineTo(L + W, ymap(g)); c.stroke();
-  }
-  // ±45° and ±135°: the facing row's display bands (front / side-on / back colours); each rule judges its own window
-  for (const g of [-135, -45, 45, 135]) {
-    c.strokeStyle = sep; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(L, ymap(g)); c.lineTo(L + W, ymap(g)); c.stroke();
-  }
-  c.save(); c.font = '600 9px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-  c.textAlign = 'left';
-  for (const [lo, hi, name] of [[135, 180, 'back'], [45, 135, 'side-on'], [-45, 45, 'front'],
-                                [-135, -45, 'side-on'], [-180, -135, 'back']]) {
-    const picked = V.faceFilter === name;
-    c.fillStyle = FACECOL[name]; c.globalAlpha = picked ? 0.30 : V.faceFilter ? 0.05 : 0.12;
-    c.fillRect(L, ymap(hi), W, ymap(lo) - ymap(hi));         // a faint band so the bucket reads at a glance
-    if (picked) {                                            // the isolated band gets an outline, not just more colour
-      c.globalAlpha = 0.9; c.strokeStyle = FACECOL[name]; c.lineWidth = 1.5;
-      c.strokeRect(L + 0.5, ymap(hi) + 0.5, W - 1, ymap(lo) - ymap(hi) - 1);
+    c.save(); c.font = LANE_FONT(600, 9.5);
+    for (const [lo, hi, name] of [[135, 180, 'back'], [45, 135, 'side-on'], [-45, 45, 'front'],
+                                  [-135, -45, 'side-on'], [-180, -135, 'back']]) {
+      const picked = V.faceFilter === name;
+      c.fillStyle = FACECOL[name]; c.globalAlpha = picked ? 0.22 : V.faceFilter ? 0.03 : 0.07;
+      c.fillRect(L, ymap(hi), W, ymap(lo) - ymap(hi));
+      if (picked) {                                          // the isolated band gets an outline, not just more colour
+        c.globalAlpha = 0.8; c.strokeStyle = FACECOL[name]; c.lineWidth = 1.5;
+        c.strokeRect(L + 0.5, ymap(hi) + 0.5, W - 1, ymap(lo) - ymap(hi) - 1);
+      }
+      c.globalAlpha = V.faceFilter && !picked ? 0.3 : 0.7;
+      if (ymap(lo) - ymap(hi) > 14) c.fillText(name, L + 8, (ymap(lo) + ymap(hi)) / 2);
     }
-    c.globalAlpha = V.faceFilter && !picked ? 0.35 : 0.9; c.fillText(name, L + 6, (ymap(lo) + ymap(hi)) / 2);
+    c.globalAlpha = 1; c.strokeStyle = grid; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(L, Math.round(ymap(0)) + 0.5); c.lineTo(L + W, Math.round(ymap(0)) + 0.5); c.stroke();
+    c.restore();
   }
-  c.globalAlpha = 1; c.restore();
-  }
-  c.restore(); c.fillStyle = text3; c.textAlign = 'right'; c.font = '500 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-  if (TR.angle) for (const g of [-180, -135, -90, -45, 0, 45, 90, 135, 180]) c.fillText(`${g}°`, L - 6, ymap(g));
+  c.restore(); c.fillStyle = text3; c.textAlign = 'right'; c.font = LANE_FONT(500, 9.5);
+  if (TR.angle) for (const g of [-180, -90, 0, 90, 180]) c.fillText(`${g}°`, L - 8, ymap(g));
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   c.save(); c.beginPath(); c.rect(L, 0, W, TR.over[0] - 4); c.clip();
   if (S.hasAngle && TR.angle) {
@@ -4475,8 +4476,8 @@ function drawTimeline(f) {
   const block = (e, y, h, s, active) => {
     const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps), w = Math.max(2, x1 - x0 - 1);
     if (x1 < L || x0 > L + W) return;
-    c.globalAlpha = V.hover === e ? 1 : 0.92; c.fillStyle = s.c; rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
-    if (active) { c.strokeStyle = text; c.lineWidth = 2; rr(x0 - 1, y + 2, w + 2, h - 4, 6); c.stroke(); }
+    c.globalAlpha = V.hover === e ? 1 : 0.9; c.fillStyle = s.c; rr(x0, y + 4, w, h - 8, 4); c.fill(); c.globalAlpha = 1;
+    if (active) { c.strokeStyle = text; c.lineWidth = 1.5; rr(x0 - 1.5, y + 2.5, w + 3, h - 5, 5); c.stroke(); }
     if (w > 13) {                                               // label at the left edge, clear of the impact line
       const big = w > 70; c.fillStyle = 'rgba(0,0,0,0.72)'; c.textAlign = big ? 'left' : 'center';
       c.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
@@ -4501,7 +4502,7 @@ function drawTimeline(f) {
       if (x1 < L || x0 > L + W) continue;
       const on = V.hover === e || (e.sf <= f && f <= e.ef);
       c.fillStyle = STANCEROW[e.state]; c.globalAlpha = on ? 1 : 0.9;
-      c.fillRect(x0, sy + 3, Math.max(1, x1 - x0), sh - 6);
+      c.fillRect(x0, sy + 8, Math.max(1, x1 - x0), sh - 16);
     }
     c.globalAlpha = 1;
   }
@@ -4512,16 +4513,21 @@ function drawTimeline(f) {
   drawExclVeil(c, W);                                     // the video's excluded time: no rule judges it
   // playhead
   const xp = tx((f + 0.5) / fps);
-  c.strokeStyle = ph; c.lineWidth = 1.5; c.beginPath(); c.moveTo(xp, 20); c.lineTo(xp, TR.bottom); c.stroke();
-  c.fillStyle = ph; rr(xp - 5, 16, 10, 8, 2.5); c.fill();
+  c.strokeStyle = ph; c.lineWidth = 1.5; c.beginPath(); c.moveTo(xp, 22); c.lineTo(xp, TR.bottom); c.stroke();
+  const pill = yy => {                                        // the playhead's time, a red pill in the ruler
+    const s = fmtT(f / fps); c.font = LANE_FONT(600, 10.5); const pw = c.measureText(s).width + 14;
+    const px = Math.min(Math.max(xp - pw / 2, L), L + W - pw);
+    c.fillStyle = ph; rr(px, yy - 8, pw, 17, 8.5); c.fill();
+    c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(s, px + pw / 2, yy + 0.5);
+  };
+  pill(14);
   const sy = tlScroll.scrollTop;
   if (sy > 0) {                                               // sticky ruler: time labels + playhead cap at the top of the view
-    c.fillStyle = css('--panel-solid'); c.fillRect(0, sy, TW, 24);
-    c.strokeStyle = sep; c.lineWidth = 1; c.beginPath(); c.moveTo(0, sy + 24.5); c.lineTo(TW, sy + 24.5); c.stroke();
-    c.textAlign = 'center'; c.fillStyle = text3;
-    for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step)
-      c.fillText(step < 1 ? t.toFixed(1) + ' s' : fmtT(t).replace(/\.\d+$/, ''), tx(t), sy + 12);
-    c.fillStyle = ph; rr(xp - 5, sy + 16, 10, 8, 2.5); c.fill();
+    c.fillStyle = css('--panel-solid'); c.fillRect(0, sy, TW, 28);
+    c.strokeStyle = sep; c.lineWidth = 1; c.beginPath(); c.moveTo(0, sy + 28.5); c.lineTo(TW, sy + 28.5); c.stroke();
+    c.textAlign = 'center'; c.fillStyle = text3; c.font = LANE_FONT(500, 10.5);
+    for (const tt of ticks) c.fillText(step < 1 ? tt.toFixed(2) + ' s' : fmtT(tt).replace(/\.\d+$/, ''), tx(tt), sy + 14);
+    pill(sy + 14);
   }
   c.restore();
   // overview: the whole video, events as ticks, the visible window as a lens
@@ -4530,8 +4536,9 @@ function drawTimeline(f) {
   for (const [a, b] of exclSpans()) { c.fillStyle = 'rgba(142,142,147,0.35)'; c.fillRect(ox(a), oy + 2, Math.max(1, ox(b) - ox(a)), oh - 4); }
   for (const e of S.defenses) if (!hid(e)) { c.fillStyle = styleD(e.type).c; c.fillRect(ox(e.sf / fps), oy + 17, Math.max(1, ox((e.ef + 1) / fps) - ox(e.sf / fps)), 8); }
   const vx0 = ox(V.t0), vx1 = ox(V.t1);
-  c.fillStyle = 'rgba(128,128,128,0.16)'; rr(vx0, oy, Math.max(4, vx1 - vx0), oh, 6); c.fill();
-  c.strokeStyle = acc; c.lineWidth = 1.5; rr(vx0, oy + 0.75, Math.max(4, vx1 - vx0), oh - 1.5, 6); c.stroke();
+  c.fillStyle = acc; c.globalAlpha = 0.12; rr(vx0, oy, Math.max(4, vx1 - vx0), oh, 6); c.fill();
+  c.globalAlpha = 0.6; c.strokeStyle = acc; c.lineWidth = 1; rr(vx0 + 0.5, oy + 0.5, Math.max(4, vx1 - vx0) - 1, oh - 1, 6); c.stroke();
+  c.globalAlpha = 1;
   c.strokeStyle = ph; c.lineWidth = 1.5; const xo = ox(f / fps); c.beginPath(); c.moveTo(xo, oy); c.lineTo(xo, oy + oh); c.stroke();
 }
 
@@ -4546,17 +4553,17 @@ const exclSpans = () => S.excl || [];
 const exclAt = t => exclSpans().find(([a, b]) => t >= a && t < b);
 function drawExclVeil(c, W) {
   const spans = exclSpans(); if (!spans.length) return;
-  const top = 20, bot = TR.bottom;
+  const top = TR.ruler[1] + 1, bot = TR.bottom;
   c.save(); c.beginPath(); c.rect(L, top, W, bot - top); c.clip();
   for (const [a, b] of spans) {
     const x0 = Math.max(L, tx(a)), x1 = Math.min(L + W, tx(b)); if (x1 <= x0) continue;
-    c.fillStyle = 'rgba(142,142,147,0.30)'; c.fillRect(x0, top, x1 - x0, bot - top);
+    c.fillStyle = 'rgba(142,142,147,0.12)'; c.fillRect(x0, top, x1 - x0, bot - top);
     c.save(); c.beginPath(); c.rect(x0, top, x1 - x0, bot - top); c.clip();      // the hatching stays inside its band
-    c.strokeStyle = 'rgba(142,142,147,0.45)'; c.lineWidth = 1; c.beginPath();
-    for (let x = x0 - (bot - top); x < x1; x += 8) { c.moveTo(x, bot); c.lineTo(x + (bot - top), top); }
+    c.strokeStyle = 'rgba(142,142,147,0.22)'; c.lineWidth = 1; c.beginPath();
+    for (let x = x0 - (bot - top); x < x1; x += 6) { c.moveTo(x, bot); c.lineTo(x + (bot - top), top); }
     c.stroke(); c.restore();
-    if (x1 - x0 > 60) { c.fillStyle = css('--text2'); c.textAlign = 'center'; c.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-      c.fillText('not judged · excluded time', (x0 + x1) / 2, top + 10); }
+    if (x1 - x0 > 70) { c.fillStyle = css('--text3'); c.textAlign = 'center'; c.font = LANE_FONT(500, 10);
+      c.fillText('not judged', (x0 + x1) / 2, top + 11); }
   }
   c.restore();
 }
@@ -4615,7 +4622,7 @@ function skipStrip(c, x, w, y, on, why) {
 //   0.27-0.3, hence the floor. Turning in place hardly moves the hip centre: a pivot shows on the Facing row, not here.
 // Fixed scales (ACT.outMax, ACT.movMax), the same for every video, so rounds compare by eye. Viewer only: no rule reads it.
 const ACT = {sigmaS: 2, lagS: 0.25, minVis: 0.5, capS: 20, floor: 0.25, outMax: 120, movMax: 1.5,
-             outCol: '#30d158', movCol: '#bf5af2', key: null, data: null};
+             outCol: '#34c759', movCol: '#af52de', key: null, data: null};
 function gaussSmooth(v, sigma, valid) {                       // a Gaussian over v; valid: per-frame 0/1 (normalised by it)
   const n = v.length, r = Math.ceil(4 * sigma), k = new Float32Array(2 * r + 1);
   for (let i = -r; i <= r; i++) k[i + r] = Math.exp(-(i * i) / (2 * sigma * sigma));
@@ -4669,19 +4676,19 @@ function activityData() {
 }
 function drawActivity(c, W, grid, text3) {
   const [y, h] = TR.activity, A = activityData(), fps = S.fps; if (!A) return;
-  const top = y + 8, bot = y + h - 6, ym = (v, max) => bot - Math.min(1, Math.max(0, v) / max) * (bot - top);
-  c.strokeStyle = grid; c.lineWidth = 1;
-  for (const q of [0.5, 1]) { const yy = Math.round(bot - q * (bot - top)) + 0.5; c.beginPath(); c.moveTo(L, yy); c.lineTo(L + W, yy); c.stroke(); }
+  const top = y + 10, bot = y + h - 8, ym = (v, max) => bot - Math.min(1, Math.max(0, v) / max) * (bot - top);
   const f0 = Math.max(0, Math.floor(V.t0 * fps) - 1), f1 = Math.min(A.n - 1, Math.ceil(V.t1 * fps) + 1);
   const step = Math.max(1, Math.floor((f1 - f0) / (W * 1.5)));
   // output: a filled area under its line
   c.beginPath(); c.moveTo(tx(f0 / fps), bot);
   for (let f = f0; f <= f1; f += step) c.lineTo(tx((f + 0.5) / fps), ym(A.out[f], ACT.outMax));
   c.lineTo(tx((f1 + 1) / fps), bot); c.closePath();
-  c.fillStyle = ACT.outCol; c.globalAlpha = 0.18; c.fill(); c.globalAlpha = 1;
+  const grad = c.createLinearGradient(0, top, 0, bot);
+  grad.addColorStop(0, 'rgba(52,199,89,0.32)'); grad.addColorStop(1, 'rgba(52,199,89,0.02)');
+  c.fillStyle = grad; c.fill();
   c.beginPath();
   for (let f = f0; f <= f1; f += step) { const xx = tx((f + 0.5) / fps), yy = ym(A.out[f], ACT.outMax); f === f0 ? c.moveTo(xx, yy) : c.lineTo(xx, yy); }
-  c.strokeStyle = ACT.outCol; c.lineWidth = 1.8; c.stroke();
+  c.strokeStyle = ACT.outCol; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke();
   // movement: a line, broken where there is no reading
   if (A.mov) {
     c.beginPath(); let on = false;
@@ -4689,11 +4696,9 @@ function drawActivity(c, W, grid, text3) {
       const v = A.mov[f]; if (!Number.isFinite(v)) { on = false; continue; }
       const xx = tx((f + 0.5) / fps), yy = ym(v, ACT.movMax); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
     }
-    c.strokeStyle = ACT.movCol; c.lineWidth = 2; c.stroke();
+    c.strokeStyle = ACT.movCol; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke();
   }
-  c.fillStyle = text3; c.textAlign = 'left'; c.font = '500 9px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-  c.fillText(`top: ${ACT.outMax}/min · ${ACT.movMax} torso/s${A.mov ? '' : ' · movement waits for the skeleton'}`, L + 6, y + 9);
-  c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+
 }
 function drawLayerRows(c, f, W, text, grid) {
   const fps = S.fps, font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
@@ -4839,6 +4844,8 @@ tl.addEventListener('pointermove', e => {
     }
     return;
   }
+  const lr = Object.entries(TR).find(([k, v]) => k !== 'ruler' && k !== 'bottom' && Array.isArray(v) && y >= v[0] && y <= v[0] + v[1])?.[0] || null;
+  if (lr !== V.hoverRow) { V.hoverRow = lr; V.dirty = true; }
   const prevLayer = V.hoverLayer; V.hoverLayer = null;
   const h = hit(x, y);
   if (h !== V.hover || V.hoverLayer !== prevLayer) { V.hover = h; V.dirty = true; }
@@ -4853,7 +4860,7 @@ tl.addEventListener('pointerup', e => {
   }
   drag = null; tl.style.cursor = 'default';
 });
-tl.addEventListener('pointerleave', () => { if (!drag) { V.hover = null; V.dirty = true; tip(null); } });
+tl.addEventListener('pointerleave', () => { if (!drag) { V.hover = null; V.hoverRow = null; V.dirty = true; tip(null); } });
 $('faceChip').addEventListener('click', () => setFaceFilter(null));
 tl.addEventListener('wheel', e => {
   const r = tl.getBoundingClientRect(), x = e.clientX - r.left, w = V.t1 - V.t0;

@@ -144,9 +144,14 @@ stance on every frame: yellow = the left foot in front (orthodox), blue = the ri
 neutral — the feet less than 0.15 torso apart along the facing direction (a stance of its own, drawn full like the
 other two since 2026-10-22); empty = no data (an ankle not seen, no facing angle).
 
-**Timeline groups** (since 2026-10-22): the rows sit in three groups, each under its caption on a faint band — BODY
-(Facing, Stance), ACTIONS (Activity, Lead, Rear, Defense) and RULES; the base rows' names are bold, every row has a
-thin outline.
+**Timeline layout** (redesigned 2026-10-22, after the first grouping with bands and outlines read worse): grouping by
+space and type, the way Apple's own charts and track views read — no bands, no outlines. Three groups under small
+uppercase headers, a hairline above each but the first: BODY (Facing, Stance), ACTIONS (Activity, Lead hand, Rear hand,
+Defense), RULES. One left-aligned label column: each lane's name, and under it a colour key where the colours carry the
+meaning (Facing: front / back, side-on; Stance: left, right, neutral; Activity: output, movement). Lanes are soft rounded
+fills (`--lane`) 6 px apart, the time grid drawn inside them only; Apple system colours for the data; softer facing
+bands; the excluded time a light wash marked "not judged"; the playhead carries the current time in a red pill in the
+ruler; the lane under the mouse turns a shade darker; the overview's window is a tinted lens.
 
 **Activity** (since 2026-10-22, viewer only, no rule reads it): two lines for looking at a round's output and movement
 by eye. Green, filled = **output**: every punch and defensive move as one event at its middle frame under a Gaussian
