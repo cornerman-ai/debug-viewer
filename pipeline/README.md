@@ -143,6 +143,21 @@ shows its 15 voting frames instead). The **Stance** row under Facing (`stance/ru
 stance on every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey =
 neutral — the feet less than 0.15 torso apart along the facing direction (a stance of its own, drawn full like the
 other two since 2026-10-22); empty = no data (an ankle not seen, no facing angle).
+
+**Timeline groups** (since 2026-10-22): the rows sit in three groups, each under its caption on a faint band — BODY
+(Facing, Stance), ACTIONS (Activity, Lead, Rear, Defense) and RULES; the base rows' names are bold, every row has a
+thin outline.
+
+**Activity** (since 2026-10-22, viewer only, no rule reads it): two lines for looking at a round's output and movement
+by eye. Green, filled = **output**: every punch and defensive move as one event at its middle frame under a Gaussian
+(σ 2 s), in events a minute — exactly 0 far from any. Purple = **movement**: the mean speed of the hip centre, both
+ankles and both wrists, each its displacement over the last 0.25 s where it is seen at both ends (visibility ≥ 0.5), in
+torso lengths a second, speeds over 20 dropped (a tracker jump), a 5-frame median, the same Gaussian, minus a fixed
+0.3 torso/s of standing still. Fixed scales for every video (top = 120 a minute and 2.5 torso/s), so rounds compare by
+eye; the left column names the two lines and the tooltip gives both values. Measured 2026-10-22 on 20 test videos: in
+rule 25's dead stretches the hips and ankles still move 0.3–0.9 torso/s, about as much as while punching (the boxers
+bounce and step), so movement reaches 0 only when he really stands; frame to frame (no 0.25 s lag) BlazePose's jitter
+swamped them.
 The hips are not read (since 2026-10-22; a folder run 2026-10-20 to 10-22 has an `unclear` state, hips square
 among its reasons, drawn grey too). The pill on the video names the frame's stance. Read on the raw skeleton, so never
 flipped back. Short flips are mostly noise.

@@ -2455,7 +2455,7 @@ const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
-V.base = {angle: true, stance: true, lead: true, rear: true, def: true};
+V.base = {angle: true, stance: true, activity: true, lead: true, rear: true, def: true};
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
 // the sub-switches under Lead / Rear / Defense: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
@@ -2945,6 +2945,7 @@ function sortLayers() {
 const BASE_ROWS = [
   ['angle', 'Facing', 'the facing angle, every frame (0° = toward the camera, ±180° = back to it)', () => S.hasAngle],
   ['stance', 'Stance', 'every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey = neutral (the feet too close to tell), empty = no data (an ankle not seen, no facing angle)', () => S.hasStanceRuns],
+  ['activity', 'Activity', 'two lines, each smoothed over about 2 s: green = output, punches + defensive moves per minute; purple = movement, how fast the hips, ankles and wrists move (torso lengths a second, the jitter of standing still taken off) — both near 0 when he just stands', () => S.punches.length > 0 || S.defenses.length > 0 || !!S.skel],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
@@ -4281,11 +4282,18 @@ function trackLines(name) {
 }
 let TR = {}, laneTop = 0;                                       // laneTop: the first row under the facing row
 // each base row's height and the gap under it: lead / rear sit close as a pair
-const BASE_GEOM = {angle: [190, 8], stance: [22, 10], lead: [30, 4], rear: [30, 10], def: [30, 10]};
+const BASE_GEOM = {angle: [190, 8], stance: [22, 10], activity: [84, 10], lead: [30, 4], rear: [30, 10], def: [30, 10]};
+// The base rows in two groups, each under its own caption on a faint band (the rule rows are the third, RULES):
+// what the body does (facing, stance) and what he does (activity, punches, defense).
+const BASE_GROUP = {angle: 'BODY', stance: 'BODY', activity: 'ACTIONS', lead: 'ACTIONS', rear: 'ACTIONS', def: 'ACTIONS'};
+let TRG = [];                                                   // [[caption, caption y, the group's last row's bottom]]
 function layout() {
-  TR = {ruler: [0, 24]};
-  let y = 30, end = 20;
-  for (const [k] of BASE_ROWS) if (baseOn(k)) { const [h, gap] = BASE_GEOM[k]; TR[k] = [y, h]; end = y + h; y = end + gap; }
+  TR = {ruler: [0, 24]}; TRG = [];
+  let y = 30, end = 20, grp = null;
+  for (const [k] of BASE_ROWS) if (baseOn(k)) {
+    if (BASE_GROUP[k] !== grp) { grp = BASE_GROUP[k]; if (TRG.length) y += 6; TRG.push([grp, y + 5, y]); y += 16; }
+    const [h, gap] = BASE_GEOM[k]; TR[k] = [y, h]; end = y + h; y = end + gap; TRG[TRG.length - 1][2] = end;
+  }
   const any = LAYERS.some(layerOn);
   y = end + (any ? 26 : 10);                                   // 16 px for the "RULES" caption when there are rule rows
   laneTop = ['lead', 'rear', 'def'].map(k => TR[k]?.[0]).find(v => v != null) ?? y;
@@ -4372,20 +4380,35 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // track backgrounds + names
-  const names = {angle: 'Facing', stance: 'Stance', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
-  if (TR.rules) {                                             // the rule rows' section caption + divider
-    c.fillStyle = text3; c.textAlign = 'left'; c.font = '600 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-    c.fillText('RULES', 8, TR.rules); c.strokeStyle = sep; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(50, TR.rules + 0.5); c.lineTo(L + W, TR.rules + 0.5); c.stroke();
-    c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  const names = {angle: 'Facing', stance: 'Stance', activity: 'Activity', lead: 'Lead', rear: 'Rear', def: 'Defense', over: 'Overview', ...LNAME};
+  // the groups: a faint band behind each, its caption and a divider (BODY, ACTIONS, then RULES)
+  const groups = TRG.map(([g, cy, gEnd]) => [g, cy, gEnd + 4]);
+  if (TR.rules) groups.push(['RULES', TR.rules, TR.bottom + 2]);
+  for (const [g, cy, gEnd] of groups) {
+    c.fillStyle = 'rgba(120,120,128,0.06)'; rr(2, cy - 9, TW - 4, gEnd - cy + 9, 8); c.fill();
+    c.fillStyle = text3; c.textAlign = 'left'; c.font = '700 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+    c.fillText(g, 10, cy); const gw = c.measureText(g).width;
+    c.strokeStyle = sep; c.lineWidth = 1; c.beginPath(); c.moveTo(18 + gw, cy + 0.5); c.lineTo(L + W, cy + 0.5); c.stroke();
   }
+  c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   for (const [k, v] of Object.entries(TR)) {
     if (k === 'ruler' || k === 'bottom' || k === 'rules') continue;
     const [y, h] = v;
     c.fillStyle = track; rr(L, y, W, h, 7); c.fill();
-    c.fillStyle = text2; c.textAlign = 'right';
+    c.strokeStyle = 'rgba(120,120,128,0.18)'; c.lineWidth = 1; rr(L + 0.5, y + 0.5, W - 1, h - 1, 7); c.stroke();
+    c.fillStyle = RULE[k] || k === 'over' ? text2 : text; c.textAlign = 'right';
     const nl = RULE[k] ? trackLines(names[k]) : [names[k]];   // a rule row's Notion name, on two lines if long
-    c.font = TRACKFONT;
+    c.font = RULE[k] || k === 'over' ? TRACKFONT : '600 11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+    if (k === 'activity') {                                  // its name on top, then a key for each of its two lines
+      c.fillText(names[k], L - 12, y + 12);
+      c.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+      for (const [i, [col, label]] of [[ACT.outCol, 'output'], [ACT.movCol, 'movement']].entries()) {
+        const ly = y + 32 + i * 16, w = c.measureText(label).width;
+        c.fillStyle = col; c.fillText(label, L - 12, ly);
+        c.strokeStyle = col; c.lineWidth = 2.5; c.beginPath(); c.moveTo(L - 34 - w, ly); c.lineTo(L - 18 - w, ly); c.stroke();
+      }
+      c.font = TRACKFONT; continue;
+    }
     const say = x => nl.forEach((t, i) => c.fillText(t, x, y + h / 2 + (i - (nl.length - 1) / 2) * 12));
     if (RULE[k]?.split) {                                    // a split row: its name, then lead / rear per half
       say(L - 12);
@@ -4482,6 +4505,7 @@ function drawTimeline(f) {
     }
     c.globalAlpha = 1;
   }
+  if (TR.activity) drawActivity(c, W, grid, text3);
   if (TR.def) for (const e of S.defenses) if (!hid(e)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
   drawLayerRows(c, f, W, text, grid);
   drawFaceVeil(c, W, text);                               // shift-click a facing band: everything else fades back
@@ -4576,6 +4600,99 @@ function skipStrip(c, x, w, y, on, why) {
   c.restore();
 }
 
+// ── the Activity row: two smoothed curves over the round, for looking at its output and movement by eye ──
+// output: every punch and defensive move as one event at its middle frame, summed under a Gaussian of ACT.sigmaS and
+//   read as events a minute - exactly 0 far from any event.
+// movement: per frame, the mean speed of the hip centre, both ankles and both wrists, each its displacement over the
+//   last ACT.lagS (a quarter second: frame to frame, BlazePose's jitter times 30 a second swamped the hips and ankles)
+//   where it is read at both ends (visibility >= ACT.minVis), in torso lengths a second (the torso = shoulder centre to
+//   hip centre, in pixels, the video's own aspect); speeds over ACT.capS are a tracker jumping and dropped; a 5-frame
+//   median, the same Gaussian (frames without a reading left out), then a fixed noise floor ACT.floor taken off, so
+//   standing still reads about 0. Measured 2026-10-22 on 20 test videos: in rule 25's dead stretches (no punch, no
+//   defensive move) the hips and ankles still move 0.3-0.9 torso/s, about as much as while punching - the boxers bounce
+//   and step - and the quietest videos sit at 0.25-0.3, hence the floor; the wrists split (about 1.0 dead, 1.9 working).
+// Fixed scales (ACT.outMax, ACT.movMax), the same for every video, so rounds compare by eye. Viewer only: no rule reads it.
+const ACT = {sigmaS: 2, lagS: 0.25, minVis: 0.5, capS: 20, floor: 0.3, outMax: 120, movMax: 2.5,
+             outCol: '#30d158', movCol: '#bf5af2', key: null, data: null};
+function gaussSmooth(v, sigma, valid) {                       // a Gaussian over v; valid: per-frame 0/1 (normalised by it)
+  const n = v.length, r = Math.ceil(4 * sigma), k = new Float32Array(2 * r + 1);
+  for (let i = -r; i <= r; i++) k[i + r] = Math.exp(-(i * i) / (2 * sigma * sigma));
+  const ksum = k.reduce((a, b) => a + b, 0), out = new Float32Array(n);
+  for (let f = 0; f < n; f++) {
+    let num = 0, den = 0;
+    for (let i = Math.max(0, f - r); i <= Math.min(n - 1, f + r); i++) {
+      const w = k[i - f + r]; if (valid && !valid[i]) continue; num += w * v[i]; den += w;
+    }
+    out[f] = valid ? (den >= 0.3 * ksum ? num / den : NaN) : num / ksum;
+  }
+  return out;
+}
+function activityData() {
+  const fps = S.fps, n = S.n, vw = video.videoWidth, vh = video.videoHeight;
+  const key = [S.src?.name, n, S.skel ? S.skel.length : 0, vw, vh, S.punches.length, S.defenses.length].join('|');
+  if (ACT.key === key) return ACT.data;
+  const sigma = ACT.sigmaS * fps;
+  const ev = new Float32Array(n);                                       // events, one per middle frame
+  for (const e of [...S.punches, ...S.defenses]) { const m = Math.round((e.sf + e.ef) / 2); if (m >= 0 && m < n) ev[m] += 1; }
+  const out = gaussSmooth(ev, sigma, null).map(x => x * fps * 60);   // gaussSmooth divides by the kernel's sum: events a frame -> a minute
+  let mov = null;
+  const C = S.skelC;
+  if (S.skel && C && vw && vh) {
+    const m = Math.min(n, S.skel.length / (33 * C)), raw = new Float32Array(n).fill(NaN);
+    const P = (fr, j) => { const b = (fr * 33 + j) * C;
+      return S.skel[b + 6] >= ACT.minVis && Number.isFinite(S.skel[b]) ? [S.skel[b] * vw, S.skel[b + 1] * vh] : null; };
+    const mid = (a, b) => a && b ? [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] : null;
+    const pts = fr => [mid(P(fr, 23), P(fr, 24)), P(fr, 27), P(fr, 28), P(fr, 15), P(fr, 16)];
+    const lag = Math.max(1, Math.round(ACT.lagS * fps)), all = [];
+    for (let fr = 0; fr < m; fr++) all.push(pts(fr));
+    for (let fr = lag; fr < m; fr++) {
+      const cur = all[fr], prev = all[fr - lag], sh = mid(P(fr, 11), P(fr, 12)), hp = cur[0];
+      const torso = sh && hp ? Math.hypot(sh[0] - hp[0], sh[1] - hp[1]) : 0;
+      if (torso > 5) {
+        let s = 0, k = 0;
+        for (let j = 0; j < 5; j++) if (cur[j] && prev[j]) { s += Math.hypot(cur[j][0] - prev[j][0], cur[j][1] - prev[j][1]) / torso / (lag / fps); k++; }
+        if (k && s / k <= ACT.capS) raw[fr] = s / k;
+      }
+    }
+    const med = new Float32Array(n).fill(NaN);                        // a 5-frame median, readings only
+    for (let fr = 0; fr < n; fr++) {
+      const w = []; for (let i = fr - 2; i <= fr + 2; i++) if (i >= 0 && i < n && Number.isFinite(raw[i])) w.push(raw[i]);
+      if (w.length >= 3) { w.sort((a, b) => a - b); med[fr] = w[w.length >> 1]; }
+    }
+    const valid = med.map(x => Number.isFinite(x) ? 1 : 0), sm = gaussSmooth(med.map(x => Number.isFinite(x) ? x : 0), sigma, valid);
+    mov = sm.map(x => Number.isFinite(x) ? Math.max(0, x - ACT.floor) : NaN);
+  }
+  ACT.key = key; ACT.data = {n, out, mov};
+  return ACT.data;
+}
+function drawActivity(c, W, grid, text3) {
+  const [y, h] = TR.activity, A = activityData(), fps = S.fps; if (!A) return;
+  const top = y + 8, bot = y + h - 6, ym = (v, max) => bot - Math.min(1, Math.max(0, v) / max) * (bot - top);
+  c.strokeStyle = grid; c.lineWidth = 1;
+  for (const q of [0.5, 1]) { const yy = Math.round(bot - q * (bot - top)) + 0.5; c.beginPath(); c.moveTo(L, yy); c.lineTo(L + W, yy); c.stroke(); }
+  const f0 = Math.max(0, Math.floor(V.t0 * fps) - 1), f1 = Math.min(A.n - 1, Math.ceil(V.t1 * fps) + 1);
+  const step = Math.max(1, Math.floor((f1 - f0) / (W * 1.5)));
+  // output: a filled area under its line
+  c.beginPath(); c.moveTo(tx(f0 / fps), bot);
+  for (let f = f0; f <= f1; f += step) c.lineTo(tx((f + 0.5) / fps), ym(A.out[f], ACT.outMax));
+  c.lineTo(tx((f1 + 1) / fps), bot); c.closePath();
+  c.fillStyle = ACT.outCol; c.globalAlpha = 0.18; c.fill(); c.globalAlpha = 1;
+  c.beginPath();
+  for (let f = f0; f <= f1; f += step) { const xx = tx((f + 0.5) / fps), yy = ym(A.out[f], ACT.outMax); f === f0 ? c.moveTo(xx, yy) : c.lineTo(xx, yy); }
+  c.strokeStyle = ACT.outCol; c.lineWidth = 1.8; c.stroke();
+  // movement: a line, broken where there is no reading
+  if (A.mov) {
+    c.beginPath(); let on = false;
+    for (let f = f0; f <= f1; f += step) {
+      const v = A.mov[f]; if (!Number.isFinite(v)) { on = false; continue; }
+      const xx = tx((f + 0.5) / fps), yy = ym(v, ACT.movMax); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
+    }
+    c.strokeStyle = ACT.movCol; c.lineWidth = 2; c.stroke();
+  }
+  c.fillStyle = text3; c.textAlign = 'left'; c.font = '500 9px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  c.fillText(`top: ${ACT.outMax}/min · ${ACT.movMax} torso/s${A.mov ? '' : ' · movement waits for the skeleton'}`, L + 6, y + 9);
+  c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+}
 function drawLayerRows(c, f, W, text, grid) {
   const fps = S.fps, font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   const span = e => { const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps); return [x0, Math.max(2, x1 - x0 - 1)]; };
@@ -4665,6 +4782,7 @@ function hit(x, y) {
   };
   if (inRow(TR.lead)) return find(S.punches, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, e => e.hand === 'rear');
+  if (inRow(TR.activity)) { const A = activityData(); return A && f >= 0 && f < A.n ? {kind: 'act', f, sf: f, ef: f} : null; }
   if (inRow(TR.stance)) return S.stanceRuns.find(e => f >= e.sf && f <= e.ef && e.reason !== 'no_reading') || null;
   if (inRow(TR.def)) return find(S.defenses, () => true);
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
@@ -4763,6 +4881,12 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${cap(e.hand)} ${s.name}</b> <span class="m">target ${e.target}</span><br>
       <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>` +
       (e.impact === null ? `<span class="m">no impact (${e.impStatus})</span>` : `<span class="num">impact f ${e.impact} · conf ${e.impConf.toFixed(2)}</span>`);
+  } else if (e.kind === 'act') {                            // the Activity row at the cursor
+    const A = activityData(), o = A?.out[e.f], m = A?.mov?.[e.f];
+    el.innerHTML = `<b>Activity</b> <span class="m num">${fmtT(e.f / fps)}</span><br>`
+      + `<b style="color:${ACT.outCol}">●</b> output <b class="num">${o == null ? '–' : o.toFixed(0)}</b> <span class="m">punches + defensive moves / min</span><br>`
+      + `<b style="color:${ACT.movCol}">●</b> movement <b class="num">${m == null || !Number.isFinite(m) ? '–' : m.toFixed(2)}</b> <span class="m">torso lengths / s${A?.mov ? '' : ' (waiting for the video and skeleton)'}</span><br>`
+      + `<span class="m">both smoothed over about ${ACT.sigmaS * 2} s; movement = the hips, ankles and wrists over ${ACT.lagS} s, minus ${ACT.floor} torso/s of standing still; the row's top is ${ACT.outMax}/min and ${ACT.movMax} torso/s</span>`;
   } else if (e.kind === 'st') {
     el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${STANCENAME[e.state] || cap(e.state)}</b>` +
       (e.reason ? `<br><span class="m">${STANCEWHY[e.reason] || e.reason}</span>` : '') +
