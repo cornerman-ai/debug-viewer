@@ -159,12 +159,15 @@ by eye. Green, filled = **output**: every punch and defensive move as one event 
 a speed of the hips showed bouncing more than moving): the hip centre averaged over 0.5 s (a bounce averages out to one
 point) against where it was 1 s before, in torso lengths, both hips seen (visibility ≥ 0.5); plus the way to and from
 the camera, which barely moves a point in the picture but changes the size — the change of the torso's log length over
-that second (averaged over 1 s, as leaning, rolling and turning also shorten it) × 4; combined as one distance a second,
+that second (averaged over 1 s, as leaning, rolling and turning also shorten it) × 4; and turning (since 2026-10-22,
+most test videos being filmed on one spot): the facing angle folded to 0–180° (so the model's +90 / −90 mix-up of a
+side-on boxer is no fake half-turn), averaged over 1 s, its change over 3 s per second, 90° counting as one torso length;
+combined as one distance a second,
 over 6 dropped (a tracker jump), the same Gaussian, minus a fixed 0.15. Fixed scales for every video (top = 120 a
 minute and 1.5 torso/s), so rounds compare by eye; the left column keys the two lines and the tooltip gives both values.
 Measured 2026-10-22 on 24 test videos: 10 % of frames under 0.15, the median 0.45, 10 % over 1.14; a beginner staying
-on one spot has a median of 0.18, a boxer moving around a court 0.70. Turning in place does not show here: the Facing
-row has it.
+on one spot has a median of 0.17, a boxer moving around a court 0.70; a quick turn reads 0.5–0.65, while a slow circle
+(4° a second) stays inside the facing model's jitter and barely shows.
 The hips are not read (since 2026-10-22; a folder run 2026-10-20 to 10-22 has an `unclear` state, hips square
 among its reasons, drawn grey too). The pill on the video names the frame's stance. Read on the raw skeleton, so never
 flipped back. Short flips are mostly noise.
