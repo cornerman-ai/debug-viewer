@@ -942,9 +942,13 @@ const GUARDSKIP = {no_pose: 'a joint it needs is not visible', punching: 'that h
 // its badges)
 const FACECOL = {front: '#0a84ff', back: '#0a84ff', 'side-on': '#ff9f0a'};   // front and back read the same to a rule
 // the Stance row (stance/runs.csv, ml/research/stance/stance.py's frame_states): its colours and why a frame is unclear
-const STANCEROW = {orthodox: '#30b0c7', southpaw: '#bf5af2', unclear: '#8e8e93'};
-const STANCEWHY = {no_reading: 'no reading (hips or ankles not seen, or no facing angle)',
-                   feet_together: 'the feet not clearly apart along the facing direction',
+// (since 2026-10-22: the left foot in front yellow, the right blue, neutral grey; the hips are not read)
+const STANCEROW = {orthodox: '#ffd60a', southpaw: '#0a84ff', neutral: '#8e8e93', unclear: '#8e8e93'};
+const STANCENAME = {orthodox: 'Left foot front (orthodox)', southpaw: 'Right foot front (southpaw)', neutral: 'Neutral',
+                    unclear: 'Unclear'};                       // unclear: a folder run 2026-10-20 to 10-22
+const STANCECLEAR = s => s === 'orthodox' || s === 'southpaw';
+const STANCEWHY = {no_reading: 'no reading (an ankle not seen, or no facing angle)',
+                   feet_together: 'the feet too close along the facing direction to say which is in front',
                    hips_square: 'the hips square (turned less than the bladedness cut)'};
 // Which band a frame is in — the facing row's cuts. null when there is no pose or no angle there.
 const faceBand = f => {
@@ -2810,7 +2814,7 @@ function sortLayers() {
 // The base rows: [key, the card's name, what it shows, whether this video has it]. Order = top to bottom.
 const BASE_ROWS = [
   ['angle', 'Facing', 'the facing angle, every frame (0° = toward the camera, ±180° = back to it)', () => S.hasAngle],
-  ['stance', 'Stance', 'every frame: orthodox / southpaw when the feet are clearly apart along the facing direction and the hips are turned; grey = unclear', () => S.hasStanceRuns],
+  ['stance', 'Stance', 'every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey = neutral (the feet too close to tell, or not seen)', () => S.hasStanceRuns],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
@@ -4287,7 +4291,7 @@ function drawTimeline(f) {
     for (const e of S.stanceRuns) {
       const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps);
       if (x1 < L || x0 > L + W) continue;
-      const clear = e.state !== 'unclear', on = V.hover === e || (e.sf <= f && f <= e.ef);
+      const clear = STANCECLEAR(e.state), on = V.hover === e || (e.sf <= f && f <= e.ef);
       c.fillStyle = STANCEROW[e.state]; c.globalAlpha = clear ? (on ? 1 : 0.9) : (on ? 0.7 : 0.4);
       const hh = clear ? sh - 6 : 4;
       c.fillRect(x0, sy + (sh - hh) / 2, Math.max(1, x1 - x0), hh);
@@ -4442,7 +4446,7 @@ function draw(force) {
     if (S.punches.some(e => e.impact === f && !hid(e))) hud.push('<span class="pill impact">IMPACT</span>');
     for (const e of dNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleD(e.type).c}"></span>${e.side ? cap(e.side) + ' ' : ''}${styleD(e.type).name}</span>`);
     const stNow = baseOn('stance') ? S.stanceRuns.find(e => f >= e.sf && f <= e.ef) : null;
-    if (stNow) hud.push(`<span class="pill"><span class="dot" style="background:${STANCEROW[stNow.state]}"></span>${cap(stNow.state)}</span>`);
+    if (stNow) hud.push(`<span class="pill"><span class="dot" style="background:${STANCEROW[stNow.state]}"></span>${STANCENAME[stNow.state] || cap(stNow.state)}</span>`);
     $('hud').innerHTML = hud.join('');
     drawOverlay(f, pNow);
     // follow: keep the playhead inside the window, scrolling continuously while playing
@@ -4576,7 +4580,7 @@ function tip(e, cx, cy) {
       <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>` +
       (e.impact === null ? `<span class="m">no impact (${e.impStatus})</span>` : `<span class="num">impact f ${e.impact} · conf ${e.impConf.toFixed(2)}</span>`);
   } else if (e.kind === 'st') {
-    el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${cap(e.state)}</b>` +
+    el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${STANCENAME[e.state] || cap(e.state)}</b>` +
       (e.reason ? `<br><span class="m">${STANCEWHY[e.reason] || e.reason}</span>` : '') +
       `<br><span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)} · ${(n / fps).toFixed(2)} s</span>`;
   } else {
