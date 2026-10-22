@@ -2945,7 +2945,7 @@ function sortLayers() {
 const BASE_ROWS = [
   ['angle', 'Facing', 'the facing angle, every frame (0° = toward the camera, ±180° = back to it)', () => S.hasAngle],
   ['stance', 'Stance', 'every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey = neutral (the feet too close to tell), empty = no data (an ankle not seen, no facing angle)', () => S.hasStanceRuns],
-  ['activity', 'Activity', 'two lines, each smoothed over about 2 s: green = output, punches + defensive moves per minute; purple = movement, how fast the hip centre moves in the picture (torso lengths a second, the jitter of standing still taken off) — both near 0 when he just stands', () => S.punches.length > 0 || S.defenses.length > 0 || !!S.skel],
+  ['activity', 'Activity', 'two lines, each smoothed over about 2 s: green = output, punches + defensive moves per minute; purple = movement, how far he actually travels — the hip centre against where it was a second before, toward and from the camera included, bouncing in place averaged out (torso lengths a second) — both near 0 when he just stands', () => S.punches.length > 0 || S.defenses.length > 0 || !!S.skel],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
@@ -4610,18 +4610,18 @@ function skipStrip(c, x, w, y, on, why) {
 // ── the Activity row: two smoothed curves over the round, for looking at its output and movement by eye ──
 // output: every punch and defensive move as one event at its middle frame, summed under a Gaussian of ACT.sigmaS and
 //   read as events a minute - exactly 0 far from any event.
-// movement: per frame, the speed of the hip centre - where the whole body is in the picture, so stepping, circling and
-//   moving around the frame (the user's call, 2026-10-22: the wrists only repeated the punches the output line already
-//   counts) - its displacement over the last ACT.lagS (a quarter second: frame to frame, BlazePose's jitter times 30 a
-//   second swamped it) where both hips are read at both ends (visibility >= ACT.minVis), in torso lengths a second (the
-//   torso = shoulder centre to hip centre, in pixels, the video's own aspect - so the camera's distance does not
-//   matter); speeds over ACT.capS are a tracker jumping and dropped; a 5-frame median, the same Gaussian (frames without
-//   a reading left out), then a fixed noise floor ACT.floor taken off, so standing still reads about 0. Measured
-//   2026-10-22 on 20 test videos: the hip centre moves 0.3-0.9 torso/s in rule 25's dead stretches (no punch, no
-//   defensive move) and about as much while punching - the boxers bounce and step - and the quietest videos sit at
-//   0.27-0.3, hence the floor. Turning in place hardly moves the hip centre: a pivot shows on the Facing row, not here.
+// movement: how far he has actually travelled - not how much he bounces. The hip centre, averaged over ACT.posSmoothS
+//   (half a second: a bounce up and down averages out to one point), against where it was ACT.lagS (1 s) before, in torso
+//   lengths (the torso = shoulder centre to hip centre, in pixels, the video's own aspect), both hips seen
+//   (visibility >= ACT.minVis); plus the way to and from the camera, which barely moves a point in the picture but
+//   changes the boxer's size: the change of the torso's log length over that second (averaged over 1 s, as leaning,
+//   rolling and turning also shorten it) times ACT.depthK (4: a step of one torso length toward a camera about six
+//   torso lengths away changes the size by a sixth; weighed down from 6 because of that noise); combined as a distance,
+//   per second; over ACT.capS a tracker jump, dropped; the same Gaussian; minus a fixed ACT.floor. Measured 2026-10-22 on
+//   24 test videos: 10 % of frames under 0.15, the median 0.45, 10 % over 1.14 torso/s. The user's call, 2026-10-22, after a speed of the hips (and before that of the hips,
+//   ankles and wrists) showed bouncing more than moving. Turning in place does not show here: the Facing row has it.
 // Fixed scales (ACT.outMax, ACT.movMax), the same for every video, so rounds compare by eye. Viewer only: no rule reads it.
-const ACT = {sigmaS: 2, lagS: 0.25, minVis: 0.5, capS: 20, floor: 0.25, outMax: 120, movMax: 1.5,
+const ACT = {sigmaS: 2, posSmoothS: 0.5, lagS: 1, depthK: 4, minVis: 0.5, capS: 6, floor: 0.15, outMax: 120, movMax: 1.5,
              outCol: '#34c759', movCol: '#af52de', key: null, data: null};
 function gaussSmooth(v, sigma, valid) {                       // a Gaussian over v; valid: per-frame 0/1 (normalised by it)
   const n = v.length, r = Math.ceil(4 * sigma), k = new Float32Array(2 * r + 1);
@@ -4647,29 +4647,34 @@ function activityData() {
   let mov = null;
   const C = S.skelC;
   if (S.skel && C && vw && vh) {
-    const m = Math.min(n, S.skel.length / (33 * C)), raw = new Float32Array(n).fill(NaN);
+    const m = Math.min(n, S.skel.length / (33 * C));
     const P = (fr, j) => { const b = (fr * 33 + j) * C;
       return S.skel[b + 6] >= ACT.minVis && Number.isFinite(S.skel[b]) ? [S.skel[b] * vw, S.skel[b + 1] * vh] : null; };
     const mid = (a, b) => a && b ? [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] : null;
-    const pts = fr => [mid(P(fr, 23), P(fr, 24))];                  // the hip centre only
-    const lag = Math.max(1, Math.round(ACT.lagS * fps)), all = [];
-    for (let fr = 0; fr < m; fr++) all.push(pts(fr));
-    for (let fr = lag; fr < m; fr++) {
-      const cur = all[fr], prev = all[fr - lag], sh = mid(P(fr, 11), P(fr, 12)), hp = cur[0];
-      const torso = sh && hp ? Math.hypot(sh[0] - hp[0], sh[1] - hp[1]) : 0;
-      if (torso > 5) {
-        let s = 0, k = 0;
-        for (let j = 0; j < cur.length; j++) if (cur[j] && prev[j]) { s += Math.hypot(cur[j][0] - prev[j][0], cur[j][1] - prev[j][1]) / torso / (lag / fps); k++; }
-        if (k && s / k <= ACT.capS) raw[fr] = s / k;
-      }
+    const hx = new Float32Array(n).fill(NaN), hy = new Float32Array(n).fill(NaN), lt = new Float32Array(n).fill(NaN);
+    for (let fr = 0; fr < m; fr++) {                                // the hip centre, and the torso's length (log)
+      const hp = mid(P(fr, 23), P(fr, 24)), sh = mid(P(fr, 11), P(fr, 12));
+      if (hp) { hx[fr] = hp[0]; hy[fr] = hp[1]; }
+      const tl_ = hp && sh ? Math.hypot(sh[0] - hp[0], sh[1] - hp[1]) : 0;
+      if (tl_ > 5) lt[fr] = Math.log(tl_);
     }
-    const med = new Float32Array(n).fill(NaN);                        // a 5-frame median, readings only
-    for (let fr = 0; fr < n; fr++) {
-      const w = []; for (let i = fr - 2; i <= fr + 2; i++) if (i >= 0 && i < n && Number.isFinite(raw[i])) w.push(raw[i]);
-      if (w.length >= 3) { w.sort((a, b) => a - b); med[fr] = w[w.length >> 1]; }
+    const box = (v, r) => {                                          // a centred mean over ±r frames; NaN with under r readings
+      const o = new Float32Array(n).fill(NaN), cs = new Float64Array(n + 1), ck = new Int32Array(n + 1);
+      for (let i = 0; i < n; i++) { const ok = Number.isFinite(v[i]); cs[i + 1] = cs[i] + (ok ? v[i] : 0); ck[i + 1] = ck[i] + (ok ? 1 : 0); }
+      for (let i = 0; i < n; i++) { const a = Math.max(0, i - r), b = Math.min(n, i + r + 1), k = ck[b] - ck[a]; if (k >= r) o[i] = (cs[b] - cs[a]) / k; }
+      return o;
+    };
+    const r = Math.max(1, Math.round(ACT.posSmoothS / 2 * fps)), x = box(hx, r), y = box(hy, r), l = box(lt, 2 * r);
+    const lag = Math.max(1, Math.round(ACT.lagS * fps)), raw = new Float32Array(n).fill(NaN);
+    for (let fr = lag; fr < n; fr++) {                               // where he is now against where he was ACT.lagS ago
+      const a = fr - lag; if (![x[fr], y[fr], l[fr], x[a], y[a], l[a]].every(Number.isFinite)) continue;
+      const tref = (Math.exp(l[fr]) + Math.exp(l[a])) / 2;
+      const planar = Math.hypot(x[fr] - x[a], y[fr] - y[a]) / tref, depth = Math.abs(l[fr] - l[a]) * ACT.depthK;
+      const d = Math.hypot(planar, depth) / ACT.lagS;                // torso lengths a second
+      if (d <= ACT.capS) raw[fr] = d;
     }
-    const valid = med.map(x => Number.isFinite(x) ? 1 : 0), sm = gaussSmooth(med.map(x => Number.isFinite(x) ? x : 0), sigma, valid);
-    mov = sm.map(x => Number.isFinite(x) ? Math.max(0, x - ACT.floor) : NaN);
+    const valid = raw.map(v => Number.isFinite(v) ? 1 : 0), sm = gaussSmooth(raw.map(v => Number.isFinite(v) ? v : 0), sigma, valid);
+    mov = sm.map(v => Number.isFinite(v) ? Math.max(0, v - ACT.floor) : NaN);
   }
   ACT.key = key; ACT.data = {n, out, mov};
   return ACT.data;
@@ -4895,7 +4900,7 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b>Activity</b> <span class="m num">${fmtT(e.f / fps)}</span><br>`
       + `<b style="color:${ACT.outCol}">●</b> output <b class="num">${o == null ? '–' : o.toFixed(0)}</b> <span class="m">punches + defensive moves / min</span><br>`
       + `<b style="color:${ACT.movCol}">●</b> movement <b class="num">${m == null || !Number.isFinite(m) ? '–' : m.toFixed(2)}</b> <span class="m">torso lengths / s${A?.mov ? '' : ' (waiting for the video and skeleton)'}</span><br>`
-      + `<span class="m">both smoothed over about ${ACT.sigmaS * 2} s; movement = the hip centre over ${ACT.lagS} s, minus ${ACT.floor} torso/s of standing still; the row's top is ${ACT.outMax}/min and ${ACT.movMax} torso/s</span>`;
+      + `<span class="m">both smoothed over about ${ACT.sigmaS * 2} s; movement = how far the hip centre (averaged over ${ACT.posSmoothS} s) got in the last ${ACT.lagS} s, toward or from the camera included, minus ${ACT.floor} torso/s; the row's top is ${ACT.outMax}/min and ${ACT.movMax} torso/s</span>`;
   } else if (e.kind === 'st') {
     el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${STANCENAME[e.state] || cap(e.state)}</b>` +
       (e.reason ? `<br><span class="m">${STANCEWHY[e.reason] || e.reason}</span>` : '') +
