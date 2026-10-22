@@ -473,6 +473,12 @@ at 5; when rule 19, 20 or 33 scored under 70 in the round (`round.strict`) 100 a
 held window: not rated. It reads the `facing_angle` stage's angle, so on a video whose facing stage predates the current
 facing model it can differ from the Stance row, which computes its own.
 
+**Combos too long** (rule 37, `combo_too_long/combo_too_long.json` + `combos.csv`, since 2026-10-22): every combined
+combination (rule 31's: punches and defensive moves, each within 0.3 s of the last) of `move.min_elements` (7) moves or
+more, one block from its first frame to its last — red when counted, grey when it touches the excluded time; the block
+carries its number of moves and the tooltip lists them. Score = 100 at 3 or fewer such combinations, linearly to 0 at
+10; fewer than 10 combined combinations: not rated.
+
 **Dead time** (rule 25, `work_rate/work_rate.json` + `segments.csv`; "Work rate" until 2026-10-03): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
 their length, empty for the short pauses in between. A frame counts as work when a

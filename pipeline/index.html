@@ -587,7 +587,7 @@ const RULE_NAMES = {
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
-  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Hand drop before the uppercut',
+  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Hand drop before the uppercut', 37: 'Combos too long',
 };
 const RN = no => RULE_NAMES[no];
 const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
@@ -1497,6 +1497,27 @@ const RULE_LAYERS = [
       }
     },
   },
+  {
+    // rule 37, combos too long (combo_too_long/combos.csv): every combined combination of move.min_elements moves or
+    // more, one block from its first frame to its last - red when counted, grey when it touches the excluded time.
+    key: 'longcombo', label: RN(37), short: RN(37), items: true,
+    csv: ['combo_too_long', 'combos.csv'], json: ['combo_too_long', 'combo_too_long.json'],
+    parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), n: num(r.n_elements), nP: num(r.n_punches),
+      nD: num(r.n_defenses), seq: r.sequence, els: comboEls(r), judged: r.judged === '1'}),
+    card: () => '',
+    tip: (e, x) => `<b>${x.n} moves · ${x.nP} punches${x.nD ? ` + ${x.nD} defense` : ''}</b> · ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s` +
+      `<div style="margin:5px 0 4px;display:grid;grid-template-columns:auto auto auto;gap:2px 10px">` +
+      x.els.map((m, i) => { const q = elName(m); return `<span class="m num">${i + 1}</span><span><span class="dot" style="background:${q.c}"></span>${q.name}</span>` +
+        `<span class="m num">${fmtT(m.sf / S.fps)}</span>`; }).join('') +
+      `</div><span class="m">${x.judged ? THR(() => `counted: ${fN(T(37, 'move.min_elements'))} moves or more without a pause`)
+                                : 'not counted: it reaches into the video’s excluded time, which no rule judges'}</span>`,
+    row(e, x, {c, y, h, tag, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
+      c.fillStyle = x.judged ? '#ff3b30' : '#8e8e93'; c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 4, w, h - 8, 4); c.fill(); c.globalAlpha = 1;
+      tag(x0, w, y, h, `${x.n}`);
+    },
+  },
   slipLayer(14), slipLayer(15),
   {
     // rule 2, punch starts from low guard (hand_drop/punches.csv): how far the punching wrist sits below the nose, in torso
@@ -2355,7 +2376,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36],
+  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -3055,6 +3076,7 @@ const SCOPE = {
   offensive: {moves: 'punches'},
   work:      {moves: 'every frame'},
   stchg:     {moves: 'every frame, every angle'},
+  longcombo: {moves: 'combined combinations (punches + defensive moves)'},
   combined:  {moves: 'punches, defensive moves'},
 };
 // Which camera angles a rule judges, as three badges — lit = judged, struck-through = skipped. Front and back share
@@ -3108,7 +3130,7 @@ const RULE_META = (() => {
   const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
-              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P]};
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
@@ -3567,6 +3589,16 @@ function ruleCard() {
     calc: `${cl.n_long} of ${cl.n_combinations} combos are ${THR(() => fN(T(24, 'move.min_long_combo_elements')))}+ = ${pct(cl.long_share)} → ${cl.score ?? '–'} · `
           + `${Object.entries(cl.by_n_elements).map(([k, v]) => `${v} of ${k}`).join(', ')} · `
           + `mean ${cl.mean_elements}, longest ${cl.longest} · ${pct(cl.solo_share)} of punches thrown solo`});
+  const lc = S.layerSum.longcombo;
+  if (lc) add(RN(37), lc.score ?? 'not rated', lc.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'does he reset between combinations, or run on without a pause?',
+    on: `${lc.n_combinations} combined combinations (punches and defensive moves, rule 31’s) · all judged${exNote(lc.n_excluded, 'combinations')}`,
+    th: THR(() => { const m = fN(T(37, 'move.min_elements')), full = fN(T(37, 'round.score.full')), zero = fN(T(37, 'round.score.zero'));
+      return {event: {label: 'per combo', rule: `a combined combination of ${m} moves or more (punches and defensive moves both count) is too long`},
+              round: {label: 'per round', rule: `the number of too-long combinations: 100 at ${full} or fewer, linearly down to 0 at ${zero} — a plain number, `
+                        + `no bands; fewer than ${NJ(37)} combined combinations: not rated`,
+                 bands: [[`≤ ${full}`, '100'], [`${full} → ${zero}`, '100 → 0'], [`≥ ${zero}`, '0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}}; }, thMiss),
+    calc: `${lc.n_long} of ${lc.n_combinations} combined combinations have ${THR(() => fN(T(37, 'move.min_elements')))}+ moves (longest ${lc.longest ?? '–'}) → ${lc.score ?? '–'}`});
   const dc = S.decay;
   if (dc) add(RN(26), dc.score ?? 'not rated', dc.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he still throw at the end what he threw at the start?',
@@ -5289,6 +5321,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [36, 'Whether the punching hand drops before the uppercut. From half a second before each head uppercut — never into the same hand’s previous punch — to its impact, the rule follows the punching forearm and keeps its most downward direction: a forearm that turns to point down means the hand wound down first. An uppercut whose arm the skeleton does not see (usually the far arm of a boxer side-on to the camera) is left out.',
        `every head uppercut, ${fN(T(36, 'move.window_before_s'))} s before it → impact`, `full marks while the forearm points at most ${fD(T(36, 'move.score.full'), 2)} down (about 29° below level), zero at ${fD(T(36, 'move.score.zero'), 2)} (about 68°); from ${fN(H(36, 'min_judged'))} judged uppercuts`,
        'An uppercut wound up from the waist is seen coming, and the face is open while the hand travels back up. The lines come from the coach’s ratings of 355 uppercut clips.'],
+  [37, `How many of the boxer’s combinations run on to ${fN(T(37, 'move.min_elements'))} moves or more — punches and defensive moves together, each within ${fN(T(31, 'move.max_gap_s'))} s of the last (rule 31’s combinations).`,
+       'combinations of punches and defensive moves', `full marks at ${fN(T(37, 'round.score.full'))} or fewer, zero at ${fN(T(37, 'round.score.zero'))}`,
+       'A combination that never stops leaves the boxer out of position and out of breath, and gives the opponent his rhythm.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));
