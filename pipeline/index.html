@@ -587,7 +587,7 @@ const RULE_NAMES = {
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
-  33: 'Rear-foot heel up',
+  33: 'Rear-foot heel up', 34: 'Stance changes',
 };
 const RN = no => RULE_NAMES[no];
 // ── the rule thresholds. Every number a rule judges by is read from rule_thresholds.json — the snapshot run_all.py
@@ -1456,6 +1456,33 @@ const RULE_LAYERS = [
       }
     },
   },
+  {
+    // rule 34, stance changes (stance_changes/segments.csv): the stance segments - a run of one stance (a neutral frame
+    // keeping the stance before it) of at least move.min_segment_s, consecutive ones of the same stance merged; each
+    // drawn from its first frame up to the next segment, so the shorter flips inside it are not drawn. A segment that
+    // starts a change carries a white tick at its start. Before the first segment nothing is drawn. Yellow / blue as
+    // the Stance row (STANCEROW).
+    key: 'stchg', label: RN(34), short: RN(34), items: true,
+    csv: ['stance_changes', 'segments.csv'], json: ['stance_changes', 'stance_changes.json'],
+    parseItem: (r, num) => r.state === 'none' ? null
+      : {state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), js: num(r.judged_s), change: r.change === '1'},
+    card: () => '',
+    tip: (e, x) => `<b style="color:${STANCEROW[x.state]}">●</b> <b>${STANCENAME[x.state]}</b> · `
+      + `<span class="num">${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(1)} s</span>`
+      + (x.change ? '<br><b>a stance change</b>' : '')
+      + `<br><span class="m">${THR(() => `a stance segment: at least ${fN(T(34, 'move.min_segment_s'))} s of one stance (neutral frames keep the stance before them); `
+        + `shorter flips inside it are not counted`)}</span>`,
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      c.fillStyle = STANCEROW[x.state]; c.globalAlpha = on ? 1 : 0.85;
+      rr(x0, y + 3, Math.max(2, x1 - x0), h - 6, 3); c.fill(); c.globalAlpha = 1;
+      if (x.change && tx(x.sf / fps) >= L) {                  // where the change happens
+        const xc = tx(x.sf / fps);
+        c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(xc, y + 1); c.lineTo(xc, y + h - 1); c.stroke();
+      }
+    },
+  },
   slipLayer(14), slipLayer(15),
   {
     // rule 2, punch starts from low guard (hand_drop/punches.csv): how far the punching wrist sits below the nose, in torso
@@ -2225,7 +2252,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25],
+  rpivot: [33], work: [25], stchg: [34],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -2776,7 +2803,7 @@ const angleGroup = k => {
   const a = (layerAngles(k) || ALL_ANGLES).split(' \u2014')[0];
   return a === 'side-on' ? 'Side-on' : a === 'front, back' ? 'Front, back' : 'Every angle';
 };
-const LSORTS = {rule: {label: 'rule number', dir: ['1 → 33', '33 → 1']},
+const LSORTS = {rule: {label: 'rule number', dir: ['1 → 34', '34 → 1']},
                 angle: {label: 'angles', dir: ['side-on first', 'every angle first']}};
 V.layerSort = 'rule'; V.layerDesc = false;
 function layerOrder() {
@@ -2921,6 +2948,7 @@ const SCOPE = {
   elbow:     {moves: 'every frame except that arm’s hooks and body shots'},
   offensive: {moves: 'punches'},
   work:      {moves: 'every frame'},
+  stchg:     {moves: 'every frame, every angle'},
   combined:  {moves: 'punches, defensive moves'},
 };
 // Which camera angles a rule judges, as three badges — lit = judged, struck-through = skipped. Front and back share
@@ -2961,7 +2989,7 @@ function scoreCounts(key) {
           fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
 // The Notion "Production rules" numbering (renumbered 2026-10-01: rules 3 and 34 were removed, the rest closed up to
-// 1-33): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
+// 1-33; a new 34, stance changes, added 2026-10-22): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
 // enough" and 15 "slip not too much" — each with its own timeline row and round row.
 const NOTION = Object.fromEntries(Object.entries(RULE_NAMES).map(([no, name]) => [name, +no]));   // name -> number
 const notionNo = name => String(NOTION[name] ?? '?');
@@ -2974,21 +3002,21 @@ const RULE_META = (() => {
   const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
-              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P]};
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
 const ON_ORDER = ['On a punch', 'On a combo', 'On a defensive move', 'On a frame', 'Whole round only'];
 // Each sort runs both ways: click the active button again to flip it. `dir` names the two directions in words.
 const SORTS = {
-  rule:  {label: 'rule number', dir: ['1 → 33', '33 → 1']},
+  rule:  {label: 'rule number', dir: ['1 → 34', '34 → 1']},
   score: {label: 'score', dir: ['worst → best', 'best → worst']},
   group: {label: 'analysis group', key: m => m.group, order: ['Separate move', 'Overall round']},
   on:    {label: 'analyzed on', key: m => m.on[0], order: ON_ORDER},
   angle: {label: 'angle gate', key: m => m.angle, order: ['Side-on', 'Front, back', 'Every angle']},
 };
 for (const s of Object.values(SORTS)) s.dir ??= [`${s.order[0]} first`, `${s.order[s.order.length - 1]} first`];
-V.ruleSort = 'rule'; V.ruleDesc = false;            // every load opens on rule number, 1 -> 33 (not remembered)
+V.ruleSort = 'rule'; V.ruleDesc = false;            // every load opens on rule number, 1 -> 34 (not remembered)
 const TIER = [[85, 'great', '#22C55E'], [75, 'good', '#84CC16'], [60, 'mid', '#EAB308'], [40, 'bad', '#F97316'],
               [0, 'critical', '#EF4444']];
 const tierOf = v => TIER.find(([lo]) => v >= lo);
@@ -3222,6 +3250,19 @@ function ruleCard() {
     calc: `${wr.dead_seconds}s dead in ${wr.n_dead_gaps} gaps / ${wr.duration_seconds}s = ${pct(wr.dead_share)} → ${wr.score ?? '–'} · `
           + `${wr.turn_only_seconds}s credited to changes of angle · `
           + `${wr.punches_per_minute} punches/min, ${wr.actions_per_minute} actions/min · longest gap ${wr.longest_dead_s}s`});
+  const sc = S.layerSum.stchg;
+  if (sc) add(RN(34), sc.score ?? 'not rated', sc.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'does he stay in one stance, or keep switching between orthodox and southpaw?',
+    on: `${sc.judged_s} s judged with a stance (excluded time left out) · every angle · `
+        + `${sc.clear_frames.toLocaleString()} frames with one foot clearly in front (${sc.orthodox_frames.toLocaleString()} left, `
+        + `${sc.southpaw_frames.toLocaleString()} right), the rest neutral and keeping the stance before them`,
+    th: THR(() => { const full = T(34, 'round.score.full'), zero = T(34, 'round.score.zero');
+      return {round: {label: 'per round', rule: `a stance segment is at least ${fN(T(34, 'move.min_segment_s'))} s of one stance (a neutral frame keeps the stance `
+                        + `before it; a shorter run is noise and does not count); a change is a segment followed by one of the other stance; `
+                        + `100 at ${fN(full)} changes or fewer, linearly down to 0 at ${fN(zero)} — a plain number, no bands; under ${NF(34)} s with a stance: not rated`,
+                 bands: [[`≤ ${fN(full)} changes`, '100'], [`${fN(full)} → ${fN(zero)}`, '100 → 0'], [`≥ ${fN(zero)}`, '0']],
+                 pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}}; }, thMiss),
+    calc: `${sc.segments} segment${sc.segments === 1 ? '' : 's'} (${sc.stances.join(' → ') || 'none'}) = ${sc.changes} change${sc.changes === 1 ? '' : 's'} → ${sc.score ?? '–'}`});
   scored('hrp', RN(16), q => ({
     what: 'after a straight lands, does the wrist come straight back, or sink into a U on the way home?',
     on: `${q.pass + q.fail + q.skip} jabs and crosses · ${q.pass + q.fail} judged side-on, ${q.skip} skipped (in excluded time, not side-on, `
@@ -4755,7 +4796,7 @@ function renderOverview() {
   const data = OVR.data || [], n = (S.videoNames || []).length;
   $('ovrStatus').textContent = OVR.loading ? `reading ${data.length} of ${n} videos…` : `${data.length} videos · ${OVR_HINT}`;
   $('ovrHtml').disabled = $('ovrPdf').disabled = OVR.loading || !data.some(d => !d.error);
-  $('ovrTable').innerHTML = ovrTableHTML(data, OVR, Array.from({length: 33}, (_, i) => RULE_NAME(i + 1)), TIER,
+  $('ovrTable').innerHTML = ovrTableHTML(data, OVR, Array.from({length: Object.keys(RULE_NAMES).length}, (_, i) => RULE_NAME(i + 1)), TIER,
                                          name => (S.videoNames || []).indexOf(name) + 1);
   ovrTableWire($('ovrTable'), OVR, renderOverview);
 }
@@ -4777,7 +4818,7 @@ function overviewPage(print) {
   const css = [...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules]; } catch { return []; } })
     .filter(r => r.selectorText && (/(^|[\s,])\.(ovr-t|vn|tiers)\b/.test(r.selectorText) || r.selectorText === '.big'))   // .big: the page-wide
     .map(r => r.cssText).join('\n');                                              // rule the Overall cells (td.oc.big) take too
-  const payload = {data, nums, names: Array.from({length: 33}, (_, i) => RULE_NAME(i + 1)), tiers: TIER, print,
+  const payload = {data, nums, names: Array.from({length: Object.keys(RULE_NAMES).length}, (_, i) => RULE_NAME(i + 1)), tiers: TIER, print,
                    st: {sort: OVR.sort, by: OVR.by ?? null}, hint: OVR_HINT,
                    made: localStamp(), excl: exclWords(OVR.data || [])};
   const json = JSON.stringify(payload).replace(/</g, '\\u003c');
@@ -4805,7 +4846,7 @@ function render() {
   t.innerHTML = ovrTableHTML(D.data, D.st, D.names, D.tiers, name => D.nums[name]);
   ovrTableWire(t, D.st, render);
 }
-document.getElementById('sub').innerHTML = D.data.length + ' videos · 33 rules, each video\\'s round score 0–100 · made ' + D.made
+document.getElementById('sub').innerHTML = D.data.length + ' videos · 34 rules, each video\\'s round score 0–100 · made ' + D.made
   + (D.excl ? ' · ' + D.excl : '') + '<span class="hint"> · ' + D.hint + '</span>';
 document.getElementById('lg').innerHTML = D.tiers.map(([lo, n, c], i) => '<span style="color:' + c + '">' + lo + '–' + (i ? D.tiers[i - 1][0] : 100) + ' ' + n + '</span>').join('')
   + '<span style="color:#8e8e93">– not rated</span>';
@@ -4942,6 +4983,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [33, `How high the rear heel is off the floor — above the rear foot-index (toe-tip) point — at impact on a rear-hand punch. In a stance the heel is already a little up (about ${PLANTED_LIFT} torso, measured 2026-09-28), so a planted foot scores about ${plantedScore()}; turning of the foot isn’t measured.`,
        'rear-hand punches', `zero with the heel ${say(T(33, 'move.score.zero'), [[0, 'level with the foot-index point']], v => `${fD(v, 2)} torso above the foot-index point`)}, full marks from ${fD(T(33, 'move.score.full'), 2)} torso up`,
        'The rear heel coming up lets the hips turn through; a flat-footed power punch is all arm.'],
+  [34, `How often the boxer changes stance and stays in the new one. On every frame the foot in front along the direction the boxer faces gives the stance (left = orthodox, right = southpaw), a frame with the feet too close to tell keeps the stance before it, and only ${fN(T(34, 'move.min_segment_s'))} s or more of one stance counts as a stance — the shorter flips are mostly the facing angle and the ankles’ depth misread.`,
+       'every frame, every angle', `full marks at ${fN(T(34, 'round.score.full'))} changes or fewer, zero at ${fN(T(34, 'round.score.zero'))}`,
+       'A boxer who drifts from one stance to the other has his lead hand and lead foot on the wrong side without choosing it.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));

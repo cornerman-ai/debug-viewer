@@ -89,7 +89,7 @@ The side panel has five views, switched at its top:
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
   bad 1, mid 2, good 3, great 4), and the sum over 4 × the rated rules is put on 0–100 (not-rated rules count in
   neither), coloured and labelled on the same tier scale as the rules, with the same bar — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count
-  per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–33 in the Notion
+  per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–34 in the Notion
   order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 75–85 good,
   60–75 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 5 s of judged frames), and under it four lines — what the
@@ -151,7 +151,7 @@ from 0.50; no rule reads it yet), then `training: bag work / shadowboxing (P(bag
 it yet).
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
-are videos, columns are the overall round score and rules 1–33, each cell the 0–100 score tinted in its tier's colour
+are videos, columns are the overall round score and rules 1–34, each cell the 0–100 score tinted in its tier's colour
 ("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
 timeline CSVs and the facing curve, which no round score needs (checked equal to the full read on all 495 cells,
 2026-10-02), and scored by the same code as the Rules tab, so a cell always equals what that video's Round score card
@@ -416,6 +416,15 @@ shades the two windows it compares in that video and draws only the punches each
 in the last, each window's count on its band; a short video's middle third is shaded gray, not compared. The windows
 are recomputed in the page from the same punch start times and the video's thresholds snapshot, so the counts are the
 rule's own.
+
+**Stance changes** (rule 34, `stance_changes/stance_changes.json` + `segments.csv`, since 2026-10-22): its timeline
+row shows the stance segments — yellow orthodox (left foot front), blue southpaw (right foot front), as the Stance row
+— each from its first frame up to the next segment, so the shorter flips inside it are not drawn; a white tick marks
+where a change starts; nothing before the first segment. A frame's stance is the foot in front along the facing, a
+neutral frame keeps the stance before it, and a segment is at least `move.min_segment_s` (5 s) of one stance. Score =
+100 at 2 changes or fewer, linearly to 0 at 5; the Round row's sum lists the segments in order. It reads the
+`facing_angle` stage's angle, so on a video whose facing stage predates the current facing model it can differ from the
+Stance row, which computes its own.
 
 **Dead time** (rule 25, `work_rate/work_rate.json` + `segments.csv`; "Work rate" until 2026-10-03): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
