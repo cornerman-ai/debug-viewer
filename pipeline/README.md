@@ -89,7 +89,7 @@ The side panel has five views, switched at its top:
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
   bad 1, mid 2, good 3, great 4), and the sum over 4 × the rated rules is put on 0–100 (not-rated rules count in
   neither), coloured and labelled on the same tier scale as the rules, with the same bar — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count
-  per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–34 in the Notion
+  per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–35 in the Notion
   order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 75–85 good,
   60–75 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 5 s of judged frames), and under it four lines — what the
@@ -151,13 +151,13 @@ from 0.50; no rule reads it yet), then `training: bag work / shadowboxing (P(bag
 it yet).
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
-are videos, columns are the overall round score and rules 1–34, each cell the 0–100 score tinted in its tier's colour
+are videos, columns are the overall round score and rules 1–35, each cell the 0–100 score tinted in its tier's colour
 ("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
 timeline CSVs and the facing curve, which no round score needs (checked equal to the full read on all 495 cells,
 2026-10-02), and scored by the same code as the Rules tab, so a cell always equals what that video's Round score card
 says. A median row closes the table; each video is its number and its name. It only sorts: a rule's header (or
 Overall) sorts the videos by it, best to worst; a video sorts the 33 rule columns by its scores, best to worst; the two
-buttons in the corner put them back in number order (**Videos 1→N**, **Rules 1→33**). Not rated always goes last. It
+buttons in the corner put them back in number order (**Videos 1→N**, **Rules 1→N**). Not rated always goes last. It
 opens with the videos and the rules in number order. Read once per folder (about 80 s for 29 videos over the local server, 2026-10-07) and kept; **Reload** re-reads after a
 pipeline re-run. Esc or a click outside closes it.
 **Export HTML** saves the table as one self-contained file (`ambo_round_scores_<date>.html`, about 22 KB for 56 videos):
@@ -231,6 +231,17 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   0.20 line in the verdict's colour, the line from the foot-index point to the heel, and the heel. Every angle is
   judged; lead-hand punches and a hidden rear heel, foot-index point or torso are not drawn. Round = the mean punch score,
   a plain number, from at least 10. Reads `punches.csv` + `rear_pivot.json`.
+- **Chin tuck on impact** (rule 35, `chin_impact/`, since 2026-10-22): rules 7 and 8 on the punch frames they skip. Per
+  punch, on the frames within ±`window_s` (0.1 s) of the impact, inside the punch, with a face chin at the 0.7 gate:
+  height = the chin against the top of the shoulder that covers it — the punching shoulder on jabs, crosses and hooks
+  (keypoint raised 0.09 torso), the other one on uppercuts and body shots (`dip_punches`; the punching shoulder dips,
+  raised 0.06), 100 at or below it, 0 at 0.20 above; depth (side-on frames, rule 7's window) = the chin against the
+  punching shoulder's front (+0.10 torso), 100 at or behind it, 0 at 0.50 in front. Each axis takes its worst frame;
+  punch score 50 / 50 with a side-on frame, height alone otherwise. Green at 100, red below, the score on the block;
+  the card and tooltip give both worst readings and their frames. The overlay draws the covering shoulder's top, the
+  punching shoulder's front when depth was read, and this frame's chin. Skipped: no face on any frame read (about half
+  the punches on the test videos — an arm in front of the face), a shoulder or hip hidden, excluded time. Round = the
+  mean punch score, from at least 10. Reads `punches.csv` + `chin_impact.json`.
 - **Hook overswing** (rule 32, `hook_stop/`; "Hook stop" until 2026-10-03): per head hook, read front-on or back-on, where the wrist is at the turnaround — the
   frame the impact spotter says it stopped going forward. Score 100 at the boxer's centre line or short of it, linearly to 0 at a third of a
   torso past his own far shoulder; green at 100, red below, the score on the block. The far shoulder is his centre

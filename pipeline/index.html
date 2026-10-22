@@ -587,9 +587,10 @@ const RULE_NAMES = {
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
-  33: 'Rear-foot heel up', 34: 'Stance changes',
+  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact',
 };
 const RN = no => RULE_NAMES[no];
+const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
 // ── the rule thresholds. Every number a rule judges by is read from rule_thresholds.json — the snapshot run_all.py
 // copies next to each video's outputs (pipeline_tests/<stem>/rule_thresholds.json), loaded into S.th with the stage
 // files — so the page shows the numbers THAT video was scored with. T(n, 'move.score.full') reads one (n = the rule
@@ -1048,6 +1049,18 @@ const faceChinOf = text => {
   rows.forEach((r, i) => { const ok = r.score !== ''; x[i] = ok ? +r.x : NaN; y[i] = ok ? +r.y : NaN; sc[i] = ok ? +r.score : NaN; });
   return {x, y, s: sc};
 };
+// rule 35's readings in words: height h (torso, + = below the top, - = above), depth gap d (torso, + = in front)
+const chinImpH = h => h < 0 ? `${(-h).toFixed(3)} torso above` : `${h.toFixed(3)} torso below`;
+const chinImpD = d => d > 0 ? `${d.toFixed(3)} torso in front of` : `${(-d).toFixed(3)} torso behind`;
+const chinImpShoulder = e => (T(35, 'move.dip_punches') || []).includes(e.type)
+  ? `${e.hand === 'lead' ? 'rear' : 'lead'} shoulder (an uppercut or body shot: the punching shoulder dips)` : `${e.hand} shoulder`;
+const chinImpRule = () => `around the impact (±${fN(T(35, 'move.window_s'))} s, inside the punch), the worst frame of each axis: `
+  + `height — the chin against the top of the shoulder covering it (the punching one, ${fD(T(35, 'move.height.shoulder_top_torso'), 2)} torso above its joint; `
+  + `on uppercuts and body shots the other one, ${fD(T(35, 'move.height.dip_shoulder_top_torso'), 2)} above), 100 at or below it, 0 at `
+  + `${fD(-T(35, 'move.height.score.zero'), 2)} torso above; depth, side-on only — the chin against the punching shoulder’s front `
+  + `(${fD(T(35, 'move.depth.shoulder_front_torso'), 2)} torso forward of its joint), 100 at or behind it, 0 at ${fD(T(35, 'move.depth.score.zero'), 2)} in front; `
+  + `both read: ${fN(T(35, 'move.height.points'))} / ${fN(T(35, 'move.depth.points'))}, else height alone; a frame whose face scores under `
+  + `${fD(T(35, 'move.face_score_gate'), 2)} is not read`;
 const CHINSKIP = {no_reading: 'a shoulder or hip the rule needs is not visible',
                   no_face: 'no face found with enough confidence — the chin is not guessed from the skeleton',
                   punching: 'a punch is in flight — the chin is judged between punches',
@@ -1756,6 +1769,59 @@ const RULE_LAYERS = [
     },
   },
   {
+    // rule 35, chin tuck on impact (chin_impact/punches.csv): every punch, on the face-chin frames within impact ±
+    // move.window_s (clipped to the punch; its middle frame without an impact): the chin's height against the top of the
+    // shoulder that covers it — the punching one, the other on move.dip_punches (uppercuts, body shots), whose punching
+    // shoulder dips — and, on side-on frames (rule 7's window), its depth in front of the punching shoulder's front.
+    // Each axis its worst frame; 50 / 50 when both are read (move.*.points), height alone otherwise.
+    key: 'chinimp', label: RN(35), short: 'Chin on impact',
+    csv: ['chin_impact', 'punches.csv'], json: ['chin_impact', 'chin_impact.json'],
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, score: num(r.score), cf: num(r.centre_frame), h: num(r.height),
+      hf: num(r.height_frame), hs: num(r.height_score), d: num(r.depth), df: num(r.depth_frame), ds: num(r.depth_score)}
+      : {verdict: '', skip: r.skip_reason},
+    card: (e, x) => `<div class="sub"><div class="h">${RN(35)}</div>` +
+      (!x || !x.verdict ? `<div class="empty">${skipTxt(x?.skip)}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Height, worst frame (${x.hf})</span><b>${chinImpH(x.h)} the ${chinImpShoulder(e)}’s top → ${x.hs.toFixed(1)}</b>
+        <span>Depth, worst side-on frame</span><b>${x.d == null ? 'not read — no side-on frame' : `${chinImpD(x.d)} the ${e.hand} shoulder’s front (frame ${x.df}) → ${x.ds.toFixed(1)}`}</b>
+        <span>Punch score</span><b>${x.score.toFixed(1)}${x.d == null ? ' (height alone)' : ' (both axes)'}</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${skipTxt(x.skip)}</span>` :
+      `<span class="num">score <b>${x.score.toFixed(1)}</b> · worst height: chin ${chinImpH(x.h)} the ${chinImpShoulder(e)}’s top`
+      + (x.d == null ? ' · depth not read (no side-on frame)' : ` · worst depth: ${chinImpD(x.d)} the ${e.hand} shoulder’s front`) + `</span><br>`
+      + `<span class="m">${THR(() => chinImpRule())}</span>`),
+    row(e, x, {c, y, h, span, tag, ring}) {
+      if (!x.verdict) return;
+      const [bx, w] = span(e);
+      c.fillStyle = x.verdict === 'tucked' ? '#34c759' : '#ff3b30';
+      rr(bx, y + 3, w, h - 6, 5); c.fill();
+      tag(bx, w, y, h, x.score.toFixed(1));
+      ring(e, 'chinimp', bx, y, w, h);
+    },
+    overlay(e, x, f, P, leadLeft) {                         // this frame's chin against the lines the rule reads it by
+      if (!x.verdict) return;
+      const dip = (T(35, 'move.dip_punches') || []).includes(e.type);
+      const cover = dip ? (e.hand === 'lead' ? 'rear' : 'lead') : e.hand;  // the shoulder covering the chin (height)
+      const sideJ = hand => (hand === 'lead') === leadLeft ? J.lsh : J.rsh;  // orthodox lead = left; a southpaw's run is mirrored
+      const sh = P(sideJ(cover)), ps = P(sideJ(e.hand)), ls = P(J.lsh), rs = P(J.rsh), lh = P(J.lhip), rh = P(J.rhip);
+      if (!(sh && ps && ls && rs && lh && rh)) return;
+      for (const j of [J.lsh, J.rsh, J.lhip, J.rhip]) if (!(visAt(f, j, 35) >= H(35, 'min_visibility'))) return;
+      const t = Math.hypot((ls[0] + rs[0]) / 2 - (lh[0] + rh[0]) / 2, (ls[1] + rs[1]) / 2 - (lh[1] + rh[1]) / 2);
+      if (!(t >= H(35, 'min_torso_px'))) return;
+      const fc = faceChinAt(f), chin = fc && PXY(fc[0], fc[1]);
+      const col = x.verdict === 'tucked' ? '#34c759' : '#ff3b30';
+      const top = sh[1] - T(35, dip ? 'move.height.dip_shoulder_top_torso' : 'move.height.shoulder_top_torso') * t;
+      OV.level(top, Math.min(ls[0], rs[0]) - 45, Math.max(ls[0], rs[0]) + 45, col);   // the covering shoulder's top
+      if (x.d != null) {                                     // depth was read on this punch: the punching shoulder's front
+        const a = S.hasAngle && S.pose?.[f] ? S.angle[f] : NaN, d = Number.isFinite(a) ? Math.sign(Math.sin(a * Math.PI / 180)) : 0;
+        if (d) { const front = ps[0] + d * T(35, 'move.depth.shoulder_front_torso') * t;
+                 OV.line([front, ps[1] - 30], [front, ps[1] + 60], col, 2.5); }
+      }
+      if (chin) { OV.ring(chin, col, 10, 3); OV.line([chin[0], top], chin, col, 2, [3, 3]); }
+      overlayLabel(Math.min(ls[0], rs[0]) - 45, top - 16, `score ${x.score.toFixed(1)} · worst height ${x.h.toFixed(2)} torso (frame ${x.hf})`
+        + (x.d == null ? '' : ` · worst depth ${x.d.toFixed(2)} (frame ${x.df})`)
+        + (f === x.hf || f === x.df ? ' ← this frame' : ''), col);
+    },
+  },
+  {
     // punch speed (punch_speed/punches.csv): start → impact, 100 up to the labelled corpus's full_pctl-th percentile of
     // its punch type, linearly down to 0 at its zero_pctl-th (move.score).
     key: 'speed', label: RN(23), short: RN(23),
@@ -2252,7 +2318,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25], stchg: [34],
+  rpivot: [33], work: [25], stchg: [34], chinimp: [35],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -2803,7 +2869,7 @@ const angleGroup = k => {
   const a = (layerAngles(k) || ALL_ANGLES).split(' \u2014')[0];
   return a === 'side-on' ? 'Side-on' : a === 'front, back' ? 'Front, back' : 'Every angle';
 };
-const LSORTS = {rule: {label: 'rule number', dir: ['1 → 34', '34 → 1']},
+const LSORTS = {rule: {label: 'rule number', dir: [`1 → ${NRULES}`, `${NRULES} → 1`]},
                 angle: {label: 'angles', dir: ['side-on first', 'every angle first']}};
 V.layerSort = 'rule'; V.layerDesc = false;
 function layerOrder() {
@@ -2939,6 +3005,7 @@ const SCOPE = {
   bal:       {moves: 'every punch at its impact frame'},
   hookstop:  {moves: 'every head hook at its impact frame'},
   rpivot:    {moves: 'every rear-hand punch at its impact frame'},
+  chinimp:   {get moves() { return `every punch at impact ±${THR(() => fN(T(35, 'move.window_s')))} s, the worst frame`; }},
   speed:     {moves: 'every punch with an impact frame'},
   arm:       {moves: 'jab, cross'},
   hip:       {moves: 'every punch'},
@@ -2989,7 +3056,7 @@ function scoreCounts(key) {
           fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
 // The Notion "Production rules" numbering (renumbered 2026-10-01: rules 3 and 34 were removed, the rest closed up to
-// 1-33; a new 34, stance changes, added 2026-10-22): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
+// 1-33; a new 34, stance changes, and 35, chin tuck on impact, added 2026-10-22): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
 // enough" and 15 "slip not too much" — each with its own timeline row and round row.
 const NOTION = Object.fromEntries(Object.entries(RULE_NAMES).map(([no, name]) => [name, +no]));   // name -> number
 const notionNo = name => String(NOTION[name] ?? '?');
@@ -3002,14 +3069,14 @@ const RULE_META = (() => {
   const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
-              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R]};
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
 const ON_ORDER = ['On a punch', 'On a combo', 'On a defensive move', 'On a frame', 'Whole round only'];
 // Each sort runs both ways: click the active button again to flip it. `dir` names the two directions in words.
 const SORTS = {
-  rule:  {label: 'rule number', dir: ['1 → 34', '34 → 1']},
+  rule:  {label: 'rule number', dir: [`1 → ${NRULES}`, `${NRULES} → 1`]},
   score: {label: 'score', dir: ['worst → best', 'best → worst']},
   group: {label: 'analysis group', key: m => m.group, order: ['Separate move', 'Overall round']},
   on:    {label: 'analyzed on', key: m => m.on[0], order: ON_ORDER},
@@ -3394,6 +3461,19 @@ function ruleCard() {
          round: {label: 'per round', rule: `the mean punch score — a plain number, no bands; fewer than ${NJ(33)} judged punches: not rated`}}; }, thMiss),
     calc: `mean of ${rp.judged_punches} punch scores = ${rp.mean_score ?? '–'} · ${rp.at_100} at 100 · `
           + `median heel ${rp.median_lift} torso above the foot-index point`});
+  const ci = S.layerSum.chinimp;
+  if (ci) add(RN(35), ci.score ?? 'not rated', ci.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'as the punch lands, does the chin stay tucked behind the shoulder, or come up or poke out?',
+    on: `${ci.n_punches} punches · ${ci.judged_punches} judged around their impact frame (${ci.both_axes_punches} with a side-on frame, on both axes; `
+        + `the rest on height alone), ${ci.n_punches - ci.judged_punches} skipped (${ci.no_face_punches} with no face found on those frames — often an arm `
+        + `in front of it — ${ci.no_reading_punches} with a shoulder or hip not visible, ${ci.excluded_punches} in excluded time)`,
+    th: THR(() => ({event: {label: 'per punch', rule: chinImpRule() + ' — green at 100, red below',
+                            bands: [['height: at or below the top', '100'], [`height: ${fD(-T(35, 'move.height.score.zero'), 2)} torso above`, '0'],
+                                    ['depth: at or behind the front', '100'], [`depth: ${fD(T(35, 'move.depth.score.zero'), 2)} torso in front`, '0']],
+                            pal: {'100': '#34c759', '0': '#ff3b30'}},
+                    round: {label: 'per round', rule: `the mean punch score — a plain number, no bands; fewer than ${NJ(35)} judged punches: not rated`}}), thMiss),
+    calc: `mean of ${ci.judged_punches} punch scores = ${ci.mean_score ?? '–'} · ${ci.at_100} at 100 · median worst height `
+          + `${ci.median_height_torso ?? '–'} torso (− = above the top), median worst depth ${ci.median_gap_torso ?? '–'} torso (+ = in front)`});
   const ih = S.layerSum.resting;
   if (ih) add(RN(6), ih.score ?? 'not rated', ih.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'when one hand lands, is the other hand’s wrist still up where a guard belongs?',
@@ -3612,6 +3692,8 @@ const SKIPTXT = {
   wrist_or_torso_not_visible: 'the wrist, a shoulder or a hip is not visible at the impact frame',
   fist_not_visible: 'neither the knuckles nor the wrist and elbow are visible at the impact frame',
   wrist_unsure: 'the wrist is not seen on the impact frame or just after it, so too few frames are left (rule 16)',
+  no_face: 'no face found with enough confidence on the frames read — the chin is not guessed from the skeleton (rule 35)',
+  no_reading: 'a shoulder or hip point is not visible on the frames read (rule 35)',
 };
 const skipTxt = c => SKIPTXT[c] || (c ? c.replace(/_/g, ' ') : 'not judged');
 const GOOD = '#22C55E', BAD = '#EF4444', MIDC = '#F97316';
@@ -3633,6 +3715,7 @@ const PUNCH_RULES = [
   ['speed', () => true, scored],
   ['hookstop', p => p.type === 'hook', scored],
   ['rpivot', p => p.hand === 'rear', scored],
+  ['chinimp', () => true, scored],
 ];
 // "fails on", under a per-punch rule's round line: the punches it failed, split by punch type. The bar is each type's
 // share of the failed punches (the punch distribution's order and colours); after each type, failed / judged of that
@@ -4789,7 +4872,7 @@ function ovrTableHTML(data, st, names, tiers, num) {
   return `<thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot>`;
 }
 // its clicks, the same in both: a rule (or Overall) sorts the videos by it, a video sorts the rules by it, both best to
-// worst; "Videos 1→N" and "Rules 1→33" put them back in number order
+// worst; "Videos 1→N" and "Rules 1→N" put them back in number order
 function ovrTableWire(table, st, rerender) {
   table.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
     st.sort = th.dataset.sort === 'overall' ? 'overall' : +th.dataset.sort; rerender(); });
@@ -4797,7 +4880,7 @@ function ovrTableWire(table, st, rerender) {
   table.querySelector('[data-num]').onclick = () => { st.sort = 'num'; rerender(); };
   table.querySelector('[data-rules]').onclick = () => { st.by = null; rerender(); };
 }
-const OVR_HINT = 'click a rule (or Overall) to sort the videos by it, a video to sort the rules by it (best to worst) · Videos 1→N, Rules 1→33: back to number order';
+const OVR_HINT = 'click a rule (or Overall) to sort the videos by it, a video to sort the rules by it (best to worst) · Videos 1→N, Rules 1→N: back to number order';
 function renderOverview() {
   const data = OVR.data || [], n = (S.videoNames || []).length;
   $('ovrStatus').textContent = OVR.loading ? `reading ${data.length} of ${n} videos…` : `${data.length} videos · ${OVR_HINT}`;
@@ -4992,6 +5075,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [34, `How often the boxer changes stance and stays in the new one. On every frame the foot in front along the direction the boxer faces gives the stance (left = orthodox, right = southpaw); a frame with the feet too close to tell, or not seen, counts for nothing, and only ${fN(T(34, 'move.min_segment_s'))} s or more of frames seen in one stance counts as a stance — the shorter flips are erased: they are mostly the facing angle and the ankles’ depth misread.`,
        'every frame, every angle', `full marks at ${fN(T(34, 'round.score.full'))} changes or fewer, zero at ${fN(T(34, 'round.score.zero'))}; when rule ${(T(34, 'round.strict.rules') || ['…']).join(', ')} scored under ${fN(T(34, 'round.strict.below'))}, full marks at ${fN(T(34, 'round.strict.score.full'))}, zero at ${fN(T(34, 'round.strict.score.zero'))}`,
        'A boxer who drifts from one stance to the other has his lead hand and lead foot on the wrong side without choosing it.'],
+  [35, 'Whether the chin stays tucked while a punch lands — rules 7 and 8 on the punch frames they skip. On the frames around each impact the chin, found on the face in the video, is read against the shoulder that should cover it: the punching shoulder on jabs, crosses and hooks, the other one on uppercuts and body shots (the punching shoulder dips to drive them). Height at every angle, depth side-on too; each takes its worst frame, so one frame with the chin up or out costs the punch.',
+       `every punch, impact ±${fN(T(35, 'move.window_s'))} s`, `height: full marks at or below the shoulder’s top, zero ${fD(-T(35, 'move.height.score.zero'), 2)} torso above; depth: full marks at or behind its front, zero ${fD(T(35, 'move.depth.score.zero'), 2)} in front; ${fN(T(35, 'move.height.points'))} / ${fN(T(35, 'move.depth.points'))} when both are read, height alone otherwise`,
+       'The moment a punch lands is the moment the counter comes back; a chin that lifts or leads then is the one that gets hit.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));
