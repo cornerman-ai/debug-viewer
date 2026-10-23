@@ -517,6 +517,16 @@ both heels are down (each under 0.06 torso above its toe tip), green where a hee
 video, each foot's heel → toe line in the same colour with the heel's height. Score = 100 at 15 % of that time
 flat-footed or less, linearly to 0 at 45 %; under 5 s judged: not rated.
 
+**Straight legs** (rule 42, `knee_bend/knee_bend.json` + `runs.csv`, since 2026-10-23): every frame, punches and
+defensive moves included, side-on (65–115°), each leg on its own — the knee angle in the picture (hip – knee – ankle,
+180° = a straight leg), read while the leg's points are seen (visibility ≥ 0.5) inside the picture and its foot is seen
+from the side (heel to toe tip at least 0.40 of the shin; a foot turned toward the camera hides the bend). Lead leg on
+the top half, rear below, as stretches: green where the leg scores 100 (lead knee at 155° or more bent, rear 159°),
+red below, gray where not judged (the leg not seen, its foot turned, not side-on, excluded time); the tooltip gives each
+stretch's mean angle and score. On the video each leg's hip – knee – ankle in the same colour with the knee's angle and
+its score; the Now tab gives this frame's angles. Score per leg = 100 at its line, linearly to 0 at 180°; the round =
+the mean of the two legs' means; either leg under 5 s judged: not rated.
+
 **Dead time** (rule 25, `work_rate/work_rate.json` + `segments.csv`; "Work rate" until 2026-10-03): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
 their length, empty for the short pauses in between. A frame counts as work when a

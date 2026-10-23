@@ -589,6 +589,7 @@ const RULE_NAMES = {
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
   33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Looping uppercut', 37: 'Combos too long', 38: 'Solo punches', 39: 'Flat-footed in guard', 40: 'Combo lands on one spot', 41: 'Punches stuck in the bag',
+  42: 'Straight legs',
 };
 const RN = no => RULE_NAMES[no];
 const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
@@ -743,7 +744,7 @@ const ELBOWSTATE = {tucked: '#34c759', flared: '#ff3b30'};   // per-stretch colo
 // reason is readable without hovering. Every gray state on every row has an entry here.
 const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 'side-on', front_on: 'front-on',
                   punching: 'punching', hook: 'hook / body', no_facing: 'no facing', no_side: 'no side',
-                  excluded: 'excluded', window_in_edge: 'excluded'};   // window_in_edge: rules 3 / 13 run before 2026-10-12's excluded time
+                  foot_turned: 'foot turned', excluded: 'excluded', window_in_edge: 'excluded'};   // window_in_edge: rules 3 / 13 run before 2026-10-12's excluded time
 // a frame rule's state in the video's excluded time (S.excl): measured there, never judged
 const EXCLWHY = 'the video’s excluded time — no rule judges it (grey on the timeline)';
 // rules 27 / 29, the variety rows: the share the score reads (the most-used types / type / side) vs everything else
@@ -976,6 +977,19 @@ const FLATSKIP = {no_pose: 'a heel, a toe tip, a shoulder or a hip is not seen',
                   excluded: EXCLWHY};
 const STANCESKIP = {no_pose: 'a joint it needs is not visible', side_on: 'the boxer is side-on',
                     front_on: 'the boxer is not side-on (front- or back-on)', excluded: EXCLWHY};
+// rule 42's colours and gray states, per leg: full = bent at least to its line (100), below = straighter
+const KNEECOL = {full: '#34c759', below: '#ff3b30'};
+const KNEESKIP = {no_pose: 'the leg (hip, knee, ankle, heel or toe tip) is not seen, or is past the picture’s edge',
+                  foot_turned: 'its foot is turned toward or away from the camera — a knee bends where its foot points, so the picture would not show the bend',
+                  front_on: 'the boxer is not side-on', excluded: EXCLWHY};
+// the angle at the knee b between hip a and ankle c, in the picture (degrees, 180 = a straight leg), and its leg score
+const kneeDeg = (a, b, c) => {
+  const u = [a[0] - b[0], a[1] - b[1]], v = [c[0] - b[0], c[1] - b[1]];
+  const cos = (u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v));
+  return Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
+};
+const kneeScore = (leg, deg) => { const full = T(42, `move.score.full.${leg}`), zero = T(42, 'move.score.zero');
+  return 100 * Math.max(0, Math.min(1, (zero - deg) / (zero - full))); };
 function stanceLayer(kind) {
   const C = STANCE[kind];
   return {
@@ -2514,6 +2528,54 @@ const RULE_LAYERS = [
       rr(x0, y + 4, w, h - 8, 3); c.fill(); c.globalAlpha = 1;
     },
   },
+  {
+    // rule 42, straight legs (knee_bend/runs.csv): per leg, the knee angle in the picture (hip - knee - ankle, 180 =
+    // a straight leg), every frame side-on while that leg's foot is seen from the side (heel to toe tip at least
+    // move.foot_min_of_shin of the shin). Lead on the top half, rear below: green where the leg scores 100 (bent at
+    // least to its line), red below, gray where it is not judged (the leg not seen, its foot turned, not side-on,
+    // excluded time).
+    key: 'knee', label: RN(42), short: RN(42), items: true, split: 'leg',
+    frameOverlay(f, P, leadLeft) {                         // each leg's hip - knee - ankle and the angle at the knee
+      const now = (S.items.knee || []).filter(it => f >= it.sf && f <= it.ef);      // the rule's own state, per leg
+      // run_knee_bend.py reads lead = the left leg of an orthodox skeleton; a southpaw's run is mirrored to orthodox,
+      // so the rule's lead leg is the boxer's lead leg — the right one on a southpaw's real skeleton
+      const LEGS2 = leadLeft ? [['lead', J.lhip, J.lkn, J.lan], ['rear', J.rhip, J.rkn, J.ran]]
+                             : [['lead', J.rhip, J.rkn, J.ran], ['rear', J.lhip, J.lkn, J.lan]];
+      for (const [leg, hj, kj, aj] of LEGS2) {
+        const hp = P(hj), kn = P(kj), an = P(aj); if (!(hp && kn && an)) continue;
+        const st = now.find(it => it.leg === leg)?.state, skip = !st || !!KNEESKIP[st];
+        const deg = kneeDeg(hp, kn, an), col = skip ? '#8e8e93' : KNEECOL[st] || '#8e8e93';
+        OV.line(hp, kn, col, 3); OV.line(kn, an, col, 3); OV.dot(kn, col, 4);
+        overlayLabel(kn[0] + 10, kn[1] - 6, skip ? `${leg} · ${SKIPWORD[st] || 'not judged'}`
+          : `${leg} ${deg.toFixed(0)}° → ${THR(() => Math.floor(kneeScore(leg, deg)))}`, col);
+      }
+    },
+    csv: ['knee_bend', 'runs.csv'], json: ['knee_bend', 'knee_bend.json'],
+    parseItem: (r, num) => ({leg: r.leg, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
+      deg: num(r.mean_deg), score: num(r.mean_score)}),
+    card: () => '',                                        // per-frame rule: nothing punch-specific to show
+    tip: (e, x) => {
+      const one = it => {
+        const nm = KNEESKIP[it.state] ? `not judged — ${KNEESKIP[it.state]}`
+          : it.state === 'full' ? 'bent' : '<b>straighter than its line</b>';
+        const num = KNEESKIP[it.state] || it.deg == null ? ''
+          : ` <span class="num">(mean ${it.deg.toFixed(0)}° · score ${it.score.toFixed(0)} over ${((it.ef + 1 - it.sf) / S.fps).toFixed(2)} s)</span>`;
+        return `<span style="color:${KNEESKIP[it.state] ? 'var(--text3)' : KNEECOL[it.state]}">●</span> ${cap(it.leg)} leg: ${nm}${num}`;
+      };
+      const rows = (x.both || [x]).slice().sort(a => a.leg === 'lead' ? -1 : 1);
+      return `<b>${RN(42)}</b> · ${fmtT(frameNow() / S.fps)}<br>` + rows.map(one).join('<br>')
+        + `<br><span class="m">${THR(() => `the knee angle in the picture (180° = a straight leg): 100 at ${fN(T(42, 'move.score.full.lead'))}° or more bent `
+          + `for the lead leg, ${fN(T(42, 'move.score.full.rear'))}° for the rear, 0 at ${fN(T(42, 'move.score.zero'))}°`)}; side-on, each leg while its foot is seen from the side</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const top = x.leg === 'lead', f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
+      const skip = !!KNEESKIP[x.state], w = Math.max(2, x1 - x0), hh = h / 2 - 3;   // no 1 px gap: the row is continuous
+      if (skip) { skipStrip(c, x0, w, y + (top ? 3 : h / 2) + hh / 2, on, x.state); return; }
+      c.fillStyle = KNEECOL[x.state] || '#8e8e93'; c.globalAlpha = on ? 1 : 0.85;
+      rr(x0, y + (top ? 3 : h / 2), w, hh, 3); c.fill(); c.globalAlpha = 1;
+    },
+  },
   chinLayer('height'), chinLayer('depth'),
   bladeLayer('hips'), bladeLayer('shoulders'),
 
@@ -2524,7 +2586,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39], samespot: [40], bite: [41],
+  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39], samespot: [40], bite: [41], knee: [42],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -3235,6 +3297,7 @@ const SCOPE = {
   samespot:  {moves: 'offensive combinations, their punches thrown front-on'},
   bite:      {moves: 'every punch with an impact frame, bag work only'},
   flat:      {moves: 'every frame, punches and defensive moves included'},
+  knee:      {moves: 'every frame, punches and defensive moves included, each leg while its foot is seen from the side'},
   combined:  {moves: 'punches, defensive moves'},
 };
 // Which camera angles a rule judges, as three badges — lit = judged, struck-through = skipped. Front and back share
@@ -3288,7 +3351,8 @@ const RULE_META = (() => {
   const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
-              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R], 39: [F], 40: [C], 41: [P]};
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R], 39: [F], 40: [C], 41: [P],
+              42: [F]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
@@ -3782,6 +3846,19 @@ function ruleCard() {
                         + `no bands; under ${NF(39)} s of judged frames: not rated`,
                  bands: [[`≤ ${full} %`, '100'], [`${full} → ${zero} %`, '100 → 0'], [`≥ ${zero} %`, '0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}}; }, thMiss),
     calc: `${ff.flat_frames.toLocaleString()} of ${ff.judged_frames.toLocaleString()} frames flat-footed = ${pct(ff.flat_share)} → ${ff.score ?? '–'}`});
+  const kb = S.layerSum.knee, KL = kb?.legs;
+  if (kb) add(RN(42), kb.score ?? 'not rated', kb.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'does he box with his knees bent, or stand tall on straight legs?',
+    on: `side-on frames, punches and defensive moves included, each leg while its foot is seen from the side: lead `
+        + `${KL.lead.judged_frames.toLocaleString()} frames (${KL.lead.judged_s} s), rear ${KL.rear.judged_frames.toLocaleString()} (${KL.rear.judged_s} s) · `
+        + `${(KL.lead.foot_turned_frames + KL.rear.foot_turned_frames).toLocaleString()} more leg-frames side-on with the foot turned, not judged`,
+    th: THR(() => { const fl = fN(T(42, 'move.score.full.lead')), fr = fN(T(42, 'move.score.full.rear')), z = fN(T(42, 'move.score.zero'));
+      return {event: {label: 'per frame, per leg', rule: `the knee angle in the picture (hip – knee – ankle, 180° = a straight leg): 100 at ${fl}° or more bent for the `
+                        + `lead leg, ${fr}° for the rear, linearly down to 0 at ${z}° — green at 100, red below; a leg is read only while its foot is seen from the side `
+                        + `(heel to toe tip at least ${fD(T(42, 'move.foot_min_of_shin'), 2)} of the shin)`,
+                      bands: [[`lead ≤ ${fl}°, rear ≤ ${fr}°`, '100'], [`→ ${z}°`, '100 → 0'], [`${z}°`, '0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}},
+              round: {label: 'per round', rule: `each leg’s mean frame score, then the mean of the two legs — a plain number, no bands; either leg under ${NF(42)} s of judged frames: not rated`}}; }, thMiss),
+    calc: `lead ${KL.lead.mean_score ?? '–'} (median knee ${KL.lead.median_deg ?? '–'}°) and rear ${KL.rear.mean_score ?? '–'} (median ${KL.rear.median_deg ?? '–'}°) → ${kb.score ?? '–'}`});
   const ss = S.layerSum.samespot;
   if (ss) add(RN(40), ss.score ?? 'not rated', ss.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'in a combination thrown at the camera, do the punches land on one spot, or side by side?',
@@ -4221,6 +4298,19 @@ function frameCard(el, f) {
     rows.push([39, !st || FLATSKIP[st] ? {skip: FLATSKIP[st] || 'no reading'}
                    : {score: st === 'flat' ? 0 : 100, note: st === 'flat' ? 'both heels down' : 'a heel up'}]);
   }
+  if (S.has.knee) FR(42, () => {                             // 42 straight legs: each judged leg's knee angle on its line
+    const part = {}, why = [];
+    for (const [leg, hj, kj, aj] of leadLeft ? [['lead', J.lhip, J.lkn, J.lan], ['rear', J.rhip, J.rkn, J.ran]]
+                                             : [['lead', J.rhip, J.rkn, J.ran], ['rear', J.lhip, J.lkn, J.lan]]) {
+      const st = state('knee', it => it.leg === leg)?.state, hp = J2(hj), kn = J2(kj), an = J2(aj);
+      if (!st || KNEESKIP[st] || !(hp && kn && an)) { why.push(`${leg} ${SKIPWORD[st] || 'not read'}`); continue; }
+      const deg = kneeDeg(hp, kn, an); part[leg] = [deg, kneeScore(leg, deg)];
+    }
+    const ls = Object.keys(part), txt = ls.map(l => `${l} ${part[l][0].toFixed(0)}°`).join(' · ');
+    return ls.length ? {score: ls.reduce((s, l) => s + part[l][1], 0) / ls.length,
+                        note: txt + (ls.length === 1 ? ` · ${why.join(', ')} (the round needs both legs)` : '')}
+                     : {skip: why.join(' · ')};
+  });
   if (S.has.stance_width) {
     const st = state('stance_width')?.state;
     if (st !== 'ok' && st !== 'narrow') rows.push([12, {skip: STANCESKIP[st] || 'no reading'}]);
@@ -5579,6 +5669,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [41, 'Whether each punch on the bag bites or stays stuck in it. Around the impact the rule follows the punching wrist’s speed in the picture: how fast it arrives at the bag, how long it stays there (from losing half its speed to regaining half its speed back) and how hard it is pulled back. Each is scored against the same punch type in the labeled bag work — full marks at its best quarter, zero at its worst — and the pause and the snap weigh a little more than the arrival. Bag work only; a wrist the bag hides is left out.',
        'every punch with an impact frame, bag work only', `each reading full at its punch type’s good quartile, zero at its bad one; weights ${fD(T(41, 'move.weights.arrival'), 2)} / ${fD(T(41, 'move.weights.pause'), 2)} / ${fD(T(41, 'move.weights.snap'), 2)}; from ${fN(H(41, 'min_judged'))} judged punches`,
        'A punch that rests on the bag or pushes it is slow to come back and leaves the boxer open; one that bites snaps straight back.'],
+  [42, `Whether the boxer boxes with his knees bent or stands tall on straight legs. Seen from the side, the angle at each knee between the hip, the knee and the ankle in the picture, every frame — guard, punches and defensive moves alike; 180° is a straight leg. A knee bends where its foot points, so a leg is read only while its foot is seen from the side (heel to toe tip at least ${fD(T(42, 'move.foot_min_of_shin'), 2)} of the shin): turned toward the camera, the bend does not show. Each leg is scored on its own line — where three in four trained boxers keep that knee on a typical frame — and the two legs count the same.`,
+       'every frame, side-on, each leg while its foot is seen from the side', `full marks at ${fN(T(42, 'move.score.full.lead'))}° or more bent (lead) / ${fN(T(42, 'move.score.full.rear'))}° (rear), zero at ${fN(T(42, 'move.score.zero'))}°; each leg needs ${fN(H(42, 'min_judged_s'))} s judged`,
+       'Straight, locked knees leave a boxer no spring: slower to move, less power from the legs, easier to knock off balance.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));
