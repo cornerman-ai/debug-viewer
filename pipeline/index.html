@@ -588,7 +588,7 @@ const RULE_NAMES = {
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
-  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Looping uppercut', 37: 'Combos too long', 38: 'Solo punches', 39: 'Flat-footed in guard',
+  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Looping uppercut', 37: 'Combos too long', 38: 'Solo punches', 39: 'Flat-footed in guard', 40: 'Combo lands on one spot',
 };
 const RN = no => RULE_NAMES[no];
 const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
@@ -1063,6 +1063,13 @@ const chinImpRule = () => `around the impact (±${fN(T(35, 'move.window_s'))} s,
   + `on uppercuts and body shots the other one, ${fD(T(35, 'move.height.dip_shoulder_top_torso'), 2)} above), 100 at or below it, 0 at `
   + `${fD(-T(35, 'move.height.score.zero'), 2)} torso above, any camera angle; a frame whose face scores under `
   + `${fD(T(35, 'move.face_score_gate'), 2)} is not read`;
+// rule 40's rule in words, every number from the snapshot
+const spotWindow = () => (T(40, 'camera_window_deg') || []).map(([a, b]) => `${fN(a)}–${fN(b)}°`).join(' + ') || '…';
+const sameSpotRule = () => `per offensive combination, its punches thrown front-on (|facing| `
+  + `${spotWindow()}), each fist at its impact frame (the knuckles, else the wrist + `
+  + `${fN(T(40, 'move.fist.forearm_extension'))} forearm): the farthest-apart two across the picture, in torso lengths — 100 at `
+  + `${fD(T(40, 'move.score.full'), 2)} or less, 0 at ${fD(T(40, 'move.score.zero'), 2)} (punches side by side, each straight out of its own shoulder); `
+  + `two punches read at least`;
 // rule 36's reading in words: the forearm's direction, -1 wrist straight above the elbow, 0 level, +1 straight below
 const upDropWords = v => v == null ? '–' : `${v.toFixed(2)}, ${Math.abs(Math.round(Math.asin(Math.max(-1, Math.min(1, v))) * 180 / Math.PI))}° ${v >= 0 ? 'below' : 'above'} level`;
 const upDropRule = () => `head uppercuts: the punching forearm’s direction in world coordinates ((wrist y − elbow y) / forearm length, the arm `
@@ -1536,6 +1543,45 @@ const RULE_LAYERS = [
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
       c.fillStyle = '#ff9f0a'; c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 5, Math.max(3, x1 - x0 - 1), h - 10, 3); c.fill(); c.globalAlpha = 1;
+    },
+  },
+  {
+    // rule 40, combo lands on one spot (combo_same_spot/combos.csv): every offensive combination (rule 30's) with two or
+    // more punches read front-on, one block from its first frame to its last - green at 100, red below, grey when it
+    // touches the excluded time; the spread of its fists across the picture at their impact frames, in torso lengths.
+    key: 'samespot', label: RN(40), short: RN(40), items: true,
+    csv: ['combo_same_spot', 'combos.csv'], json: ['combo_same_spot', 'combo_same_spot.json'],
+    parseItem: (r, num) => r.spread === '' ? null : {sf: num(r.start_frame), ef: num(r.end_frame), seq: r.sequence,
+      spread: num(r.spread), score: num(r.score), verdict: r.verdict, excl: r.skip_reason === 'excluded', nP: num(r.n_punches),
+      fists: (r.fists || '').split(' ; ').filter(Boolean).map(t => { const [hand, type, f, nx, ny] = t.split('|');
+        return {hand, type, f: +f, nx: +nx, ny: +ny}; })},
+    card: () => '',
+    tip: (e, x) => `<b>${x.seq.replace(/ > /g, ' › ')}</b> · ${fmtT(x.sf / S.fps)}<br>` +
+      (x.excl ? `<span class="m">not judged: it reaches into the video’s excluded time, which no rule judges</span><br>` :
+       `<span class="num">score <b>${x.score.toFixed(1)}</b> · the fists land ${x.spread.toFixed(2)} torso lengths apart across the picture`
+       + ` (${x.fists.length} of ${x.nP} punches read front-on)</span><br>`) +
+      `<span class="m">${THR(() => sameSpotRule())}</span>`,
+    row(e, x, {c, y, h, tag, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0 - 1);
+      c.fillStyle = x.excl ? '#8e8e93' : x.verdict === 'same_spot' ? '#34c759' : '#ff3b30';
+      c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 4, w, h - 8, 4); c.fill(); c.globalAlpha = 1;
+      if (!x.excl) tag(x0, w, y, h, x.score.toFixed(1));
+    },
+    frameOverlay(f) {                                      // inside a combination: where each of its fists landed
+      const it = OV.at('samespot', f); if (!it) return;
+      const col = it.excl ? '#8e8e93' : it.verdict === 'same_spot' ? '#34c759' : '#ff3b30';
+      const pts = it.fists.map(q => ({...q, p: PXY(S.mirrored ? 1 - q.nx : q.nx, q.ny)})).filter(q => q.p);
+      if (pts.length < 2) return;
+      const xs = pts.map(q => q.p[0]), ys = pts.map(q => q.p[1]);
+      const lo = Math.min(...xs), hi = Math.max(...xs), top = Math.min(...ys) - 70, bot = Math.max(...ys) + 70;
+      OV.line([lo, top], [lo, bot], col, 2, [5, 4]); OV.line([hi, top], [hi, bot], col, 2, [5, 4]);   // the spread
+      for (const q of pts) {
+        const pc = PUNCH[q.type]?.c || '#fff';
+        OV.ring(q.p, pc, q.f === f ? 13 : 9, 3);                                 // each landing spot; this frame's bigger
+      }
+      overlayLabel(lo, top - 12, it.excl ? `${RN(40)} · not judged (excluded time)`
+        : `${RN(40)} · fists ${it.spread.toFixed(2)} torso apart → ${it.score.toFixed(1)}`, col);
     },
   },
   slipLayer(14), slipLayer(15),
@@ -2428,7 +2474,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39],
+  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39], samespot: [40],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -3130,6 +3176,7 @@ const SCOPE = {
   stchg:     {moves: 'every frame, every angle'},
   longcombo: {moves: 'combined combinations (punches + defensive moves)'},
   solo:      {moves: 'every punch, as a share of the round'},
+  samespot:  {moves: 'offensive combinations, their punches thrown front-on'},
   flat:      {moves: 'every frame, punches and defensive moves included'},
   combined:  {moves: 'punches, defensive moves'},
 };
@@ -3184,7 +3231,7 @@ const RULE_META = (() => {
   const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
-              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R], 39: [F]};
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R], 39: [F], 40: [C]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
@@ -3664,6 +3711,17 @@ function ruleCard() {
                         + `no bands; under ${NF(39)} s of judged frames: not rated`,
                  bands: [[`≤ ${full} %`, '100'], [`${full} → ${zero} %`, '100 → 0'], [`≥ ${zero} %`, '0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}}}; }, thMiss),
     calc: `${ff.flat_frames.toLocaleString()} of ${ff.judged_frames.toLocaleString()} frames flat-footed = ${pct(ff.flat_share)} → ${ff.score ?? '–'}`});
+  const ss = S.layerSum.samespot;
+  if (ss) add(RN(40), ss.score ?? 'not rated', ss.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'in a combination thrown at the camera, do the punches land on one spot, or side by side?',
+    on: `${ss.n_combos} offensive combinations (rule 30’s) · ${ss.judged_combos} judged with two or more punches read front-on, `
+        + `${ss.few_front_on_combos} with fewer (thrown side-on, no impact frame or the fist not seen)${exNote(ss.excluded_combos, 'combinations')}`,
+    th: THR(() => { const full = fD(T(40, 'move.score.full'), 2), zero = fD(T(40, 'move.score.zero'), 2);
+      return {event: {label: 'per combo', rule: sameSpotRule() + ' — green at 100, red below',
+                      bands: [[`≤ ${full} torso apart`, '100'], [`${full} → ${zero}`, '100 → 0'], [`≥ ${zero}`, '0']],
+                      pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}},
+              round: {label: 'per round', rule: `the mean combination score — a plain number, no bands; fewer than ${NJ(40)} judged combinations: not rated`}}; }, thMiss),
+    calc: `mean of ${ss.judged_combos} combination scores = ${ss.mean_score ?? '–'} · ${ss.at_100} at 100 · median spread ${ss.median_spread_torso ?? '–'} torso`});
   const sp1 = S.layerSum.solo;
   if (sp1) add(RN(38), sp1.score ?? 'not rated', sp1.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he put his punches together, or throw them one at a time?',
@@ -3974,6 +4032,11 @@ function comboCard(el, f) {
         {text: TH_MISSING, col: '#8e8e93'})]);
       const r = reps(kind, c);
       if (r != null) rows.push([30, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: 'var(--text)'}]);
+      if (S.has.samespot) {
+        const ssc = (S.items.samespot || []).find(x => x.sf === c.sf);
+        rows.push([40, !ssc ? {skip: 'fewer than two punches read front-on'} : ssc.excl ? {skip: 'excluded'}
+          : {score: ssc.score, note: `fists ${ssc.spread.toFixed(2)} torso apart`}]);
+      }
       if (S.has.defcov) {
         const d = (S.items.defcov || []).find(x => x.endF === c.ef);
         if (d) rows.push([3, d.covered === null ? {skip: d.skip} : d.covered ? {text: `defended — ${d.side ? d.side + ' ' : ''}${styleD(d.type)?.name.toLowerCase() || d.type} `
@@ -5410,6 +5473,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [39, `Whether the boxer stands flat on both heels while he boxes. Seen from the side, each heel’s height above its own toe tip (BlazePose’s heel and foot-index points): under ${fD(T(39, 'move.heel_down_below'), 2)} torso lengths the heel is down; both down is flat-footed. Punches and defensive moves count: only the angle and the feet being seen decide which frames are judged.`,
        'every frame, side-on', `full marks at ${fP(T(39, 'round.score.full'))} % of that time flat-footed or less, zero at ${fP(T(39, 'round.score.zero'))} %`,
        'Flat on both heels a boxer is slow to move, slow to push off into a punch and easy to catch.'],
+  [40, 'Whether the punches of a combination land on one spot across the picture when it is thrown at the camera. Each fist is read at its punch’s impact frame (the knuckles, else the wrist pushed out along the forearm); the combination’s score is how far apart the farthest two land, in torso lengths. Punches thrown side by side, each straight out of its own shoulder, land a shoulder’s width apart.',
+       `offensive combinations, their punches thrown front-on (|facing| ${spotWindow()})`, `full marks with the fists ${fD(T(40, 'move.score.full'), 2)} torso apart or less, zero at ${fD(T(40, 'move.score.zero'), 2)}`,
+       'A jab and a cross aimed at one chin meet on one line; thrown parallel, the second one lands beside the target.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));
