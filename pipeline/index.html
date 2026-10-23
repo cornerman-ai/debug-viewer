@@ -588,7 +588,7 @@ const RULE_NAMES = {
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
-  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Looping uppercut', 37: 'Combos too long', 38: 'Solo punches', 39: 'Flat-footed in guard', 40: 'Combo lands on one spot',
+  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Looping uppercut', 37: 'Combos too long', 38: 'Solo punches', 39: 'Flat-footed in guard', 40: 'Combo lands on one spot', 41: 'Punches stuck in the bag',
 };
 const RN = no => RULE_NAMES[no];
 const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
@@ -1077,6 +1077,17 @@ const upDropRule = () => `head uppercuts: the punching forearm’s direction in 
   + `same hand’s previous punch, when later) to impact (start + ${fN(T(36, 'move.default_impact_s'))} s without one); 100 up to `
   + `${fD(T(36, 'move.score.full'), 2)}, linearly to 0 at ${fD(T(36, 'move.score.zero'), 2)}; not judged when the arm’s least visible joint has a median `
   + `visibility under ${fD(T(36, 'move.min_arm_visibility'), 2)}`;
+// rule 41's per-punch line in words: the three readings, their weights and each punch type's quartile lines
+const BITE_TYPES = [['jab', 'jab'], ['cross', 'cross'], ['hook', 'hook'], ['uppercut', 'uppercut'], ['hook_or_uppercut', 'body shot']];
+const biteLine = k => `arrival ${fD(T(41, `move.score.arrival.zero.${k}`), 1)} → ${fD(T(41, `move.score.arrival.full.${k}`), 1)}, `
+  + `pause ${fD(T(41, `move.score.pause.zero.${k}`), 3)} → ${fD(T(41, `move.score.pause.full.${k}`), 3)} s, `
+  + `snap ${fN(Math.round(T(41, `move.score.snap.zero.${k}`)))} → ${fN(Math.round(T(41, `move.score.snap.full.${k}`)))}`;
+const biteRule = () => `bag work only: the punching wrist’s speed in the picture over the torso (smoothed at ${fN(T(41, 'move.smooth_hz'))} Hz); `
+  + `arrival = the speed’s peak before the fist stops at the bag (torso lengths / s), pause = from losing half that speed to `
+  + `regaining half the return speed (s), snap = the speed’s highest rise per second after the stop (torso lengths / s²). `
+  + `Each scores 0 → 100 between its punch type’s quartiles of the labeled bag punches (${BITE_TYPES.map(([k, w]) => `${w}: ${biteLine(k)}`).join('; ')}); `
+  + `the punch’s score = ${fD(T(41, 'move.weights.arrival'), 2)} × arrival + ${fD(T(41, 'move.weights.pause'), 2)} × pause + `
+  + `${fD(T(41, 'move.weights.snap'), 2)} × snap`;
 const CHINSKIP = {no_reading: 'a shoulder or hip the rule needs is not visible',
                   no_face: 'no face found with enough confidence — the chin is not guessed from the skeleton',
                   punching: 'a punch is in flight — the chin is judged between punches',
@@ -1946,6 +1957,45 @@ const RULE_LAYERS = [
     },
   },
   {
+    // rule 41, punches stuck in the bag (bag_bite/punches.csv): bag work only (bagwork/bagwork.json); every punch with
+    // an impact frame, the punching wrist's speed in the picture over the torso: arrival (the peak before the stop at
+    // the bag), pause (half the arrival speed lost -> half the return speed regained), snap (the speed's highest rise
+    // after the stop), each on its punch type's quartile lines (move.score), weighted by move.weights.
+    key: 'bite', label: RN(41), short: RN(41),
+    csv: ['bag_bite', 'punches.csv'], json: ['bag_bite', 'bag_bite.json'],
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, score: num(r.score), arr: num(r.arrival), pause: num(r.pause),
+      snap: num(r.snap), sa: num(r.arrival_score), sp: num(r.pause_score), ss: num(r.snap_score), leave: num(r.leave),
+      back: num(r.back), stop: num(r.stop), vis: num(r.wrist_vis)}
+      : {verdict: '', skip: r.skip_reason, vis: num(r.wrist_vis)},
+    card: (e, x) => `<div class="sub"><div class="h">${RN(41)}</div>` +
+      (!x || !x.verdict ? `<div class="empty">${skipTxt(x?.skip)}${x?.vis != null ? ` (wrist visibility ${x.vis.toFixed(2)})` : ''}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Arrival</span><b>${x.arr.toFixed(1)} torso / s → ${x.sa.toFixed(0)}</b>
+        <span>Pause on the bag</span><b>${(x.pause * 1000).toFixed(0)} ms → ${x.sp.toFixed(0)}</b>
+        <span>Snap back</span><b>${x.snap.toFixed(0)} torso / s² → ${x.ss.toFixed(0)}</b>
+        <span>Punch score</span><b>${x.score.toFixed(1)} ${THR(() => `(${fD(T(41, 'move.weights.arrival'), 2)} / ${fD(T(41, 'move.weights.pause'), 2)} / ${fD(T(41, 'move.weights.snap'), 2)})`)}</b>
+        <span>Wrist visibility</span><b>${x.vis.toFixed(2)} (median over the readings)</b></div>`) + '</div>',
+    tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${skipTxt(x.skip)}</span>` :
+      `<span class="num"><b>${x.score.toFixed(1)} / 100</b> · arrival ${x.arr.toFixed(1)} torso / s (${x.sa.toFixed(0)}) · `
+      + `pause ${(x.pause * 1000).toFixed(0)} ms (${x.sp.toFixed(0)}) · snap ${x.snap.toFixed(0)} torso / s² (${x.ss.toFixed(0)})</span><br>`
+      + `<span class="m">${THR(() => biteRule())}</span>`),
+    row(e, x, {c, y, h, span, tag, ring}) {
+      if (!x.verdict) return;                                // not judged: draw nothing
+      const [bx, w] = span(e);
+      c.fillStyle = x.verdict === 'bites' ? '#34c759' : '#ff3b30';
+      rr(bx, y + 3, w, h - 6, 5); c.fill();
+      tag(bx, w, y, h, x.score.toFixed(1));
+      ring(e, 'bite', bx, y, w, h);
+    },
+    overlay(e, x, f, P, leadLeft) {                         // the punching wrist; ringed solid while it is on the bag
+      if (!x.verdict) return;
+      const wr = P((e.hand === 'lead') === leadLeft ? J.lwr : J.rwr); if (!wr) return;
+      const col = x.verdict === 'bites' ? '#34c759' : '#ff3b30', on = f >= Math.floor(x.leave) && f <= Math.ceil(x.back);
+      OV.ring(wr, col, on ? 13 : 9, on ? 4 : 2);
+      overlayLabel(wr[0] + 16, wr[1] - 8, `${on ? 'on the bag · ' : ''}pause ${(x.pause * 1000).toFixed(0)} ms · arrival ${x.arr.toFixed(1)} · snap `
+        + `${x.snap.toFixed(0)} → ${x.score.toFixed(1)}`, col);
+    },
+  },
+  {
     // punch speed (punch_speed/punches.csv): start → impact, 100 up to the labelled corpus's full_pctl-th percentile of
     // its punch type, linearly down to 0 at its zero_pctl-th (move.score).
     key: 'speed', label: RN(23), short: RN(23),
@@ -2474,7 +2524,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39], samespot: [40],
+  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39], samespot: [40], bite: [41],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -2574,7 +2624,7 @@ const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
-V.base = {angle: true, stance: true, activity: true, lead: true, rear: true, def: true, steps: true};
+V.base = {angle: true, stance: true, activity: true, lead: true, rear: true, def: true};
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
 // the sub-switches under Lead / Rear / Defense: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
@@ -2622,14 +2672,13 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, exj, stRuns, stepCsv] = await Promise.all([
+  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, exj, stRuns] = await Promise.all([
     jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
     jsn(['stance', 'stance.json']),                         // the stance stage (2026-10-09): who run_all mirrored, and why
     jsn(['gloves', 'gloves.json']),                         // the gloves stage (2026-10-09): no rule reads it yet
     jsn(['bagwork', 'bagwork.json']),                       // the bagwork stage (2026-10-10): no rule reads it yet
     jsn(['excluded_segments.json']),                        // the excluded time (2026-10-12): see N.excl below
-    lite ? null : txt(['stance', 'runs.csv']),              // every frame's stance (2026-10-20): the Stance row
-    lite ? null : txt(['steps', 'steps.csv'])]);            // every foot move (2026-10-23): the Steps row
+    lite ? null : txt(['stance', 'runs.csv'])]);            // every frame's stance (2026-10-20): the Stance row
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
@@ -2650,10 +2699,6 @@ async function buildVideo(src, sig, lite = false) {
   N.stanceRuns = (stRuns ? parseCSV(stRuns) : []).map(r => ({
     kind: 'st', sf: +r.start_frame, ef: +r.end_frame, state: r.state, reason: r.reason}));
   N.hasStanceRuns = N.stanceRuns.length > 0;
-  // the Steps row (steps/steps.csv): every foot move, lead / rear as the stages saw them (a southpaw's run mirrored, so
-  // lead is lead either way)
-  N.steps = (stepCsv ? parseCSV(stepCsv) : []).map(r => ({kind: 'step', foot: r.foot, sf: +r.start_frame, ef: +r.end_frame}));
-  N.hasSteps = !!stepCsv;
   N.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
     kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share,
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
@@ -3073,7 +3118,6 @@ const BASE_ROWS = [
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
-  ['steps', 'Steps', 'every foot move, lead foot on top, rear below: the app’s foot-move counter (Feet stance) — a foot’s speed over 0.6 torso lengths a second until back under 0.35. Measured on 545 labeled foot moves (any angle): it finds 87 %, about 3 in 10 of its moves are not real steps, and about one step in six shows as two', () => S.hasSteps],
 ];
 // the rows with a sub-switch per type: [the type table, the events, which of them sit on this row]
 const SUB_ROWS = {lead: () => [PUNCH, S.punches, e => e.hand === 'lead'], rear: () => [PUNCH, S.punches, e => e.hand === 'rear'],
@@ -3183,6 +3227,7 @@ const SCOPE = {
   longcombo: {moves: 'combined combinations (punches + defensive moves)'},
   solo:      {moves: 'every punch, as a share of the round'},
   samespot:  {moves: 'offensive combinations, their punches thrown front-on'},
+  bite:      {moves: 'every punch with an impact frame, bag work only'},
   flat:      {moves: 'every frame, punches and defensive moves included'},
   combined:  {moves: 'punches, defensive moves'},
 };
@@ -3237,7 +3282,7 @@ const RULE_META = (() => {
   const P = 'On a punch', F = 'On a frame', C = 'On a combo', D = 'On a defensive move', R = 'Whole round only';
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
-              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R], 39: [F], 40: [C]};
+              24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R], 39: [F], 40: [C], 41: [P]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
@@ -3655,6 +3700,20 @@ function ruleCard() {
                     round: {label: 'per round', rule: `the mean uppercut score — a plain number, no bands; fewer than ${NJ(36)} judged uppercuts: not rated`}}), thMiss),
     calc: `mean of ${ud.judged_uppercuts} uppercut scores = ${ud.mean_score ?? '–'} · ${ud.at_100 ?? '–'} at 100 · ${ud.dropped} dropped · `
           + `median forearm at its lowest ${ud.median_drop ?? '–'}`});
+  const bb = S.layerSum.bite;
+  if (bb) add(RN(41), bb.score ?? 'not rated', bb.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'on the bag, does each punch bite — arrive fast, leave the bag at once and snap back — or stay stuck in the bag?',
+    on: bb.bagwork !== true ? `not bag work (the bagwork stage: P(bag) ${bb.p_bag ?? '–'}, bag work from 0.5): the rule judges bag work only`
+      : `${bb.n_punches} punches · ${bb.judged_punches} judged around their impact frame, ${bb.n_punches - bb.judged_punches} skipped `
+        + `(${bb.skipped?.wrist_not_seen ?? 0} with the wrist not seen — mostly the bag hiding the far hand — ${bb.skipped?.no_impact ?? 0} with no impact `
+        + `frame, ${bb.skipped?.too_little_motion ?? 0} moving too little to read, ${bb.skipped?.no_stop ?? 0} with no stop, ${bb.skipped?.excluded ?? 0} in excluded time)`,
+    th: THR(() => ({event: {label: 'per punch', rule: biteRule() + ' — green at 100, red below',
+                            bands: [['all three at the good quartile', '100'], ['all three at the bad quartile', '0']],
+                            pal: {'100': '#34c759', '0': '#ff3b30'}},
+                    round: {label: 'per round', rule: `the mean punch score — a plain number, no bands; bag work only; fewer than ${NJ(41)} judged punches: not rated`}}), thMiss),
+    calc: `mean of ${bb.judged_punches} punch scores = ${bb.mean_score ?? '–'} · ${bb.at_100} at 100 · part means: arrival ${bb.mean_part_scores?.arrival ?? '–'}, `
+          + `pause ${bb.mean_part_scores?.pause ?? '–'}, snap ${bb.mean_part_scores?.snap ?? '–'} · medians: arrival ${bb.median?.arrival ?? '–'} torso / s, `
+          + `pause ${bb.median?.pause ?? '–'} s, snap ${bb.median?.snap ?? '–'} torso / s²`});
   const ih = S.layerSum.resting;
   if (ih) add(RN(6), ih.score ?? 'not rated', ih.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'when one hand lands, is the other hand’s wrist still up where a guard belongs?',
@@ -3919,6 +3978,10 @@ const SKIPTXT = {
   no_reading: 'a shoulder or hip point is not visible on the frames read (rule 35)',
   arm_not_seen: 'the punching arm is not seen: the median visibility of its least visible joint over the window is too low — mostly the far arm of a boxer side-on to the camera (rule 36)',
   no_arm_reading: 'no frame of the window has the punching arm’s elbow and wrist (rule 36)',
+  wrist_not_seen: 'the punching wrist is not seen: its median visibility over the readings is too low — mostly the bag hiding the far hand (rule 41)',
+  too_little_motion: 'the wrist moves too little to read: its arrival or return speed is under the rule’s minimum (rule 41)',
+  no_stop: 'the wrist never clearly slows between going out and coming back: no stop at the bag to read (rule 41)',
+  no_wrist_reading: 'no reading of the punching wrist around the impact (rule 41)',
 };
 const skipTxt = c => SKIPTXT[c] || (c ? c.replace(/_/g, ' ') : 'not judged');
 const GOOD = '#22C55E', BAD = '#EF4444', MIDC = '#F97316';
@@ -3942,6 +4005,7 @@ const PUNCH_RULES = [
   ['rpivot', p => p.hand === 'rear', scored],
   ['chinimp', () => true, scored],
   ['updrop', p => p.type === 'uppercut', scored],
+  ['bite', () => true, scored],
 ];
 // "fails on", under a per-punch rule's round line: the punches it failed, split by punch type. The bar is each type's
 // share of the failed punches (the punch distribution's order and colours); after each type, failed / judged of that
@@ -4465,16 +4529,14 @@ let TR = {}, laneTop = 0;                                       // laneTop: the 
 // each base row's height and the gap under it: lead / rear sit close as a pair
 // Every lane's height; lanes sit LANE_GAP apart, groups GROUP_GAP apart under a HEAD_H header (2026-10-22 redesign:
 // grouping by space and type, no bands or outlines - the way Apple's own charts and track views read).
-const BASE_GEOM = {angle: 150, stance: 32, activity: 96, lead: 30, rear: 30, def: 30, steps: 36};
+const BASE_GEOM = {angle: 150, stance: 32, activity: 96, lead: 30, rear: 30, def: 30};
 const LANE_GAP = 6, GROUP_GAP = 20, HEAD_H = 24, RULE_H = 28;
 // The base rows in two groups (the rule rows are the third): what the body does and what he does.
-const BASE_GROUP = {angle: 'Body', stance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions', steps: 'Actions'};
-// the Steps row's two feet
-const STEPCOL = {lead: '#64d2ff', rear: '#5e5ce6'};
+const BASE_GROUP = {angle: 'Body', stance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions'};
 // A row's colour key, under its name in the label column, where its colours carry the meaning.
 const STANCE_KEY = () => [[STANCEROW.orthodox, 'left'], [STANCEROW.southpaw, 'right'], [STANCEROW.neutral, 'neutral']];
 const LANE_KEY = () => ({angle: [[FACECOL.front, 'front / back'], [FACECOL['side-on'], 'side-on']], stance: STANCE_KEY(),
-  activity: [[ACT.outCol, 'output / min'], [ACT.movCol, 'movement']], steps: [[STEPCOL.lead, 'lead foot'], [STEPCOL.rear, 'rear foot']]});
+  activity: [[ACT.outCol, 'output / min'], [ACT.movCol, 'movement']]});
 const LANE_FONT = (w, s) => `${w} ${s}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif`;
 let TRG = [];                                                   // [[header, its baseline y, first group?]]
 function layout() {
@@ -4573,7 +4635,7 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // the label column, the group headers and the lanes (2026-10-22 redesign: space and type do the grouping)
-  const names = {angle: 'Facing', stance: 'Stance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', steps: 'Steps', over: 'Overview', ...LNAME};
+  const names = {angle: 'Facing', stance: 'Stance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', over: 'Overview', ...LNAME};
   const lane = css('--lane') || 'rgba(120,120,128,0.075)', F = LANE_FONT, KEY = LANE_KEY();
   const step = niceStep(V.t1 - V.t0, W), ticks = [];
   for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) ticks.push(t);
@@ -4691,17 +4753,6 @@ function drawTimeline(f) {
   }
   if (TR.activity) drawActivity(c, W, grid, text3);
   if (TR.def) for (const e of S.defenses) if (!hid(e)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
-  if (TR.steps) {                                             // the Steps row: lead foot's moves on the top half, rear's below
-    const [sy, sh] = TR.steps, hh = sh / 2;
-    for (const e of S.steps) {
-      const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps);
-      if (x1 < L || x0 > L + W) continue;
-      const on = V.hover === e || (e.sf <= f && f <= e.ef), yy = sy + (e.foot === 'lead' ? 3 : hh + 1);
-      c.fillStyle = STEPCOL[e.foot]; c.globalAlpha = on ? 1 : 0.8;
-      rr(x0, yy, Math.max(2, x1 - x0 - 1), hh - 4, 3); c.fill();
-    }
-    c.globalAlpha = 1;
-  }
   drawLayerRows(c, f, W, text, grid);
   drawFaceVeil(c, W, text);                               // shift-click a facing band: everything else fades back
   drawExclVeil(c, W);                                     // the video's excluded time: no rule judges it
@@ -4969,8 +5020,6 @@ function draw(force) {
     if (S.punches.some(e => e.impact === f && !hid(e))) hud.push('<span class="pill impact">IMPACT</span>');
     for (const e of dNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleD(e.type).c}"></span>${e.side ? cap(e.side) + ' ' : ''}${styleD(e.type).name}</span>`);
     const stNow = baseOn('stance') ? S.stanceRuns.find(e => f >= e.sf && f <= e.ef && e.reason !== 'no_reading') : null;
-    for (const e of baseOn('steps') ? S.steps.filter(e => f >= e.sf && f <= e.ef) : [])
-      hud.push(`<span class="pill"><span class="dot" style="background:${STEPCOL[e.foot]}"></span>${cap(e.foot)} foot step</span>`);
     if (stNow) hud.push(`<span class="pill"><span class="dot" style="background:${STANCEROW[stNow.state]}"></span>${STANCENAME[stNow.state] || cap(stNow.state)}</span>`);
     $('hud').innerHTML = hud.join('');
     drawOverlay(f, pNow);
@@ -5009,10 +5058,6 @@ function hit(x, y) {
   if (inRow(TR.activity)) { const A = activityData(); return A && f >= 0 && f < A.n ? {kind: 'act', f, sf: f, ef: f} : null; }
   if (inRow(TR.stance)) return S.stanceRuns.find(e => f >= e.sf && f <= e.ef && e.reason !== 'no_reading') || null;
   if (inRow(TR.def)) return find(S.defenses, () => true);
-  if (inRow(TR.steps)) {                                      // the cursor's half picks the foot
-    const foot = y < TR.steps[0] + TR.steps[1] / 2 ? 'lead' : 'rear';
-    return S.steps.find(e => e.foot === foot && f >= e.sf - 1 && f <= e.ef + 1) || null;
-  }
   for (const k of LAYERS) if (TR[k] && inRow(TR[k])) {
     const L_ = RULE[k];
     let e;
@@ -5117,11 +5162,6 @@ function tip(e, cx, cy) {
       + `<b style="color:${ACT.outCol}">●</b> output <b class="num">${o == null ? '–' : o.toFixed(0)}</b> <span class="m">punches + defensive moves / min</span><br>`
       + `<b style="color:${ACT.movCol}">●</b> movement <b class="num">${m == null || !Number.isFinite(m) ? '–' : m.toFixed(2)}</b> <span class="m">torso lengths / s${A?.mov ? '' : ' (waiting for the video and skeleton)'}</span><br>`
       + `<span class="m">both smoothed over about ${ACT.sigmaS * 2} s; movement = how far the hip centre (averaged over ${ACT.posSmoothS} s) got in the last ${ACT.lagS} s, toward or from the camera included, and how far he turned (${ACT.turnDeg}° counts as one torso length), minus ${ACT.floor}; the row's top is ${ACT.outMax}/min and ${ACT.movMax} torso/s</span>`;
-  } else if (e.kind === 'step') {
-    el.innerHTML = `<b style="color:${STEPCOL[e.foot]}">●</b> <b>${cap(e.foot)} foot moves</b><br>`
-      + `<span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)} · ${(n / fps).toFixed(2)} s</span><br>`
-      + `<span class="m">the app’s foot-move counter: the foot’s speed over 0.6 torso lengths a second, until back under 0.35. On 545 `
-      + `labeled foot moves it found 87 %; about 3 in 10 of its moves are not real steps and one step in six shows as two</span>`;
   } else if (e.kind === 'st') {
     el.innerHTML = `<b style="color:${STANCEROW[e.state]}">●</b> <b>${STANCENAME[e.state] || cap(e.state)}</b>` +
       (e.reason ? `<br><span class="m">${STANCEWHY[e.reason] || e.reason}</span>` : '') +
@@ -5506,6 +5546,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [40, 'Whether the punches of a combination land on one spot across the picture when it is thrown at the camera. Each fist is read at its punch’s impact frame (the knuckles, else the wrist pushed out along the forearm); the combination’s score is how far apart the farthest two land, in torso lengths. Punches thrown side by side, each straight out of its own shoulder, land a shoulder’s width apart.',
        `offensive combinations, their punches thrown front-on (|facing| ${spotWindow()})`, `full marks with the fists ${fD(T(40, 'move.score.full'), 2)} torso apart or less, zero at ${fD(T(40, 'move.score.zero'), 2)}`,
        'A jab and a cross aimed at one chin meet on one line; thrown parallel, the second one lands beside the target.'],
+  [41, 'Whether each punch on the bag bites or stays stuck in it. Around the impact the rule follows the punching wrist’s speed in the picture: how fast it arrives at the bag, how long it stays there (from losing half its speed to regaining half its speed back) and how hard it is pulled back. Each is scored against the same punch type in the labeled bag work — full marks at its best quarter, zero at its worst — and the pause and the snap weigh a little more than the arrival. Bag work only; a wrist the bag hides is left out.',
+       'every punch with an impact frame, bag work only', `each reading full at its punch type’s good quartile, zero at its bad one; weights ${fD(T(41, 'move.weights.arrival'), 2)} / ${fD(T(41, 'move.weights.pause'), 2)} / ${fD(T(41, 'move.weights.snap'), 2)}; from ${fN(H(41, 'min_judged'))} judged punches`,
+       'A punch that rests on the bag or pushes it is slow to come back and leaves the boxer open; one that bites snaps straight back.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));

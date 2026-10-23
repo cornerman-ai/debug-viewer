@@ -176,14 +176,6 @@ from 0.50; no rule reads it yet), then `training: bag work / shadowboxing (P(bag
 (`bagwork/bagwork.json`: a logistic regression on how hidden the hands are, the framing and the punches; no rule reads
 it yet).
 
-**Steps** (the base row under Defense, on by default, since 2026-10-23; the backend's `steps` stage,
-`steps/steps.csv`): every foot move, the lead foot's on the top half (light blue), the rear foot's below (indigo); the
-video's pill names a foot while it moves. The counter is the AMBO app's own (Feet stance, `stance.ts`, one definition in
-the backend's `ml/research/footwork/foot_moves.py`): a foot's centre (ankle, heel, toe) moving over 0.6 torso lengths a
-second starts a move, back under 0.35 ends it. Against 545 labeled foot moves (YouTube footage, any angle, 2026-10-09;
-its settings swept on the same labels) it found 87 % at precision 0.70, and about one labeled step in six comes out as
-two moves - so read the row as when the feet move, not an exact step count. No rule reads it yet.
-
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
 are videos, columns are the overall round score and rules 1–36, each cell the 0–100 score tinted in its tier's colour
 ("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
@@ -285,6 +277,15 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   and this frame's chin. Skipped: no face on any frame read (about half the punches on the test videos — an arm in
   front of the face), a shoulder or hip hidden, excluded time. Round = the mean punch score, from at least 10. Reads
   `punches.csv` + `chin_impact.json`.
+- **Punches stuck in the bag** (rule 41, `bag_bite/`, since 2026-10-23): bag work only (the bagwork stage's call;
+  otherwise the Round row says "not bag work" with its P(bag)). Per punch with an impact frame, the punching wrist's
+  speed in the picture over the torso: the arrival (the speed's peak before the stop at the bag), the pause on the bag
+  (half the arrival speed lost → half the return speed regained) and the snap back (the speed's highest rise after the
+  stop), each scored 0 → 100 between its punch type's quartiles of the labeled bag punches, weighted 0.30 / 0.35 / 0.35.
+  A block per judged punch, green at 100, red below, its score on it; the card and tooltip give the three readings and
+  their part scores; on the video the punching wrist is ringed, solid and labelled "on the bag" while the pause lasts.
+  Round = the mean punch score (from 10); the Now tab lists it per punch; skip reasons: wrist not seen (the bag hides
+  the far hand), too little motion, no stop, no impact frame.
 - **Looping uppercut** (rule 36, `uppercut_drop/`, since 2026-10-22; "Hand drop before the uppercut" until 2026-10-23): per head uppercut (body uppercuts are
   the punch model's body class and are not judged), the punching forearm's direction in world coordinates — (wrist y −
   elbow y) / forearm length, the arm filtered at 6 Hz — at its most downward over the window from 0.5 s before the
