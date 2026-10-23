@@ -267,7 +267,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   and this frame's chin. Skipped: no face on any frame read (about half the punches on the test videos — an arm in
   front of the face), a shoulder or hip hidden, excluded time. Round = the mean punch score, from at least 10. Reads
   `punches.csv` + `chin_impact.json`.
-- **Hand drop before the uppercut** (rule 36, `uppercut_drop/`, since 2026-10-22): per head uppercut (body uppercuts are
+- **Looping uppercut** (rule 36, `uppercut_drop/`, since 2026-10-22; "Hand drop before the uppercut" until 2026-10-23): per head uppercut (body uppercuts are
   the punch model's body class and are not judged), the punching forearm's direction in world coordinates — (wrist y −
   elbow y) / forearm length, the arm filtered at 6 Hz — at its most downward over the window from 0.5 s before the
   start (or the end of the same hand's previous punch, when later) to impact. 100 up to 0.49 (about 29° below level),

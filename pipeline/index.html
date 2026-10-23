@@ -588,7 +588,7 @@ const RULE_NAMES = {
   21: 'Arm extension', 22: 'Hit height', 23: 'Punch speed', 24: 'Combination length',
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
-  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Hand drop before the uppercut', 37: 'Combos too long', 38: 'Solo punches', 39: 'Flat-footed in guard',
+  33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Looping uppercut', 37: 'Combos too long', 38: 'Solo punches', 39: 'Flat-footed in guard',
 };
 const RN = no => RULE_NAMES[no];
 const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
@@ -1855,12 +1855,12 @@ const RULE_LAYERS = [
     },
   },
   {
-    // rule 36, hand drop before the uppercut (uppercut_drop/punches.csv): every head uppercut, the punching forearm's
+    // rule 36, looping uppercut (uppercut_drop/punches.csv): every head uppercut, the punching forearm's
     // direction in world coordinates ((wrist y - elbow y) / forearm length, the arm's joints filtered at move.smooth_hz),
     // at its most downward over the window: from move.window_before_s before the start - or the end of the same hand's
     // previous punch, when later - to impact (start + move.default_impact_s without one). Scored against move.score;
     // not judged when the arm is not seen (the median of its least visible joint under move.min_arm_visibility).
-    key: 'updrop', label: RN(36), short: 'Uppercut hand drop',
+    key: 'updrop', label: RN(36), short: RN(36),
     window: true,                                          // its block, ring and hover cover the window, start - 0.5 s → impact
     split: 'hand',                                         // lead windows on the top half, rear on the bottom
     csv: ['uppercut_drop', 'punches.csv'], json: ['uppercut_drop', 'uppercut_drop.json'],
@@ -3171,7 +3171,7 @@ function scoreCounts(key) {
           fail: n(x => x.verdict === 'on'), skip: n(x => x.score == null)};
 }
 // The Notion "Production rules" numbering (renumbered 2026-10-01: rules 3 and 34 were removed, the rest closed up to
-// 1-33; a new 34, stance changes, 35, chin tuck on impact, and 36, hand drop before the uppercut, added 2026-10-22): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
+// 1-33; a new 34, stance changes, 35, chin tuck on impact, and 36, looping uppercut, added 2026-10-22): the round view is one list in this order. Slip distance is one script for two Notion rules — 14 "slip far
 // enough" and 15 "slip not too much" — each with its own timeline row and round row.
 const NOTION = Object.fromEntries(Object.entries(RULE_NAMES).map(([no, name]) => [name, +no]));   // name -> number
 const notionNo = name => String(NOTION[name] ?? '?');
@@ -3591,7 +3591,7 @@ function ruleCard() {
           + `${ci.median_height_torso ?? '–'} torso (− = above the top)`});
   const ud = S.layerSum.updrop;
   if (ud) add(RN(36), ud.score ?? 'not rated', ud.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'before the uppercut comes up, does the punching hand stay up, or drop and wind up from low?',
+    what: 'does the uppercut rise from the guard with the hand up, or swing wide — the hand dropping and looping up from below?',
     on: `${ud.n_uppercuts} head uppercuts · ${ud.judged_uppercuts} judged (window trimmed at the same hand’s previous punch: ${ud.trimmed_windows}), `
         + `${ud.n_uppercuts - ud.judged_uppercuts} skipped (${ud.skipped?.arm_not_seen ?? 0} with the arm not seen — mostly the far arm of a boxer side-on to `
         + `the camera — ${ud.skipped?.no_arm_reading ?? 0} with no reading, ${ud.skipped?.excluded ?? 0} in excluded time); body uppercuts are a separate class `
@@ -5398,9 +5398,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [35, 'Whether the chin stays down while a punch lands — rule 8 on the punch frames it skips. On the frames around each impact the chin, found on the face in the video, is read against the top of the shoulder that should cover it: the punching shoulder on jabs, crosses and hooks, the other one on uppercuts and body shots (the punching shoulder dips to drive them). Height only, at every angle; the punch takes its highest-chin frame, so one frame with the chin up costs the punch.',
        `every punch, impact ±${fN(T(35, 'move.window_s'))} s`, `full marks at or below the shoulder’s top, zero ${fD(-T(35, 'move.height.score.zero'), 2)} torso above`,
        'The moment a punch lands is the moment the counter comes back; a chin that lifts then is the one that gets hit.'],
-  [36, 'Whether the punching hand drops before the uppercut. From half a second before each head uppercut — never into the same hand’s previous punch — to its impact, the rule follows the punching forearm and keeps its most downward direction: a forearm that turns to point down means the hand wound down first. An uppercut whose arm the skeleton does not see (usually the far arm of a boxer side-on to the camera) is left out.',
+  [36, 'Whether the uppercut swings wide instead of rising from the guard. From half a second before each head uppercut — never into the same hand’s previous punch — to its impact, the rule follows the punching forearm and keeps its most downward direction: a forearm that turns to point down means the hand dropped and the uppercut looped up from below. An uppercut whose arm the skeleton does not see (usually the far arm of a boxer side-on to the camera) is left out.',
        `every head uppercut, ${fN(T(36, 'move.window_before_s'))} s before it → impact`, `full marks while the forearm points at most ${fD(T(36, 'move.score.full'), 2)} down (about 29° below level), zero at ${fD(T(36, 'move.score.zero'), 2)} (about 68°); from ${fN(H(36, 'min_judged'))} judged uppercuts`,
-       'An uppercut wound up from the waist is seen coming, and the face is open while the hand travels back up. The lines come from the coach’s ratings of 355 uppercut clips.'],
+       'A looping uppercut is seen coming, and the face is open while the hand travels back up. The lines come from the coach’s ratings of 355 uppercut clips.'],
   [37, `How many of the boxer’s combinations run on to ${fN(T(37, 'move.min_elements'))} moves or more — punches and defensive moves together, each within ${fN(T(31, 'move.max_gap_s'))} s of the last (rule 31’s combinations).`,
        'combinations of punches and defensive moves', `full marks at ${fN(T(37, 'round.score.full'))} or fewer, zero at ${fN(T(37, 'round.score.zero'))}`,
        'A combination that never stops leaves the boxer out of position and out of breath, and gives the opponent his rhythm.'],
