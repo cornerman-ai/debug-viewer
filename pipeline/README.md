@@ -176,6 +176,14 @@ from 0.50; no rule reads it yet), then `training: bag work / shadowboxing (P(bag
 (`bagwork/bagwork.json`: a logistic regression on how hidden the hands are, the framing and the punches; no rule reads
 it yet).
 
+**Steps** (the base row under Defense, on by default, since 2026-10-23; the backend's `steps` stage,
+`steps/steps.csv`): every foot move, the lead foot's on the top half (light blue), the rear foot's below (indigo); the
+video's pill names a foot while it moves. The counter is the AMBO app's own (Feet stance, `stance.ts`, one definition in
+the backend's `ml/research/footwork/foot_moves.py`): a foot's centre (ankle, heel, toe) moving over 0.6 torso lengths a
+second starts a move, back under 0.35 ends it. Against 545 labeled foot moves (YouTube footage, any angle, 2026-10-09;
+its settings swept on the same labels) it found 87 % at precision 0.70, and about one labeled step in six comes out as
+two moves - so read the row as when the feet move, not an exact step count. No rule reads it yet.
+
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
 are videos, columns are the overall round score and rules 1–36, each cell the 0–100 score tinted in its tier's colour
 ("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
