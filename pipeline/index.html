@@ -3773,8 +3773,8 @@ function ruleCard() {
   const bb = S.layerSum.bite;
   if (bb) add(RN(41), bb.score ?? 'not rated', bb.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'on the bag, does each punch bite — arrive fast, leave the bag at once and snap back — or stay stuck in the bag?',
-    on: bb.bagwork !== true ? `not bag work (the bagwork stage: P(bag) ${bb.p_bag ?? '–'}, bag work from 0.5): the rule judges bag work only`
-      : `${bb.n_punches} punches · ${bb.judged_punches} judged around their impact frame, ${bb.n_punches - bb.judged_punches} skipped `
+    on: bb.bag_work !== true ? `not bag work (${bb.bag_work_from ?? `the bagwork stage: P(bag) ${bb.p_bag ?? '–'}`}): the rule judges bag work only`
+      : `bag work (${bb.bag_work_from}) · ${bb.n_punches} punches · ${bb.judged_punches} judged around their impact frame, ${bb.n_punches - bb.judged_punches} skipped `
         + `(${bb.skipped?.wrist_not_seen ?? 0} with the wrist not seen — mostly the bag hiding the far hand — ${bb.skipped?.no_impact ?? 0} with no impact `
         + `frame, ${bb.skipped?.too_little_motion ?? 0} moving too little to read, ${bb.skipped?.no_stop ?? 0} with no stop, ${bb.skipped?.excluded ?? 0} in excluded time)`,
     th: THR(() => ({event: {label: 'per punch', rule: biteRule() + ' — green at 100, red below',

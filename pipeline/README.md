@@ -285,8 +285,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   and this frame's chin. Skipped: no face on any frame read (about half the punches on the test videos — an arm in
   front of the face), a shoulder or hip hidden, excluded time. Round = the mean punch score, from at least 10. Reads
   `punches.csv` + `chin_impact.json`.
-- **Punches stuck in the bag** (rule 41, `bag_bite/`, since 2026-10-23): bag work only (the bagwork stage's call;
-  otherwise the Round row says "not bag work" with its P(bag)). Per punch with an impact frame, the punching wrist's
+- **Punches stuck in the bag** (rule 41, `bag_bite/`, since 2026-10-23): bag work only (a test video by its known
+  training type, the backend's `configs/training_types.json`; any other round by the bagwork stage's call - the Round
+  row says which, and "not bag work" with it otherwise). Per punch with an impact frame, the punching wrist's
   speed in the picture over the torso: the arrival (the speed's peak before the stop at the bag), the pause on the bag
   (half the arrival speed lost → half the return speed regained) and the snap back (the speed's highest rise after the
   stop), each scored 0 → 100 between its punch type's quartiles of the labeled bag punches, weighted 0.30 / 0.35 / 0.35.
