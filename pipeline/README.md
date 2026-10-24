@@ -289,6 +289,17 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   one landing on this frame bigger) between two dashed lines at the outermost two. The Now tab's combo card has its
   line. Round = the mean combination score, from at least 5 (the rule's own floor: front-on combinations are rare).
   Reads `combos.csv` + `combo_same_spot.json`.
+- **Combo lands at one height** (rule 44, `combo_same_height/`, since 2026-10-24): rule 40 up and down, side-on. Per
+  offensive combination (rule 30's), its head punches thrown side-on (each punch's mean facing within
+  `camera_window_deg`, 65–115°), each fist read at its impact frame (the knuckles' midpoint, else the wrist pushed 0.3 of
+  the forearm further; not read outside the picture or moving up or down faster than 4.5 torso lengths a second): the
+  spread is the farthest-apart two fists up and down the picture over the median torso. Body shots are left out: the
+  body-shot class, and a jab or cross at or under 0.75 of hip centre → shoulder centre. 100 at 0.20 torso or less, 0 at
+  0.50. Its timeline row draws every combination with two or more head punches read, from its first frame to its last —
+  green at 100, red below, grey in excluded time — with the score on the block; the tooltip gives the spread. On the
+  video, inside a combination, each fist's landing spot is ringed in its punch's colour (the one landing on this frame
+  bigger) between two dashed lines at the highest and the lowest. The Now tab's combo card has its line. Round = the
+  mean combination score, from at least 10. Reads `combos.csv` + `combo_same_height.json`.
 - **Chin tuck on impact** (rule 35, `chin_impact/`, since 2026-10-22): rule 8 on the punch frames it skips. Per
   punch, on the frames within ±`window_s` (0.1 s) of the impact, inside the punch, with a face chin at the 0.7 gate:
   the chin against the top of the shoulder that covers it — the punching shoulder on jabs, crosses and hooks (keypoint
