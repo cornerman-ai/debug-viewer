@@ -550,6 +550,13 @@ stretch's mean angle and score. On the video each leg's hip – knee – ankle i
 its score; the Now tab gives this frame's angles. Score per leg = 100 at its line, linearly to 0 at 180°; the round =
 the mean of the two legs' means; either leg under 5 s judged: not rated.
 
+**Form fades when tired** (rule 43, `form_fade/form_fade.json` + `thirds.csv`, since 2026-10-24): the judged time in
+thirds; each form rule's own score over the first third against the last — hands (2, 4, 6), feet and legs (11, 12, 39,
+42), punch speed (23), a rule counting when both thirds hold its own floor — and the mean of the drops. Its row draws
+the two thirds compared (blue first, amber last, as rule 26), each tagged with the mean score of the rules that count;
+the tooltip lists every rule's first → last score. Score = 100 at a mean drop of 0 points or less, linearly to 0 at 20;
+under 60 s of judged time or fewer than 3 rules: not rated. It reads those rules' outputs and re-measures nothing.
+
 **Dead time** (rule 25, `work_rate/work_rate.json` + `segments.csv`; "Work rate" until 2026-10-03): its timeline row shows the whole video as runs — green
 where a punch or a defensive move covers it, blue where only a change of angle does, red for dead stretches with
 their length, empty for the short pauses in between. A frame counts as work when a
