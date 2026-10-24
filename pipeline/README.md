@@ -119,7 +119,8 @@ the punch card's sections follow the same order.
   '…').
 - **Info** (since 2026-10-24) — one card, the video as a whole, one row each: file, frames, fps, duration, punches,
   defensive moves, stance (its clear frames, mirrored or not), gloves, training (bag work / shadowboxing) and camera
-  height — the toolbar line spelled out, each value's detail under it, the stage's rule in the row's tooltip.
+  height, each value's detail under it, the stage's rule in the row's tooltip. The only place they are shown: the line
+  under the video's name that carried them was dropped the same day (it duplicated this tab).
 
 **Excluded time**: the stretches of the video no rule judges, read from its `excluded_segments.json` (run_all writes it
 beside the outputs from the backend's `combined_pipeline/configs/excluded_segments.json`: by default the first and last
@@ -139,8 +140,8 @@ the judged minimum (10 punches / combos / moves, 5 s of judged frames) and the t
 **Explanations** says what both mean. Every reading the page recomputes (and the hollow joints) drops a joint under
 the presence floor exactly as the pipeline does (`visAt`).
 
-**Stance.** The line under the video's name ends with `stance: orthodox` / `southpaw` — the stance the run used (who
-was mirrored), and in brackets how the backend's `stance` stage decided (`stance/stance.json`: since 2026-10-20 the
+**Stance.** The Info tab's Stance row says `orthodox` / `southpaw` — the stance the run used (who
+was mirrored), and under it how the backend's `stance` stage decided (`stance/stance.json`: since 2026-10-20 the
 clear frames each way, the majority deciding — or no answer and taken as orthodox; a folder from 2026-10-09 to 10-20
 shows its 15 voting frames instead). The **Stance** row under Facing (`stance/runs.csv`, since 2026-10-20) is the
 stance on every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey =
@@ -174,10 +175,10 @@ on one spot has a median of 0.17, a boxer moving around a court 0.70; a quick tu
 The hips are not read (since 2026-10-22; a folder run 2026-10-20 to 10-22 has an `unclear` state, hips square
 among its reasons, drawn grey too). The pill on the video names the frame's stance. Read on the raw skeleton, so never
 flipped back. Short flips are mostly noise.
-After it, `gloves: yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand points' shape, gloves
-from 0.50; no rule reads it yet), then `training: bag work / shadowboxing (P(bag) X)` from the `bagwork` stage
+The Info tab's next rows: Gloves, `yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand points' shape, gloves
+from 0.50; no rule reads it yet), Training, `bag work / shadowboxing (P(bag) X)` from the `bagwork` stage
 (`bagwork/bagwork.json`: a logistic regression on how hidden the hands are, the framing and the punches; no rule reads
-it yet), then `camera: ~X cm (bucket, leg/torso Y)` from the `camera_height` stage (`camera_height/camera_height.json`,
+it yet), and Camera height, `~X cm (bucket, leg/torso Y)` from the `camera_height` stage (`camera_height/camera_height.json`,
 since 2026-10-24: leg / torso length in the picture through four reference clips - floor 0, hips 95, head 170, above
 the head 220 cm; `extrapolated` past them; `unknown` when the legs are seen on under 30 frames; no rule reads it yet).
 

@@ -2864,10 +2864,7 @@ function commitVideo(src, N) {
   V.hover = null; V.hoverLayer = null; V.shown = null; V.lastFrame = -1;
   $('title').textContent = src.name;
   $('title').style.display = $('videoSelect').style.display === 'none' ? '' : 'none';   // the dropdown already names it
-  $('subtitle').textContent = `${S.n.toLocaleString()} frames · ${S.fps} fps · ${fmtT(S.dur).replace(/\.\d+$/, '')} · ` +
-    `${S.punches.length} punches · ${S.defenses.length} defensive moves · stance: ${S.stance}${stanceWhy()} · ` +
-    `gloves: ${glovesTxt()} · training: ${bagworkTxt()} · camera: ${cameraTxt()}`;
-  $('subtitle').title = [S.stanceInfo?.rule, S.glovesInfo?.rule, S.bagworkInfo?.rule, S.cameraInfo?.rule].filter(Boolean).join(' · ');
+  $('subtitle').textContent = ''; $('subtitle').title = '';   // the video's facts are in the Info tab (since 2026-10-24)
   $('welcome').style.display = 'none'; $('app').classList.add('ready');
   $('banner').textContent = missing.length ? `Not in this folder: ${missing.join(', ')}` : '';
   $('banner').classList.toggle('show', missing.length > 0);
