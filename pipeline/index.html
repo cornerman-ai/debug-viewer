@@ -631,9 +631,13 @@ function H(n, k) {
 // A gated rule's camera window: the |facing angle| ranges in degrees it judges (0 = facing the camera, 90 = side-on,
 // 180 = back to it; both sides alike), any shape - e.g. side-on [[60, 105]], front only [[0, 30]] - every rule gating
 // on the angle itself (rule_config.camera_window / in_window, both ends included). Every gated rule carries its window.
+// A rule with move.camera_by_height (rule 22, since 2026-10-24) narrows it on a video whose camera_height bucket is one
+// of its buckets (filmed from the floor or above the head) - rule_config.camera_window_for.
+const camNarrowed = n => { const by = S.th?.rules?.[n]?.move?.camera_by_height, b = S.cameraInfo?.bucket;
+  return !!(by && b && by.buckets?.includes(b)); };
 function camWindow(n) {
   T(n, 'camera');                                          // a gated rule; one without a camera gate throws ThMissing
-  return T(n, 'camera_window_deg');
+  return camNarrowed(n) ? T(n, 'move.camera_by_height.camera_window_deg') : T(n, 'camera_window_deg');
 }
 // whether a facing angle (degrees, any sign or turn) is inside rule n's window - the backend's in_window
 const inCam = (n, deg) => {
@@ -655,7 +659,7 @@ function camNote(n) {
   try {
     const view = S.th?.rules?.[n]?.camera;
     if (!view) return '';
-    return ` — ${camRange(n)}`;
+    return ` — ${camRange(n)}` + (camNarrowed(n) ? ` (camera ${S.cameraInfo.bucket.replace('_', ' ')})` : '');
   } catch { return ''; }
 }
 // rules 19 / 20: where the cost above the range is all spent, "twice the upper bound" while that is 2 x
@@ -3956,7 +3960,7 @@ function ruleCard() {
           + `${dc.first_window} → ${dc.last_window} = ${dc.drop == null ? '–' : dc.drop >= 0 ? `${pct(dc.drop)} fewer` : `${pct(-dc.drop)} more`} → ${dc.score ?? '–'}`});
   scored('hit', RN(22), q => ({
     what: 'would the punch land somewhere useful on an opponent his own size?',
-    on: `${q.pass + q.fail + q.skip} punches of every type · ${q.pass + q.fail} judged at their impact frame, ${q.skip} skipped (in excluded time, thrown too head-on, no impact frame, neither the knuckles nor the wrist and elbow visible, or a shoulder or hip unseen)`,
+    on: `${q.pass + q.fail + q.skip} punches of every type · ${q.pass + q.fail} judged at their impact frame, ${q.skip} skipped (in excluded time, thrown outside ${THR(() => camRange(22), '…')}${camNarrowed(22) ? ` — the narrower window for a camera ${S.cameraInfo.bucket === 'ground' ? 'on the floor' : 'above the head'}` : ''}, no impact frame, neither the knuckles nor the wrist and elbow visible, or a shoulder or hip unseen)`,
     th: S.layerSum.hit?.mean_score === undefined && S.layerSum.hit?.on_target_share != null
       ? {event: {label: 'per punch', rule: 'on target (the head or the body zone) or off target — this video’s run is from before the 0-100 punch score (2026-10-24): rerun its hit_height stage',
                  bands: [['head, body', 'on target'], ['over the head, shoulder, below the body', 'off target']],

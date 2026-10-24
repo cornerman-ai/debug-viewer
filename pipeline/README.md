@@ -375,7 +375,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   scored like hip rotation — green at 100, red below, the score on the block; on the video the shoulder line in the
   verdict's colour and the same dial from above. The round is the mean punch score, no bands.
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — read side-on
-  (|facing| 65–115°), the zone the fist is in at its impact frame (the midpoint of the index and pinky knuckle points; with either
+  (|facing| 65–115°; 75–105° on a video filmed from the floor or above the head - the camera_height stage's ground /
+  above_head, since 2026-10-24 - and the angle badges, the Rules tab and the Round row show that video's window),
+  the zone the fist is in at its impact frame (the midpoint of the index and pinky knuckle points; with either
   unseen, the wrist pushed 0.3 of the forearm further — `fist_from` in the CSV) against the boxer's own skeleton on that frame (the ghost below, whose heights are his: head = from the higher
   shoulder up to 0.28 torso above it, body = the middle third from the hip centre to the shoulder centre, misses = over the head, the shoulder gap
   between them and below the body; since 2026-10-08, a ghost stance built from his limb lengths before) and scores it
