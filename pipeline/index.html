@@ -2724,7 +2724,7 @@ const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
-V.base = {angle: true, stance: true, activity: true, lead: true, rear: true, def: true, steps: true};
+V.base = {angle: true, stance: true, distance: true, activity: true, lead: true, rear: true, def: true, steps: true};
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
 // the sub-switches under Lead / Rear / Defense: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
@@ -2772,19 +2772,21 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, chj, exj, stRuns, stepCsv] = await Promise.all([
+  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, chj, cdj, exj, stRuns, stepCsv, distCsv] = await Promise.all([
     jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
     jsn(['stance', 'stance.json']),                         // the stance stage (2026-10-09): who run_all mirrored, and why
     jsn(['gloves', 'gloves.json']),                         // the gloves stage (2026-10-09): no rule reads it yet
     jsn(['bagwork', 'bagwork.json']),                       // the bagwork stage (2026-10-10): no rule reads it yet
     jsn(['camera_height', 'camera_height.json']),           // the camera_height stage (2026-10-24): no rule reads it yet
+    jsn(['camera_distance', 'camera_distance.json']),       // the camera_distance stage (2026-10-24): the Info tab
     jsn(['excluded_segments.json']),                        // the excluded time (2026-10-12): see N.excl below
     lite ? null : txt(['stance', 'runs.csv']),              // every frame's stance (2026-10-20): the Stance row
-    lite ? null : txt(['steps', 'steps.csv'])]);            // every foot move (2026-10-23): the Steps row
+    lite ? null : txt(['steps', 'steps.csv']),              // every foot move (2026-10-23): the Steps row
+    lite ? null : txt(['camera_distance', 'distance.csv'])]);   // camera -> hips every frame (2026-10-24): the Distance row
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
-  const N = {fps: pjs?.run?.fps || 30, stance: pjs?.run?.stance || 'orthodox', mirrored: !!pjs?.run?.mirrored, stanceInfo: stj, glovesInfo: glj, bagworkInfo: bwj, cameraInfo: chj,
+  const N = {fps: pjs?.run?.fps || 30, stance: pjs?.run?.stance || 'orthodox', mirrored: !!pjs?.run?.mirrored, stanceInfo: stj, glovesInfo: glj, bagworkInfo: bwj, cameraInfo: chj, distInfo: cdj,
              videoName: pjs?.run?.video || `${src.name}.mp4`, hasImpact, missing: [],
              th: th?.rules && th?.house ? th : null};
   const A = angleCsv ? parseCSV(angleCsv) : [];
@@ -2805,6 +2807,15 @@ async function buildVideo(src, sig, lite = false) {
   // lead is lead either way)
   N.steps = (stepCsv ? parseCSV(stepCsv) : []).map(r => ({kind: 'step', foot: r.foot, sf: +r.start_frame, ef: +r.end_frame}));
   N.hasSteps = !!stepCsv;
+  // the Distance row (camera_distance/distance.csv): camera -> hips every frame and its 0.5 s median; a distance is the
+  // same on a mirrored run, so nothing to flip back
+  N.dist = null;
+  if (distCsv) {
+    const R = parseCSV(distCsv), raw = new Float32Array(R.length).fill(NaN), sm = new Float32Array(R.length).fill(NaN);
+    R.forEach((r, i) => { if (r.distance_m) raw[i] = +r.distance_m; if (r.smooth_m) sm[i] = +r.smooth_m; });
+    N.dist = {n: R.length, raw, sm};
+  }
+  N.hasDist = !!N.dist;
   N.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
     kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share,
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
@@ -2896,7 +2907,10 @@ function renderInfo() {
     row('Stance', S.stance, (st ? st + ' · ' : '') + (S.mirrored ? 'mirrored to orthodox for the stages' : 'not mirrored'), S.stanceInfo?.rule) +
     row('Gloves', gl, glD, S.glovesInfo?.rule) +
     row('Training', bw, bwD, S.bagworkInfo?.rule) +
-    row('Camera height', ca, caD, S.cameraInfo?.rule);
+    row('Camera height', ca, caD, S.cameraInfo?.rule) +
+    row('Camera distance', S.distInfo?.median_m == null ? (S.distInfo ? 'unknown' : '–') : `~${S.distInfo.median_m} m`,
+        S.distInfo?.median_m == null ? '' : `median of the video; 10–90 % of frames ${S.distInfo.p10_m}–${S.distInfo.p90_m} m · assumed ${S.distInfo.fov_deg}° field of view`,
+        S.distInfo?.rule);
 }
 
 // The overlay when the footage is not there, naming the exact place this video's file is looked for - so a copied or
@@ -3244,6 +3258,7 @@ function sortLayers() {
 const BASE_ROWS = [
   ['angle', 'Facing', 'the facing angle, every frame (0° = toward the camera, ±180° = back to it)', () => S.hasAngle],
   ['stance', 'Stance', 'every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey = neutral (the feet too close to tell), empty = no data (an ankle not seen, no facing angle)', () => S.hasStanceRuns],
+  ['distance', 'Distance', 'how far he stands from the camera, camera → hips in metres, every frame (the line: its median over 0.5 s, on a fixed 0–6 m scale): BlazePose’s metre skeleton fitted onto its pixel one, with an assumed 65° field of view and BlazePose’s size of the body — both guesses, so a whole video can read too near or too far by the same factor', () => S.hasDist],
   ['activity', 'Activity', 'two lines, each smoothed over about 2 s: green = output, punches + defensive moves per minute; purple = movement, how far he actually travels and turns — the hip centre against where it was a second before (toward and from the camera included, bouncing in place averaged out) and the change of his facing angle (a quarter turn counts as one torso length) — both near 0 when he just stands', () => S.punches.length > 0 || S.defenses.length > 0 || !!S.skel],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
@@ -4697,16 +4712,18 @@ let TR = {}, laneTop = 0;                                       // laneTop: the 
 // each base row's height and the gap under it: lead / rear sit close as a pair
 // Every lane's height; lanes sit LANE_GAP apart, groups GROUP_GAP apart under a HEAD_H header (2026-10-22 redesign:
 // grouping by space and type, no bands or outlines - the way Apple's own charts and track views read).
-const BASE_GEOM = {angle: 150, stance: 32, activity: 96, lead: 30, rear: 30, def: 30, steps: 36};
+const BASE_GEOM = {angle: 150, stance: 32, distance: 80, activity: 96, lead: 30, rear: 30, def: 30, steps: 36};
 const LANE_GAP = 6, GROUP_GAP = 20, HEAD_H = 24, RULE_H = 28;
 // The base rows in two groups (the rule rows are the third): what the body does and what he does.
-const BASE_GROUP = {angle: 'Body', stance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions', steps: 'Actions'};
+const BASE_GROUP = {angle: 'Body', stance: 'Body', distance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions', steps: 'Actions'};
 // the Steps row's two feet
 const STEPCOL = {lead: '#64d2ff', rear: '#5e5ce6'};
+// the Distance row: its colour, its fixed scale (the same for every video, so videos compare by eye) and gridlines
+const DIST = {col: '#30b0c7', max: 6, grid: 2};
 // A row's colour key, under its name in the label column, where its colours carry the meaning.
 const STANCE_KEY = () => [[STANCEROW.orthodox, 'left'], [STANCEROW.southpaw, 'right'], [STANCEROW.neutral, 'neutral']];
 const LANE_KEY = () => ({angle: [[FACECOL.front, 'front / back'], [FACECOL['side-on'], 'side-on']], stance: STANCE_KEY(),
-  activity: [[ACT.outCol, 'output / min'], [ACT.movCol, 'movement']], steps: [[STEPCOL.lead, 'lead foot'], [STEPCOL.rear, 'rear foot']]});
+  distance: [[DIST.col, 'camera → hips']], activity: [[ACT.outCol, 'output / min'], [ACT.movCol, 'movement']], steps: [[STEPCOL.lead, 'lead foot'], [STEPCOL.rear, 'rear foot']]});
 const LANE_FONT = (w, s) => `${w} ${s}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif`;
 let TRG = [];                                                   // [[header, its baseline y, first group?]]
 function layout() {
@@ -4805,7 +4822,7 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // the label column, the group headers and the lanes (2026-10-22 redesign: space and type do the grouping)
-  const names = {angle: 'Facing', stance: 'Stance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', steps: 'Steps', over: 'Overview', ...LNAME};
+  const names = {angle: 'Facing', stance: 'Stance', distance: 'Distance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', steps: 'Steps', over: 'Overview', ...LNAME};
   const lane = css('--lane') || 'rgba(120,120,128,0.075)', F = LANE_FONT, KEY = LANE_KEY();
   const step = niceStep(V.t1 - V.t0, W), ticks = [];
   for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) ticks.push(t);
@@ -4922,6 +4939,7 @@ function drawTimeline(f) {
     c.globalAlpha = 1;
   }
   if (TR.activity) drawActivity(c, W, grid, text3);
+  if (TR.distance) drawDistance(c, W, grid, text3);
   if (TR.def) for (const e of S.defenses) if (!hid(e)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
   if (TR.steps) {                                             // the Steps row: lead foot's moves on the top half, rear's below
     const [sy, sh] = TR.steps, hh = sh / 2;
@@ -5147,6 +5165,26 @@ function drawActivity(c, W, grid, text3) {
   }
 
 }
+// ── the Distance row (the camera_distance stage): camera -> hips in metres, its 0.5 s median as a line broken where
+// there is no reading, on DIST's fixed scale with a gridline every DIST.grid m ──
+function drawDistance(c, W, grid, text3) {
+  const [y, h] = TR.distance, D = S.dist, fps = S.fps; if (!D) return;
+  const top = y + 8, bot = y + h - 6, ym = v => bot - Math.min(1, Math.max(0, v) / DIST.max) * (bot - top);
+  c.save(); c.font = LANE_FONT(500, 9.5); c.fillStyle = text3; c.strokeStyle = grid; c.lineWidth = 1; c.textAlign = 'left';
+  for (let m = DIST.grid; m <= DIST.max; m += DIST.grid) {
+    const yy = Math.round(ym(m)) + 0.5;
+    c.beginPath(); c.moveTo(L, yy); c.lineTo(L + W, yy); c.stroke(); c.fillText(`${m} m`, L + 4, yy - 5);
+  }
+  const f0 = Math.max(0, Math.floor(V.t0 * fps) - 1), f1 = Math.min(D.n - 1, Math.ceil(V.t1 * fps) + 1);
+  const step = Math.max(1, Math.floor((f1 - f0) / (W * 1.5)));
+  c.beginPath(); let on = false;
+  for (let f = f0; f <= f1; f += step) {
+    const v = D.sm[f]; if (!Number.isFinite(v)) { on = false; continue; }
+    const xx = tx((f + 0.5) / fps), yy = ym(v); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
+  }
+  c.strokeStyle = DIST.col; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke();
+  c.restore();
+}
 function drawLayerRows(c, f, W, text, grid) {
   const fps = S.fps, font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   const span = e => { const x0 = tx(e.sf / fps), x1 = tx((e.ef + 1) / fps); return [x0, Math.max(2, x1 - x0 - 1)]; };
@@ -5238,6 +5276,7 @@ function hit(x, y) {
   };
   if (inRow(TR.lead)) return find(S.punches, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, e => e.hand === 'rear');
+  if (inRow(TR.distance)) return S.dist && f >= 0 && f < S.dist.n ? {kind: 'dist', f, sf: f, ef: f} : null;
   if (inRow(TR.activity)) { const A = activityData(); return A && f >= 0 && f < A.n ? {kind: 'act', f, sf: f, ef: f} : null; }
   if (inRow(TR.stance)) return S.stanceRuns.find(e => f >= e.sf && f <= e.ef && e.reason !== 'no_reading') || null;
   if (inRow(TR.def)) return find(S.defenses, () => true);
@@ -5349,6 +5388,11 @@ function tip(e, cx, cy) {
       + `<b style="color:${ACT.outCol}">●</b> output <b class="num">${o == null ? '–' : o.toFixed(0)}</b> <span class="m">punches + defensive moves / min</span><br>`
       + `<b style="color:${ACT.movCol}">●</b> movement <b class="num">${m == null || !Number.isFinite(m) ? '–' : m.toFixed(2)}</b> <span class="m">torso lengths / s${A?.mov ? '' : ' (waiting for the video and skeleton)'}</span><br>`
       + `<span class="m">both smoothed over about ${ACT.sigmaS * 2} s; movement = how far the hip centre (averaged over ${ACT.posSmoothS} s) got in the last ${ACT.lagS} s, toward or from the camera included, and how far he turned (${ACT.turnDeg}° counts as one torso length), minus ${ACT.floor}; the row's top is ${ACT.outMax}/min and ${ACT.movMax} torso/s</span>`;
+  } else if (e.kind === 'dist') {                           // the Distance row at the cursor
+    const D = S.dist, m = v => Number.isFinite(v) ? `${v.toFixed(2)} m` : '–';
+    el.innerHTML = `<b style="color:${DIST.col}">●</b> <b>Distance to the camera</b> <span class="m num">${fmtT(e.f / fps)}</span><br>`
+      + `<b class="num">${m(D.sm[e.f])}</b> <span class="m">median over 0.5 s · this frame ${m(D.raw[e.f])}</span><br>`
+      + `<span class="m">${S.distInfo?.rule || ''}</span>`;
   } else if (e.kind === 'step') {
     el.innerHTML = `<b style="color:${STEPCOL[e.foot]}">●</b> <b>${cap(e.foot)} foot moves</b><br>`
       + `<span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)} · ${(n / fps).toFixed(2)} s</span><br>`

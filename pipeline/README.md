@@ -118,8 +118,8 @@ the punch card's sections follow the same order.
   changes with it. Every number in it is read from the video's thresholds snapshot (before a video is open each reads
   '…').
 - **Info** (since 2026-10-24) — one card, the video as a whole, one row each: file, frames, fps, duration, punches,
-  defensive moves, stance (its clear frames, mirrored or not), gloves, training (bag work / shadowboxing) and camera
-  height, each value's detail under it, the stage's rule in the row's tooltip. The only place they are shown: the line
+  defensive moves, stance (its clear frames, mirrored or not), gloves, training (bag work / shadowboxing), camera
+  height and camera distance, each value's detail under it, the stage's rule in the row's tooltip. The only place they are shown: the line
   under the video's name that carried them was dropped the same day (it duplicated this tab).
 
 **Excluded time**: the stretches of the video no rule judges, read from its `excluded_segments.json` (run_all writes it
@@ -189,6 +189,14 @@ the backend's `ml/research/footwork/foot_moves.py`): a foot's centre (ankle, hee
 second starts a move, back under 0.35 ends it. Against 545 labeled foot moves (YouTube footage, any angle, 2026-10-09;
 its settings swept on the same labels) it found 87 % at precision 0.70, and about one labeled step in six comes out as
 two moves - so read the row as when the feet move, not an exact step count. No rule reads it yet.
+
+**Distance** (the base row under Stance, on by default, since 2026-10-24; the backend's `camera_distance` stage,
+`camera_distance/distance.csv`): how far the boxer stands from the camera, camera → hips in metres, every frame — the
+line is its median over 0.5 s, on a fixed 0–6 m scale (gridlines every 2 m, the same for every video, so videos compare
+by eye); the tooltip gives that and the frame's own reading. The stage fits BlazePose's metre skeleton onto its pixel one
+(13 joints) with an assumed 65° field of view over the picture's long side (black bars cut) and BlazePose's size of the
+body — both guesses, so a whole video can read too near or too far by one factor; a forward lean (a squat) reads a
+little farther. The Info tab shows the video's median and 10–90 %. No rule reads it yet.
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
 are videos, columns are the overall round score and rules 1–36, each cell the 0–100 score tinted in its tier's colour
