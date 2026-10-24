@@ -117,6 +117,9 @@ the punch card's sections follow the same order.
   from the scripts and checked against them on 2026-10-08; when a rule's script changes, its row in `explainRows()`
   changes with it. Every number in it is read from the video's thresholds snapshot (before a video is open each reads
   '…').
+- **Info** (since 2026-10-24) — one card, the video as a whole, one row each: file, frames, fps, duration, punches,
+  defensive moves, stance (its clear frames, mirrored or not), gloves, training (bag work / shadowboxing) and camera
+  height — the toolbar line spelled out, each value's detail under it, the stage's rule in the row's tooltip.
 
 **Excluded time**: the stretches of the video no rule judges, read from its `excluded_segments.json` (run_all writes it
 beside the outputs from the backend's `combined_pipeline/configs/excluded_segments.json`: by default the first and last
@@ -174,7 +177,9 @@ flipped back. Short flips are mostly noise.
 After it, `gloves: yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand points' shape, gloves
 from 0.50; no rule reads it yet), then `training: bag work / shadowboxing (P(bag) X)` from the `bagwork` stage
 (`bagwork/bagwork.json`: a logistic regression on how hidden the hands are, the framing and the punches; no rule reads
-it yet).
+it yet), then `camera: ~X cm (bucket, leg/torso Y)` from the `camera_height` stage (`camera_height/camera_height.json`,
+since 2026-10-24: leg / torso length in the picture through four reference clips - floor 0, hips 95, head 170, above
+the head 220 cm; `extrapolated` past them; `unknown` when the legs are seen on under 30 frames; no rule reads it yet).
 
 **Steps** (the base row under Defense, on by default, since 2026-10-23; the backend's `steps` stage,
 `steps/steps.csv`): every foot move, the lead foot's on the top half (light blue), the rear foot's below (indigo); the

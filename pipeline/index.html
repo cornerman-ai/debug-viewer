@@ -146,6 +146,11 @@
   .srow .v { font-weight: 600; white-space: nowrap; }
   .srow .v i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
   .srow .v .m { color: var(--text2); font-weight: 400; }
+  .irow { display: grid; grid-template-columns: 112px 1fr; gap: 10px; font-size: 12.5px; padding: 5px 0; border-top: 0.5px solid var(--sep); }
+  .irow:first-of-type { border-top: 0; }
+  .irow .k { color: var(--text2); }
+  .irow .v { font-weight: 600; overflow-wrap: anywhere; }
+  .irow .v .d { display: block; color: var(--text2); font-weight: 400; font-size: 11.5px; margin-top: 1px; }
   .big { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; }
   .big .n { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
   .big .n.small { font-size: 14px; }
@@ -485,7 +490,7 @@
   </div>
   <div class="split v" id="splitV" title="drag to resize · double-click to reset"></div>
   <div class="inspector">
-    <div class="seg viewSeg" id="viewSeg"><button data-v="now" class="on">Now</button><button data-v="round">Round</button><button data-v="rules">Rules</button><button data-v="timelines">Timelines</button><button data-v="explain">Explanations</button></div>
+    <div class="seg viewSeg" id="viewSeg"><button data-v="now" class="on">Now</button><button data-v="round">Round</button><button data-v="rules">Rules</button><button data-v="timelines">Timelines</button><button data-v="explain">Explanations</button><button data-v="info">Info</button></div>
 
     <div id="nowView" style="display:contents">
       <div class="card">
@@ -538,6 +543,10 @@
 
     <div id="explainView" style="display:none">
       <div class="card" id="explainCard"></div>
+    </div>
+
+    <div id="infoView" style="display:none">
+      <div class="card" id="infoCard"><div class="label">Video info</div><div class="empty">Open a video</div></div>
     </div>
     </div>
   </div>
@@ -2759,18 +2768,19 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, exj, stRuns, stepCsv] = await Promise.all([
+  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, chj, exj, stRuns, stepCsv] = await Promise.all([
     jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
     jsn(['stance', 'stance.json']),                         // the stance stage (2026-10-09): who run_all mirrored, and why
     jsn(['gloves', 'gloves.json']),                         // the gloves stage (2026-10-09): no rule reads it yet
     jsn(['bagwork', 'bagwork.json']),                       // the bagwork stage (2026-10-10): no rule reads it yet
+    jsn(['camera_height', 'camera_height.json']),           // the camera_height stage (2026-10-24): no rule reads it yet
     jsn(['excluded_segments.json']),                        // the excluded time (2026-10-12): see N.excl below
     lite ? null : txt(['stance', 'runs.csv']),              // every frame's stance (2026-10-20): the Stance row
     lite ? null : txt(['steps', 'steps.csv'])]);            // every foot move (2026-10-23): the Steps row
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
-  const N = {fps: pjs?.run?.fps || 30, stance: pjs?.run?.stance || 'orthodox', mirrored: !!pjs?.run?.mirrored, stanceInfo: stj, glovesInfo: glj, bagworkInfo: bwj,
+  const N = {fps: pjs?.run?.fps || 30, stance: pjs?.run?.stance || 'orthodox', mirrored: !!pjs?.run?.mirrored, stanceInfo: stj, glovesInfo: glj, bagworkInfo: bwj, cameraInfo: chj,
              videoName: pjs?.run?.video || `${src.name}.mp4`, hasImpact, missing: [],
              th: th?.rules && th?.house ? th : null};
   const A = angleCsv ? parseCSV(angleCsv) : [];
@@ -2842,6 +2852,9 @@ const bagworkTxt = (b = S.bagworkInfo) => !b ? '–' : b.bagwork == null ? 'unkn
   : `${b.bagwork ? 'bag work' : 'shadowboxing'} (P(bag) ${b.p_bag}${b.model === 'skeleton' ? ', skeleton only' : ''})`;
 const glovesTxt = (g = S.glovesInfo) => !g ? '–' : g.gloves == null ? `unknown (${g.readings} hand readings)`
   : `${g.gloves ? 'yes' : 'no'} (hand shape ${g.hand_shape}, gloves from ${g.cut})`;
+// the camera_height stage (camera_height/camera_height.json): ~cm and the bucket from leg / torso length, or unknown
+const cameraTxt = (c = S.cameraInfo) => !c ? '–' : c.camera_height_cm == null ? `unknown (legs seen on ${c.frames} frames)`
+  : `~${c.camera_height_cm} cm (${c.bucket.replace('_', ' ')}, leg/torso ${c.leg_torso}${c.outside_reference ? ', extrapolated' : ''})`;
 
 // the swap: one synchronous step, so the draw loop never sees half of one video and half of another
 function commitVideo(src, N) {
@@ -2853,13 +2866,36 @@ function commitVideo(src, N) {
   $('title').style.display = $('videoSelect').style.display === 'none' ? '' : 'none';   // the dropdown already names it
   $('subtitle').textContent = `${S.n.toLocaleString()} frames · ${S.fps} fps · ${fmtT(S.dur).replace(/\.\d+$/, '')} · ` +
     `${S.punches.length} punches · ${S.defenses.length} defensive moves · stance: ${S.stance}${stanceWhy()} · ` +
-    `gloves: ${glovesTxt()} · training: ${bagworkTxt()}`;
-  $('subtitle').title = [S.stanceInfo?.rule, S.glovesInfo?.rule, S.bagworkInfo?.rule].filter(Boolean).join(' · ');
+    `gloves: ${glovesTxt()} · training: ${bagworkTxt()} · camera: ${cameraTxt()}`;
+  $('subtitle').title = [S.stanceInfo?.rule, S.glovesInfo?.rule, S.bagworkInfo?.rule, S.cameraInfo?.rule].filter(Boolean).join(' · ');
   $('welcome').style.display = 'none'; $('app').classList.add('ready');
   $('banner').textContent = missing.length ? `Not in this folder: ${missing.join(', ')}` : '';
   $('banner').classList.toggle('show', missing.length > 0);
   buildChips(); buildLayers(); setSpan(10);
   renderExplain();                                          // the Explanations tab reads this video's thresholds
+  renderInfo();
+}
+
+// the Info tab: everything known about the video as a whole, one row each - the toolbar line, spelled out; each stage's
+// rule in the row's tooltip
+function renderInfo() {
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const row = (k, v, d, rule) => `<div class="irow"${rule ? ` title="${esc(rule)}"` : ''}><span class="k">${k}</span>` +
+    `<span class="v">${esc(v)}${d ? `<span class="d">${esc(d)}</span>` : ''}</span></div>`;
+  const split = t => { const m = /^([^(]*?)\s*\((.*)\)$/.exec(t.trim()); return m ? [m[1], m[2]] : [t, ''];};   // 'no (hand shape..)' -> main, detail
+  const [gl, glD] = split(glovesTxt()), [bw, bwD] = split(bagworkTxt()), [ca, caD] = split(cameraTxt());
+  const st = stanceWhy().trim().replace(/^\(|\)$/g, '');
+  $('infoCard').innerHTML = '<div class="label">Video info</div>' +
+    row('Video', S.videoName || S.src?.name || '–') +
+    row('Frames', S.n.toLocaleString()) +
+    row('FPS', S.fps) +
+    row('Duration', fmtT(S.dur).replace(/\.\d+$/, '')) +
+    row('Punches', S.punches.length) +
+    row('Defensive moves', S.defenses.length) +
+    row('Stance', S.stance, (st ? st + ' · ' : '') + (S.mirrored ? 'mirrored to orthodox for the stages' : 'not mirrored'), S.stanceInfo?.rule) +
+    row('Gloves', gl, glD, S.glovesInfo?.rule) +
+    row('Training', bw, bwD, S.bagworkInfo?.rule) +
+    row('Camera height', ca, caD, S.cameraInfo?.rule);
 }
 
 // The overlay when the footage is not there, naming the exact place this video's file is looked for - so a copied or
@@ -3151,6 +3187,7 @@ $('viewSeg').onclick = e => {
   $('rulesView').style.display = v === 'rules' ? 'contents' : 'none';
   $('timelinesView').style.display = v === 'timelines' ? 'contents' : 'none';
   $('explainView').style.display = v === 'explain' ? 'contents' : 'none';
+  $('infoView').style.display = v === 'info' ? 'contents' : 'none';
 };
 
 // one compact row: name on the left, a colored dot + verdict + number on the right; the rule goes in the tooltip
