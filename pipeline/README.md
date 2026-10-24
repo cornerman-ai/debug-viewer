@@ -96,8 +96,8 @@ The side panel has five views, switched at its top:
   rule measures, what it was measured on, its thresholds, and the sum that produced the number — and a rated per-punch
   rule a fifth, **fails on**: its failed punches split by punch type, a bar in the punch colours (each type's share of
   the fails) with failed / judged after each type, so a punch that fails out of proportion to how often it is thrown
-  shows. A fail is what the rule's own counts call one (under 100; off target for hit height, not okay for hand return
-  path); hook overswing has none (hooks only). Under the score a
+  shows. A fail is what the rule's own counts call one (under 100 - for hit height the off-target punches; not okay for
+  hand return path); hook overswing has none (hooks only). Under the score a
   game-style bar shows it on 0–100, filled in its tier's colour, with a tick at each tier line (40, 60, 75, 85);
   a not-rated rule gets an empty striped bar. Each row carries three
   tags — its analysis group (separate move / overall round), what it is analysed on (a punch, a combo, a defensive
@@ -372,16 +372,22 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   (|facing| 65–115°), the zone the fist is in at its impact frame (the midpoint of the index and pinky knuckle points; with either
   unseen, the wrist pushed 0.3 of the forearm further — `fist_from` in the CSV) against the boxer's own skeleton on that frame (the ghost below, whose heights are his: head = from the higher
   shoulder up to 0.28 torso above it, body = the middle third from the hip centre to the shoulder centre, misses = over the head, the shoulder gap
-  between them and below the body; since 2026-10-08, a ghost stance built from his limb lengths before;
-  on target = green, off = red, skipped = not drawn) with a white tick at the impact frame. On the video a ring on the
-  fist where the rule read it at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone. With the layer on, every frame also draws the ghost opponent (dashed): the boxer's own
+  between them and below the body; since 2026-10-08, a ghost stance built from his limb lengths before) and scores it
+  0–100 (since 2026-10-24; on / off target only before): on target 100; over the head and below the body 100 at the
+  zone's edge, linearly down to 0 at 0.5 torso past it; in the shoulder gap 100 at either edge, linearly down to 30 at
+  its middle (`score`, `past_zone_torso`, `gap_share` in the CSV). The block: green on target (100), red off target,
+  skipped not drawn, the score and zone on it, with a white tick at the impact frame; the card and tooltip say how far
+  off target the fist is. On the video a ring on the
+  fist where the rule read it at that frame (for ±2 frames around it, with a dot on the wrist now), with its zone and score. With the layer on, every frame also draws the ghost opponent (dashed): the boxer's own
   skeleton without the arms, mirrored about a vertical line through the nose and moved one arm's reach (upper arm +
   forearm, 90th percentile of both arms over ±1 s) toward the side the lead ankle points to — same height, floor and
   pose, face to face. Mirroring keeps every height, so the rule's zones are this ghost's: its shoulders and hips are the boxer's own.
   At the ghost's face a bar shows them on that frame — green = hit (head: from the higher shoulder up to 0.28 torso above it; body: the
   middle third from the hip centre to the shoulder centre), red = miss (over the head, the shoulder gap, below the body) — with dashed
-  borders from the boxer to the ghost; no bar when a shoulder or hip is under the house visibility floor. Round = 100 × the on-target share of the judged punches, a plain number, from at
-  least 10 judged punches.
+  borders from the boxer to the ghost, the over / below bars running to where the score reaches 0 (dashed red lines,
+  labelled 0) and a dashed orange line at the shoulder gap's middle (labelled 30); no bar when a shoulder or hip is under
+  the house visibility floor. Round = the mean punch score of the judged punches, a plain number, from at least 10
+  judged punches (100 × the on-target share before 2026-10-24; a video still on such a run says so in its Round row).
 - **Head off center line** (`head_offcenter/`): per punch thrown facing or backing the camera, how far the head point
   (the middle of the visible face landmarks: nose, eyes, ears, mouth) is off a vertical line through the hip centre — 0.75 × at the impact frame + 0.125 × at 25 % of the punch + 0.125 × at 75 % (in torso lengths, each frame's own torso), scored linearly to 100 at 0.25 torso off —
   green at 100, red below, the score on the block — with a tick at the impact frame; on the video the vertical line through the hip centre (dashed) and the head point's distance from it.
