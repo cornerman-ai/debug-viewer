@@ -598,7 +598,7 @@ const RULE_NAMES = {
   25: 'Dead time', 26: 'Fading output through round', 27: 'Punch variety', 28: 'Body shots',
   29: 'Defense variety', 30: 'Offensive combo variety', 31: 'Combined combo variety', 32: 'Hook overswing',
   33: 'Rear-foot heel up', 34: 'Stance changes', 35: 'Chin tuck on impact', 36: 'Looping uppercut', 37: 'Combos too long', 38: 'Solo punches', 39: 'Flat-footed in guard', 40: 'Combo lands on one spot', 41: 'Punches stuck in the bag',
-  42: 'Straight legs', 43: 'Form fades when tired', 44: 'Combo lands at one height',
+  42: 'Straight legs', 43: 'Form fades when tired', 44: 'Combo lands at one height', 45: 'Front-foot heavy',
 };
 const RN = no => RULE_NAMES[no];
 const NRULES = Math.max(...Object.keys(RULE_NAMES).map(Number));   // the highest rule number
@@ -762,7 +762,7 @@ const ELBOWSTATE = {tucked: '#34c759', flared: '#ff3b30'};   // per-stretch colo
 // reason is readable without hovering. Every gray state on every row has an entry here.
 const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 'side-on', front_on: 'front-on',
                   punching: 'punching', hook: 'hook / body', no_facing: 'no facing', no_side: 'no side',
-                  foot_turned: 'foot turned', excluded: 'excluded', window_in_edge: 'excluded'};   // window_in_edge: rules 3 / 13 run before 2026-10-12's excluded time
+                  foot_turned: 'foot turned', feet_together: 'feet together', excluded: 'excluded', window_in_edge: 'excluded'};   // window_in_edge: rules 3 / 13 run before 2026-10-12's excluded time
 // a frame rule's state in the video's excluded time (S.excl): measured there, never judged
 const EXCLWHY = 'the video’s excluded time — no rule judges it (grey on the timeline)';
 // rules 27 / 29, the variety rows: the share the score reads (the most-used types / type / side) vs everything else
@@ -1000,6 +1000,22 @@ const KNEECOL = {full: '#34c759', below: '#ff3b30'};
 const KNEESKIP = {no_pose: 'the leg (hip, knee, ankle, heel or toe tip) is not seen, or is past the picture’s edge',
                   foot_turned: 'its foot is turned toward or away from the camera — a knee bends where its foot points, so the picture would not show the bend',
                   front_on: 'the boxer is not side-on', excluded: EXCLWHY};
+// rule 45's colours and gray states: ok = both halves full, hips / head = that half past its line, both = both past
+const HEAVYCOL = {ok: '#34c759', hips: '#ff9f0a', head: '#ff9f0a', both: '#ff3b30'};
+const HEAVYSKIP = {no_pose: 'a joint it needs (nose, shoulders, hips, ankles, the front knee, heel or toe tip) is not seen, or is past the picture’s edge',
+                   feet_together: 'the ankles are too close together along the picture to place anything between them',
+                   foot_turned: 'the front foot is not seen from the side — the boxer is probably facing the camera',
+                   front_on: 'the boxer is not side-on (the facing angle, or his shoulders wide in the picture)', excluded: EXCLWHY};
+// rule 45: one half's score (k = 'hips' / 'head') for a position on the rear (0) -> front (1) ankle line, and the two
+// positions on this frame from the picture (the front ankle is the left one on an orthodox skeleton, the right on a
+// southpaw's real one: the rule reads them mirrored to orthodox)
+const heavyPart = (x, k) => T(45, `move.${k}.points`) * Math.min(1, Math.max(0, (T(45, `move.${k}.zero`) - x) / (T(45, `move.${k}.zero`) - T(45, `move.${k}.full`))));
+function heavyPos(P, leadLeft) {
+  const [fa, ra] = leadLeft ? [P(J.lan), P(J.ran)] : [P(J.ran), P(J.lan)], hl = P(J.lhip), hr = P(J.rhip), no = P(J.nose);
+  if (!(fa && ra && hl && hr && no) || fa[0] === ra[0]) return null;
+  const hx = (hl[0] + hr[0]) / 2, span = fa[0] - ra[0];
+  return {fa, ra, no, hip: [hx, (hl[1] + hr[1]) / 2], hips: (hx - ra[0]) / span, head: (no[0] - ra[0]) / span};
+}
 // the angle at the knee b between hip a and ankle c, in the picture (degrees, 180 = a straight leg), and its leg score
 const kneeDeg = (a, b, c) => {
   const u = [a[0] - b[0], a[1] - b[1]], v = [c[0] - b[0], c[1] - b[1]];
@@ -2686,6 +2702,44 @@ const RULE_LAYERS = [
       rr(x0, y + (top ? 3 : h / 2), w, hh, 3); c.fill(); c.globalAlpha = 1;
     },
   },
+  {
+    // rule 45, front-foot heavy (front_heavy/runs.csv): every frame side-on while the front foot is seen from the side,
+    // as stretches - green where both halves score full, orange where the hip centre or the nose is past its line, red
+    // where both are, gray where the rule does not judge (a joint not seen, the feet together, the foot turned, not
+    // side-on, excluded time).
+    key: 'heavy', label: RN(45), short: RN(45), items: true,
+    csv: ['front_heavy', 'runs.csv'], json: ['front_heavy', 'front_heavy.json'],
+    parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), hips: num(r.mean_hips),
+      head: num(r.mean_head), score: num(r.mean_score)}),
+    card: () => '',                                        // per-frame rule: nothing punch-specific to show
+    frameOverlay(f, P, leadLeft) {                         // the ankle line, its two marks, the hip centre and the nose on it
+      const it = OV.at('heavy', f); if (!it || HEAVYSKIP[it.state]) return;
+      const q = heavyPos(P, leadLeft); if (!q) return;
+      const y = Math.max(q.fa[1], q.ra[1]) + 14, at = v => q.ra[0] + v * (q.fa[0] - q.ra[0]), col = HEAVYCOL[it.state];
+      OV.line([q.ra[0], y], [q.fa[0], y], '#ffffff', 2);
+      THR(() => { const h1 = at(T(45, 'move.hips.full')), n1 = at(T(45, 'move.head.full'));
+        OV.line([h1, y - 7], [h1, y + 7], '#ff9f0a', 2); OV.line([n1, y - 7], [n1, y + 7], '#64d2ff', 2); });
+      OV.line(q.hip, [q.hip[0], y], col, 1.5, [4, 3]); OV.dot([q.hip[0], y], col, 5);
+      OV.line(q.no, [q.no[0], y], '#64d2ff', 1.5, [4, 3]); OV.dot([q.no[0], y], '#64d2ff', 4);
+      overlayLabel(Math.max(q.fa[0], q.ra[0]) + 10, y + 4, `hips ${q.hips.toFixed(2)} · head ${q.head.toFixed(2)}`, col);
+    },
+    tip: (e, x) => {
+      const tt = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
+      if (HEAVYSKIP[x.state]) return `<b>Not judged</b> ${tt}<br><span>${HEAVYSKIP[x.state]}</span>`;
+      const nm = {ok: 'Hips and head between the feet', hips: 'Hips on the front foot', head: 'Head past the front foot', both: 'Hips and head forward'}[x.state];
+      return `<b>${nm}</b> ${tt}<br>`
+        + `<span class="num">mean hips ${x.hips?.toFixed(2)} · head ${x.head?.toFixed(2)} of the way to the front ankle · score ${x.score?.toFixed(0)}</span><br>`
+        + `<span class="m">${THR(() => `0 = over the rear ankle, 1 = over the front ankle; hips 50 up to ${fD(T(45, 'move.hips.full'), 2)}, 0 at ${fD(T(45, 'move.hips.zero'), 2)}; `
+          + `head 50 up to ${fD(T(45, 'move.head.full'), 2)}, 0 at ${fD(T(45, 'move.head.zero'), 2)}`)}</span>`;
+    },
+    row(e, x, {c, y, h, tx, fps}) {
+      const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
+      const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0);
+      if (HEAVYSKIP[x.state]) { skipStrip(c, x0, w, y + h / 2, on, x.state); return; }
+      c.fillStyle = HEAVYCOL[x.state] || '#8e8e93'; c.globalAlpha = on ? 1 : 0.85;
+      rr(x0, y + 4, w, h - 8, 3); c.fill(); c.globalAlpha = 1;
+    },
+  },
   chinLayer('height'), chinLayer('depth'),
   bladeLayer('hips'), bladeLayer('shoulders'),
 
@@ -2696,7 +2750,7 @@ const LAYER_RULES = {
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
   hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
-  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39], samespot: [40], bite: [41], knee: [42], formfade: [43], sameheight: [44],
+  rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39], samespot: [40], bite: [41], knee: [42], formfade: [43], sameheight: [44], heavy: [45],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
 // the two combo layers first, then by the lowest rule number each layer judges.
@@ -3449,6 +3503,7 @@ const SCOPE = {
   bite:      {moves: 'every punch with an impact frame, bag work only'},
   flat:      {moves: 'every frame, punches and defensive moves included'},
   knee:      {moves: 'every frame, punches and defensive moves included, each leg while its foot is seen from the side'},
+  heavy:     {moves: 'every frame, punches and defensive moves included, while the front foot is seen from the side'},
   formfade:  {get moves() { return `the first and the last third: the scores of rules ${THR(() => T(43, 'move.rules').join(', '))}`; }},
   combined:  {moves: 'punches, defensive moves'},
 };
@@ -3504,7 +3559,7 @@ const RULE_META = (() => {
   const on = {1: [P], 2: [P], 3: [C], 4: [F], 5: [R], 6: [P], 7: [F], 8: [F], 9: [F], 10: [P], 11: [F], 12: [F],
               13: [C], 14: [D], 15: [D], 16: [P], 17: [F], 18: [F], 19: [P], 20: [P], 21: [P], 22: [P], 23: [P],
               24: [R], 25: [R], 26: [R], 27: [R], 28: [R], 29: [R], 30: [R], 31: [R], 32: [P], 33: [P], 34: [R], 35: [P], 36: [P], 37: [R], 38: [R], 39: [F], 40: [C], 41: [P],
-              42: [F], 43: [R], 44: [C]};
+              42: [F], 43: [R], 44: [C], 45: [F]};
   return Object.fromEntries(Object.entries(on).map(([n, o]) =>
     [n, {group: o[0] === R ? 'Overall round' : 'Separate move', on: o}]));
 })();
@@ -4011,6 +4066,16 @@ function ruleCard() {
                       bands: [[`lead ≤ ${fl}°, rear ≤ ${fr}°`, '100'], [`→ ${z}°`, '100 → 0'], [`${z}°`, '0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a', '0': '#ff3b30'}},
               round: {label: 'per round', rule: `each leg’s mean frame score, then the mean of the two legs — a plain number, no bands; either leg under ${NF(42)} s of judged frames: not rated`}}; }, thMiss),
     calc: `lead ${KL.lead.mean_score ?? '–'} (median knee ${KL.lead.median_deg ?? '–'}°) and rear ${KL.rear.mean_score ?? '–'} (median ${KL.rear.median_deg ?? '–'}°) → ${kb.score ?? '–'}`});
+  const fh = S.layerSum.heavy;
+  if (fh) add(RN(45), fh.score ?? 'not rated', fh.score == null ? '#8e8e93' : 'var(--text)', {
+    what: 'does he sit on his front foot and lean his head in past it?',
+    on: `${fh.judged_frames.toLocaleString()} frames judged (${fh.judged_s} s): side-on, punches and defensive moves included, the front foot seen from the side`,
+    th: THR(() => { const hf = fD(T(45, 'move.hips.full'), 2), hz = fD(T(45, 'move.hips.zero'), 2), nf = fD(T(45, 'move.head.full'), 2), nz = fD(T(45, 'move.head.zero'), 2);
+      return {event: {label: 'per frame', rule: `where the hip centre and the nose sit on the line from the rear ankle (0) to the front ankle (1), along the picture: `
+                        + `hips 50 up to ${hf}, linearly down to 0 at ${hz}; head 50 up to ${nf}, linearly down to 0 at ${nz} — green at 100, orange with one half past its line, red with both`,
+                      bands: [[`hips ≤ ${hf}, head ≤ ${nf}`, 'ok'], ['one past its line', 'one'], ['both past', 'both']], pal: {ok: '#34c759', one: '#ff9f0a', both: '#ff3b30'}},
+              round: {label: 'per round', rule: `the mean frame score — a plain number, no bands; under ${NF(45)} s of judged frames: not rated`}}; }, thMiss),
+    calc: `hips median ${fh.median_hips ?? '–'} (past its line on ${pct(fh.hips_past_share)}), head median ${fh.median_head ?? '–'} (past on ${pct(fh.head_past_share)}) → ${fh.score ?? '–'}`});
   const ss = S.layerSum.samespot;
   if (ss) add(RN(40), ss.score ?? 'not rated', ss.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'in a combination thrown at the camera, do the punches land on one spot, or side by side?',
@@ -4500,6 +4565,15 @@ function frameCard(el, f) {
                         note: txt + (ls.length === 1 ? ` · ${why.join(', ')} (the round needs both legs)` : '')}
                      : {skip: why.join(' · ')};
   });
+  if (S.has.heavy) {                                         // 45 front-foot heavy: this frame's positions on the ankle line
+    const st = state('heavy')?.state;
+    if (!st || HEAVYSKIP[st]) rows.push([45, {skip: HEAVYSKIP[st] || 'no reading'}]);
+    else FR(45, () => {
+      const q = heavyPos(J2, leadLeft);
+      return q ? {score: heavyPart(q.hips, 'hips') + heavyPart(q.head, 'head'), note: `hips ${q.hips.toFixed(2)} · head ${q.head.toFixed(2)} of the way to the front ankle`}
+               : {skip: 'no reading'};
+    });
+  }
   if (S.has.stance_width) {
     const st = state('stance_width')?.state;
     if (st !== 'ok' && st !== 'narrow') rows.push([12, {skip: STANCESKIP[st] || 'no reading'}]);
@@ -5896,6 +5970,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [44, 'Whether the head punches of a combination land at one height. Seen from the side, each fist is read at its punch’s impact frame (the knuckles, else the wrist pushed out along the forearm); the combination’s score is how far apart the highest and the lowest land up and down the picture, in torso lengths. Body shots are left out: the body-shot class, and a jab or cross landing at body height (the classifier has one class for a jab to the head and to the body). A fist still moving up or down fast at the impact frame, or outside the picture, is not read.',
        `offensive combinations, their head punches thrown side-on (|facing| ${heightWindow()})`, `full marks with the fists ${fD(T(44, 'move.score.full'), 2)} torso apart or less, zero at ${fD(T(44, 'move.score.zero'), 2)}; from ${fN(H(44, 'min_judged'))} judged combinations`,
        'A jab and a cross aimed at one chin land at one height; a cross that drops to the chest, or a jab that goes over the head, hits a second spot and finds nothing.'],
+  [45, `Whether the boxer sits on his front foot and leans his head in. Seen from the side, every frame — guard, punches and defensive moves alike — where the hip centre and the nose sit on the line from the rear ankle (0) to the front ankle (1) in the picture. In a guard the head is normally over the front foot (about 1.0), so the head’s line sits past it, at ${fD(T(45, 'move.head.full'), 2)}; the hips’ at ${fD(T(45, 'move.hips.full'), 2)}. Read only while the front foot is seen from the side and the shoulders are narrow in the picture: a boxer facing the camera has no front and rear foot to measure between.`,
+       'every frame, side-on, while the front foot is seen from the side', `per frame hips 50 up to ${fD(T(45, 'move.hips.full'), 2)} (0 at ${fD(T(45, 'move.hips.zero'), 2)}) + head 50 up to ${fD(T(45, 'move.head.full'), 2)} (0 at ${fD(T(45, 'move.head.zero'), 2)}); the round the mean, from ${fN(H(45, 'min_judged_s'))} s judged`,
+       'Sitting on the front foot with the head out past it leaves a boxer unable to step back or pivot away in time, takes the push out of the rear hand and puts the head in range first.'],
 ];
 function renderExplain() {
   const nameOf = Object.fromEntries(Object.entries(NOTION).map(([n, i]) => [i, n]));

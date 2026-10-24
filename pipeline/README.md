@@ -561,6 +561,18 @@ stretch's mean angle and score. On the video each leg's hip – knee – ankle i
 its score; the Now tab gives this frame's angles. Score per leg = 100 at its line, linearly to 0 at 180°; the round =
 the mean of the two legs' means; either leg under 5 s judged: not rated.
 
+**Front-foot heavy** (rule 45, `front_heavy/front_heavy.json` + `runs.csv`, since 2026-10-24): every frame, punches and
+defensive moves included, side-on (65–115°) — where the hip centre and the nose sit on the line from the rear ankle (0)
+to the front ankle (1), along the picture's x; read while the joints are seen (visibility ≥ 0.5), the ankles at least
+0.25 torso apart, the front foot seen from the side (heel to toe tip at least 0.40 of the shin) and the shoulders at
+most 0.45 torso apart in the picture (wider = facing the camera). One row of stretches: green where both halves score
+full, orange where the hip centre (past 0.6) or the nose (past 1.2: a guard keeps the head over the front foot) is past
+its line, red where both are, gray where not judged (a joint not seen, the feet together, the foot turned, not side-on,
+excluded time); the tooltip gives each stretch's mean positions and score. On the video the ankle line with the two
+marks (orange 0.6, blue 1.2) and the hip centre and the nose dropped onto it; the Now tab gives this frame's positions.
+Score per frame = hips 50 (full to 0.6, 0 at 1.0) + head 50 (full to 1.2, 0 at 1.6); the round = the mean; under 5 s
+judged: not rated.
+
 **Form fades when tired** (rule 43, `form_fade/form_fade.json` + `thirds.csv`, since 2026-10-24): the judged time in
 thirds; each form rule's own score over the first third against the last — hands (2, 4, 6), feet and legs (11, 12, 39,
 42), punch speed (23), a rule counting when both thirds hold its own floor — and the mean of the drops. Its row draws
