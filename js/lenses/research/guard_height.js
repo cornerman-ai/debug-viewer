@@ -1,0 +1,611 @@
+// Guard-height lens — "is a hand dropping below guard while not punching?".
+//
+// Two jobs:
+//   1. VISUALISE the vertical guard stack on the overlay:
+//        - Solid line at nose height.
+//        - Dashed "target" line just below the nose — where the wrists should sit.
+//        - One line per wrist at its current height, tinted red when it's flagged low.
+//   2. FLAG too-low hands across the clip, EXCLUDING punch windows, and roll the
+//      result up into a per-hand "guard low %".
+//
+// How "just below nose" is configured: the target line is
+//     target_y = nose_y + targetOffset * torso_height
+// where torso_height is the shoulder→hip distance (same normaliser
+// guard_drop.py uses), so the offset scales with the boxer's size and
+// distance from the camera instead of being a fixed pixel count.
+// Default targetOffset = 0.30: with glove tops at nose height the wrist
+// joint sits roughly a glove-length lower (0.10 was glove-top height, not
+// wrist height). Matches guard_drop's guard_low_threshold (0.30). Tune with
+// the slider.
+//
+// Punch exclusion is PER-HAND, not per-frame: a wrist is only ignored while
+// THAT wrist is the one throwing (mapped from the detection's hand+stance via
+// SIDE_FOR, same as hit_height / guard_drop). This keeps the extended punching
+// fist from being flagged as "low", while still catching the classic mistake of
+// the guard hand dropping during the other hand's punch (e.g. the left dropping
+// on a right cross). A small ± frame pad covers the hand still returning home.
+//
+// Torso confidence: the shared torsoHeight() averages BOTH shoulders and BOTH
+// hips with no confidence check, so one dropped joint silently inflates the
+// torso, pushes the target line below the chin, and quietly stops flagging —
+// while the frame still counts as eligible. torsoAt() below gates each pair at
+// minWristConfidence instead:
+//   - both sides good  → midpoint, as before (torso status OK)
+//   - one side good    → that side alone, frame still measured but flagged
+//                        ONE_SIDED (amber target line + counter)
+//   - neither good     → torso unusable: target line drawn RED from the last
+//                        good torso (display only) and both wrists GATED, so
+//                        the frame is dropped from the % entirely.
+// The one-sided fallback is not bias-free — the lead shoulder rides higher than
+// the rear, so a single-side torso shifts by half that gap. It's flagged rather
+// than hidden so we can see how often it fires before deciding it matters.
+
+import { J } from "../../skeleton.js";
+import { activeDetections } from "../shared/punch_detections.js";
+import { isPunchLabel } from "../shared/slip_labels.js";
+
+const DEFAULTS = {
+  targetOffset: 0.30,          // fraction of torso height below the nose
+  minWristConfidence: 0.30,
+  punchPad: 3,                 // frames of pad added each side of a punch window
+};
+
+const COLORS = {
+  nose:    "#7ec8ff",
+  target:  "#5fd97a",
+  degraded: "#f5b945",   // torso built from one shoulder and/or one hip
+  l_wrist: "#ff8a5c",
+  r_wrist: "#ffd95c",
+  low:     "#e85a5a",
+  up:      "#5fd97a",
+  muted:   "rgba(255,255,255,0.45)",
+};
+
+// Per-frame, per-hand status codes (also drive the timeline colours).
+const ST = { GATED: 0, EXCLUDED: 1, UP: 2, LOW: 3 };
+
+// Per-frame torso-normaliser quality (see torsoAt).
+const TS = { OK: 0, ONE_SIDED: 1, BAD: 2 };
+
+const TL_LABEL_W = 56;   // px reserved on the left of the stage timeline for L/R labels
+
+// Detection hand + stance → anatomical wrist side. Orthodox leads with the
+// left; southpaw leads with the right. Mirrors guard_drop.py's GUARD_JOINTS.
+const SIDE_FOR = {
+  lead: { orthodox: "L", southpaw: "R" },
+  rear: { orthodox: "R", southpaw: "L" },
+};
+
+let host;
+let cfg = { ...DEFAULTS };
+let cache = null;   // memoised whole-clip flagging (see getData)
+
+export const GuardHeightRule = {
+  id: "guard_height",
+  label: "Guard height",
+
+  skeletonStyle() {
+    return {
+      boneColor: "rgba(255,255,255,0.25)",
+      boneWidth: 1.5,
+      jointRadius: 3,
+      highlightJoints: new Set([J.NOSE, J.L_WRIST, J.R_WRIST]),
+    };
+  },
+
+  mount(_host, state) {
+    host = _host;
+    host.innerHTML = `
+      <h2>Guard height</h2>
+      <p class="hint">Lines: <span style="color:${COLORS.nose}">nose (solid)</span> ·
+        <span style="color:${COLORS.target}">wrist target (dashed)</span> ·
+        <span style="color:${COLORS.l_wrist}">L wrist</span> ·
+        <span style="color:${COLORS.r_wrist}">R wrist</span>.
+        Target = nose_y + offset × torso height (shoulder→hip), so it scales
+        with the boxer instead of being a pixel constant. A wrist below the
+        target while it isn't punching is flagged <span style="color:${COLORS.low}">low</span>.</p>
+
+      <h3>Guard low % (punches excluded)</h3>
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="metric-label">L wrist</div>
+          <div class="metric-val" id="gh-l-low">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">R wrist</div>
+          <div class="metric-val" id="gh-r-low">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Both</div>
+          <div class="metric-val" id="gh-tot-low">—</div>
+        </div>
+      </div>
+      <p class="hint" id="gh-note"></p>
+
+      <h3>Guard timeline</h3>
+      <p class="hint">Per frame, per hand:
+        <span style="color:${COLORS.up}">guard up</span> ·
+        <span style="color:${COLORS.low}">low</span> ·
+        <span style="color:${COLORS.muted}">punching (excluded)</span> ·
+        <span style="color:#f5b945">low conf</span>. Click to seek.</p>
+      <canvas id="gh-timeline" width="320" height="48" style="cursor:pointer;width:100%"></canvas>
+
+      <h3>Wrist vs target (torso units, + = above)</h3>
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="metric-label">L wrist</div>
+          <div class="metric-val" id="l-target-dist">—</div>
+          <div class="metric-sub" id="l-target-verdict"></div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">R wrist</div>
+          <div class="metric-val" id="r-target-dist">—</div>
+          <div class="metric-sub" id="r-target-verdict"></div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Torso source</div>
+          <div class="metric-val" id="gh-torso-src">—</div>
+          <div class="metric-sub" id="gh-torso-sub"></div>
+        </div>
+      </div>
+      <p class="hint" id="gh-torso-note"></p>
+
+      <h3>Config</h3>
+      <label class="slider">
+        <span>target_offset = <output id="to-out">${cfg.targetOffset.toFixed(2)}</output> × torso below nose</span>
+        <input type="range" id="to-slider" min="0" max="0.40" step="0.01" value="${cfg.targetOffset}">
+      </label>
+      <label class="slider">
+        <span>min_wrist_confidence = <output id="mwc-out">${cfg.minWristConfidence.toFixed(2)}</output></span>
+        <input type="range" id="mwc-slider" min="0" max="1" step="0.01" value="${cfg.minWristConfidence}">
+      </label>
+      <label class="slider">
+        <span>punch_pad = <output id="pp-out">${cfg.punchPad}</output> frames each side</span>
+        <input type="range" id="pp-slider" min="0" max="15" step="1" value="${cfg.punchPad}">
+      </label>
+    `;
+
+    const wire = (slider, out, key, fmt = v => v.toFixed(2)) => {
+      const s = host.querySelector(slider);
+      const o = host.querySelector(out);
+      s.addEventListener("input", () => {
+        cfg[key] = parseFloat(s.value);
+        o.textContent = fmt(cfg[key]);
+        seekHack(state, state.frame);   // cfg change → getData re-keys + recomputes
+      });
+    };
+    wire("#to-slider", "#to-out", "targetOffset");
+    wire("#mwc-slider", "#mwc-out", "minWristConfidence");
+    wire("#pp-slider", "#pp-out", "punchPad", v => String(Math.round(v)));
+
+    // Click the timeline to jump to that frame.
+    host.querySelector("#gh-timeline").addEventListener("click", (ev) => {
+      if (!cache) return;
+      const rect = ev.currentTarget.getBoundingClientRect();
+      const frac = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+      const f = Math.round(frac * (cache.N - 1));
+      const sc = document.getElementById("scrubber");
+      if (sc) { sc.value = f; sc.dispatchEvent(new Event("input")); }
+    });
+
+    mountStageTimeline();
+  },
+
+  draw(ctx, state) {
+    const f = state.frame;
+    const p = pickPose(state);
+    const W = ctx.canvas.width;
+    const s = state.renderScale || 1;
+    const data = getData(state);
+
+    const nose = jt(p, f, J.NOSE);
+    const lw = jt(p, f, J.L_WRIST);
+    const rw = jt(p, f, J.R_WRIST);
+    const tStat = data.torsoStat[f];
+    const torso = Math.max(1e-6, data.torsoVal[f]);
+    const targetY = nose.y + cfg.targetOffset * torso;
+
+    drawHLine(ctx, nose.y,  W, COLORS.nose,   2 * s, null);
+    drawHLine(ctx, targetY, W, torsoColor(tStat), 2 * s, 3 * s);
+    drawHLine(ctx, lw.y,    W, lineColor(data.L[f], COLORS.l_wrist), 2 * s, 3 * s);
+    drawHLine(ctx, rw.y,    W, lineColor(data.R[f], COLORS.r_wrist), 2 * s, 3 * s);
+
+    // Say WHY the target line changed colour, right on the line.
+    if (tStat !== TS.OK) {
+      drawTag(ctx, 8 * s, targetY - 4 * s,
+        tStat === TS.BAD ? "torso unusable — gated" : `torso ${data.torsoSrc[f]}`,
+        torsoColor(tStat), s);
+    }
+
+    drawTag(ctx, lw.x + 8 * s, lw.y, "L " + statusLabel(data.L[f]), tagColor(data.L[f], COLORS.l_wrist), s);
+    drawTag(ctx, rw.x + 8 * s, rw.y, "R " + statusLabel(data.R[f]), tagColor(data.R[f], COLORS.r_wrist), s);
+  },
+
+  update(state) {
+    const f = state.frame;
+    const p = pickPose(state);
+    const data = getData(state);
+
+    const nose = jt(p, f, J.NOSE);
+    const lw = jt(p, f, J.L_WRIST);
+    const rw = jt(p, f, J.R_WRIST);
+    const tStat = data.torsoStat[f];
+    const torso = Math.max(1e-6, data.torsoVal[f]);
+    const targetY = nose.y + cfg.targetOffset * torso;
+
+    // Displayed sign is flipped vs image space: y grows downward, but "above
+    // the target" reading as positive is what anyone expects. Only the readout
+    // is flipped — the LOW test in compute() still works in raw image y.
+    setText("l-target-dist", ((targetY - lw.y) / torso).toFixed(2));
+    setText("r-target-dist", ((targetY - rw.y) / torso).toFixed(2));
+    setText("l-target-verdict", verdictFor(data.L[f]));
+    setText("r-target-verdict", verdictFor(data.R[f]));
+
+    setText("gh-torso-src", torsoLabel(tStat));
+    setText("gh-torso-sub", tStat === TS.OK
+      ? `${torso.toFixed(0)} px`
+      : `<span style="color:${torsoColor(tStat)}">shoulders/hips: ${data.torsoSrc[f]}</span>`);
+    const cN = data.torsoCounts;
+    const pct = (n) => `${Math.round(100 * n / Math.max(1, data.N))}%`;
+    setText("gh-torso-note",
+      `Torso normaliser over the clip: ${pct(cN[TS.OK])} both-sided · ` +
+      `<span style="color:${COLORS.degraded}">${pct(cN[TS.ONE_SIDED])} one-sided (${cN[TS.ONE_SIDED]}f, used + flagged)</span> · ` +
+      `<span style="color:${COLORS.low}">${pct(cN[TS.BAD])} unusable (${cN[TS.BAD]}f, gated)</span>.`);
+
+    const fmt = (st) => st.elig ? `${Math.round(100 * st.low / st.elig)}% <span class="metric-sub">(${st.low}/${st.elig})</span>` : "—";
+    setText("gh-l-low", fmt(data.stats.L));
+    setText("gh-r-low", fmt(data.stats.R));
+    const tElig = data.stats.L.elig + data.stats.R.elig;
+    const tLow = data.stats.L.low + data.stats.R.low;
+    setText("gh-tot-low", tElig ? `${Math.round(100 * tLow / tElig)}%` : "—");
+    setText("gh-note", data.detCount
+      ? `${data.detCount} punches excluded per-hand (±${Math.round(cfg.punchPad)}f pad).`
+      : `No punches loaded — nothing excluded, so this is raw per-frame flagging.`);
+
+    drawTimeline(host.querySelector("#gh-timeline"), data, f);
+    drawStageTimeline(document.getElementById("gh-stage-timeline"), data, f);
+  },
+};
+
+// ── whole-clip flagging (memoised) ──────────────────────────────────────────
+
+// Recompute only when the pose, the punch source, or a slider actually changes.
+// update() + draw() both call this every frame, so the memo matters.
+function getData(state) {
+  const p = pickPose(state);
+  const dets = activeDetections(state);
+  const sig = [p, dets, cfg.targetOffset, cfg.minWristConfidence, cfg.punchPad];
+  if (cache && cache.sig.length === sig.length && cache.sig.every((v, i) => v === sig[i])) {
+    return cache;
+  }
+  cache = compute(p, dets);
+  cache.sig = sig;
+  return cache;
+}
+
+function compute(p, dets) {
+  const N = p.n_frames;
+  const pad = Math.round(cfg.punchPad);
+
+  // Per-hand punch masks: a wrist is excluded only while IT is the punching hand.
+  const inPunch = { L: new Uint8Array(N), R: new Uint8Array(N) };
+  let detCount = 0;
+  for (const d of (dets || [])) {
+    if (!isPunchLabel(d.punch_type)) continue;   // the Sheet labels carry defense rows too
+    const side = sideFor(d);
+    if (!side) continue;
+    let sf = d.start_frame, ef = d.end_frame;
+    if (!Number.isFinite(sf) || !Number.isFinite(ef)) continue;
+    detCount++;
+    sf = Math.max(0, Math.round(sf) - pad);
+    ef = Math.min(N - 1, Math.round(ef) + pad);
+    const mask = inPunch[side];
+    for (let f = sf; f <= ef; f++) mask[f] = 1;
+  }
+
+  const L = new Uint8Array(N), R = new Uint8Array(N);
+  const stats = { L: { elig: 0, low: 0 }, R: { elig: 0, low: 0 } };
+
+  // Per-frame torso normaliser + how trustworthy it was. Kept on the cache so
+  // draw()/update() read the same numbers the flagging used instead of calling
+  // the confidence-blind torsoHeight() again.
+  const torsoVal = new Float32Array(N);
+  const torsoStat = new Uint8Array(N);
+  const torsoSrc = new Array(N);
+  const torsoCounts = { [TS.OK]: 0, [TS.ONE_SIDED]: 0, [TS.BAD]: 0 };
+  let lastGoodTorso = 0;
+
+  for (let f = 0; f < N; f++) {
+    const i = f * 17;
+    const noseY = p.skeleton[(i + J.NOSE) * 2 + 1];
+    const noseC = p.conf[i + J.NOSE];
+
+    const t = torsoAt(p, f);
+    torsoStat[f] = t.status;
+    torsoSrc[f] = t.src;
+    torsoCounts[t.status]++;
+    // BAD frames keep the last good torso purely so the red target line stays
+    // put on the overlay — they're gated out below, so it never reaches a stat.
+    if (t.status !== TS.BAD) lastGoodTorso = t.torso;
+    const torso = t.status === TS.BAD ? lastGoodTorso : t.torso;
+    torsoVal[f] = torso;
+
+    const target = noseY + cfg.targetOffset * torso;
+    // Frame-level validity: need a trustworthy nose + a usable torso for the target.
+    const frameOk = noseC >= cfg.minWristConfidence &&
+                    t.status !== TS.BAD &&
+                    Number.isFinite(noseY);
+
+    for (const side of ["L", "R"]) {
+      const jIdx = side === "L" ? J.L_WRIST : J.R_WRIST;
+      const wy = p.skeleton[(i + jIdx) * 2 + 1];
+      const wc = p.conf[i + jIdx];
+      const arr = side === "L" ? L : R;
+
+      if (inPunch[side][f]) { arr[f] = ST.EXCLUDED; continue; }
+      if (!frameOk || wc < cfg.minWristConfidence || !Number.isFinite(wy)) { arr[f] = ST.GATED; continue; }
+
+      const low = (wy - target) / torso > 0;   // y grows downward → below target = low
+      arr[f] = low ? ST.LOW : ST.UP;
+      stats[side].elig++;
+      if (low) stats[side].low++;
+    }
+  }
+
+  return { N, L, R, stats, detCount, torsoVal, torsoStat, torsoSrc, torsoCounts };
+}
+
+// Confidence-aware torso height: shoulder mid → hip mid, but each pair falls
+// back to whichever side is trustworthy. Returns the height, a TS status, and a
+// short source string for the readout ("both/both", "L/both", …).
+//
+// `torso > 1` px stays as the sanity floor — a sub-pixel torso means the pose
+// collapsed even if every confidence looks fine.
+function torsoAt(pose, frame) {
+  const shoulder = pairY(pose, frame, J.L_SHOULDER, J.R_SHOULDER);
+  const hip = pairY(pose, frame, J.L_HIP, J.R_HIP);
+  const src = `${shoulder.src}/${hip.src}`;
+
+  if (shoulder.src === "none" || hip.src === "none") {
+    return { torso: 0, status: TS.BAD, src };
+  }
+  const torso = Math.abs(shoulder.y - hip.y);
+  if (!(torso > 1)) return { torso: 0, status: TS.BAD, src };
+
+  const status = (shoulder.src === "both" && hip.src === "both") ? TS.OK : TS.ONE_SIDED;
+  return { torso, status, src };
+}
+
+// y of a left/right joint pair: midpoint when both clear the confidence gate,
+// the single good side when only one does, "none" when neither.
+function pairY(pose, frame, lIdx, rIdx) {
+  const l = jt(pose, frame, lIdx);
+  const r = jt(pose, frame, rIdx);
+  const lOk = l.c >= cfg.minWristConfidence && Number.isFinite(l.y);
+  const rOk = r.c >= cfg.minWristConfidence && Number.isFinite(r.y);
+  if (lOk && rOk) return { y: (l.y + r.y) / 2, src: "both" };
+  if (lOk) return { y: l.y, src: "L" };
+  if (rOk) return { y: r.y, src: "R" };
+  return { y: NaN, src: "none" };
+}
+
+function sideFor(d) {
+  const stance = (d.stance === "southpaw" || d.stance === "orthodox") ? d.stance : "orthodox";
+  return SIDE_FOR[d.hand]?.[stance] || null;
+}
+
+// ── status → display ─────────────────────────────────────────────────────────
+
+function verdictFor(status) {
+  switch (status) {
+    case ST.EXCLUDED: return `<span class="muted">punching (excluded)</span>`;
+    case ST.GATED:    return `<span class="muted">low conf, gated</span>`;
+    case ST.LOW:      return `<span class="bad">below target</span>`;
+    default:          return `<span class="good">at/above target</span>`;
+  }
+}
+
+function torsoColor(status) {
+  if (status === TS.BAD) return COLORS.low;
+  if (status === TS.ONE_SIDED) return COLORS.degraded;
+  return COLORS.target;
+}
+
+function torsoLabel(status) {
+  if (status === TS.BAD) return `<span class="bad">unusable</span>`;
+  if (status === TS.ONE_SIDED) return `<span style="color:${COLORS.degraded}">one-sided</span>`;
+  return `<span class="good">both sides</span>`;
+}
+
+function statusLabel(status) {
+  switch (status) {
+    case ST.EXCLUDED: return "punch";
+    case ST.GATED:    return "low conf";
+    case ST.LOW:      return "LOW";
+    default:          return "up";
+  }
+}
+
+function lineColor(status, base) {
+  return status === ST.LOW ? COLORS.low : base;
+}
+
+function tagColor(status, base) {
+  if (status === ST.LOW) return COLORS.low;
+  if (status === ST.UP)  return COLORS.up;
+  return COLORS.muted;
+}
+
+function timelineColor(status) {
+  switch (status) {
+    case ST.LOW:      return COLORS.low;
+    case ST.UP:       return COLORS.up;
+    case ST.EXCLUDED: return "rgba(255,255,255,0.14)";
+    default:          return "rgba(245,185,69,0.22)";   // gated / low conf
+  }
+}
+
+// ── canvas helpers ───────────────────────────────────────────────────────────
+
+// Use the SAME pose the viewer draws the skeleton from (state.pose = BlazePose)
+// so the guard-height lines stay glued to the skeleton.
+function pickPose(state) {
+  return state.pose;
+}
+
+function jt(pose, frame, j) {
+  return {
+    x: pose.skeleton[(frame * 17 + j) * 2],
+    y: pose.skeleton[(frame * 17 + j) * 2 + 1],
+    c: pose.conf[frame * 17 + j],
+  };
+}
+
+// dashUnit null ⇒ solid line.
+function drawHLine(ctx, y, w, color, lineWidth, dashUnit) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  if (dashUnit) ctx.setLineDash([dashUnit * 2, dashUnit * 2]);
+  ctx.beginPath();
+  ctx.moveTo(0, y);
+  ctx.lineTo(w, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTag(ctx, x, y, text, color, scale) {
+  const fontSize = Math.round(12 * scale);
+  ctx.save();
+  ctx.font = `${fontSize}px ui-monospace, monospace`;
+  const pad = 3 * scale;
+  const m = ctx.measureText(text);
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillRect(x - pad, y - fontSize, m.width + pad * 2, fontSize + 4 * scale);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// Two-row strip (L over R) of per-frame guard status across the whole clip.
+function drawTimeline(canvas, data, frame) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const N = data.N;
+  const rowH = Math.floor((H - 2) / 2);
+  const xToFrame = x => Math.round((x / (W - 1)) * (N - 1));
+
+  for (let x = 0; x < W; x++) {
+    const f = xToFrame(x);
+    ctx.fillStyle = timelineColor(data.L[f]);
+    ctx.fillRect(x, 1, 1, rowH);
+    ctx.fillStyle = timelineColor(data.R[f]);
+    ctx.fillRect(x, 1 + rowH, 1, rowH);
+  }
+
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = "10px ui-monospace, monospace";
+  ctx.fillText("L", 2, 11);
+  ctx.fillText("R", 2, 1 + rowH + 11);
+
+  const cx = Math.round((frame / Math.max(1, N - 1)) * (W - 1));
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx + 0.5, 0);
+  ctx.lineTo(cx + 0.5, H);
+  ctx.stroke();
+}
+
+function setText(id, value) {
+  const el = host.querySelector("#" + id);
+  if (el) el.innerHTML = value;
+}
+
+function seekHack(state, f) {
+  const slider = document.getElementById("scrubber");
+  if (!slider) return;
+  slider.value = f;
+  slider.dispatchEvent(new Event("input"));
+}
+
+// Full-width per-hand guard timeline below the video (mirrors elbow_tuck's
+// stage timeline). Two rows — L wrist over R wrist — coloured per frame:
+// up=green · low=red · punching=excluded · low-conf=amber, with a current-frame
+// marker. Click to seek. Rendered into #stage-extras, the slot under the stage.
+function mountStageTimeline() {
+  const slot = document.getElementById("stage-extras");
+  if (!slot) return;
+  slot.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "margin-top:12px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px";
+  const label = document.createElement("div");
+  label.className = "muted small";
+  label.style.cssText = "margin-bottom:6px";
+  label.innerHTML = `Guard height — per hand: ` +
+    `<span style="color:${COLORS.up}">up</span> · ` +
+    `<span style="color:${COLORS.low}">low</span> · ` +
+    `<span style="color:rgba(255,255,255,0.45)">punching (excluded)</span> · ` +
+    `<span style="color:#f5b945">low conf</span> (click to seek)`;
+  wrap.appendChild(label);
+  const canvas = document.createElement("canvas");
+  canvas.id = "gh-stage-timeline";
+  canvas.style.cssText = "display:block;width:100%;height:64px";
+  canvas.width = 800; canvas.height = 64;
+  wrap.appendChild(canvas);
+  slot.appendChild(wrap);
+
+  canvas.addEventListener("click", (e) => {
+    const N = cache?.N;
+    if (!N) return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left - TL_LABEL_W) / Math.max(1, rect.width - TL_LABEL_W - 4);
+    seekHack(null, Math.max(0, Math.min(N - 1, Math.round(ratio * (N - 1)))));
+  });
+}
+
+function drawStageTimeline(canvas, data, frame) {
+  if (!canvas) return;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const cssW = Math.max(1, canvas.getBoundingClientRect().width);
+  const cssH = Math.max(1, canvas.getBoundingClientRect().height);
+  if (canvas.width !== Math.round(cssW * dpr)) canvas.width = Math.round(cssW * dpr);
+  if (canvas.height !== Math.round(cssH * dpr)) canvas.height = Math.round(cssH * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = cssW, H = cssH;
+  ctx.clearRect(0, 0, W, H);
+  const N = data.N;
+  if (!N) return;
+
+  const xOf = (f) => TL_LABEL_W + (f / Math.max(1, N - 1)) * (W - TL_LABEL_W - 4);
+  const colW = Math.max(1, (W - TL_LABEL_W - 4) / Math.max(1, N - 1));
+
+  const tracks = [
+    { label: "L", arr: data.L, accent: COLORS.l_wrist },
+    { label: "R", arr: data.R, accent: COLORS.r_wrist },
+  ];
+  const top = 4, gap = 6;
+  const trackH = Math.floor((H - top * 2 - gap * (tracks.length - 1)) / tracks.length);
+  ctx.font = "11px ui-monospace, monospace";
+
+  tracks.forEach((t, i) => {
+    const y = top + i * (trackH + gap);
+    for (let f = 0; f < N; f++) {
+      ctx.fillStyle = timelineColor(t.arr[f]);
+      ctx.fillRect(xOf(f), y, colW + 0.5, trackH);
+    }
+    ctx.fillStyle = t.accent;
+    ctx.fillText(t.label, 6, y + trackH / 2 + 4);
+  });
+
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(xOf(frame), 1);
+  ctx.lineTo(xOf(frame), H - 1);
+  ctx.stroke();
+}

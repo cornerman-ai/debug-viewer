@@ -1,0 +1,333 @@
+// Loads a BlazePose Drive cache: a `<stem>_blazepose_r<N>.npy` of shape
+// (N, 33, 8) plus a sibling `_meta.json` with at least
+// { fps, layout: "blazepose33" }, remapped to COCO-17 on the way in.
+//
+// Coords in the .npy are normalised to [0, 1]; we de-normalise to pixels using
+// the loaded video's natural dimensions (so the video must be loaded first).
+//
+// **NaN handling (must match the classifier's training-time view):**
+// the punch classifier's input conditioning (`detect_punches` in
+// cornerman-backend) interpolates NaN runs linearly. This pose-loader
+// mirrors that — NaN positions get
+// interpolated between flanking valid frames, with carry-forward /
+// carry-back at clip boundaries. The `imputed` mask flags which joints
+// were originally NaN so lenses can render them with a magenta indicator
+// around their now-interpolated position (skeleton.js handles the
+// rendering).
+//
+// Output shape (consumed by the rest of the viewer):
+//   { skeleton: Float32Array(n*17*2),  // (frame, joint, xy) row-major
+//     conf:     Float32Array(n*17),    // (frame, joint)     row-major
+//     imputed:  Uint8Array(n*17),      // 1 = was NaN in cache, now 0,0,0
+//     fps, width, height, n_frames, engine: "blazepose", source }
+
+const N_JOINTS = 17;
+
+export async function loadPose(files, videoSize) {
+  const arr = Array.from(files || []);
+  const npy  = arr.find(f => f.name.toLowerCase().endsWith(".npy"));
+  const meta = arr.find(f => f.name.toLowerCase().endsWith(".json"));
+
+  if (!npy || !meta) {
+    throw new Error(
+      "Pick the .npy and its sibling _meta.json together (multi-select)."
+    );
+  }
+  return loadNpy(npy, meta, videoSize);
+}
+
+async function loadNpy(npyFile, metaFile, videoSize) {
+  const meta = JSON.parse(await metaFile.text());
+  const fps = Number(meta.fps);
+  // The cache typically includes a pre-buffer of pre_buffer_sec (≈1.5s)
+  // BEFORE the official round start, so cache frame 0 lives at
+  // `actual_start_sec`, NOT `start_sec`. Some newer caches don't write
+  // pre-buffer fields and the round begins right at `start_sec`. Trust
+  // actual_start_sec when present; otherwise fall back.
+  const start_sec = Number(meta.actual_start_sec ?? meta.start_sec ?? 0);
+  const round_start_sec = Number(meta.start_sec ?? start_sec);
+  const pre_buffer_sec = Math.max(0, round_start_sec - start_sec);
+  const layout = meta.layout || "(none)";
+  if (layout !== "blazepose33") {
+    throw new Error(
+      `Unsupported layout '${layout}' — the viewer reads BlazePose caches only ` +
+      `(layout blazepose33). Apple Vision / YOLO / RTMPose caches are no longer supported.`
+    );
+  }
+
+  const { data, shape, dtype } = parseNpy(await npyFile.arrayBuffer());
+  if (dtype !== "<f4") {
+    throw new Error(`Expected float32 LE in .npy, got dtype '${dtype}'.`);
+  }
+
+  // BlazePose-33 production cache (shape (N,33,8) =
+  // [x, y, z, x_world_m, y_world_m, z_world_m, visibility, presence]) is read
+  // THROUGH a 33→COCO-17 remap so every lens sees an ordinary COCO-17
+  // skeleton. x,y are image-normalised; `conf` is BlazePose's per-joint
+  // `visibility` (channel 6), its cleanest occlusion signal. The extra
+  // 33-joint data (feet, world-3D) rides state.blaze33 (loadBlaze33 below).
+  if (shape.length !== 3 || shape[1] !== 33 || shape[2] !== 8) {
+    throw new Error(
+      `Expected .npy shape (N, 33, 8) for blazepose33 cache, got (${shape.join(", ")}).`
+    );
+  }
+
+  // COCO-17 joint j ← BlazePose-33 source index (mouth/hands/feet-extra dropped).
+  const BLAZE_TO_COCO = [0, 2, 5, 7, 8, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+  const J_IN    = 33;
+  const CH      = 8;
+  const CONF_CH = 6;   // BlazePose visibility
+  // Base offset into `data` for the source joint backing COCO joint j at frame f.
+  const srcBase = (f, j) => (f * J_IN + BLAZE_TO_COCO[j]) * CH;
+
+  const n_frames = shape[0];
+  const w = videoSize?.width || meta.width || 1;
+  const h = videoSize?.height || meta.height || 1;
+
+  // Detect normalised (0..1) vs pixel coords. BlazePose emits out-of-frame
+  // extrapolations (|coord| up to ~3) that a max-based probe misreads as pixel
+  // coords — one such value in the probe window flips the verdict and collapses
+  // the whole skeleton to the origin (was the "IMG_6743 shows no skeleton" bug).
+  // Use the MEDIAN of the finite |x|,|y|: normalised poses cluster in [0,1]
+  // (median well under 1.5) while pixel caches sit in the hundreds, so sparse
+  // extrapolations can't flip it. Probe a wider window since leading frames are
+  // often undetected (all-NaN).
+  const probeFrames = Math.min(60, n_frames);
+  const mags = [];
+  for (let f = 0; f < probeFrames; f++) {
+    for (let j = 0; j < N_JOINTS; j++) {
+      const b = srcBase(f, j);
+      const x = data[b], y = data[b + 1];
+      if (x === x) mags.push(Math.abs(x));   // `x === x` is false only for NaN
+      if (y === y) mags.push(Math.abs(y));
+    }
+  }
+  let normalised = true;
+  if (mags.length) {
+    mags.sort((a, b) => a - b);
+    normalised = mags[mags.length >> 1] <= 1.5;   // median magnitude, outlier-proof
+  }
+  const sx = normalised ? w : 1;
+  const sy = normalised ? h : 1;
+
+  // Split the remapped (N, 17) joints → flat skeleton (N*17*2) + flat conf (N*17).
+  //
+  // **NaN handling (must match the classifier's training-time pipeline):**
+  // the punch classifier interpolates NaN runs linearly (`detect_punches`'
+  // input conditioning, mirroring the training loaders). The viewer must
+  // mirror that to honor the "debug must mirror target" principle (memory:
+  // feedback_debug_must_mirror_target.md). NaN runs are interpolated
+  // per-(joint, channel) between flanking valid frames; boundary runs
+  // carry-forward / carry-back.
+  //
+  // `imputed[f*17+j]` flags joints whose original cache value was NaN.
+  // Lenses use it to draw a magenta indicator around the joint at its
+  // INTERPOLATED position (no longer at (0,0)), so the user can see
+  // exactly which joints are inferred vs real-detected.
+  const skeleton = new Float32Array(n_frames * N_JOINTS * 2);
+  const conf = new Float32Array(n_frames * N_JOINTS);
+  const imputed = new Uint8Array(n_frames * N_JOINTS);
+  let n_imputed = 0;
+
+  // Pass 1: copy raw data into flat arrays, preserving NaN. Track which
+  // (frame, joint) pairs were NaN so the imputed mask is built from the
+  // RAW data (we'll interpolate next, but we want to remember what was
+  // originally missing).
+  for (let f = 0; f < n_frames; f++) {
+    for (let j = 0; j < N_JOINTS; j++) {
+      const base = srcBase(f, j);
+      const rx = data[base + 0];
+      const ry = data[base + 1];
+      const rc = data[base + CONF_CH];
+      // `x !== x` is the standard NaN check that works on raw Float32Array
+      // reads without a function call. Faster than Number.isNaN inside this
+      // hot loop.
+      const wasNan = (rx !== rx) || (ry !== ry) || (rc !== rc);
+      if (wasNan) {
+        imputed[f * N_JOINTS + j] = 1;
+        n_imputed++;
+      }
+      skeleton[(f * N_JOINTS + j) * 2 + 0] = rx * sx;
+      skeleton[(f * N_JOINTS + j) * 2 + 1] = ry * sy;
+      conf[f * N_JOINTS + j] = rc;
+    }
+  }
+
+  // Pass 2: interpolate NaN runs in each (joint, channel) trajectory.
+  // Linear interp between flanking valid frames, nearest-valid carry at
+  // clip boundaries. Same algorithm as `interpolate_nan_runs` in the
+  // training notebook (np.interp with clamp-to-endpoint).
+  interpolateNanTrajectories(skeleton, n_frames, N_JOINTS, 2);
+  interpolateNanTrajectories(conf,     n_frames, N_JOINTS, 1);
+
+  return {
+    skeleton, conf, imputed, n_imputed, fps,
+    start_sec,           // video time of cache frame 0 (incl. pre-buffer)
+    round_start_sec,     // video time the official round begins
+    pre_buffer_sec,      // round_start_sec - start_sec, for the meta line
+    width: w, height: h, n_frames,
+    engine: "blazepose",
+    source: npyFile.name,
+    normalised,
+    meta,                // parsed _meta.json — lenses read extras (e.g. wrist_run)
+  };
+}
+
+// Linear-interpolate NaN runs in a flat (n_frames × n_joints × n_channels)
+// array. Operates per (joint, channel) trajectory: walk the time axis,
+// replace each NaN frame with linear interpolation between the nearest
+// valid frames on either side, or carry-forward / carry-back at clip
+// boundaries. If the whole trajectory is NaN, fill with zeros.
+//
+// Mirrors the training notebook's `interpolate_nan_runs` (which uses
+// np.interp's clamp-to-endpoint behaviour for out-of-range x). The
+// `arr[idx] !== arr[idx]` check is the standard NaN test that works
+// without a function call inside the hot loop.
+function interpolateNanTrajectories(arr, n_frames, n_joints, n_channels) {
+  const stride = n_joints * n_channels;
+  // Reusable buffer for valid frame indices on this trajectory.
+  const valid = new Int32Array(n_frames);
+  for (let j = 0; j < n_joints; j++) {
+    for (let c = 0; c < n_channels; c++) {
+      const off = j * n_channels + c;
+      // First sweep: collect valid frame indices for this trajectory.
+      let v = 0;
+      for (let f = 0; f < n_frames; f++) {
+        const x = arr[f * stride + off];
+        if (x === x) valid[v++] = f;   // x === x is false for NaN
+      }
+      if (v === n_frames) continue;     // no NaN — nothing to do
+      if (v === 0) {
+        // All-NaN trajectory: zero it. Safe fallback so downstream maths
+        // doesn't propagate NaN.
+        for (let f = 0; f < n_frames; f++) arr[f * stride + off] = 0;
+        continue;
+      }
+      // Second sweep: walk frames, interpolate NaN against the precomputed
+      // valid index list. `vi` is a moving pointer into `valid`.
+      let vi = 0;
+      for (let f = 0; f < n_frames; f++) {
+        const idx = f * stride + off;
+        if (arr[idx] === arr[idx]) continue;   // not NaN
+        // Advance vi to the first valid index > f.
+        while (vi < v && valid[vi] <= f) vi++;
+        const nextF = vi < v ? valid[vi] : -1;
+        const prevF = vi > 0 ? valid[vi - 1] : -1;
+        if (prevF >= 0 && nextF >= 0) {
+          const t = (f - prevF) / (nextF - prevF);
+          const pv = arr[prevF * stride + off];
+          const nv = arr[nextF * stride + off];
+          arr[idx] = (1 - t) * pv + t * nv;
+        } else if (prevF >= 0) {
+          arr[idx] = arr[prevF * stride + off];
+        } else {
+          arr[idx] = arr[nextF * stride + off];
+        }
+      }
+    }
+  }
+}
+
+// Full BlazePose-33 production cache loader (blazepose_pose_cache/<stem>_blazepose_r<N>.npy).
+// Unlike loadPose — which remaps to COCO-17 and keeps only x/y/conf — this keeps
+// ALL 33 joints and ALL 8 channels so the BlazePose inspector lens can surface
+// z / world-3D / visibility / presence per joint. x,y are image-normalised
+// (0..1); the lens de-normalises to video pixels itself.
+//
+//   channels: 0 x  1 y  2 z  3 x_world_m  4 y_world_m  5 z_world_m  6 visibility  7 presence
+//
+// Returns { data: Float32Array(N*33*8) (NaN where undetected), n_frames,
+//           n_joints: 33, n_channels: 8, fps, start_sec, round_start_sec,
+//           pre_buffer_sec, width, height }.
+export async function loadBlaze33(npyFile, metaFile, videoSize) {
+  const meta = JSON.parse(await metaFile.text());
+  const { data, shape, dtype } = parseNpy(await npyFile.arrayBuffer());
+  if (shape.length !== 3 || shape[1] !== 33 || shape[2] !== 8) {
+    throw new Error(`Expected (N, 33, 8) blazepose33 cache, got (${shape.join(", ")}).`);
+  }
+  if (dtype !== "<f4") throw new Error(`Expected float32 LE in .npy, got '${dtype}'.`);
+  const start_sec = Number(meta.actual_start_sec ?? meta.start_sec ?? 0);
+  const round_start_sec = Number(meta.start_sec ?? start_sec);
+  return {
+    data, n_frames: shape[0], n_joints: 33, n_channels: 8,
+    fps: Number(meta.fps) || 30,
+    start_sec, round_start_sec,
+    pre_buffer_sec: Math.max(0, round_start_sec - start_sec),
+    width: videoSize?.width || meta.width || 0,
+    height: videoSize?.height || meta.height || 0,
+  };
+}
+
+// ── .npy parser ────────────────────────────────────────────────────────────
+// Implements numpy's NPY format v1/v2/v3 (subset we need).
+// https://numpy.org/doc/stable/reference/generated/numpy.lib.format.html
+function parseNpy(buffer) {
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+
+  // Magic: \x93NUMPY
+  if (bytes[0] !== 0x93 ||
+      String.fromCharCode(...bytes.slice(1, 6)) !== "NUMPY") {
+    throw new Error("Not a .npy file (magic mismatch)");
+  }
+  const major = bytes[6];
+  let headerLen, dataOffset;
+  if (major === 1) {
+    headerLen = view.getUint16(8, true);
+    dataOffset = 10 + headerLen;
+  } else if (major === 2 || major === 3) {
+    headerLen = view.getUint32(8, true);
+    dataOffset = 12 + headerLen;
+  } else {
+    throw new Error(`Unsupported .npy major version ${major}`);
+  }
+
+  const headerStr = new TextDecoder("ascii")
+    .decode(bytes.slice(major === 1 ? 10 : 12, dataOffset))
+    .trim().replace(/,\s*}$/, "}");
+
+  const dtype = (headerStr.match(/'descr'\s*:\s*'([^']+)'/) || [])[1];
+  const fortran = /'fortran_order'\s*:\s*True/.test(headerStr);
+  const shapeStr = (headerStr.match(/'shape'\s*:\s*\(([^)]*)\)/) || [])[1] || "";
+  const shape = shapeStr
+    .split(",").map(s => s.trim()).filter(Boolean).map(Number);
+
+  if (fortran) throw new Error("Fortran-order .npy not supported.");
+
+  const total = shape.reduce((a, b) => a * b, 1);
+  const slice = buffer.slice(dataOffset);
+
+  let data;
+  switch (dtype) {
+    case "<f4": data = new Float32Array(slice, 0, total); break;
+    case "<f8": data = new Float64Array(slice, 0, total); break;
+    case "<i4": data = new Int32Array(slice, 0, total); break;
+    default:
+      throw new Error(`Unsupported .npy dtype '${dtype}'.`);
+  }
+
+  return { data, shape, dtype };
+}
+
+// Load a per-frame PTS sidecar (<base>_<engine>_r<N>_pts.npy → (N,) float32,
+// seconds) for deterministic cross-engine time alignment. Returns a
+// Float32Array, or null if absent / wrong dtype.
+export async function loadPtsArray(file) {
+  if (!file) return null;
+  try {
+    const { data, dtype } = parseNpy(await file.arrayBuffer());
+    return dtype === "<f4" ? data : null;
+  } catch (e) {
+    console.warn("pts sidecar load failed:", e.message);
+    return null;
+  }
+}
+
+export function jointXY(pose, frame, joint) {
+  const i = (frame * N_JOINTS + joint) * 2;
+  return [pose.skeleton[i], pose.skeleton[i + 1]];
+}
+
+export function jointConf(pose, frame, joint) {
+  return pose.conf[frame * N_JOINTS + joint];
+}

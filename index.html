@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cornerman · Rule Debug Viewer</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    // Applied synchronously (before first paint) so a saved theme choice
+    // doesn't flash the system-default theme for a moment. With nothing
+    // saved, [data-theme] stays unset and the CSS media query alone
+    // decides — i.e. the default is "follow the OS".
+    try {
+      var t = localStorage.getItem("cornerman-theme");
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Cornerman rule debug viewer <span id="build-tag" class="muted small">build …</span></h1>
+      <p class="sub">Frame-by-frame inspection of BlazePose Drive caches against the rules engine. Pick a video and its matching <code>.npy</code> + <code>_meta.json</code> pair to begin.
+        Full-pipeline test videos (punches, impact, defense, facing angle on one timeline): <a href="pipeline/">Pipeline viewer →</a></p>
+    </div>
+    <button type="button" id="theme-toggle" class="theme-toggle" title="Toggle color theme"></button>
+  </header>
+
+  <details id="picker-card" class="card" open>
+    <summary><span class="section-label">Data and lens selection</span> <span class="muted small">— pick a source, then what to view</span></summary>
+    <p class="section-group-label">From a folder</p>
+    <div class="alt-group">
+      <details id="drive-section">
+        <summary><span class="section-label">Drive folder</span> <span id="drive-status" class="muted small">— not connected</span></summary>
+        <p class="section-desc">
+          Give the app one-time, read-only access to your Drive folder and
+          it'll pick up your videos, caches, and punches automatically on
+          every visit — no more choosing files by hand. Point it at the
+          folder that holds your data, e.g. <code>My Drive/Cornerman/data/</code>;
+          we'll find <code>skeleton_data/blazepose/</code> and
+          <code>raw_videos/</code> inside it on our own. Chrome and Edge
+          only — on Safari or Firefox, use the manual picker at the bottom
+          instead.
+        </p>
+        <div class="section-actions">
+          <button type="button" id="drive-connect" class="btn btn-primary">Connect Drive folder</button>
+          <button type="button" id="drive-disconnect" class="btn" hidden>Disconnect</button>
+        </div>
+      </details>
+
+      <div class="or-divider" role="separator"><span>or</span></div>
+
+      <details id="cache-section">
+        <summary><span class="section-label">Cache folder</span> <span id="cache-status" class="muted small">— pick once per session</span></summary>
+        <p class="section-desc">
+          Don't want to grant Drive access? Point this at your cache folder
+          instead — pick <code>skeleton_data/blazepose/</code>. Pick again
+          anytime to merge in another folder.
+        </p>
+        <label class="folder-pick">
+          <input type="file" id="cache-folder" webkitdirectory directory multiple>
+          <button type="button" id="cache-clear" class="btn" hidden>Clear index</button>
+        </label>
+      </details>
+    </div>
+
+    <details id="pick-section">
+      <summary><span class="section-label">Video &amp; lens</span> <span class="muted small">— choose what to view</span></summary>
+      <p class="section-desc">
+        Pick a lens first — it narrows the video list down to footage it
+        can actually render.
+      </p>
+      <div class="lens-row">
+        <label>
+          <span>Lens</span>
+          <select id="lens-pick"></select>
+        </label>
+        <p id="lens-pick-status" class="muted small"></p>
+      </div>
+
+      <div class="picker-row">
+        <label>
+          <span>Video <span class="muted">(from your Drive folder)</span></span>
+          <select id="video-pick" disabled>
+            <option value="">— connect a Drive folder to populate —</option>
+          </select>
+        </label>
+        <label>
+          <span>Round <span class="muted">(shown only if more than one matches)</span></span>
+          <select id="round-select" disabled>
+            <option value="">—</option>
+          </select>
+        </label>
+      </div>
+    </details>
+
+    <p class="section-group-label">Load one round directly</p>
+    <div class="alt-group">
+      <details class="manual-fallback">
+        <summary>Manual file pick (no folder)</summary>
+        <p class="section-desc">
+          No Drive folder, no cache folder — just pick the video and its
+          matching pose cache files yourself.
+        </p>
+        <label>
+          <span>Video <span class="muted">(re-pick to load another round)</span></span>
+          <input type="file" id="video-file" accept="video/*">
+        </label>
+        <label>
+          <span>BlazePose cache <code>.npy</code> + <code>_meta.json</code></span>
+          <input type="file" id="pose-file" accept=".npy,.json,application/json" multiple>
+        </label>
+      </details>
+    </div>
+
+    <p id="load-status" class="status"></p>
+  </details>
+
+  <section id="viewer" hidden>
+    <div class="layout">
+      <div id="stage">
+        <!-- Mirror of the picker card's video + round dropdowns so you can
+             switch rounds without scrolling back up. Kept in sync by
+             syncStagePickers(); changing one drives the other. -->
+        <div class="stage-pick">
+          <label>
+            <span>Video</span>
+            <select id="stage-video-pick" disabled></select>
+          </label>
+          <label>
+            <span>Round</span>
+            <select id="stage-round-select" disabled></select>
+          </label>
+          <button type="button" id="stage-copy-name" title="Copy the video filename">⧉ Copy</button>
+        </div>
+        <div class="video-wrap">
+          <video id="video" preload="auto" playsinline></video>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div class="controls">
+          <button id="prev-frame" title="Previous frame (←)">◀</button>
+          <button id="play-pause" title="Play/pause (Space)">▶</button>
+          <button id="next-frame" title="Next frame (→)">▶</button>
+          <select id="speed" title="Playback speed">
+            <option value="0.25">0.25x</option>
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+          </select>
+          <input type="range" id="scrubber" min="0" max="0" value="0">
+          <button id="mute-toggle" title="Mute/unmute (M)">🔊</button>
+          <button id="export-clip" title="Export the clip with the current lens overlay burned in">⬇︎ Export</button>
+        </div>
+        <video id="thumb-video" preload="auto" playsinline muted></video>
+        <div id="thumb-tooltip" hidden>
+          <canvas id="thumb-canvas" width="240" height="135"></canvas>
+          <div id="thumb-label" class="muted small"></div>
+        </div>
+        <div id="frame-label" class="muted"></div>
+        <div id="meta" class="muted small"></div>
+        <!-- Lens-scoped slot for full-width extras (e.g. punch-classifier
+             timeline). Cleared on every lens switch by setRule(). Lenses
+             that want stage-wide real estate query this by id. -->
+        <div id="stage-extras"></div>
+      </div>
+
+      <aside id="side">
+        <div id="video-info" class="video-info" hidden>
+          <span class="vi-label">Source video</span>
+          <span id="vi-name" class="vi-name"></span>
+          <a id="vi-drive" class="vi-drive" target="_blank" rel="noopener noreferrer">Search in Drive ↗</a>
+        </div>
+        <label class="rule-pick">
+          <span>Lens</span>
+          <select id="rule-select"></select>
+        </label>
+        <div id="rule-panel"></div>
+        <details class="shortcuts">
+          <summary>Keyboard</summary>
+          <ul>
+            <li><kbd>←</kbd> / <kbd>→</kbd> — step 1 frame</li>
+            <li><kbd>[</kbd> / <kbd>]</kbd> — step 10 frames</li>
+            <li><kbd>Space</kbd> — play/pause</li>
+            <li><kbd>M</kbd> — mute/unmute</li>
+          </ul>
+        </details>
+      </aside>
+    </div>
+  </section>
+
+  <script type="module" src="js/viewer.js"></script>
+</body>
+</html>
