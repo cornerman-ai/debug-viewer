@@ -762,7 +762,7 @@ const ELBOWSTATE = {tucked: '#34c759', flared: '#ff3b30'};   // per-stretch colo
 // reason is readable without hovering. Every gray state on every row has an entry here.
 const SKIPWORD = {no_pose: 'joint hidden', no_reading: 'joint hidden', side_on: 'side-on', front_on: 'front-on',
                   punching: 'punching', hook: 'hook / body', no_facing: 'no facing', no_side: 'no side',
-                  foot_turned: 'foot turned', feet_together: 'feet together', excluded: 'excluded', not_frontal: 'not frontal', window_in_edge: 'excluded'};   // window_in_edge: rules 3 / 13 run before 2026-10-12's excluded time
+                  foot_turned: 'foot turned', feet_together: 'feet together', excluded: 'excluded', window_in_edge: 'excluded'};   // window_in_edge: rules 3 / 13 run before 2026-10-12's excluded time
 // a frame rule's state in the video's excluded time (S.excl): measured there, never judged
 const EXCLWHY = 'the video’s excluded time — no rule judges it (grey on the timeline)';
 // rules 27 / 29, the variety rows: the share the score reads (the most-used types / type / side) vs everything else
@@ -1406,7 +1406,7 @@ const RULE_LAYERS = [
     // rule 29, defense variety (same_defense/same_defense.json, over defense_classification/defenses.csv — every move
     // the rule counts), two lanes, the score's two halves: "move" — amber when the move is the round's most-used
     // type, green another type; "side" — amber when it went to the most-used side, green the other side, a dashed
-    // strip when it has no side (a roll or a duck since 2026-10-26, a pull-back before: not counted for the side).
+    // strip when it has no side (a duck, a pull-back: not counted for the side).
     key: 'vardef', label: RN(29), short: RN(29), items: true, split: 'lane', halves: ['move', 'side'],
     csv: ['defense_classification', 'defenses.csv'], json: ['same_defense', 'same_defense.json'],
     parseItem: (r, num) => ({sf: num(r.start_frame), ef: num(r.end_frame), type: r.defense_type, side: r.side}),
@@ -3347,7 +3347,7 @@ function srow(name, main, color, value, rule) {
 const ANGLE_GROUPS = ['Side-on', 'Front, back', 'Every angle'];
 const angleGroup = k => {
   const a = (layerAngles(k) || ALL_ANGLES).split(' \u2014')[0];
-  return a === 'side-on' ? 'Side-on' : a === 'front, back' || a === 'front' ? 'Front, back' : 'Every angle';   // front: rules 3, 29
+  return a === 'side-on' ? 'Side-on' : a === 'front, back' ? 'Front, back' : 'Every angle';
 };
 const LSORTS = {rule: {label: 'rule number', dir: [`1 → ${NRULES}`, `${NRULES} → 1`]},
                 angle: {label: 'angles', dir: ['side-on first', 'every angle first']}};
@@ -3392,7 +3392,7 @@ const BASE_ROWS = [
   ['activity', 'Activity', 'two lines, each smoothed over about 2 s: green = output, punches + defensive moves per minute; purple = movement, how far he actually travels and turns — the hip centre against where it was a second before (toward and from the camera included, bouncing in place averaged out) and the change of his facing angle (a quarter turn counts as one torso length) — both near 0 when he just stands', () => S.punches.length > 0 || S.defenses.length > 0 || !!S.skel],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
-  ['def', 'Defense', 'defensive moves on frontal footage: slips (the Slip exploration lens rule), rolls, ducks (backend run_defense.py; defense6 before 2026-10-26)', () => S.hasDef],
+  ['def', 'Defense', 'defensive moves: facing the camera the frontal detectors (slips by the Slip exploration lens rule, rolls, ducks), defense6 at every other angle (backend run_defense.py)', () => S.hasDef],
   ['steps', 'Steps', 'every foot move, lead foot on top, rear below: the app’s foot-move counter (Feet stance) — a foot’s speed over 0.6 torso lengths a second until back under 0.35. Measured on 545 labeled foot moves (any angle): it finds 87 %, about 3 in 10 of its moves are not real steps, and about one step in six shows as two', () => S.hasSteps],
 ];
 // the rows with a sub-switch per type: [the type table, the events, which of them sit on this row]
@@ -3460,12 +3460,8 @@ function buildLayers() {
 // (from the video's snapshot: its rule's camera, side_on / front_back, or none = every angle).
 const ALL_ANGLES = 'front, back, side-on';
 // the camera views rule n judges, from the snapshot: 'side-on', 'front, back' or every angle; null without a snapshot
-// rules 3 and 29 read the defensive moves for their absence too, so they judge only the footage the backend's defense
-// stage searched for moves - its frontal stretches since 2026-10-26 (run_defense.py) - not a camera window of their own
-const DEFENSE_SEARCHED = new Set([3, 29]);
 const ruleAngles = n => {
   const r = S.th?.rules?.[n]; if (!r) return null;
-  if (DEFENSE_SEARCHED.has(+n)) return 'front — where the defense stage looks for moves';
   return r.camera === 'side_on' ? 'side-on' : r.camera === 'front_back' ? 'front, back' : ALL_ANGLES;
 };
 const layerAngles = k => ruleAngles((LAYER_RULES[k] || [])[0]);
@@ -3636,8 +3632,7 @@ function ruleCard() {
   if (da) add(RN(3), da.score ?? 'not rated', da.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does a defensive move come with, or right after, his combinations?',
     on: `${da.n_combos} offensive combos (punches only) · ${da.n_judged ?? da.n_combos} judged`
-        + ((da.n_excluded ?? da.n_window_in_edge) ? `, ${da.n_excluded ?? da.n_window_in_edge} not (it or its window touches the excluded time)` : '')
-        + (da.n_not_frontal ? `, ${da.n_not_frontal} not on frontal footage (its window leaves the ${da.searched_s} s where moves are looked for)` : ''),
+        + ((da.n_excluded ?? da.n_window_in_edge) ? `, ${da.n_excluded ?? da.n_window_in_edge} not (it or its window touches the excluded time)` : ''),
     th: THR(() => ({event: {label: 'per combo', rule: `a defensive move starting anywhere from the combo’s first frame to ${fN(T(3, 'move.window_after_s'))} s `
                         + 'after its last one covers it — or only until the next punch starts, if that comes first'},
          round: {label: 'per round', rule: `the share of combos covered, scored 100 at ${fP(T(3, 'round.score.full'))} % or more and 0 at none, `
@@ -3695,13 +3690,13 @@ function ruleCard() {
     on: `${cmb.n_combinations} combined combos · all judged · ${cmb.n_different} different sequences among them${exNote(cmb.n_excluded, 'combos')}`,
     th: THR(() => { const full = fP(T(31, 'round.score.full')), zero = fP(T(31, 'round.score.zero'));
       return {round: {label: 'per round', rule: `the same top-3 share and the same scale — 100 at ${full} % or less, linearly down to 0 `
-                        + `at ${zero} %; under ${NJ(31)} combos: not rated — but the defense stage’s false slips inflate how many different `
+                        + `at ${zero} %; under ${NJ(31)} combos: not rated — but the defense model’s noise inflates how many different `
                         + 'sequences there are, so read it next to the offensive score, not alone',
                  bands: [[`≤ ${full} %`, '100'], [`${full} → ${zero} %`, '100 → 0']], pal: {'100': '#34c759', '100 → 0': '#ff9f0a'}}}; }, thMiss),
     calc: `top 3 sequences / ${cmb.n_combinations} combos = ${pct(cmb.top3_share)} → ${cmb.diversity.score ?? '–'}`});
   if (sd) add(RN(29), sd.score ?? 'not rated', sd.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he only ever use one move, or always go to one side?',
-    on: `${sd.n_moves} defensive moves${sd.searched_s != null ? ` on ${sd.searched_s} s of frontal footage (where moves are looked for)` : ''} · all judged for the move · the side only over the ${sd.n_with_side} that have one (slips; rolls too before 2026-10-26)${exNote(sd.n_excluded, 'moves')}`,
+    on: `${sd.n_moves} defensive moves · all judged for the move · the side only over the ${sd.n_with_side} that have one (ducks and pull-backs have none)${exNote(sd.n_excluded, 'moves')}`,
     th: THR(() => { const mv = fP(T(29, 'round.move.full')), sd = fP(T(29, 'round.side.full'));
       const mz = fP(T(29, 'round.move.zero')), sz = fP(T(29, 'round.side.zero'));
       const mp = fN(T(29, 'round.move.points')), spt = fN(T(29, 'round.side.points'));
@@ -4296,7 +4291,6 @@ const RULE_NAME = no => RULE_NAMES[no] || `rule ${no}`;
 const SKIPTXT = {
   excluded: 'not judged: it reaches into the video’s excluded time (grey on the timeline), which no rule judges',
   window_in_edge: 'not judged: it reaches into the video’s excluded time (grey on the timeline), which no rule judges',
-  not_frontal: 'not judged: the defense stage looks for moves only on frontal footage (facing the camera), and this combo’s window is not all on it',
   not_side_on: 'thrown front- or back-on; this rule reads side-on only',
   facing_head_on: 'thrown front- or back-on; this rule reads side-on only',
   side_on: 'thrown side-on; this rule reads front- or back-on only',

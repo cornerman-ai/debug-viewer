@@ -501,10 +501,7 @@ the facing has turned so far against the 45° needed.
   after its end. Hovering says how long after the combo the move started, or how long the window was and whether the
   next punch cut it. A move counts when it starts anywhere from the combo's first frame to 2 s after its last — or
   only until the next punch starts, if that comes first. Round = 100 at 70 % of combos covered or more, 0 at none,
-  linearly in between; a plain number, no bands (fewer than 10 combos → not rated). Since 2026-10-26 (backend
-  run_defense.py) moves are looked for only on frontal footage, so a combo is judged only when its window is all on
-  it; the others draw a grey strip, "not frontal", and the rule's angles read Front only, "where the defense stage looks
-  for moves".
+  linearly in between; a plain number, no bands (fewer than 10 combos → not rated).
 
 **Lead/rear hand balance** (rule 5, `hand_balance/hand_balance.json`; "Hand balance" until 2026-10-03; a whole-video rule): the share of punches
 thrown with the rear hand, scored 100 from 25 % to 40 % (60 % until 2026-10-05) and falling linearly to 0 at 0 % (all lead) and at 100 % (all
@@ -612,9 +609,9 @@ and 50 for the side among moves that have one — full up to 70 %, linearly to 0
 one alone is the whole score. Its timeline row (since 2026-10-06) has the same two halves as lanes over every move the
 rule counts (`defense_classification/defenses.csv`): **move** — amber when it is the most-used type, green another;
 **side** — amber when it went to the most-used side, green the other side, dashed ("no side") for a duck or a
-pull-back, which the side half does not count. Since 2026-10-26 (backend run_defense.py) the moves come from frontal
-footage only — a round without any is not rated, "no frontal footage" — and only slips have a side; the slip rule's
-false slips make a high slip share partly the detector.
+pull-back, which the side half does not count. Since 2026-10-26 the moves come from two detectors (backend
+run_defense.py): facing the camera the frontal ones, whose slip rule finds many slips (false ones among them), and at
+every other angle defense6, which finds rolls far better than slips — a high share of either is partly the detector.
 
 **Adding or changing a rule**: see [instructions.md](instructions.md) — every place a rule lives in `index.html`, the
 timeline-layer and Round-row templates, and the backend documents that change with it. Every rule has a timeline row
