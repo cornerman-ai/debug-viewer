@@ -310,16 +310,18 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   and this frame's chin. Skipped: no face on any frame read (about half the punches on the test videos — an arm in
   front of the face), a shoulder or hip hidden, excluded time. Round = the mean punch score, from at least 10. Reads
   `punches.csv` + `chin_impact.json`.
-- **Punches stuck in the bag** (rule 41, `bag_bite/`, since 2026-10-23): bag work only (a test video by its known
-  training type, the backend's `configs/training_types.json`; any other round by the bagwork stage's call - the Round
-  row says which, and "not bag work" with it otherwise). Per punch with an impact frame, the punching wrist's
-  speed in the picture over the torso: the arrival (the speed's peak before the stop at the bag), the pause on the bag
-  (half the arrival speed lost → half the return speed regained) and the snap back (the speed's highest rise after the
-  stop), each scored 0 → 100 between its punch type's quartiles of the labeled bag punches, weighted 0.30 / 0.35 / 0.35.
-  A block per judged punch, green at 100, red below, its score on it; the card and tooltip give the three readings and
-  their part scores; on the video the punching wrist is ringed, solid and labelled "on the bag" while the pause lasts.
-  Round = the mean punch score (from 10); the Now tab lists it per punch; skip reasons: wrist not seen (the bag hides
-  the far hand), too little motion, no stop, no impact frame.
+- **Punches stuck in the bag** (rule 41, `bag_bite/`, since 2026-10-23; the push model since 2026-10-26): bag work only
+  (a test video by its known training type, the backend's `configs/training_types.json`; any other round by the bagwork
+  stage's call - the Round row says which, and "not bag work" with it otherwise). Per jab and cross whose elbow
+  straightens to 130°, the punching arm in BlazePose's world skeleton: how long the elbow stays within 20° of its
+  straightest, the wrist's mean 3D speed over the 0.3 s after the arm is out (its reach first within 2 cm of its
+  longest) and the punch's length, weighed by a logistic regression (the snapshot's `model`, fitted on coach Stafford's
+  ratings) into the push probability; 100 at p ≤ 0.3, 0 at p ≥ 0.7. A block per judged punch, green snapping (100), red
+  pushing, the score on it; the card and tooltip give the three readings, p and the arm's visibility; on the video the
+  punching wrist is ringed, solid and labelled "coming back" over the 0.3 s return window. Round = the mean punch score
+  (from 10); the Now tab lists it per jab / cross; skip reasons: a hook or an uppercut (not judged), the arm not seen
+  (the bag hides the far arm), the elbow never straightening, no arm reading. Until 2026-10-26: the wrist's speed in the
+  picture around the impact (arrival, pause, snap).
 - **Looping uppercut** (rule 36, `uppercut_drop/`, since 2026-10-22; "Hand drop before the uppercut" until 2026-10-23): per head uppercut (body uppercuts are
   the punch model's body class and are not judged), the punching forearm's direction in world coordinates — (wrist y −
   elbow y) / forearm length, the arm filtered at 6 Hz — at its most downward over the window from 0.5 s before the

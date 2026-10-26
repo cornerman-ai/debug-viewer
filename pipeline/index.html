@@ -1135,16 +1135,16 @@ const upDropRule = () => `head uppercuts: the punching forearm’s direction in 
   + `${fD(T(36, 'move.score.full'), 2)}, linearly to 0 at ${fD(T(36, 'move.score.zero'), 2)}; not judged when the arm’s least visible joint has a median `
   + `visibility under ${fD(T(36, 'move.min_arm_visibility'), 2)}`;
 // rule 41's per-punch line in words: the three readings, their weights and each punch type's quartile lines
-const BITE_TYPES = [['jab', 'jab'], ['cross', 'cross'], ['hook', 'hook'], ['uppercut', 'uppercut'], ['hook_or_uppercut', 'body shot']];
-const biteLine = k => `arrival ${fD(T(41, `move.score.arrival.zero.${k}`), 1)} → ${fD(T(41, `move.score.arrival.full.${k}`), 1)}, `
-  + `pause ${fD(T(41, `move.score.pause.zero.${k}`), 3)} → ${fD(T(41, `move.score.pause.full.${k}`), 3)} s, `
-  + `snap ${fN(Math.round(T(41, `move.score.snap.zero.${k}`)))} → ${fN(Math.round(T(41, `move.score.snap.full.${k}`)))}`;
-const biteRule = () => `bag work only: the punching wrist’s speed in the picture over the torso (smoothed at ${fN(T(41, 'move.smooth_hz'))} Hz); `
-  + `arrival = the speed’s peak before the fist stops at the bag (torso lengths / s), pause = from losing half that speed to `
-  + `regaining half the return speed (s), snap = the speed’s highest rise per second after the stop (torso lengths / s²). `
-  + `Each scores 0 → 100 between its punch type’s quartiles of the labeled bag punches (${BITE_TYPES.map(([k, w]) => `${w}: ${biteLine(k)}`).join('; ')}); `
-  + `the punch’s score = ${fD(T(41, 'move.weights.arrival'), 2)} × arrival + ${fD(T(41, 'move.weights.pause'), 2)} × pause + `
-  + `${fD(T(41, 'move.weights.snap'), 2)} × snap`;
+const biteW = () => { const w = T(41, 'move.model.weights'), f = T(41, 'move.model.features');
+  const name = {back_speed: 'back speed', straight: 'straight', length: 'length'};
+  return f.map((k, i) => `${w[i] >= 0 ? '+' : '−'} ${fD(Math.abs(w[i]), 2)} × ${name[k] || k}`).join(' '); };
+const biteRule = () => `bag work only; jabs and crosses whose elbow straightens to ${fN(T(41, 'move.min_elbow_deg'))}°, on the punching arm in `
+  + `BlazePose’s world skeleton (smoothed at ${fN(T(41, 'move.smooth_hz'))} Hz): straight = how long the elbow stays within `
+  + `${fN(T(41, 'move.straight_drop_deg'))}° of its straightest, back speed = the wrist’s mean 3D speed over the `
+  + `${fD(T(41, 'move.return_s'), 1)} s after the reach first comes within ${fN(T(41, 'move.reach_tol_m') * 100)} cm of its longest, `
+  + `length = the punch’s start → end; push probability p = 1 / (1 + e^−z), z = ${fD(T(41, 'move.model.intercept'), 2)} ${biteW()} `
+  + `(each reading’s logarithm, standardised; fitted on coach Stafford’s ratings); the punch’s score is 100 at p ≤ `
+  + `${fD(T(41, 'move.score.full'), 2)}, 0 at p ≥ ${fD(T(41, 'move.score.zero'), 2)}, linear between`;
 const CHINSKIP = {no_reading: 'a shoulder or hip the rule needs is not visible',
                   no_face: 'no face found with enough confidence — the chin is not guessed from the skeleton',
                   punching: 'a punch is in flight — the chin is judged between punches',
@@ -2077,42 +2077,46 @@ const RULE_LAYERS = [
     },
   },
   {
-    // rule 41, punches stuck in the bag (bag_bite/punches.csv): bag work only (bagwork/bagwork.json); every punch with
-    // an impact frame, the punching wrist's speed in the picture over the torso: arrival (the peak before the stop at
-    // the bag), pause (half the arrival speed lost -> half the return speed regained), snap (the speed's highest rise
-    // after the stop), each on its punch type's quartile lines (move.score), weighted by move.weights.
+    // rule 41, punches stuck in the bag (bag_bite/punches.csv, the push model since 2026-10-26): bag work only
+    // (configs/training_types.json for the test videos, else bagwork/bagwork.json); per jab and cross whose elbow
+    // straightens to move.min_elbow_deg, the punching arm in BlazePose's world skeleton: straight (the elbow within
+    // move.straight_drop_deg of its straightest), back_speed (the wrist's mean 3D speed over move.return_s after the reach
+    // is out) and length, weighed by move.model (a logistic regression fitted on coach Stafford's ratings) into p_push;
+    // the punch's score is 100 at p <= move.score.full, 0 at p >= move.score.zero.
     key: 'bite', label: RN(41), short: RN(41),
     csv: ['bag_bite', 'punches.csv'], json: ['bag_bite', 'bag_bite.json'],
-    parse: (r, num) => r.verdict ? {verdict: r.verdict, score: num(r.score), arr: num(r.arrival), pause: num(r.pause),
-      snap: num(r.snap), sa: num(r.arrival_score), sp: num(r.pause_score), ss: num(r.snap_score), leave: num(r.leave),
-      back: num(r.back), stop: num(r.stop), vis: num(r.wrist_vis)}
-      : {verdict: '', skip: r.skip_reason, vis: num(r.wrist_vis)},
+    parse: (r, num) => r.verdict ? {verdict: r.verdict, score: num(r.score), p: num(r.p_push), straight: num(r.straight),
+      back: num(r.back_speed), len: num(r.length), elbow: num(r.elbow_max), vis: num(r.arm_vis), ff: num(r.furthest_frame)}
+      : {verdict: '', skip: r.skip_reason, vis: num(r.arm_vis), elbow: num(r.elbow_max)},
     card: (e, x) => `<div class="sub"><div class="h">${RN(41)}</div>` +
-      (!x || !x.verdict ? `<div class="empty">${skipTxt(x?.skip)}${x?.vis != null ? ` (wrist visibility ${x.vis.toFixed(2)})` : ''}</div>` :
-       `<div class="rows num" style="margin-top:0"><span>Arrival</span><b>${x.arr.toFixed(1)} torso / s → ${x.sa.toFixed(0)}</b>
-        <span>Pause on the bag</span><b>${(x.pause * 1000).toFixed(0)} ms → ${x.sp.toFixed(0)}</b>
-        <span>Snap back</span><b>${x.snap.toFixed(0)} torso / s² → ${x.ss.toFixed(0)}</b>
-        <span>Punch score</span><b>${x.score.toFixed(1)} ${THR(() => `(${fD(T(41, 'move.weights.arrival'), 2)} / ${fD(T(41, 'move.weights.pause'), 2)} / ${fD(T(41, 'move.weights.snap'), 2)})`)}</b>
-        <span>Wrist visibility</span><b>${x.vis.toFixed(2)} (median over the readings)</b></div>`) + '</div>',
+      (!x || !x.verdict ? `<div class="empty">${skipTxt(x?.skip)}`
+        + `${x?.skip === 'arm_not_straightened' && x.elbow != null ? ` (the elbow reached ${x.elbow.toFixed(0)}°)` : ''}`
+        + `${x?.skip === 'arm_not_seen' && x.vis != null ? ` (visibility ${x.vis.toFixed(2)})` : ''}</div>` :
+       `<div class="rows num" style="margin-top:0"><span>Elbow straight</span><b>${(x.straight * 1000).toFixed(0)} ms (straightest ${x.elbow.toFixed(0)}°)</b>
+        <span>Back speed</span><b>${x.back.toFixed(2)} m/s</b>
+        <span>Punch length</span><b>${(x.len * 1000).toFixed(0)} ms</b>
+        <span>Push probability</span><b>${x.p.toFixed(2)} → ${x.score.toFixed(1)} (${x.verdict})</b>
+        <span>Arm visibility</span><b>${x.vis.toFixed(2)} (its least seen joint, median over the punch)</b></div>`) + '</div>',
     tip: (e, x, {head}) => head + (!x.verdict ? `<span class="m">not judged: ${skipTxt(x.skip)}</span>` :
-      `<span class="num"><b>${x.score.toFixed(1)} / 100</b> · arrival ${x.arr.toFixed(1)} torso / s (${x.sa.toFixed(0)}) · `
-      + `pause ${(x.pause * 1000).toFixed(0)} ms (${x.sp.toFixed(0)}) · snap ${x.snap.toFixed(0)} torso / s² (${x.ss.toFixed(0)})</span><br>`
+      `<span class="num"><b>${x.score.toFixed(1)} / 100</b> · ${x.verdict}, p ${x.p.toFixed(2)} · elbow straight `
+      + `${(x.straight * 1000).toFixed(0)} ms · back ${x.back.toFixed(2)} m/s · punch ${(x.len * 1000).toFixed(0)} ms</span><br>`
       + `<span class="m">${THR(() => biteRule())}</span>`),
     row(e, x, {c, y, h, span, tag, ring}) {
       if (!x.verdict) return;                                // not judged: draw nothing
       const [bx, w] = span(e);
-      c.fillStyle = x.verdict === 'bites' ? '#34c759' : '#ff3b30';
+      c.fillStyle = x.verdict === 'snapping' ? '#34c759' : '#ff3b30';
       rr(bx, y + 3, w, h - 6, 5); c.fill();
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'bite', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                         // the punching wrist; ringed solid while it is on the bag
+    overlay(e, x, f, P, leadLeft) {                         // the punching wrist; ringed solid over the return window
       if (!x.verdict) return;
       const wr = P((e.hand === 'lead') === leadLeft ? J.lwr : J.rwr); if (!wr) return;
-      const col = x.verdict === 'bites' ? '#34c759' : '#ff3b30', on = f >= Math.floor(x.leave) && f <= Math.ceil(x.back);
+      const col = x.verdict === 'snapping' ? '#34c759' : '#ff3b30', back = THR(() => T(41, 'move.return_s'), null);
+      const on = x.ff != null && back != null && f >= Math.floor(x.ff) && f <= Math.ceil(x.ff + back * (S.fps || 30));
       OV.ring(wr, col, on ? 13 : 9, on ? 4 : 2);
-      overlayLabel(wr[0] + 16, wr[1] - 8, `${on ? 'on the bag · ' : ''}pause ${(x.pause * 1000).toFixed(0)} ms · arrival ${x.arr.toFixed(1)} · snap `
-        + `${x.snap.toFixed(0)} → ${x.score.toFixed(1)}`, col);
+      overlayLabel(wr[0] + 16, wr[1] - 8, `${on ? 'coming back · ' : ''}straight ${(x.straight * 1000).toFixed(0)} ms · `
+        + `back ${x.back.toFixed(2)} m/s · p ${x.p.toFixed(2)} → ${x.score.toFixed(1)}`, col);
     },
   },
   {
@@ -3500,7 +3504,7 @@ const SCOPE = {
   solo:      {moves: 'every punch, as a share of the round'},
   samespot:  {moves: 'offensive combinations, their punches thrown front-on'},
   sameheight: {moves: 'offensive combinations, their head punches thrown side-on'},
-  bite:      {moves: 'every punch with an impact frame, bag work only'},
+  bite:      {moves: 'every jab and cross whose elbow straightens, bag work only'},
   flat:      {moves: 'every frame, punches and defensive moves included'},
   knee:      {moves: 'every frame, punches and defensive moves included, each leg while its foot is seen from the side'},
   heavy:     {moves: 'every frame, punches and defensive moves included, while the front foot is seen from the side'},
@@ -3977,20 +3981,21 @@ function ruleCard() {
                     round: {label: 'per round', rule: `the mean uppercut score — a plain number, no bands; fewer than ${NJ(36)} judged uppercuts: not rated`}}), thMiss),
     calc: `mean of ${ud.judged_uppercuts} uppercut scores = ${ud.mean_score ?? '–'} · ${ud.at_100 ?? '–'} at 100 · ${ud.dropped} dropped · `
           + `median forearm at its lowest ${ud.median_drop ?? '–'}`});
-  const bb = S.layerSum.bite;
+  const bb = S.layerSum.bite, bsk = bb?.skipped || {};
   if (bb) add(RN(41), bb.score ?? 'not rated', bb.score == null ? '#8e8e93' : 'var(--text)', {
-    what: 'on the bag, does each punch bite — arrive fast, leave the bag at once and snap back — or stay stuck in the bag?',
+    what: 'on the bag, does each straight punch snap back off the bag, or push it — the arm staying out, the elbow locked, the fist slow to come back?',
     on: bb.bag_work !== true ? `not bag work (${bb.bag_work_from ?? `the bagwork stage: P(bag) ${bb.p_bag ?? '–'}`}): the rule judges bag work only`
-      : `bag work (${bb.bag_work_from}) · ${bb.n_punches} punches · ${bb.judged_punches} judged around their impact frame, ${bb.n_punches - bb.judged_punches} skipped `
-        + `(${bb.skipped?.wrist_not_seen ?? 0} with the wrist not seen — mostly the bag hiding the far hand — ${bb.skipped?.no_impact ?? 0} with no impact `
-        + `frame, ${bb.skipped?.too_little_motion ?? 0} moving too little to read, ${bb.skipped?.no_stop ?? 0} with no stop, ${bb.skipped?.excluded ?? 0} in excluded time)`,
-    th: THR(() => ({event: {label: 'per punch', rule: biteRule() + ' — green at 100, red below',
-                            bands: [['all three at the good quartile', '100'], ['all three at the bad quartile', '0']],
+      : `bag work (${bb.bag_work_from}) · ${bb.n_punches} punches, ${bb.n_straights ?? '–'} jabs and crosses · ${bb.judged_punches} judged, `
+        + `${(bb.n_straights ?? 0) - bb.judged_punches} skipped (${bsk.arm_not_seen ?? 0} with the arm not seen — mostly the bag hiding the far arm — `
+        + `${bsk.arm_not_straightened ?? 0} whose elbow never straightens, ${bsk.no_arm_reading ?? 0} with no reading, ${bsk.excluded ?? 0} in `
+        + `excluded time); ${bsk.not_a_straight ?? 0} hooks and uppercuts are not judged`,
+    th: THR(() => ({event: {label: 'per punch', rule: biteRule() + ' — green at 100 (snapping), red below (pushing)',
+                            bands: [[`p ≤ ${fD(T(41, 'move.score.full'), 2)}`, '100'], [`p ≥ ${fD(T(41, 'move.score.zero'), 2)}`, '0']],
                             pal: {'100': '#34c759', '0': '#ff3b30'}},
                     round: {label: 'per round', rule: `the mean punch score — a plain number, no bands; bag work only; fewer than ${NJ(41)} judged punches: not rated`}}), thMiss),
-    calc: `mean of ${bb.judged_punches} punch scores = ${bb.mean_score ?? '–'} · ${bb.at_100} at 100 · part means: arrival ${bb.mean_part_scores?.arrival ?? '–'}, `
-          + `pause ${bb.mean_part_scores?.pause ?? '–'}, snap ${bb.mean_part_scores?.snap ?? '–'} · medians: arrival ${bb.median?.arrival ?? '–'} torso / s, `
-          + `pause ${bb.median?.pause ?? '–'} s, snap ${bb.median?.snap ?? '–'} torso / s²`});
+    calc: `mean of ${bb.judged_punches} punch scores = ${bb.mean_score ?? '–'} · ${bb.snapping ?? '–'} snapping, ${bb.pushing ?? '–'} pushing · `
+          + `mean push probability ${bb.mean_p_push ?? '–'} · medians: straight ${bb.median?.straight ?? '–'} s, back speed `
+          + `${bb.median?.back_speed ?? '–'} m/s, length ${bb.median?.length ?? '–'} s`});
   const ih = S.layerSum.resting;
   if (ih) add(RN(6), ih.score ?? 'not rated', ih.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'when one hand lands, is the other hand’s wrist still up where a guard belongs?',
@@ -4306,12 +4311,10 @@ const SKIPTXT = {
   wrist_unsure: 'the wrist is not seen on the impact frame or just after it, so too few frames are left (rule 16)',
   no_face: 'no face found with enough confidence on the frames read — the chin is not guessed from the skeleton (rule 35)',
   no_reading: 'a shoulder or hip point is not visible on the frames read (rule 35)',
-  arm_not_seen: 'the punching arm is not seen: the median visibility of its least visible joint over the window is too low — mostly the far arm of a boxer side-on to the camera (rule 36)',
-  no_arm_reading: 'no frame of the window has the punching arm’s elbow and wrist (rule 36)',
-  wrist_not_seen: 'the punching wrist is not seen: its median visibility over the readings is too low — mostly the bag hiding the far hand (rule 41)',
-  too_little_motion: 'the wrist moves too little to read: its arrival or return speed is under the rule’s minimum (rule 41)',
-  no_stop: 'the wrist never clearly slows between going out and coming back: no stop at the bag to read (rule 41)',
-  no_wrist_reading: 'no reading of the punching wrist around the impact (rule 41)',
+  arm_not_seen: 'the punching arm is not seen: the median visibility of its least visible joint over the frames read is too low — mostly the far arm, hidden by the body or the bag (rules 36, 41)',
+  no_arm_reading: 'no reading of the punching arm’s joints on the frames read (rules 36, 41)',
+  not_a_straight: 'a hook or an uppercut: the rule judges jabs and crosses (rule 41)',
+  arm_not_straightened: 'the elbow never straightens to the rule’s minimum angle — a feint, or a jab thrown at the camera (rule 41)',
 };
 const skipTxt = c => SKIPTXT[c] || (c ? c.replace(/_/g, ' ') : 'not judged');
 const GOOD = '#22C55E', BAD = '#EF4444', MIDC = '#F97316';
@@ -4336,7 +4339,7 @@ const PUNCH_RULES = [
   ['rpivot', p => p.hand === 'rear', scored],
   ['chinimp', () => true, scored],
   ['updrop', p => p.type === 'uppercut', scored],
-  ['bite', () => true, scored],
+  ['bite', p => p.type === 'jab' || p.type === 'cross', scored],
 ];
 // "fails on", under a per-punch rule's round line: the punches it failed, split by punch type. The bar is each type's
 // share of the failed punches (the punch distribution's order and colours); after each type, failed / judged of that
@@ -5958,9 +5961,9 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [40, 'Whether the punches of a combination land on one spot across the picture when it is thrown at the camera. Each fist is read at its punch’s impact frame (the knuckles, else the wrist pushed out along the forearm); the combination’s score is how far apart the farthest two land, in torso lengths. Punches thrown side by side, each straight out of its own shoulder, land a shoulder’s width apart.',
        `offensive combinations, their punches thrown front-on (|facing| ${spotWindow()})`, `full marks with the fists ${fD(T(40, 'move.score.full'), 2)} torso apart or less, zero at ${fD(T(40, 'move.score.zero'), 2)}`,
        'A jab and a cross aimed at one chin meet on one line; thrown parallel, the second one lands beside the target.'],
-  [41, 'Whether each punch on the bag bites or stays stuck in it. Around the impact the rule follows the punching wrist’s speed in the picture: how fast it arrives at the bag, how long it stays there (from losing half its speed to regaining half its speed back) and how hard it is pulled back. Each is scored against the same punch type in the labeled bag work — full marks at its best quarter, zero at its worst — and the pause and the snap weigh a little more than the arrival. Bag work only; a wrist the bag hides is left out.',
-       'every punch with an impact frame, bag work only', `each reading full at its punch type’s good quartile, zero at its bad one; weights ${fD(T(41, 'move.weights.arrival'), 2)} / ${fD(T(41, 'move.weights.pause'), 2)} / ${fD(T(41, 'move.weights.snap'), 2)}; from ${fN(H(41, 'min_judged'))} judged punches`,
-       'A punch that rests on the bag or pushes it is slow to come back and leaves the boxer open; one that bites snaps straight back.'],
+  [41, 'Whether each straight punch on the bag snaps back or pushes. A push stays out: the elbow stays locked, the fist comes back slowly and the whole punch takes longer. The rule reads the punching arm in BlazePose’s 3D skeleton — how long the elbow stays near its straightest, how fast the wrist comes back in the moment after the arm is out, and how long the punch takes — and weighs the three into one push probability, fitted on coach Stafford’s ratings of bag punches. Bag work only; jabs and crosses only (hooks and uppercuts are bent-arm punches); an arm the bag hides is left out.',
+       'jabs and crosses whose elbow straightens, bag work only', `full marks at a push probability of ${fD(T(41, 'move.score.full'), 2)} or less, zero at ${fD(T(41, 'move.score.zero'), 2)}; from ${fN(H(41, 'min_judged'))} judged punches`,
+       'A punch that stays out on the bag leaves the boxer open and takes the snap out of the next one; one that snaps straight back is ready for the next.'],
   [42, `Whether the boxer boxes with his knees bent or stands tall on straight legs. Seen from the side, the angle at each knee between the hip, the knee and the ankle in the picture, every frame — guard, punches and defensive moves alike; 180° is a straight leg. A knee bends where its foot points, so a leg is read only while its foot is seen from the side (heel to toe tip at least ${fD(T(42, 'move.foot_min_of_shin'), 2)} of the shin): turned toward the camera, the bend does not show. Each leg is scored on its own line — where three in four trained boxers keep that knee on a typical frame — and the two legs count the same.`,
        'every frame, side-on, each leg while its foot is seen from the side', `full marks at ${fN(T(42, 'move.score.full.lead'))}° or more bent (lead) / ${fN(T(42, 'move.score.full.rear'))}° (rear), zero at ${fN(T(42, 'move.score.zero'))}°; each leg needs ${fN(H(42, 'min_judged_s'))} s judged`,
        'Straight, locked knees leave a boxer no spring: slower to move, less power from the legs, easier to knock off balance.'],
