@@ -89,7 +89,7 @@ The side panel has five views, switched at its top:
 - **Rules** — a **Brief** on top: the **overall round score** — each rated rule earns points by its tier (critical 0,
   bad 1, mid 2, good 3, great 4), and the sum over 4 × the rated rules is put on 0–100 (not-rated rules count in
   neither), coloured and labelled on the same tier scale as the rules, with the same bar — then every rule's name under its tier (great / good / mid / bad / critical / not rated), with the count
-  per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–36 in the Notion
+  per tier. Then the whole video's **Round score**: every rule we have, one row each, numbered 1–45 in the Notion
   order: its 0–100 score — a plain number, coloured on one scale shared by every rule (85–100 great, 75–85 good,
   60–75 mid, 40–60 bad, 0–40 critical; display only, the rules compute no bands) — or "not rated" under
   the rule's floor (10 judged punches / combos / moves, 5 s of judged frames), and under it four lines — what the
@@ -102,9 +102,9 @@ The side panel has five views, switched at its top:
   a not-rated rule gets an empty striped bar. Each row carries three
   tags — its analysis group (separate move / overall round), what it is analysed on (a punch, a combo, a defensive
   move, a frame, or the whole round only) and its angle gate (side-on / front, back / every angle; the rule's `camera`
-  in the video's thresholds snapshot, its window beside the badges; shown as three Front / Side / Back badges, lit = judged, struck through = skipped, in the facing row's colours) — and the card sorts by rule number, score (not rated always last), or any of the three tags, grouped under
+  and `camera_window_deg` in the video's thresholds snapshot, its window beside the badges — a front / back rule whose window stays on one side of 90° lights that badge alone: rule 40, front only; shown as three Front / Side / Back badges, lit = judged, struck through = skipped, in the facing row's colours) — and the card sorts by rule number, score (not rated always last), or any of the three tags, grouped under
   a heading. Every sort runs both ways: click the active button again to flip it (the arrow and the line under the
-  buttons say which way, e.g. worst → best). The card always opens on rule number, 1 → 33.
+  buttons say which way, e.g. worst → best). The card always opens on rule number, 1 → 45.
 
 - **Timelines** — the **Timeline layers** card, the tab's only card: it only turns timeline rows on and off; under each toggle,
 the rule's number, what it is measured on and the camera views it judges (the badges and the window, from the video's
@@ -177,10 +177,11 @@ among its reasons, drawn grey too). The pill on the video names the frame's stan
 flipped back. Short flips are mostly noise.
 The Info tab's next rows: Gloves, `yes / no` from the backend's `gloves` stage (`gloves/gloves.json`: the hand points' shape, gloves
 from 0.50; no rule reads it yet), Training, `bag work / shadowboxing (P(bag) X)` from the `bagwork` stage
-(`bagwork/bagwork.json`: a logistic regression on how hidden the hands are, the framing and the punches; no rule reads
-it yet), and Camera height, `~X cm (bucket, leg/torso Y)` from the `camera_height` stage (`camera_height/camera_height.json`,
+(`bagwork/bagwork.json`: a logistic regression on how hidden the hands are, the framing and the punches; rule 41
+reads it, for a video not in the backend's configs/training_types.json), and Camera height, `~X cm (bucket, leg/torso Y)` from the `camera_height` stage (`camera_height/camera_height.json`,
 since 2026-10-24: leg / torso length in the picture through four reference clips - floor 0, hips 95, head 170, above
-the head 220 cm; `extrapolated` past them; `unknown` when the legs are seen on under 30 frames; no rule reads it yet).
+the head 220 cm; `extrapolated` past them; `unknown` when the legs are seen on under 30 frames; rule 22 reads its bucket:
+ground / above_head judge 75–105° instead of 65–115°).
 
 **Steps** (the base row under Defense, on by default, since 2026-10-23; the backend's `steps` stage,
 `steps/steps.csv`): every foot move, the lead foot's on the top half (light blue), the rear foot's below (indigo); the
@@ -199,12 +200,12 @@ body — both guesses, so a whole video can read too near or too far by one fact
 little farther. The Info tab shows the video's median and 10–90 %. No rule reads it yet.
 
 **All videos** (header button, next to the video list): every video in the folder × every rule in one table — rows
-are videos, columns are the overall round score and rules 1–36, each cell the 0–100 score tinted in its tier's colour
+are videos, columns are the overall round score and rules 1–45, each cell the 0–100 score tinted in its tier's colour
 ("–" = not rated). It is not a separate computation: each video is read with the viewer's own loader, minus the
 timeline CSVs and the facing curve, which no round score needs (checked equal to the full read on all 495 cells,
 2026-10-02), and scored by the same code as the Rules tab, so a cell always equals what that video's Round score card
 says. A median row closes the table; each video is its number and its name. It only sorts: a rule's header (or
-Overall) sorts the videos by it, best to worst; a video sorts the 33 rule columns by its scores, best to worst; the two
+Overall) sorts the videos by it, best to worst; a video sorts the 45 rule columns by its scores, best to worst; the two
 buttons in the corner put them back in number order (**Videos 1→N**, **Rules 1→N**). Not rated always goes last. It
 opens with the videos and the rules in number order. Read once per folder (about 80 s for 29 videos over the local server, 2026-10-07) and kept; **Reload** re-reads after a
 pipeline re-run. Esc or a click outside closes it.
@@ -233,7 +234,7 @@ the punch card and a video overlay.
 Every rule with geometry in the frame now draws it. Rules that judge a punch (arm extension, hit height, hip and
 shoulder rotation, head off center, punch starts from low guard, resting hand, balance, hand return path, hook overswing, rear-foot heel up)
 draw for the punch under the playhead. Rules that judge frames (guard height, elbow tuck, chin tuck height and depth, stance width and depth, both
-bladedness axes, slip distance) draw on every frame through `frameOverlay`, which gets the raw BlazePose-33
+bladedness axes) draw on every frame through `frameOverlay` — and so does slip distance, which judges slips, inside a slip — which gets the raw BlazePose-33
 channels — they need joints (mouth corners, heels, foot-index (toe-tip) points) and channels (world x/z) the punch overlays never touch.
 Punch speed has no overlay on purpose: it measures a duration, and a duration has no geometry to draw.
 
@@ -242,10 +243,10 @@ hand and punch ("Rear cross · …"); labels never land on top of each other —
 
 Turn on one or two at a time. With a dozen layers on, the picture is unreadable — that is a debugging view, not a
 bug. Colors: green = full marks (100), red = below; orange only where a row has a
-middle state (slip distance and bladedness, between 0 and 100) and in the hip / shoulder rotation cards, which name a
+middle state (slip distance and bladedness, between 0 and 100; angle change after combo at 50) and in the hip / shoulder rotation cards, which name a
 turn short of the range "too little" (orange) apart from one past it, "too much" (red). A stretch the rule threw out —
 a joint it needs not visible, a punch in flight, the wrong camera angle, no facing angle — is a **dashed gray mid-line
-carrying the reason** (`SKIPWORD`): `joint hidden`, `side-on`, `front-on`, `punching`, `hook / body`, `no facing` or `no side`,
+carrying the reason** (`SKIPWORD`): `joint hidden`, `not front/back`, `not side-on` (outside the rule's camera window: in-between angles and no facing angle too), `punching`, `hook / body`, `no facing`, `no face` or `no side`,
 written on the strip when there is room for it and in the tooltip always. The row is
 continuous, so a gray stretch never means "nothing happened" — it means the rule could not look, and says why.
 
@@ -326,7 +327,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   the punch model's body class and are not judged), the punching forearm's direction in world coordinates — (wrist y −
   elbow y) / forearm length, the arm filtered at 6 Hz — at its most downward over the window from 0.5 s before the
   start (or the end of the same hand's previous punch, when later) to impact. 100 up to 0.49 (about 29° below level),
-  0 at 0.93 (about 68°), linear; both lines fitted to Stafford's ratings of 355 uppercut clips. The row draws the window,
+  0 at 0.93 (about 68°), linear; both lines fitted to Stafford's ratings of the 197 of his 355 uppercut clips that the rule judges. The row draws the window,
   lead on the top half, rear below — green at 100, red below, the score on the block; the card and tooltip give the
   lowest reading, its frame and whether the window was trimmed. The overlay draws the punching forearm in the verdict's
   colour, thicker with a ring on the frame that decides. Skipped: the arm not seen (the median over the window of its
@@ -430,14 +431,14 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   Reads `offensive.csv` / `combined.csv` + `combinations.json`; the Round tab's Combos card counts both (how many, how
   many unique, each sequence with its count), and the Rules tab scores their variety as rules 30 (offensive) and 31
   (combined), each kind on its own combos (the share of combos that are one of the 3 most-used sequences: 100 at
-  40 % or less, linearly to 0 at 100 %, < 10 combos not rated) — the combined one with the caveat that the defense model's
+  40 % or less, linearly to 0 at 100 %, < 10 combos not rated) — the combined one with the caveat that the defense stage's
   noise inflates its variety. These are "items" layers (`items: true`): their rows are the combinations,
   not the punches.
 
 - **Slip far enough** / **Slip not too much** (rules 14 and 15, `slip_distance/`; 15 was "Slips compact" until 2026-10-03): per slip, how far the head point (the middle of the visible face landmarks: nose,
   eyes, ears, mouth) travelled against the hip centre from where it started, in torso lengths, sideways (x) and up-down (y) each scored on its own for up to 50 points, summed (since 2026-10-07; x only
   before), with a white tick at the furthest frame of the axis with fewer points. Rolls, ducks and pull-backs are not measured. Judged front-on / back-on only;
-  a frame is read when a face landmark and both hip points are visible (the overlay's path too: the head point against the hip centre, both axes, with a ring at each axis's furthest frame). Two timeline rows, one per rule, each slip coloured by that
+  a frame is read when a face landmark and both hip and both shoulder points are visible (the overlay's path too: the head point against the hip centre, both axes, with a ring at each axis's furthest frame). Two timeline rows, one per rule, each slip coloured by that
   rule's slip score (green 100, orange between, red 0), and two round rows, each the mean of its slip scores: rule 14 "slip far enough" (per axis 50 at 0.20 torso of travel or more, 0 with none) and 15 "slip not too much" (per axis 50
   up to 0.50, 0 at 1.00). Reads `moves.csv` + `slip_distance.json`.
 - **Guard height** (`guard_height/`): per hand, how far the wrist sits below the nose in torso lengths while that
@@ -468,7 +469,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   linearly to 0 at 0.40 in front — green at 100, red below — read side-on
   only. A dashed gray line is everything the rule could not look at: no face, a joint not visible, a punch in flight, or
   the wrong camera angle. Round = the mean frame score over every judged frame, however brief — a plain number, no
-  bands; under 5 s of judged frames → not rated. Both read joints at visibility 0.30, like every rule. Read `runs.csv` + the stage's `.json`.
+  bands; under 5 s of judged frames → not rated. Both read joints at the house visibility floor (0.30). Read `runs.csv` + the stage's `.json`.
 - **Stance width** (`stance_width/`) and **Stance depth** (`stance_depth/`): both per frame, both continuous rows
   — green fine, red too small, and a dashed gray line for everything the rule could not look at — the wrong side of
   the camera, or a joint not visible. Width = ankle-to-ankle distance in torso lengths,
@@ -480,7 +481,7 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   judged only while the boxer is within 25° of facing or backing the camera (45° until 2026-10-06) and that arm isn't
   throwing a hook or a body shot. The row is continuous — every frame belongs to a stretch: green tucked (flare ≤ 0.15,
   full marks), red flared (above it, below full marks), and a thin gray strip where the rule cannot judge, with the reason in its tooltip (the
-  boxer is side-on, a joint it needs is not visible, or that arm is throwing a hook or a body shot). Lead in the top half, rear in the bottom. Each
+  boxer is not front- or back-on, a joint it needs is not visible, or that arm is throwing a hook or a body shot). Lead in the top half, rear in the bottom. Each
   frame scores 0–100: each arm 50, full up to 0.15 flare and 0 at 0.50, or 100 when only one arm can be judged; the
   overlay labels it ("frame score 65.8 · lead 15.8/50 · rear 50.0/50"). Round = the mean frame score, no bands.
   Reads `runs.csv` + `elbow_tuck.json`.
@@ -501,13 +502,13 @@ the facing has turned so far against the 45° needed.
   after its end. Hovering says how long after the combo the move started, or how long the window was and whether the
   next punch cut it. A move counts when it starts anywhere from the combo's first frame to 2 s after its last — or
   only until the next punch starts, if that comes first. Round = 100 at 70 % of combos covered or more, 0 at none,
-  linearly in between; a plain number, no bands (fewer than 10 combos → not rated).
+  linearly in between; a plain number, no bands (fewer than 10 judged combos → not rated).
 
 **Lead/rear hand balance** (rule 5, `hand_balance/hand_balance.json`; "Hand balance" until 2026-10-03; a whole-video rule): the share of punches
 thrown with the rear hand, scored 100 from 25 % to 40 % (60 % until 2026-10-05) and falling linearly to 0 at 0 % (all lead) and at 100 % (all
 rear); a plain number, no bands; fewer than 10 punches → not rated. The band is off-centre on purpose: the lead hand should throw more, the jab
 being the most thrown punch. Each hand's punch types sit beside it, unjudged. Its timeline row (since 2026-10-06) has
-a lane per hand over every punch it counts — lead blue on top, rear amber below (the share the score reads), the
+a lane per hand over every punch (those in the excluded time drawn but not counted) — lead blue on top, rear amber below (the share the score reads), the
 punch's letter on each — so the split, and where in the round one hand takes over, can be seen.
 
 **Combination length** (`combo_length/combo_length.json`, a whole-video rule; its combos are the Offensive combos row, shared with rule 30): over the offensive
@@ -523,8 +524,8 @@ punches → not rated. The per-window counts, rates and dead shares are shown be
 slower rate from more standing. It needs one continuous round to mean anything. Its timeline row (since 2026-10-06)
 shades the two windows it compares in that video and draws only the punches each counted — blue in the first, amber
 in the last, each window's count on its band; a short video's middle third is shaded gray, not compared. The windows
-are recomputed in the page from the same punch start times and the video's thresholds snapshot, so the counts are the
-rule's own.
+are recomputed in the page from the start times of the punches clear of the excluded time, as the rule takes them,
+and the video's thresholds snapshot, so the counts are the rule's own.
 
 **Stance changes** (rule 34, `stance_changes/stance_changes.json` + `segments.csv`, since 2026-10-22): the raw
 per-frame stance (the Stance row, no smoothing) under a `move.window_s` (5 s) window sliding one frame at a time; a
@@ -587,20 +588,20 @@ where a punch or a defensive move covers it, blue where only a change of angle d
 their length, empty for the short pauses in between. A frame counts as work when a
 punch or a defensive move covers it, or when he is changing angle — the 0.5 s-smoothed facing turning 90° or more in
 under 1 s, only the frames of the turn itself. A stretch with none of these lasting ≥ 3 s is dead time. Score = 100 at no dead time, linearly
-to 0 at 50 % dead — a plain number, no bands; under 20 s of video → not rated. Punches and actions per minute and the
+to 0 at 50 % dead — a plain number, no bands; under 20 s of judged time (the video minus its excluded time) → not rated. Punches and actions per minute and the
 seconds credited to turns are shown beside it, unjudged — punch rate is a style, standing still is not.
 
 **Punch variety** (rule 27, `same_punches/same_punches.json`; "Same punches" until 2026-10-03; a whole-video rule): under the target
 distribution, the share of the 2 most-used punch types, scored 100 at 66 % or less and linearly to 0 at 100 % (a plain
 number; fewer than 10 punches → not rated). The top 2 because jab and cross are normally the most common anyway. Its
-timeline row (since 2026-10-06) shows what that share is made of: every punch the rule counts
-(`punch_impact/impacts.csv`) as a block with its type's letter, amber when the type is one of the 2 most-used, green
+timeline row (since 2026-10-06) shows what that share is made of: every punch
+(`punch_impact/impacts.csv`; those in the excluded time drawn but not counted) as a block with its type's letter, amber when the type is one of the 2 most-used, green
 when it is another; hover gives the share and the scale. No punch is right or wrong — it is a round rule.
 
 **Body shots** (`bodyshots/bodyshots.json`, a whole-video rule): under punch variety, body shots /
 (body + head) over hooks and uppercuts only (the classifier can't split jab / cross into head / body): scored 0 at
 none and 100 from 25 %, linearly between (a plain number); fewer than 10 hooks + uppercuts → not rated. The cut-offs are ours.
-Its timeline row (since 2026-10-06) draws the punches it counts: body shots as solid green blocks ("B"), head hooks and
+Its timeline row (since 2026-10-06) draws the hooks and uppercuts (those in the excluded time drawn but not counted): body shots as solid green blocks ("B"), head hooks and
 uppercuts as outlines (they only count in the total); jab and cross are not drawn.
 
 **Defense variety** (rule 29, `same_defense/same_defense.json`; "Same defense" until 2026-10-03; a whole-video rule): under the defense
@@ -608,8 +609,8 @@ distributions, a score of two halves: 50 for the move — full up to 60 % of the
 and 50 for the side among moves that have one — full up to 70 %, linearly to 0 at 100 %; each half needs 10 moves,
 one alone is the whole score. Its timeline row (since 2026-10-06) has the same two halves as lanes over every move the
 rule counts (`defense_classification/defenses.csv`): **move** — amber when it is the most-used type, green another;
-**side** — amber when it went to the most-used side, green the other side, dashed ("no side") for a duck or a
-pull-back, which the side half does not count. Since 2026-10-26 the moves come from two detectors (backend
+**side** — amber when it went to the most-used side, green the other side, dashed ("no side") for a duck, a
+pull-back or a roll found facing the camera, which the side half does not count. Since 2026-10-26 the moves come from two detectors (backend
 run_defense.py): facing the camera the frontal ones, whose slip rule finds many slips (false ones among them), and at
 every other angle defense6, which finds rolls far better than slips — a high share of either is partly the detector.
 
@@ -623,7 +624,7 @@ of). A split row names its two halves with `halves` (lead / rear by default).
 only the stretches the boxer spent in that band at full strength — everything else fades back and stops answering the
 cursor, so a rule's row can be read against the view it is actually judged in. The bands are fixed ±45° / ±135°
 cuts; since 2026-10-06 the gated rules judge narrower windows inside them — side-on 65–115°, front / back 0–25° +
-155–180° — each shown beside its rule's badges. The chosen band is outlined in the facing row and named in a chip beside the zoom buttons;
+155–180°, rule 40 front only 0–35°, rule 22 75–105° on a floor or above-head camera — each shown beside its rule's badges. The chosen band is outlined in the facing row and named in a chip beside the zoom buttons;
 shift-click it again, click the chip, or press Esc to clear. Faded is not hidden on purpose — the shape of the round
 stays visible around the selection.
 
