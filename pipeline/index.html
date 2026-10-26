@@ -2947,7 +2947,7 @@ async function buildVideo(src, sig, lite = false) {
   }
   N.hasDist = !!N.dist;
   N.defenses = (defCsv ? parseCSV(defCsv) : []).map(r => ({
-    kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share,
+    kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share, detector: r.detector, strength: +r.strength,
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
   const byKey = new Map(N.punches.map(p => [`${p.sf}|${p.hand}`, p]));
   const num = v => v === '' || v === undefined ? null : +v;
@@ -3392,7 +3392,7 @@ const BASE_ROWS = [
   ['activity', 'Activity', 'two lines, each smoothed over about 2 s: green = output, punches + defensive moves per minute; purple = movement, how far he actually travels and turns — the hip centre against where it was a second before (toward and from the camera included, bouncing in place averaged out) and the change of his facing angle (a quarter turn counts as one torso length) — both near 0 when he just stands', () => S.punches.length > 0 || S.defenses.length > 0 || !!S.skel],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
-  ['def', 'Defense', 'defensive moves from the defense model (defense6)', () => S.hasDef],
+  ['def', 'Defense', 'defensive moves on frontal footage: slips (the Slip exploration lens rule), rolls, ducks (backend run_defense.py; defense6 before 2026-10-26)', () => S.hasDef],
   ['steps', 'Steps', 'every foot move, lead foot on top, rear below: the app’s foot-move counter (Feet stance) — a foot’s speed over 0.6 torso lengths a second until back under 0.35. Measured on 545 labeled foot moves (any angle): it finds 87 %, about 3 in 10 of its moves are not real steps, and about one step in six shows as two', () => S.hasSteps],
 ];
 // the rows with a sub-switch per type: [the type table, the events, which of them sit on this row]
@@ -5585,7 +5585,7 @@ function tip(e, cx, cy) {
     const s = styleD(e.type);
     el.innerHTML = `<b style="color:${s.c}">●</b> <b>${e.side ? cap(e.side) + ' ' : ''}${s.name}</b><br>
       <span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)}</span><br>
-      <span class="num">which-move share ${e.share.toFixed(2)} · move prob ${e.prob.toFixed(2)}</span>`;
+      <span class="num">${e.detector ? `${e.detector} · strength ${e.strength.toFixed(2)}` : `which-move share ${e.share.toFixed(2)} · move prob ${e.prob.toFixed(2)}`}</span>`;
   }
   el.style.display = 'block';
   const bw = el.offsetWidth, bh = el.offsetHeight;
