@@ -387,8 +387,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   body shot 30°, each 5° higher than before 2026-10-27 but the jab's — the card reads them from the video's thresholds
   copy): 100 at or above it, linear from 0° to the minimum below it; no cost for turning more (until
   2026-10-27 a range, and up to 20 off above its upper end — the user took that out; a snapshot from before still reads
-  as a range). Green at 100, red below, the score on the block; the round is the mean punch score, no bands (from
-  `hip_rotation.json`); on the video the hip line coloured by the rule's verdict, and — since that line is not the
+  as a range). Green at 100, red below, the score on the block; the round is the mean punch score with every punch
+  under 100 counted twice (since 2026-10-27, the thresholds' `round.weight_below_full`; the Explanations say so), no
+  bands (from `hip_rotation.json`); on the video the hip line coloured by the rule's verdict, and — since that line is not the
   measurement — a dial of what is: seen from above (the world landmarks), the direction other hip → punching hip at
   the start (dashed white), at impact, and on the frame on screen (yellow, since 2026-10-27: the turn as it plays),
   against the facing angle (grey), labelled with the start frame and the angles; the start → impact difference
