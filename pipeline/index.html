@@ -741,13 +741,17 @@ const elbowSpan = (zero, full) => +(zero - full).toFixed(12);
 // rule 19's round since 2026-10-27: every punch under 100 counts round.weight_below_full times in the mean (1 = a plain
 // mean, also for a video computed before, whose thresholds copy has no weight)
 const hipWeight = () => THR(() => T(19, 'round.weight_below_full'), 1) ?? 1;
+// and its points off, once, when any punch scored under a line (round.low_punch: below 40, 10 off); null before
+const hipLow = () => THR(() => { const b = T(19, 'round.low_punch.below'), o = T(19, 'round.low_punch.points_off'); return b == null || o == null ? null : {below: b, off: o}; }, null);
 function rotTh(n, part, nj) {
   if (n === 19 && hipMinOnly())                            // rule 19 since 2026-10-27: a minimum only
     return {event: {label: 'per punch', rule: `the ${part} turn from start to impact against a set minimum per punch type — `
                           + `${ivList(n)}. 100 at or above it; below, linear from 0° (0) to the minimum (100); no cost for turning more`,
                    bands: [['at or above', '100'], ['below', '0 → 100 (linear)']],
                    pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30'}},
-            round: {label: 'per round', rule: `the mean punch score${hipWeight() > 1 ? `, every punch under 100 counted ${fN(hipWeight())}×` : ''} — a plain number, no bands; fewer than ${nj} judged punches: not rated`}};
+            round: {label: 'per round', rule: `the mean punch score${hipWeight() > 1 ? `, every punch under 100 counted ${fN(hipWeight())}×` : ''}`
+                          + `${hipLow() ? `, then ${fN(hipLow().off)} off (once, not below 0) when any punch scored under ${fN(hipLow().below)}` : ''}`
+                          + ` — a plain number, no bands; fewer than ${nj} judged punches: not rated`}};
   const over = T(n, 'move.score.over.points_off'), at = T(n, 'move.score.over.max_at_x_upper');
   const top = `100 → ${fN(100 - over)} (linear to ${fN(at)} × upper)`;
   return {event: {label: 'per punch', rule: `the ${part} turn from start to impact against a set range per punch type — `
@@ -3817,6 +3821,7 @@ function ruleCard() {
     th: THR(() => rotTh(19, 'hip', NJ(19)), thMiss),
     calc: (hp.n_too_much == null ? (hp.thresholds?.weight_below_full > 1
                                     ? `mean of ${hp.n_judged} punch scores, the ${hp.n_too_little} below 100 counted ${fN(hp.thresholds.weight_below_full)}× · ${hp.n_good} at or above the minimum`
+                                      + (hp.thresholds.low_punch && hp.n_low != null ? ` · ${hp.n_low ? `−${fN(hp.thresholds.low_punch.points_off)}: ${hp.n_low} ${hp.n_low === 1 ? 'punch' : 'punches'} under ${fN(hp.thresholds.low_punch.below)}` : `none under ${fN(hp.thresholds.low_punch.below)}, nothing off`}` : '')
                                     : `mean of ${hp.n_judged} punch scores · ${hp.n_good} at or above the minimum · ${hp.n_too_little} below`)
                                   : `mean of ${hp.n_judged} punch scores · ${hp.n_good} inside · ${hp.n_too_little} below · ${hp.n_too_much} above`)
       + (hp.buffer ? ` · Hip rotation + buffer (each punch from its best start in the ${fN(hp.buffer.s)} s = ${hp.buffer.frames} frames before it, `
