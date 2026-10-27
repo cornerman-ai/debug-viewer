@@ -394,10 +394,15 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   is the rule's number (checked to 0.14° on 5,352 punches, 2026-10-02).
 - **Hip rotation + buffer** (the same `hip_rotation/` files, since 2026-10-27, the user's call; a test, not a rule): on
   the videos the backend ran it for (`move.start_buffer.videos`: Good and Mistake - picking up their handbag with the
-  upper), rule 19's reading again with each punch's start `move.start_buffer.s` (0.2 s, 6 frames at 30 fps) earlier.
-  Its own row (the block from the earlier start, the buffer part lighter), card and tooltip (beside rule 19's own
-  reading), and its own animation, drawn per frame from the earlier start so it shows before the punch begins: the hip
-  line (dashed while in the buffer) and a second dial, titled "Hip rotation + buffer", starting from the earlier frame.
+  upper), rule 19's reading again from each punch's best start: of the frames from `move.start_buffer.s` (0.2 s, 6
+  frames at 30 fps) before the punch's start to the start itself, the one with the most turn to the impact (the CSV's
+  `buffer_start_frame`; the same day's first version moved every start the full 0.2 s earlier). Its own row (a dashed
+  outline over the whole buffer searched, the block from the best start, the part before the punch's own start
+  lighter), card and tooltip (the best start, how many frames before the punch, the frames searched, beside rule 19's
+  own reading), and its own animation, drawn per frame from the best start so it shows before the punch begins: the
+  hip line (dashed until the punch's own start), the label "best start k f before the …" and a second dial, titled
+  "Hip rotation + buffer, best start −k f", starting from that frame. The Explanations count how many punches had their
+  best start k frames before their own (`buffer.best_start_frames_before` in `hip_rotation.json`).
   Beside a portrait video the dials stack in the black bars: two per punch (rule 19's, the buffer's above it), the
   punch under the playhead that started last first, from the bottom of the left bar up under the HUD's pills, then on
   in the right bar from the top; a dial with no room left is not drawn. Rule 19's round row names its round score; it is in no round total and not in `rule_scores.json`.
