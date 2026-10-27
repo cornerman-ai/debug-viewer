@@ -645,7 +645,7 @@ cuts; since 2026-10-06 the gated rules judge narrower windows inside them — si
 shift-click it again, click the chip, or press Esc to clear. Faded is not hidden on purpose — the shape of the round
 stays visible around the selection.
 
-Keys: Space or K play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact · M sound on / off · F full screen · Esc clear the angle filter.
+Keys: Space or K play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact · M sound on / off · F full screen · Esc clear the angle filter. The keys work whatever was clicked last (a button, the volume slider, the speed menu); only typing in the video search or the frame box keeps them, and ← → in the frame box still step a frame. From 2026-10-12 (the upload dialog's removal) to 2026-10-27 no key worked: the key handler still read the deleted dialog and threw.
 The video's control bar (since 2026-10-27, YouTube-style): shown while the mouse is over the video, gone 2.5 s after
 the mouse stops while it plays. A seek bar across the video (frame-exact: a click or a drag lands on whole frames,
 the time and frame under the cursor shown above it), play / pause, one frame back / on, sound (muted at first; the

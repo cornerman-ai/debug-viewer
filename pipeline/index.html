@@ -3348,9 +3348,18 @@ $('vpickQ').onkeydown = e => {
 $('vlist').onmousemove = e => { const el = e.target.closest('.vrow'); if (el && +el.dataset.k !== VP.act) { VP.act = +el.dataset.k; vpickMove(0); } };
 $('vlist').onclick = e => { const el = e.target.closest('.vrow'); if (el) vpickPick(+el.dataset.k); };
 document.addEventListener('mousedown', e => { if (VP.open && !$('vpick').contains(e.target)) vpickClose(); });
+// The viewer's keys go to the page unless a text is being typed: the video search, or a number in the frame box (whose
+// ← → still step a frame). A clicked button, slider or menu keeps no key: the keys work whatever was clicked last.
+function typing(e) {
+  const t = e.target;
+  if (t === $('frameGo')) return !/^Arrow(Left|Right)$/.test(e.code);
+  return t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && !/^(range|checkbox|radio|button)$/.test(t.type));
+}
 document.addEventListener('keydown', e => {                 // / opens the picker unless something is being typed
-  if (e.key === '/' && !VP.open && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName) && $('upl').style.display === 'none'
-      && $('ovr').style.display === 'none') { e.preventDefault(); vpickOpen(); }
+  if (e.key === '/' && !VP.open && !typing(e) && $('ovr').style.display === 'none') { e.preventDefault(); vpickOpen(); }
+});
+document.addEventListener('pointerup', e => {               // a clicked button or slider gives the keys back to the page
+  const el = e.target.closest?.('button, input[type=range]'); if (el) setTimeout(() => el.blur(), 0);
 });
 async function guard(fn) {
   try { await fn(); } catch (e) {
@@ -5873,8 +5882,9 @@ $('stage').addEventListener('click', e => {
   if (e.target === video || e.target.id === 'overlay' || e.target.id === 'stage') video.paused ? video.play() : video.pause();
 });
 document.addEventListener('keydown', e => {
-  if (!S.src || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-  if ($('upl').style.display !== 'none' || $('ovr').style.display !== 'none' || VP.open) return;   // a window is open
+  if (!S.src || typing(e)) return;
+  if ($('ovr').style.display !== 'none' || VP.open) return;   // a window is open
+  if (e.target === $('frameGo')) $('frameGo').blur();         // ← → in the frame box: step, and the box follows the frame
   if (e.code === 'Escape' && V.faceFilter) { e.preventDefault(); setFaceFilter(null); return; }
   const f = frameNow(), events = S.punches.filter(p => !hid(p)).concat(S.defenses.filter(d => !hid(d))).sort((a, b) => a.sf - b.sf);
   if (e.code === 'Space' || e.code === 'KeyK') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
@@ -5955,7 +5965,7 @@ var VC = (() => {                            // var: draw() may look it up befor
     if (sd) { video.volume = sd.volume; video.muted = sd.muted; $('vVol').value = sd.muted ? 0 : sd.volume; }
     else $('vVol').value = 0;
   } catch {}
-  $('vRate').onchange = () => setRate(+$('vRate').value);
+  $('vRate').onchange = () => { setRate(+$('vRate').value); $('vRate').blur(); };   // the menu keeps no key
   function full() { document.fullscreenElement ? document.exitFullscreen() : st.requestFullscreen?.(); }
   $('vFull').onclick = full;
   document.addEventListener('fullscreenchange', () => { resize(); applyZoom(); draw(true); });
