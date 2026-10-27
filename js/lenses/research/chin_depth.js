@@ -1,44 +1,39 @@
-// Chin depth — the x axis: the chin against the front of the lead shoulder.
+// Chin depth — the x axis: how well each source finds the chin, left-right.
 //
-// The sibling lens `chin_sources` is the HEIGHT axis and draws three
-// estimates of one point. This one is a different measurement, not a
-// different colour scheme:
+// The sibling lens `chin_sources` is the HEIGHT axis. This one is the same
+// three chin estimates measured along x instead of y:
 //
 //   height rule   chin tip  vs  the TOP of the lead shoulder    -> dy
 //   depth rule    chin tip  vs  the lead shoulder's FRONT       -> dx
 //
-// So depth has TWO clicked points, not one, and everything about it is
-// signed by which way the boxer is working. What gets drawn:
+// What gets drawn:
 //
-//   ◯ red ring      the labelers' median chin click
-//   ◯ amber ring    the labelers' median SHOULDER-FRONT click
+//   ◯ red ring      the labelers' median chin click — the target
 //   ● purple        the skeleton formula's chin
 //   ● cyan          the face pipeline's chin (orange below the score gate)
-//   ■ lime          the BlazePose lead-shoulder KEYPOINT — the stand-in the
-//                   rule actually uses for that amber ring
-//   ↔ the gap       a bar between the two x positions, which IS the number
-//                   the rule reads
+//   ◯ amber ring    the labelers' median SHOULDER-FRONT click
+//   ■ lime          the BlazePose lead-shoulder KEYPOINT
+//   | x guides      a vertical line at each x, because on this axis the y
+//                   positions are context and the x positions are the measurement
 //
-// Why the keypoint gets equal billing with the chins: the backend's
-// chin_depth_compare.py measured that the gap error is dominated by the
-// SHOULDER end, not the chin (see FACE_PIPELINE.md, "The other axis: chin
-// depth"). The keypoint sits a median 0.058 torso BEHIND the clicked
-// surface, and on 31% of frames it reads in FRONT of it — which a joint
-// centre inside the deltoid should not be able to do. Those frames are
-// flagged SUSPECT here and are reachable with their own step button: they
-// are either a mislabeled stance, an ambiguous "front", or a bad keypoint,
-// and the only way to tell is to look.
+// EVERYTHING HERE IS UNSIGNED — |dx|, a distance, never a direction.
 //
-// Everything is signed by `facing`, so + always means AHEAD of the shoulder
-// (toward the opponent) whichever way the boxer works. A frame whose facing
-// would not resolve — the stance is square to the camera, so the projected
-// depth axis is noise — carries no gap at all rather than a guessed one,
-// and is drawn greyed.
+// That is a deliberate retreat, not an oversight. The depth rule's actual
+// question ("is the chin ahead of the shoulder, or tucked behind it?") needs
+// to know which way the boxer is working, and the geometric facing estimate
+// this lens used to draw — lead-vs-rear shoulder separation, nose fallback —
+// was checked against real footage on 2026-08-22 and found unreliable. Until
+// a model can call the direction, anything signed would be decorated noise.
 //
-// Units: TORSO (shoulder-mid to hip-mid), which is what the backend
-// defaults to on this axis. Shoulder width is the projection of the very
-// line depth is measured along, so it collapses side-on and every number
-// divided by it inflates.
+// So the lens answers the question that survives without direction: WHICH
+// CHIN IS CLOSER TO THE HUMAN CLICK, and by how much. That is a pure
+// distance, so a broken facing sign cannot touch it. The shoulder marks stay
+// drawn as context — you can see the gap the rule will eventually read — but
+// no gap number is computed, because its sign is the whole point of it.
+//
+// Units: TORSO (shoulder-mid to hip-mid). Shoulder width is the projection
+// of the very line depth is measured along, so it collapses side-on and
+// every number divided by it inflates.
 //
 // Data: ./lens_data/chin_depth/<stem>.json + index.json, built by the
 // backend's chin_depth_lens_data.py. Only labeled frames carry data, so
@@ -58,8 +53,7 @@ const C = {
   ext:      "#3ad9e0",   // cyan — the face pipeline's chin
   gated:    "#ff9e64",   // an extractor chin below the score gate
   kp:       "#7ee787",   // lime — the shoulder KEYPOINT
-  suspect:  "#ff5d6c",   // keypoint reads in front of the clicked surface
-  unsigned: "#777",      // facing unresolved — no honest gap
+  tie:      "#8a8a8a",   // the two chins land equally close
   mark:     "#d3b136",
   playhead: "#3ad9e0",
   text:     "#aaa",
@@ -162,38 +156,26 @@ function gatedOut(entry) {
   return entry?.ext != null && entry.score != null && entry.score < scoreGate();
 }
 
-// Signed x distance in TORSO units, + = ahead along the facing axis. The
-// generator precomputes the three gaps; this is for everything else (chin
-// errors, the keypoint's offset from the clicked front).
-function depth(entry, a, b, W) {
-  if (!entry?.facing || !a || !b || !entry.torso_px) return NaN;
-  return entry.facing * (a[0] - b[0]) * W / entry.torso_px;
-}
-
-// The keypoint reading in FRONT of the clicked shoulder surface. A joint
-// centre inside the deltoid cannot really be outside the body, so this is
-// the frame telling you something is wrong — with the stance label, the
-// click, or the keypoint. 31% of the corpus, and the reason this lens has a
-// step button for them.
-function isSuspect(entry, W) {
-  const d = depth(entry, entry.kp, entry.gt_sh, W);
-  return Number.isFinite(d) && d > 0;
+// |dx| between two points, in TORSO units. UNSIGNED on purpose — see the
+// header: the facing estimate that would give this a direction is not
+// trustworthy, and a distance needs no direction to be correct.
+function dx(entry, a, b, W) {
+  if (!a || !b || !entry?.torso_px) return NaN;
+  return Math.abs(a[0] - b[0]) * W / entry.torso_px;
 }
 
 function errorsOf(entry, W) {
   if (!entry) return null;
   return {
     // each chin estimate against the clicked chin, on the depth axis
-    proxy: depth(entry, entry.proxy, entry.gt, W),
-    ext: depth(entry, entry.ext, entry.gt, W),
-    // the shoulder end: keypoint against the clicked front
-    kp: depth(entry, entry.kp, entry.gt_sh, W),
-    gap: entry.gap || {},
-    // what each source's gap gets wrong — the number a rule would act on
-    gapErrProxy: Number.isFinite(entry.gap?.proxy) && Number.isFinite(entry.gap?.gt)
-      ? entry.gap.proxy - entry.gap.gt : NaN,
-    gapErrExt: Number.isFinite(entry.gap?.ext) && Number.isFinite(entry.gap?.gt)
-      ? entry.gap.ext - entry.gap.gt : NaN,
+    proxy: dx(entry, entry.proxy, entry.gt, W),
+    ext: dx(entry, entry.ext, entry.gt, W),
+    // the shoulder end: keypoint against the clicked front. Context only —
+    // the rule reads the SIGNED gap, which is on hold.
+    kp: dx(entry, entry.kp, entry.gt_sh, W),
+    // how far apart the two clicked points are. The magnitude the rule will
+    // eventually threshold, minus the sign that gives it meaning.
+    span: dx(entry, entry.gt, entry.gt_sh, W),
   };
 }
 
@@ -234,31 +216,28 @@ function median(a) {
   return s.length % 2 ? s[m] : 0.5 * (s[m - 1] + s[m]);
 }
 
-// Which chin source gets the GAP closer on this frame — the per-frame
-// verdict for THIS axis. Deliberately not "which chin is closer": the
-// backend measured that the better chin can give the worse gap, because the
-// gap error is the chin error minus the shoulder error and a chin built off
-// the same skeleton as the keypoint cancels part of it.
+// Which chin lands closer to the human click on this frame. With the gap
+// on hold this IS the question the lens exists to answer, and it is a pure
+// distance comparison — no direction anywhere in it.
 function winnerOf(entry, W) {
   const e = errorsOf(entry, W);
-  if (!entry.facing) return "unsigned";
-  if (isSuspect(entry, W)) return "suspect";
-  const p = Math.abs(e.gapErrProxy), x = Math.abs(e.gapErrExt);
+  const p = e.proxy, x = e.ext;
   if (!Number.isFinite(p) && !Number.isFinite(x)) return "none";
   if (!Number.isFinite(x) || gatedOut(entry)) return "proxy-only";
   if (!Number.isFinite(p)) return "ext-only";
-  return x <= p ? "ext" : "proxy";
+  if (Math.abs(x - p) < 1e-6) return "tie";
+  return x < p ? "ext" : "proxy";
 }
 
 const WIN_COLOR = {
   ext: C.ext, proxy: C.proxy, "ext-only": C.ext, "proxy-only": C.proxy,
-  suspect: C.suspect, unsigned: C.unsigned, none: "#666",
+  tie: C.tie, none: "#666",
 };
 
 // ---------------------------------------------------------------- toggles
 const SHOW_KEY = "cornerman.chin_depth.show.v1";
 const show = { gt: true, gtSh: true, proxy: true, ext: true, kp: true,
-               guides: true, gap: true };
+               guides: true };
 try {
   Object.assign(show, JSON.parse(localStorage.getItem(SHOW_KEY) || "null") || {});
 } catch { /* private mode, or a value another build wrote */ }
@@ -272,30 +251,25 @@ function setShow(k, v) {
 // ---------------------------------------------------------------- sidebar
 function summary(state) {
   const W = ctxW(state);
-  const out = { n: 0, gapProxy: [], gapExt: [], kp: [], gt: [],
-                suspect: 0, unsigned: 0, noFace: 0, gated: 0, cameraBad: 0,
-                sideProxy: 0, sideExt: 0, sidePaired: 0 };
+  const out = { n: 0, proxy: [], ext: [], kp: [], span: [],
+                noFace: 0, gated: 0, cameraBad: 0,
+                extWins: 0, paired: 0 };
   for (const f of labeledFrames()) {
     const entry = byViewer.get(f);
     const e = errorsOf(entry, W);
     out.n++;
-    if (!entry.facing) out.unsigned++;
-    else if (isSuspect(entry, W)) out.suspect++;
     if (entry.camera_bad) out.cameraBad++;
     if (entry.ext == null) out.noFace++;
     else if (gatedOut(entry)) out.gated++;
-    if (Number.isFinite(e.gapErrProxy)) out.gapProxy.push(Math.abs(e.gapErrProxy));
-    if (Number.isFinite(e.gapErrExt) && !gatedOut(entry)) out.gapExt.push(Math.abs(e.gapErrExt));
+    if (Number.isFinite(e.proxy)) out.proxy.push(e.proxy);
+    if (Number.isFinite(e.ext) && !gatedOut(entry)) out.ext.push(e.ext);
     if (Number.isFinite(e.kp)) out.kp.push(e.kp);
-    if (Number.isFinite(entry.gap?.gt)) out.gt.push(entry.gap.gt);
-    // does the estimate agree which SIDE of the shoulder the chin is on —
-    // the coarsest thing a rule could act on
-    if (Number.isFinite(entry.gap?.gt)) {
-      if (Number.isFinite(entry.gap?.proxy)) {
-        out.sidePaired++;
-        if ((entry.gap.gt > 0) === (entry.gap.proxy > 0)) out.sideProxy++;
-        if (Number.isFinite(entry.gap?.ext) && (entry.gap.gt > 0) === (entry.gap.ext > 0)) out.sideExt++;
-      }
+    if (Number.isFinite(e.span)) out.span.push(e.span);
+    // head to head on the frames where BOTH answered — the honest count,
+    // since the extractor declines on some frames and the formula never does
+    if (Number.isFinite(e.proxy) && Number.isFinite(e.ext) && !gatedOut(entry)) {
+      out.paired++;
+      if (e.ext < e.proxy) out.extWins++;
     }
   }
   return out;
@@ -310,18 +284,18 @@ function buildSidebar() {
     ["gt", "chin (clicked)", C.gt], ["gtSh", "shoulder (clicked)", C.gtSh],
     ["kp", "shoulder keypoint", C.kp], ["proxy", "formula chin", C.proxy],
     ["ext", "extractor chin", C.ext], ["guides", "x guides", C.text],
-    ["gap", "gap bar", C.text],
   ];
 
   host.innerHTML = `
     <h2>Chin depth</h2>
     <p class="hint">
-      The x axis: <span style="color:${C.gt}">◯ the clicked chin</span> against
-      <span style="color:${C.gtSh}">◯ the clicked shoulder front</span>, and the
-      <span style="color:${C.kp}">■ keypoint</span> that stands in for that
-      shoulder in the rule. The bar between the two x positions IS the number
-      the rule reads; + means the chin is AHEAD of the shoulder, whichever way
-      the boxer works. Units are torso.
+      How close each chin estimate lands to
+      <span style="color:${C.gt}">◯ the human click</span>, measured left-right.
+      Every number here is <strong>|dx|, a distance</strong> — no direction.
+      The <span style="color:${C.gtSh}">◯ clicked shoulder front</span> and the
+      <span style="color:${C.kp}">■ keypoint</span> are drawn as context, but no
+      gap is computed: the gap only means something once you know which way the
+      boxer faces, and that estimate is on hold pending a model. Units are torso.
     </p>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0" id="cd-show">
@@ -337,9 +311,9 @@ function buildSidebar() {
     <div style="display:flex;gap:6px;margin:6px 0;flex-wrap:wrap">
       <button id="cd-prev" class="btn small">◀ prev</button>
       <button id="cd-next" class="btn small">next ▶</button>
-      <button id="cd-suspect" class="btn small"
-        title="frames where the keypoint reads in FRONT of the clicked shoulder surface">
-        next suspect ▶</button>
+      <button id="cd-worst" class="btn small"
+        title="the frames where the extractor chin is furthest from the click">
+        next worst ▶</button>
     </div>
 
     <div id="cd-frame" class="small" style="margin:8px 0"></div>
@@ -349,23 +323,22 @@ function buildSidebar() {
     <table class="small" style="width:100%;border-collapse:collapse">
       <tr><th style="text-align:left">what</th><th style="text-align:right">n</th>
           <th style="text-align:right">median</th></tr>
-      <tr><td>labelers' gap</td><td style="text-align:right">${sum.gt.length}</td>
-          <td style="text-align:right">${signed(median(sum.gt), 3)}</td></tr>
-      <tr><td style="color:${C.kp}">keypoint − clicked front</td>
+      <tr><td style="color:${C.proxy}">|dx| formula chin</td>
+          <td style="text-align:right">${sum.proxy.length}</td>
+          <td style="text-align:right">${fmt(median(sum.proxy), 3)}</td></tr>
+      <tr><td style="color:${C.ext}">|dx| extractor chin</td>
+          <td style="text-align:right">${sum.ext.length}</td>
+          <td style="text-align:right">${fmt(median(sum.ext), 3)}</td></tr>
+      <tr><td style="color:${C.kp}">|dx| keypoint vs clicked front</td>
           <td style="text-align:right">${sum.kp.length}</td>
-          <td style="text-align:right">${signed(median(sum.kp), 3)}</td></tr>
-      <tr><td style="color:${C.proxy}">|gap err| formula</td>
-          <td style="text-align:right">${sum.gapProxy.length}</td>
-          <td style="text-align:right">${fmt(median(sum.gapProxy), 3)}</td></tr>
-      <tr><td style="color:${C.ext}">|gap err| extractor</td>
-          <td style="text-align:right">${sum.gapExt.length}</td>
-          <td style="text-align:right">${fmt(median(sum.gapExt), 3)}</td></tr>
+          <td style="text-align:right">${fmt(median(sum.kp), 3)}</td></tr>
+      <tr><td class="muted">chin↔shoulder span (unsigned)</td>
+          <td style="text-align:right">${sum.span.length}</td>
+          <td style="text-align:right">${fmt(median(sum.span), 3)}</td></tr>
     </table>
     <p class="hint">${sum.n} labeled frames ·
-      side agreed on ${sum.sidePaired ? `${(100 * sum.sideProxy / sum.sidePaired).toFixed(0)}%` : "—"}
-      (formula) / ${sum.sidePaired ? `${(100 * sum.sideExt / sum.sidePaired).toFixed(0)}%` : "—"} (extractor) ·
-      <span style="color:${C.suspect}">${sum.suspect} suspect</span> ·
-      <span style="color:${C.unsigned}">${sum.unsigned} unsigned</span> ·
+      extractor closer on ${sum.paired ? `${(100 * sum.extWins / sum.paired).toFixed(0)}% of ${sum.paired}` : "—"}
+      frames where both answered ·
       ${sum.noFace} no face · ${sum.gated} below the ${gate} gate ·
       ${sum.cameraBad} camera_bad</p>` : ""}
 
@@ -378,7 +351,7 @@ function buildSidebar() {
 
   host.querySelector("#cd-prev")?.addEventListener("click", () => step(-1));
   host.querySelector("#cd-next")?.addEventListener("click", () => step(+1));
-  host.querySelector("#cd-suspect")?.addEventListener("click", () => stepSuspect());
+  host.querySelector("#cd-worst")?.addEventListener("click", () => stepWorst());
   host.querySelectorAll("#cd-show input[data-show]").forEach(cb => {
     cb.addEventListener("change", () => setShow(cb.dataset.show, cb.checked));
   });
@@ -394,13 +367,21 @@ function step(dir) {
   seekFrame(next != null ? next : (dir > 0 ? frames[0] : frames[frames.length - 1]));
 }
 
-function stepSuspect() {
+// The worst decile by extractor error. With the gap on hold these are the
+// frames worth looking at: where the face pipeline puts the chin somewhere
+// a human would not, which is the only way to learn WHY it misses.
+function stepWorst() {
   if (!latestState) return;
   const W = ctxW(latestState);
-  const frames = labeledFrames().filter(f => isSuspect(byViewer.get(f), W));
-  if (!frames.length) return;
+  const scored = labeledFrames()
+    .map(f => ({ f, e: errorsOf(byViewer.get(f), W).ext }))
+    .filter(r => Number.isFinite(r.e))
+    .sort((a, b) => b.e - a.e);
+  if (!scored.length) return;
+  const worst = scored.slice(0, Math.max(1, Math.ceil(scored.length / 10)))
+    .map(r => r.f).sort((a, b) => a - b);
   const cur = latestState.frame;
-  seekFrame(frames.find(f => f > cur) ?? frames[0]);
+  seekFrame(worst.find(f => f > cur) ?? worst[0]);
 }
 
 function buildList() {
@@ -422,10 +403,9 @@ function buildList() {
         cursor:pointer;border-left:3px solid ${WIN_COLOR[win]};
         background:${cur ? "rgba(58,217,224,0.12)" : "transparent"}">
       <span>f${f}${entry.camera_bad ? " ⚑" : ""}</span>
-      <span title="the labelers' gap">${signed(entry.gap?.gt, 2)}</span>
-      <span style="color:${C.proxy}" title="formula gap error">${signed(e.gapErrProxy, 2)}</span>
-      <span style="color:${C.ext}" title="extractor gap error">${
-        entry.ext == null ? "—" : signed(e.gapErrExt, 2)}</span>
+      <span style="color:${C.proxy}" title="|dx| formula chin vs the click">${fmt(e.proxy, 3)}</span>
+      <span style="color:${C.ext}" title="|dx| extractor chin vs the click">${
+        entry.ext == null ? "—" : fmt(e.ext, 3)}</span>
     </div>`;
   }).join("");
   box.querySelectorAll(".cd-row").forEach(el =>
@@ -450,39 +430,33 @@ function updateFrameBox(state) {
       : gated
         ? [entry.score.toFixed(2), `below gate ${gate.toFixed(2)} — dropped`, C.gated]
         : [entry.score.toFixed(2), `at or above gate ${gate.toFixed(2)} — used`, C.ext];
-  const suspect = isSuspect(entry, W);
+  const better = Number.isFinite(e.ext) && Number.isFinite(e.proxy) && !gated
+    ? (e.ext < e.proxy ? "extractor" : "formula") : null;
 
   box.innerHTML = `
     <table class="small" style="width:100%;border-collapse:collapse">
-      <tr><th style="text-align:left">gap (torso)</th><th style="text-align:right">value</th>
-          <th style="text-align:right">err vs GT</th></tr>
-      <tr><td>labelers (both clicks)</td>
-          <td style="text-align:right">${signed(entry.gap?.gt, 3)}</td>
-          <td style="text-align:right" class="muted">—</td></tr>
-      <tr><td style="color:${C.proxy}">formula vs keypoint</td>
-          <td style="text-align:right">${signed(entry.gap?.proxy, 3)}</td>
-          <td style="text-align:right">${signed(e.gapErrProxy, 3)}</td></tr>
-      <tr><td style="color:${C.ext}">extractor vs keypoint</td>
-          <td style="text-align:right">${signed(entry.gap?.ext, 3)}</td>
-          <td style="text-align:right">${signed(e.gapErrExt, 3)}</td></tr>
+      <tr><th style="text-align:left">distance to the click (torso)</th>
+          <th style="text-align:right">|dx|</th></tr>
+      <tr><td style="color:${C.proxy}">formula chin</td>
+          <td style="text-align:right">${fmt(e.proxy, 3)}</td></tr>
+      <tr><td style="color:${C.ext}">extractor chin</td>
+          <td style="text-align:right">${fmt(e.ext, 3)}</td></tr>
     </table>
+    ${better ? `<p class="hint" style="margin:4px 0 0">
+      closer here: <strong style="color:${better === "extractor" ? C.ext : C.proxy}">
+      the ${better}</strong></p>` : ""}
     <table class="small" style="width:100%;border-collapse:collapse;margin-top:6px">
-      <tr><th style="text-align:left">endpoint error</th><th style="text-align:right">depth</th></tr>
-      <tr><td style="color:${C.proxy}">formula chin − clicked chin</td>
-          <td style="text-align:right">${signed(e.proxy, 3)}</td></tr>
-      <tr><td style="color:${C.ext}">extractor chin − clicked chin</td>
-          <td style="text-align:right">${signed(e.ext, 3)}</td></tr>
-      <tr><td style="color:${suspect ? C.suspect : C.kp}">keypoint − clicked front</td>
-          <td style="text-align:right;color:${suspect ? C.suspect : "inherit"}">
-            ${signed(e.kp, 3)}</td></tr>
+      <tr><th style="text-align:left">context (not the rule's number)</th>
+          <th style="text-align:right">|dx|</th></tr>
+      <tr><td style="color:${C.kp}">keypoint vs clicked shoulder front</td>
+          <td style="text-align:right">${fmt(e.kp, 3)}</td></tr>
+      <tr><td class="muted">chin ↔ shoulder span</td>
+          <td style="text-align:right">${fmt(e.span, 3)}</td></tr>
     </table>
-    ${suspect ? `<p class="hint" style="color:${C.suspect};margin:6px 0 0">
-      SUSPECT: the keypoint reads in FRONT of the clicked surface. A joint
-      centre cannot sit outside the body — mislabeled stance, an ambiguous
-      "front", or a bad keypoint.</p>` : ""}
-    ${!entry.facing ? `<p class="hint" style="color:${C.unsigned};margin:6px 0 0">
-      facing unresolved — the stance is square to the camera, so the depth
-      axis is noise here and no gap is drawn.</p>` : ""}
+    <p class="hint" style="margin:6px 0 0">
+      The span is a magnitude only. Whether the chin sits AHEAD of the
+      shoulder (the fault) or behind it (the tuck) needs the facing
+      direction, which is on hold — so this lens does not claim it.</p>
     ${entry.camera_bad ? `<p class="hint" style="color:${C.gated};margin:6px 0 0">
       ⚑ a labeler flagged this frame as not usable side-on footage. The
       comparison drops these; this lens keeps them.</p>` : ""}
@@ -492,8 +466,6 @@ function updateFrameBox(state) {
       <span class="muted small">${verdict}</span>
     </div>
     <span class="muted">t ${entry.t}s · r${entry.round} f${entry.frame} ·
-      lead ${entry.lead || "?"} · facing ${entry.facing ? (entry.facing > 0 ? "→" : "←") : "?"}
-      ${entry.facing_src ? `(${entry.facing_src})` : ""} ·
       ${entry.clicks.length} chin / ${entry.sh_clicks?.length ?? 0} shoulder click(s)</span>`;
 }
 
@@ -571,12 +543,14 @@ function drawMarks(ctx, entry, P, s, zoomed) {
   if (show.gt) { const p = P(entry.gt); ring(p[0], p[1], C.gt); }
 }
 
-// The x guides and the gap bar — the part that makes this a DEPTH lens
-// rather than a second chin lens. Vertical lines at each x position, and a
-// horizontal double-arrow spanning the two that matter, because on this
-// axis the y positions are context and the x positions are the measurement.
+// The x guides — the part that makes this a DEPTH lens rather than a second
+// chin lens. A vertical line at each x position, because on this axis the y
+// positions are context and the x positions are the measurement.
+//
+// The signed gap bar this used to draw is gone with the facing estimate: an
+// arrow pointing "ahead" is a claim about direction, and drawing one from an
+// estimate we do not trust would be the most confident-looking thing here.
 function drawAxis(ctx, entry, W, H, view, s) {
-  if (!entry.facing) return;
   const yA = entry.gt[1] * H, yB = (entry.gt_sh ? entry.gt_sh[1] : entry.gt[1]) * H;
   const top = Math.min(yA, yB), bot = Math.max(yA, yB);
   const pad = Math.max(12 * s, (bot - top) * 0.25);
@@ -598,36 +572,6 @@ function drawAxis(ctx, entry, W, H, view, s) {
     if (show.ext && entry.ext) guide(entry.ext[0] * W, C.ext, true);
   }
 
-  if (!show.gap || !entry.gt_sh || !Number.isFinite(entry.gap?.gt)) return;
-  // The bar sits between the two points it measures, so it cannot be
-  // mistaken for something about the head or the shoulder alone.
-  const y = (top + bot) / 2;
-  const x1 = entry.gt_sh[0] * W, x2 = entry.gt[0] * W;
-  ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 3.0 * s;
-  ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
-  ctx.strokeStyle = entry.gap.gt >= 0 ? C.gt : C.kp;
-  ctx.lineWidth = 1.4 * s;
-  ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
-  // arrow head at the chin end — the direction the gap is measured in
-  const dir = Math.sign(x2 - x1) || 1;
-  ctx.beginPath();
-  ctx.moveTo(x2, y);
-  ctx.lineTo(x2 - dir * 4 * s, y - 2.6 * s);
-  ctx.lineTo(x2 - dir * 4 * s, y + 2.6 * s);
-  ctx.closePath();
-  ctx.fillStyle = entry.gap.gt >= 0 ? C.gt : C.kp; ctx.fill();
-
-  if ((view.zoom || 1) > 2.5) return;
-  ctx.font = `${Math.round(11 * s)}px ui-monospace, monospace`;
-  ctx.textBaseline = "bottom";
-  ctx.textAlign = "center";
-  const label = `${signed(entry.gap.gt, 3)} torso`;
-  const mx = (x1 + x2) / 2;
-  ctx.strokeStyle = "rgba(0,0,0,0.7)"; ctx.lineWidth = 3 * s;
-  ctx.strokeText(label, mx, y - 3 * s);
-  ctx.fillStyle = entry.gap.gt >= 0 ? C.gt : C.kp;
-  ctx.fillText(label, mx, y - 3 * s);
-  ctx.textAlign = "left";
 }
 
 function draw(ctx, state) {
@@ -691,15 +635,13 @@ function draw(ctx, state) {
   const lines = [
     show.gt ? ["○ chin (clicked)", C.gt, ""] : null,
     show.gtSh && entry.gt_sh ? ["○ shoulder (clicked)", C.gtSh, ""] : null,
-    show.kp && entry.kp ? ["■ shoulder keypoint", isSuspect(entry, ctxW(state))
-      ? C.suspect : C.kp, signed(e.kp, 3)] : null,
-    show.proxy ? ["● formula chin", C.proxy, signed(e.gapErrProxy, 3)] : null,
+    show.kp && entry.kp ? ["■ shoulder keypoint", C.kp, fmt(e.kp, 3)] : null,
+    show.proxy ? ["● formula chin", C.proxy, fmt(e.proxy, 3)] : null,
     !show.ext ? null
       : [entry.ext ? "● extractor chin" : "○ extractor chin",
          entry.ext ? (gatedOut(entry) ? C.gated : C.ext) : C.gated,
-         entry.ext ? signed(e.gapErrExt, 3) : "no face"],
-    ["↔ gap (labelers)", entry.facing ? C.text : C.unsigned,
-     entry.facing ? signed(entry.gap?.gt, 3) : "unsigned"],
+         entry.ext ? fmt(e.ext, 3) : "no face"],
+    ["|dx| to the click, torso", C.text, ""],
   ].filter(Boolean);
   const padX = 10 * s, padY = 8 * s, boxW = 235 * s;
   const boxH = lines.length * lineH + padY * 2 - 4 * s;
@@ -731,7 +673,7 @@ function mountStageTimeline() {
   const label = document.createElement("div");
   label.className = "muted small";
   label.style.cssText = "margin-bottom:6px";
-  label.textContent = "Labeled frames (click to seek) — colored by which chin gets the GAP closer; red = suspect keypoint, grey = facing unresolved";
+  label.textContent = "Labeled frames (click to seek) — colored by which chin lands closer to the human click";
   wrap.appendChild(label);
   const canvas = document.createElement("canvas");
   canvas.id = "cd-timeline";
@@ -787,7 +729,7 @@ function drawTimeline(state) {
 
 export const ChinDepthRule = {
   id: "chin_depth",
-  label: "Chin depth (chin · shoulder front · gap)",
+  label: "Chin depth (chin accuracy on x)",
   requiresVideo,
   mount,
   update,
