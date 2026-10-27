@@ -483,6 +483,7 @@
         <div class="banner" id="banner"></div>
         <label class="toggle on" id="skelToggle"><span class="sw"></span>Skeleton</label>
         <label class="toggle on" id="followToggle"><span class="sw"></span>Follow playhead</label>
+        <div class="seg" id="frameSeg"><button data-d="-1" title="previous frame (←; Shift+← a second back)">◀</button><button data-d="1" title="next frame (→; Shift+→ a second on)">▶</button></div>
         <div class="seg" id="rateSeg"><button data-r="0.125">⅛×</button><button data-r="0.25">¼×</button><button data-r="0.5">½×</button><button data-r="1" class="on">1×</button><button data-r="2">2×</button></div>
       </div>
       <div class="tl-scroll" id="tlScroll"><canvas id="tl"></canvas></div>
@@ -5628,6 +5629,8 @@ function tip(e, cx, cy) {
   el.style.left = Math.min(innerWidth - bw - 8, cx + 14) + 'px'; el.style.top = Math.max(8, cy - bh - 12) + 'px';
 }
 $('zoomSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; setSpan(+b.dataset.s); setFollow(true); };
+$('frameSeg').onclick = e => { const b = e.target.closest('button'); if (!b || !S.src) return;   // one frame back / on, as ← / →
+  video.pause(); seekFrame(frameNow() + (+b.dataset.d) * (e.shiftKey ? Math.round(S.fps) : 1)); };
 $('rateSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return;
   video.playbackRate = +b.dataset.r; document.querySelectorAll('#rateSeg button').forEach(x => x.classList.toggle('on', x === b)); };
 $('followToggle').onclick = e => { e.preventDefault(); setFollow(!V.follow); if (V.follow) { const t = video.currentTime, w = V.t1 - V.t0; V.t0 = t - w / 2; V.t1 = t + w / 2; clampView(); V.dirty = true; } };
