@@ -383,8 +383,9 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   the rule did not judge says why: head-on, too far from the camera…). The round is the mean punch score, a plain
   number with no bands.
 - **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a set minimum per punch type (lead
-  jab 0°, lead hook 25°, lead uppercut 15°, lead body shot 25°, rear cross 20°, rear hook 25°, rear uppercut 20°, rear
-  body shot 25°): 100 at or above it, linear from 0° to the minimum below it; no cost for turning more (until
+  jab 0°, lead hook 30°, lead uppercut 20°, lead body shot 30°, rear cross 25°, rear hook 30°, rear uppercut 25°, rear
+  body shot 30°, each 5° higher than before 2026-10-27 but the jab's — the card reads them from the video's thresholds
+  copy): 100 at or above it, linear from 0° to the minimum below it; no cost for turning more (until
   2026-10-27 a range, and up to 20 off above its upper end — the user took that out; a snapshot from before still reads
   as a range). Green at 100, red below, the score on the block; the round is the mean punch score, no bands (from
   `hip_rotation.json`); on the video the hip line coloured by the rule's verdict, and — since that line is not the
