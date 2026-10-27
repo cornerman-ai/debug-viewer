@@ -58,7 +58,7 @@ the server's upload were removed 2026-10-12.
 
 ## Using it
 
-Timeline rows: facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands (each gated rule judges its own, narrower window — its `camera_window_deg` in the video's thresholds snapshot; there is no default — shown beside its Front / Side / Back badges, e.g. "Side — 65–115°"), each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
+Timeline rows: **Frames** (since 2026-10-27, a VIDEO group of its own on top) — one dot per video frame at the frame's middle, (f + 0.5) / fps: the place the playhead sits on frame f, and the middle of the span every block draws a frame as (a punch from its start frame's dot to its end frame's, covering them exactly); the frame on screen is the red dot, numbers every few frames; click a dot to go to that frame; zoomed out past 3 px a frame it says so instead; then facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands (each gated rule judges its own, narrower window — its `camera_window_deg` in the video's thresholds snapshot; there is no default — shown beside its Front / Side / Back badges, e.g. "Side — 65–115°"), each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
 defense — and an
 overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
 hover for details; the chips in the side panel hide or show a punch / defense type. Every row has a switch in the
@@ -149,8 +149,8 @@ neutral — the feet less than 0.15 torso apart along the facing direction (a st
 other two since 2026-10-22); empty = no data (an ankle not seen, no facing angle).
 
 **Timeline layout** (redesigned 2026-10-22, after the first grouping with bands and outlines read worse): grouping by
-space and type, the way Apple's own charts and track views read — no bands, no outlines. Three groups under small
-uppercase headers, a hairline above each but the first: BODY (Facing, Stance), ACTIONS (Activity, Lead hand, Rear hand,
+space and type, the way Apple's own charts and track views read — no bands, no outlines. Four groups under small
+uppercase headers, a hairline above each but the first: VIDEO (Frames, since 2026-10-27), BODY (Facing, Stance), ACTIONS (Activity, Lead hand, Rear hand,
 Defense), RULES. One left-aligned label column: each lane's name, and under it a colour key where the colours carry the
 meaning (Facing: front / back, side-on; Stance: left, right, neutral; Activity: output, movement). Lanes are soft rounded
 fills (`--lane`) 6 px apart, the time grid drawn inside them only; Apple system colours for the data; softer facing
@@ -244,7 +244,7 @@ hand and punch ("Rear cross · …"); labels never land on top of each other —
 Turn on one or two at a time. With a dozen layers on, the picture is unreadable — that is a debugging view, not a
 bug. Colors: green = full marks (100), red = below; orange only where a row has a
 middle state (slip distance and bladedness, between 0 and 100; angle change after combo at 50) and in the hip / shoulder rotation cards, which name a
-turn short of the range "too little" (orange) apart from one past it, "too much" (red). A stretch the rule threw out —
+turn short of the range "too little" (orange) apart from one past it, "too much" (red) — since 2026-10-27 hip rotation has a minimum only, so only "too little". A stretch the rule threw out —
 a joint it needs not visible, a punch in flight, the wrong camera angle, no facing angle — is a **dashed gray mid-line
 carrying the reason** (`SKIPWORD`): `joint hidden`, `not front/back`, `not side-on` (outside the rule's camera window: in-between angles and no facing angle too), `punching`, `hook / body`, `no facing`, `no face` or `no side`,
 written on the strip when there is room for it and in the tooltip always. The row is
@@ -382,19 +382,29 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   tick at the frame measured; on the video the punching arm in the same colour with this frame's elbow angle (a punch
   the rule did not judge says why: head-on, too far from the camera…). The round is the mean punch score, a plain
   number with no bands.
-- **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a set range per punch type (lead
-  jab 0–25°, lead hook 25–60°, lead uppercut 15–50°, lead body shot 25–60°, rear cross 20–60°, rear hook 25–60°, rear
-  uppercut 20–50°, rear body shot 25–50°): 100 inside, linear from 0° to the lower bound below it, and above it up
-  to 20 off — linear from the upper bound to twice it, capped at 20. Green at 100, red below, the score on the block; the round is the mean punch score, no bands (from
+- **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a set minimum per punch type (lead
+  jab 0°, lead hook 25°, lead uppercut 15°, lead body shot 25°, rear cross 20°, rear hook 25°, rear uppercut 20°, rear
+  body shot 25°): 100 at or above it, linear from 0° to the minimum below it; no cost for turning more (until
+  2026-10-27 a range, and up to 20 off above its upper end — the user took that out; a snapshot from before still reads
+  as a range). Green at 100, red below, the score on the block; the round is the mean punch score, no bands (from
   `hip_rotation.json`); on the video the hip line coloured by the rule's verdict, and — since that line is not the
   measurement — a dial of what is: seen from above (the world landmarks), the direction other hip → punching hip at
-  the start (dashed white) and at impact, against the facing angle (grey), labelled with both angles; their difference
-  is the rule's number (checked to 0.14° on 5,352 punches, 2026-10-02). The impact → end step is in the CSV but not shown
+  the start (dashed white), at impact, and on the frame on screen (yellow, since 2026-10-27: the turn as it plays),
+  against the facing angle (grey), labelled with the start frame and the angles; the start → impact difference
+  is the rule's number (checked to 0.14° on 5,352 punches, 2026-10-02).
+- **Hip rotation + buffer** (the same `hip_rotation/` files, since 2026-10-27, the user's call; a test, not a rule): on
+  the videos the backend ran it for (`move.start_buffer.videos`: Good and Mistake - picking up their handbag with the
+  upper), rule 19's reading again with each punch's start `move.start_buffer.s` (0.2 s, 6 frames at 30 fps) earlier.
+  Its own row (the block from the earlier start, the buffer part lighter), card and tooltip (beside rule 19's own
+  reading), and its own animation, drawn per frame from the earlier start so it shows before the punch begins: the hip
+  line (dashed while in the buffer) and a second dial, below rule 19's, titled "Hip rotation + buffer", starting from
+  the earlier frame. Rule 19's round row names its round score; it is in no round total and not in `rule_scores.json`.
+  Switch on both Hip rotation layers to see the two animations together. The impact → end step is in the CSV but not shown
   (blank when the end frame hides a hip: only the start and impact frames decide whether a punch is judged).
 - **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
   turn of the punching shoulder against a set range per punch type (lead jab 5–30°, lead hook 35–70°, lead uppercut
   25–60°, lead body shot 40–75°, rear cross 30–60°, rear hook 40–75°, rear uppercut 30–75°, rear body shot 50–75°),
-  scored like hip rotation — green at 100, red below, the score on the block; on the video the shoulder line in the
+  scored as hip rotation was until 2026-10-27 (100 inside, linear from 0° below, above up to 20 off at twice the upper end) — green at 100, red below, the score on the block; on the video the shoulder line in the
   verdict's colour and the same dial from above. The round is the mean punch score, no bands.
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — read side-on
   (|facing| 65–115°; 75–105° on a video filmed from the floor or above the head - the camera_height stage's ground /
@@ -629,3 +639,6 @@ shift-click it again, click the chip, or press Esc to clear. Faded is not hidden
 stays visible around the selection.
 
 Keys: Space play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact · Esc clear the angle filter.
+Beside the playback speeds: ◀ ▶ (one frame back / on, Shift a second, as ← →) and a box with the frame on screen — type a
+frame number and Enter to go there. The clock on the video shows the frame's own time (frame / fps), the same as the
+playhead's pill (since 2026-10-27; before, the video's raw time, half a frame later after a frame step).

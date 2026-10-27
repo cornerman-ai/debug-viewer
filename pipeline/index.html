@@ -113,6 +113,7 @@
   .stage .media-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: #ddd; text-align: center; padding: 24px; }
   .stage .media-msg.show { display: flex; }
   .stage .clock { position: absolute; bottom: 12px; right: 12px; pointer-events: none; }
+  .framego { width: 62px; padding: 3px 6px; border-radius: 7px; border: 0.5px solid var(--sep); background: var(--fill); color: var(--text); font-size: 12px; }
 
   .inspector { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; }
   /* a switch in progress: the old video stays, paused and dimmed, until the new one is swapped in */
@@ -483,6 +484,7 @@
         <div class="banner" id="banner"></div>
         <label class="toggle on" id="skelToggle"><span class="sw"></span>Skeleton</label>
         <label class="toggle on" id="followToggle"><span class="sw"></span>Follow playhead</label>
+        <input id="frameGo" class="framego num" type="number" min="0" step="1" title="the frame on screen; type a frame number + Enter to go there">
         <div class="seg" id="frameSeg"><button data-d="-1" title="previous frame (←; Shift+← a second back)">◀</button><button data-d="1" title="next frame (→; Shift+→ a second on)">▶</button></div>
         <div class="seg" id="rateSeg"><button data-r="0.125">⅛×</button><button data-r="0.25">¼×</button><button data-r="0.5">½×</button><button data-r="1" class="on">1×</button><button data-r="2">2×</button></div>
       </div>
@@ -676,6 +678,10 @@ const ord = v => { if (v == null) return '…'; const n = Math.round(v), t = n %
   return n + (t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'); };   // 30 → "30th"
 const fOff = v => v == null ? '…' : v < 0 ? `−${-v}` : `+${v}`;                  // a frame offset: −1, +1
 const fIv = a => a == null ? '…' : `${fN(a[0])}–${fN(a[1])}`;                          // [20, 60] → "20–60"
+// rule 19 since 2026-10-27: a minimum per punch type, no upper end (an older snapshot's [lo, hi]: its lo)
+const minOf = v => Array.isArray(v) ? v[0] : v;
+const fMin = v => v == null ? '…' : `≥ ${fN(minOf(v))}`;                               // 20 → "≥ 20"
+const hipMinOnly = () => S.th?.rules?.[19]?.move?.score?.over == null;                // the snapshot's rule 19 has no over-rotation cost
 // rule 6: the frames read around the impact — the impact frame, and the frames within around_impact.window_s before
 // and after it (round(window_s × fps) each side: 1 at 30 fps). restOffs → [−k, 0, k] in this video's frames,
 // restWeights → the three parts' weights "¼ · ½ · ¼", restWin → the window in seconds
@@ -692,6 +698,12 @@ const guardLine = (hand, f) => guardDef(f) ? T(4, `move.full_in_defensive_move.$
 const elbowSpan = (zero, full) => +(zero - full).toFixed(12);
 // rules 19 / 20 on the Rules tab: the ranges and the cost above them, from the snapshot
 function rotTh(n, part, nj) {
+  if (n === 19 && hipMinOnly())                            // rule 19 since 2026-10-27: a minimum only
+    return {event: {label: 'per punch', rule: `the ${part} turn from start to impact against a set minimum per punch type — `
+                          + `${ivList(n)}. 100 at or above it; below, linear from 0° (0) to the minimum (100); no cost for turning more`,
+                   bands: [['at or above', '100'], ['below', '0 → 100 (linear)']],
+                   pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30'}},
+            round: {label: 'per round', rule: `the mean punch score — a plain number, no bands; fewer than ${nj} judged punches: not rated`}};
   const over = T(n, 'move.score.over.points_off'), at = T(n, 'move.score.over.max_at_x_upper');
   const top = `100 → ${fN(100 - over)} (linear to ${fN(at)} × upper)`;
   return {event: {label: 'per punch', rule: `the ${part} turn from start to impact against a set range per punch type — `
@@ -721,7 +733,7 @@ const hookZeroTxt = () => say(T(32, 'move.score.zero'), [[1 / 3, 'a third of a t
 const overAnkle = (txt) => say(T(1, 'move.hips.zero'), [[0.5, txt]], () => '');
 // rules 19 / 20: the per-hand-and-type ranges in the file's order, "lead jab 0–25°, …, rear body shot 25–50°"
 const ivList = n => Object.entries(T(n, 'move.score.full'))
-  .map(([k, a]) => `${k.replace('hook_or_uppercut', 'body shot')} ${fIv(a)}°`).join(', ');
+  .map(([k, a]) => `${k.replace('hook_or_uppercut', 'body shot')} ${n === 19 && hipMinOnly() ? fMin(a) : fIv(a)}°`).join(', ');
 const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12],
                [27,29],[29,31],[27,31],[28,30],[30,32],[28,32]];   // each foot: ankle - heel - toe tip
 const STAGES = {
@@ -730,7 +742,8 @@ const STAGES = {
   angle: ['facing_angle', 'facing_angle.csv'],
 };
 // verdict pills and tooltips → semantic Apple colors (green = pass / on target / inside the range, red = fail / off
-// target; hip and shoulder rotation name the side of the range: orange = too little, red = too much; gray = not judged)
+// target; hip and shoulder rotation name the side of the range: orange = too little, red = too much (hip rotation has
+// a minimum only since 2026-10-27: orange or green); gray = not judged)
 const VERD = {good: '#34c759', pass: '#34c759', bad_low: '#ff9500', bad_high: '#ff3b30', fail: '#ff3b30',
               skip: '#8e8e93', unclear: '#8e8e93', on_target: '#34c759', off_target: '#ff3b30'};
 const VNAME = {good: 'good', pass: 'pass', bad_low: 'too little', bad_high: 'too much', fail: 'fail', skip: 'skipped',
@@ -2318,15 +2331,16 @@ const RULE_LAYERS = [
       qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact), score: num(r.score)}),
     card: (e, r) => `<div class="sub"><div class="h">${RN(19)} ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">${rotSkip(r)}</div>` :
       `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
-       <span>Good range</span><b>${iqr(r.bsi)}</b>
+       <span>${r.bsi[1] == null ? 'Minimum' : 'Good range'}</span><b>${hipIv(r)}</b>
        <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}${r.vsi === 'bad_high' ? ` ${THR(() => `(above the range: up to ${fN(T(19, 'move.score.over.points_off'))} off, all ${fN(T(19, 'move.score.over.points_off'))} at ${overAt(19)})`)}` : ''}</b>
        <span>Study IQR, for reference</span><b>${iqr(r.qsi)}</b></div>`) + '</div>',
     tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">${rotSkip(r)}</span>` :
       head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
-      `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi)}</b></span>` +
-      iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
-      `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); ${THR(() => `above it up to ${fN(T(19, 'move.score.over.points_off'))} off, all ${fN(T(19, 'move.score.over.points_off'))} at ${overAt(19)}`)} · `
-      + `dark: the study's IQR ${iqr(r.qsi)}</span>`,
+      `<span class="num">${r.bsi[1] == null ? 'minimum' : 'good range'} for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${hipIv(r)}</b></span>` +
+      (r.bsi[1] == null ? '<br>' : iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi)) +
+      (r.bsi[1] == null ? `<span class="m">100 at or above the minimum; below it linear from 0° (0) to the minimum (100); no cost for turning more · the study's IQR ${iqr(r.qsi)}</span>`
+        : `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); ${THR(() => `above it up to ${fN(T(19, 'move.score.over.points_off'))} off, all ${fN(T(19, 'move.score.over.points_off'))} at ${overAt(19)}`)} · `
+          + `dark: the study's IQR ${iqr(r.qsi)}</span>`),
     row(e, r, {c, y, h, span, tag, ring}) {                // the start → impact verdict
       if (r.status !== 'ok') return;
       const [x, w] = span(e);
@@ -2339,8 +2353,48 @@ const RULE_LAYERS = [
       const l = P(23), rt = P(24); if (!(l && rt)) return;
       const col = r.vsi === 'good' ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
       octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
-      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `hip line start → impact ${r.si.toFixed(1)}° (range ${iqr(r.bsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
-      rotationTopView(e, r, leadLeft, 23, 24, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 70], col);
+      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `Hip rotation ${r.si.toFixed(1)}° (${r.bsi[1] == null ? 'min' : 'range'} ${hipIv(r)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
+      rotationTopView(e, r, leadLeft, 23, 24, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 70], col, {live: f, title: 'Hip rotation', slot: 'hip'});
+    },
+  },
+  {
+    // 'Hip rotation + buffer' (backend run_hip_rotation.py, since 2026-10-27, the user's call; not a rule of its own):
+    // rule 19's reading again with each punch's start move.start_buffer.s (0.2 s) earlier, on the videos the
+    // backend ran it for (move.start_buffer.videos) - its own row, card and animation, drawn from the earlier start
+    key: 'hipBuf', label: 'Hip rotation + buffer', short: 'Hip rotation + buffer', only: true,
+    csv: ['hip_rotation', 'hip_rotation.csv'],
+    parse: (r, num) => !r.status_buffer ? null : ({status: r.status_buffer, sfb: num(r.buffer_start_frame), si: num(r.rot_buffer_impact),
+      vsi: r.verdict_buffer_impact, score: num(r.score_buffer), lo: num(r.ref_start_impact_lo), facing: num(r.facing_at_impact),
+      base: {si: num(r.rot_start_impact), score: num(r.score), status: r.status}}),
+    card: (e, r) => `<div class="sub"><div class="h">Hip rotation + buffer ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">${rotSkip(r)}</div>` :
+      `<div class="rows num" style="margin-top:0"><span>Start</span><b>f ${r.sfb} (${e.sf - r.sfb} frames before the punch’s f ${e.sf})</b>
+       <span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
+       <span>Minimum</span><b>${r.lo == null ? '–' : `≥ ${fN(r.lo)}°`}</b>
+       <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}</b>
+       <span>${RN(19)}, from f ${e.sf}</span><b>${r.base.si == null ? '–' : r.base.si.toFixed(1) + '°'} → ${r.base.score == null ? '–' : r.base.score.toFixed(1)}</b></div>`) + '</div>',
+    tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">${rotSkip(r)}</span>` :
+      head + `<span class="num">hip rotation + buffer: start f ${r.sfb} (${e.sf - r.sfb} frames earlier) → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
+      `<span class="num">${RN(19)} from the punch’s own start f ${e.sf}: <b>${r.base.si == null ? '–' : r.base.si.toFixed(1) + '°'}</b> · score <b>${r.base.score == null ? '–' : r.base.score.toFixed(1)}</b></span><br>` +
+      `<span class="m">minimum for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: ${r.lo == null ? '–' : `≥ ${fN(r.lo)}°`} · the block starts at the earlier start · a test on this video, not a rule</span>`,
+    row(e, r, {c, y, h, span, tag, ring, tx, fps}) {        // from the earlier start to the punch's end
+      if (r.status !== 'ok') return;
+      const [x1, w1] = span(e), x = tx(r.sfb / fps), w = x1 + w1 - x;
+      c.fillStyle = r.vsi === 'good' ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.35)'; rr(x, y + 3, Math.max(1, x1 - x), h - 6, 5); c.fill();   // the buffer, lighter
+      tag(x, w, y, h, r.score == null ? `${r.si.toFixed(0)}°` : r.score.toFixed(1));
+      ring(e, 'hipBuf', x, y, w, h);
+    },
+    // drawn per frame (not per punch under the playhead), so it shows from the earlier start, before the punch begins
+    frameOverlay(f, P, leadLeft) {
+      for (const e of S.punches) {
+        const r = e.hipBuf;
+        if (!r || r.status !== 'ok' || hid(e) || f < r.sfb || f > e.ef) continue;
+        const l = P(23), rt = P(24); if (!(l && rt)) continue;
+        const col = r.vsi === 'good' ? '#34c759' : '#ff3b30';
+        OV.line(l, rt, col, 4, f < e.sf ? [6, 5] : null);  // dashed while inside the buffer, before the punch's own start
+        overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2 + 26, `+ buffer ${r.si.toFixed(1)}° → ${r.score == null ? '–' : r.score.toFixed(1)}${f < e.sf ? ` · ${e.sf - f} f before the ${styleP(e.type).name.toLowerCase()}` : ''}`, col);
+        rotationTopView(e, r, leadLeft, 23, 24, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 170], col, {start: r.sfb, live: f, title: 'Hip rotation + buffer', slot: 'buf'});
+      }
     },
   },
   {
@@ -2769,7 +2823,7 @@ const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [3], guard: [4], resting: [6], chin_depth: [7], chin_height: [8], elbow: [9], anglechg: [13],
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
-  hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
+  hip: [19], hipBuf: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
   rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39], samespot: [40], bite: [41], knee: [42], formfade: [43], sameheight: [44], heavy: [45],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
@@ -2870,7 +2924,7 @@ const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
-V.base = {angle: true, stance: true, distance: true, activity: true, lead: true, rear: true, def: true, steps: true};
+V.base = {frames: true, angle: true, stance: true, distance: true, activity: true, lead: true, rear: true, def: true, steps: true};
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
 // the sub-switches under Lead / Rear / Defense: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
@@ -2985,6 +3039,7 @@ async function buildVideo(src, sig, lite = false) {
         return;
       }
       for (const r of parseCSV(text)) { const p = byKey.get(`${r.start_frame}|${r.hand}`); const d = p && L.parse(r, num); if (d) p[L.key] = d; }
+      if (L.only && !N.punches.some(p => p[L.key])) N.has[L.key] = false;   // its columns are empty on this video
     }),
     ...Object.entries(SUMS).map(async ([k, stage]) => { N[k] = await jsn([stage, `${stage}.json`]); }),
     lite ? null : txt(['angle_change', 'combos.csv']).then(t => { N.angleCombos = t ? parseCSV(t) : []; }),
@@ -3410,6 +3465,7 @@ function sortLayers() {
 }
 // The base rows: [key, the card's name, what it shows, whether this video has it]. Order = top to bottom.
 const BASE_ROWS = [
+  ['frames', 'Frames', 'one dot per video frame, at the frame’s middle — where the playhead sits on it; the frame on screen is the red dot; numbers every few frames. A punch block covers its frames’ dots exactly, from its start frame’s to its end frame’s. Click a dot to go to that frame (or type a frame number in the box beside ◀ ▶). Zoom in until the dots show', () => true],
   ['angle', 'Facing', 'the facing angle, every frame (0° = toward the camera, ±180° = back to it)', () => S.hasAngle],
   ['stance', 'Stance', 'every frame: yellow = the left foot in front (orthodox), blue = the right foot in front (southpaw), grey = neutral (the feet too close to tell), empty = no data (an ankle not seen, no facing angle)', () => S.hasStanceRuns],
   ['distance', 'Distance', 'how far he stands from the camera, camera → hips in metres, every frame (the line: its median over 0.5 s, on a fixed 0–6 m scale): BlazePose’s metre skeleton fitted onto its pixel one, with an assumed 65° field of view and BlazePose’s size of the body — both guesses, so a whole video can read too near or too far by the same factor', () => S.hasDist],
@@ -3521,6 +3577,7 @@ const SCOPE = {
   speed:     {moves: 'every punch with an impact frame'},
   arm:       {moves: 'jab, cross'},
   hip:       {moves: 'every punch'},
+  hipBuf:    {get moves() { return `every punch, read from ${THR(() => fN(T(19, 'move.start_buffer.s')))} s before its start (a test on this video, not a rule)`; }},
   shoulder:  {moves: 'every punch'},
   hit:       {moves: 'every punch'},
   hoc:       {moves: 'every punch'},
@@ -3696,7 +3753,11 @@ function ruleCard() {
     what: 'does the hip line turn into the punch, or does he arm-punch?',
     on: `${hp.n_punches} punches · ${hp.n_judged} judged from start to impact, ${hp.n_punches - hp.n_judged} skipped (in excluded time, no impact frame or no readable hip line)`,
     th: THR(() => rotTh(19, 'hip', NJ(19)), thMiss),
-    calc: `mean of ${hp.n_judged} punch scores · ${hp.n_good} inside · ${hp.n_too_little} below · ${hp.n_too_much} above`});
+    calc: (hp.n_too_much == null ? `mean of ${hp.n_judged} punch scores · ${hp.n_good} at or above the minimum · ${hp.n_too_little} below`
+                                  : `mean of ${hp.n_judged} punch scores · ${hp.n_good} inside · ${hp.n_too_little} below · ${hp.n_too_much} above`)
+      + (hp.buffer ? ` · Hip rotation + buffer (each start ${fN(hp.buffer.s)} s = ${hp.buffer.frames} frames earlier, a test on this video, `
+                     + `not a rule): ${hp.buffer.score ?? 'not rated'} (${hp.buffer.n_judged} judged, ${hp.buffer.n_good} at or above the minimum`
+                     + `${hp.buffer.mean_punch_score != null && hp.buffer.score == null ? `, mean ${hp.buffer.mean_punch_score}` : ''})` : '')});
   if (bs) add(RN(28), bs.score ?? 'not rated', bs.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he go downstairs, or hunt the head only?',
     on: `${bs.n_hooks_uppercuts} hooks and uppercuts · all judged · the ${bs.n_jab_cross_not_counted} jabs and crosses are left out (the model cannot tell a head jab from a body jab)${exNote(bs.n_excluded, 'punches')}`,
@@ -4712,6 +4773,7 @@ $('frameCard').addEventListener('click', e => {           // the switch: re-draw
   if (S.skel) frameCard($('frameCard'), frameNow());
 });
 const iqr = q => q.map(x => x == null ? '–' : x.toFixed(1)).join('–') + '°';
+const hipIv = r => r.bsi[1] == null ? `≥ ${r.bsi[0] == null ? '–' : r.bsi[0].toFixed(1)}°` : iqr(r.bsi);   // rule 19: a minimum (since 2026-10-27) or a range
 // a small scale 0°..max: the IQR as a shaded band, this punch's value as a marker in its verdict color
 function iqrBar(val, q, col, good) {
   const max = Math.max(60, Math.ceil(Math.max(val, (good || q)[1] ?? 0) / 15) * 15 + 15), pct = x => `${Math.min(100, x / max * 100)}%`;
@@ -4851,19 +4913,40 @@ function drawFrameOverlays(f, P) {
 // impact, against the facing angle at impact. The rule's number is |angle(facing, impact) - angle(facing, start)|, so
 // the label prints both angles rather than the arc between the rays — the rays can sit on either side of the facing.
 // Checked 2026-10-02: reproduces the CSV's rot_start_impact to 0.11 deg on 945 punches per rule.
-function rotationTopView(e, r, leadLeft, jl, jr, c, col) {
+// The rotation dials of the two hip rotation layers stack in the black bar beside a portrait video, from the bottom
+// up, two per punch - rule 19's, and the buffer's right above it - in the order the punches start; a video that fills
+// the stage keeps them next to the hips.
+function dialSpot(fallback, e, kind, f) {
+  const Rv = videoRect(), r = 26;
+  if (Rv.x < 190) return {c: fallback, r: 34, side: false};
+  const act = S.punches.filter(p => !hid(p) && ((layerOn('hip') && p.hip?.status === 'ok' && f >= p.sf && f <= p.ef)
+    || (layerOn('hipBuf') && p.hipBuf?.status === 'ok' && f >= p.hipBuf.sfb && f <= p.ef))).sort((a, b) => a.sf - b.sf);
+  const k = Math.max(0, act.indexOf(e)) * 2 + (kind === 'buf' ? 1 : 0);
+  return {c: [16 + r, Rv.H - 22 - r - k * 62], r, side: true};
+}
+function rotationTopView(e, r, leadLeft, jl, jr, c, col, o = {}) {   // o: {start: the start frame (default the punch's), live: the frame on screen, title, slot}
   if (e.impact == null || r.facing == null || !S.skel) return;
   const F = S.mirrored ? -r.facing : r.facing;             // a mirrored run's facing, back on the real skeleton
   const C = S.skelC, n = S.skel.length / (33 * C), Wc = (fr, j, ch) => S.skel[(fr * 33 + j) * C + ch];
-  if (!(e.sf >= 0 && e.sf < n && e.impact >= 0 && e.impact < n)) return;
+  const s0 = o.start ?? e.sf;
+  if (!(s0 >= 0 && s0 < n && e.impact >= 0 && e.impact < n)) return;
   const own = (e.hand === 'lead') === leadLeft ? jl : jr, oth = own === jl ? jr : jl;
   const dir = fr => Math.atan2(Wc(fr, own, 3) - Wc(fr, oth, 3), -(Wc(fr, own, 5) - Wc(fr, oth, 5))) * 180 / Math.PI;
-  const ds = dir(e.sf), di = dir(e.impact); if (!(Number.isFinite(ds) && Number.isFinite(di))) return;
-  const wrap = d => ((d + 180) % 360 + 360) % 360 - 180, R = 34, rad = Math.PI / 180;
+  const ds = dir(s0), di = dir(e.impact); if (!(Number.isFinite(ds) && Number.isFinite(di))) return;
+  const spot = o.slot ? dialSpot(c, e, o.slot, o.live) : {c, r: 34, side: false};
+  c = spot.c;
+  const wrap = d => ((d + 180) % 360 + 360) % 360 - 180, R = spot.r, rad = Math.PI / 180;
   const ray = (deg, cc, w, dash) => OV.line(c, [c[0] + R * Math.sin(deg * rad), c[1] + R * Math.cos(deg * rad)], cc, w, dash);
   octx.save(); octx.fillStyle = 'rgba(0,0,0,0.45)'; octx.beginPath(); octx.arc(c[0], c[1], R + 6, 0, 7); octx.fill(); octx.restore();
   ray(F, '#8e8e93', 2); ray(ds, '#ffffff', 2, [3, 3]); ray(di, col, 3);
-  overlayLabel(c[0] + R + 10, c[1], `from above, vs facing: start ${Math.abs(wrap(F - ds)).toFixed(1)}° → impact ${Math.abs(wrap(F - di)).toFixed(1)}°`, col);
+  const dl = o.live != null && o.live >= 0 && o.live < n ? dir(o.live) : NaN;   // the hip line now, as the video plays
+  if (Number.isFinite(dl)) ray(dl, '#ffd60a', 2);
+  const reading = `start f ${s0} ${Math.abs(wrap(F - ds)).toFixed(1)}° → impact f ${e.impact} ${Math.abs(wrap(F - di)).toFixed(1)}°`
+    + (Number.isFinite(dl) ? ` · now ${Math.abs(wrap(F - dl)).toFixed(1)}°` : '');
+  if (spot.side) {                                         // in the side bar: the title, then the reading under it
+    overlayLabel(c[0] + R + 10, c[1] - 12, LABEL_TAG ? o.title || '' : `${cap(e.hand)} ${styleP(e.type).name.toLowerCase()} · ${o.title || ''}`, col);
+    overlayLabel(c[0] + R + 10, c[1] + 12, reading, col);
+  } else overlayLabel(c[0] + R + 10, c[1], `${o.title ? o.title + ' · ' : ''}from above, vs facing: ${reading}${Number.isFinite(dl) ? ' (yellow)' : ''}`, col);
 }
 // Shared bits of overlay grammar, so thirteen rules do not each invent their own.
 const OV = {
@@ -4926,10 +5009,10 @@ let TR = {}, laneTop = 0;                                       // laneTop: the 
 // each base row's height and the gap under it: lead / rear sit close as a pair
 // Every lane's height; lanes sit LANE_GAP apart, groups GROUP_GAP apart under a HEAD_H header (2026-10-22 redesign:
 // grouping by space and type, no bands or outlines - the way Apple's own charts and track views read).
-const BASE_GEOM = {angle: 150, stance: 32, distance: 80, activity: 96, lead: 30, rear: 30, def: 30, steps: 36};
+const BASE_GEOM = {frames: 30, angle: 150, stance: 32, distance: 80, activity: 96, lead: 30, rear: 30, def: 30, steps: 36};
 const LANE_GAP = 6, GROUP_GAP = 20, HEAD_H = 24, RULE_H = 28;
 // The base rows in two groups (the rule rows are the third): what the body does and what he does.
-const BASE_GROUP = {angle: 'Body', stance: 'Body', distance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions', steps: 'Actions'};
+const BASE_GROUP = {frames: 'Video', angle: 'Body', stance: 'Body', distance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions', steps: 'Actions'};
 // the Steps row's two feet
 const STEPCOL = {lead: '#64d2ff', rear: '#5e5ce6'};
 // the Distance row: its colour, its fixed scale (the same for every video, so videos compare by eye) and gridlines
@@ -5028,6 +5111,34 @@ function niceStep(span, px) {
   const target = span / (px / 90), steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
   return steps.find(s => s >= target) || 600;
 }
+// The Frames row: one dot per frame at the frame's middle, (f + 0.5) / fps - the playhead's place on frame f, and the
+// middle of the span every block draws a frame as (sf / fps to (ef + 1) / fps). The frame on screen is the red dot.
+function drawFrameRow(c, f, W, ph, text, text2, text3) {
+  const [y, h] = TR.frames, fps = S.fps, pf = W / ((V.t1 - V.t0) * fps);       // pixels per frame
+  const f0 = Math.max(0, Math.floor(V.t0 * fps) - 1), f1 = Math.min(S.n - 1, Math.ceil(V.t1 * fps) + 1);
+  c.textBaseline = 'middle';
+  if (pf < 3) {
+    c.fillStyle = text3; c.font = LANE_FONT(500, 10.5); c.textAlign = 'left';
+    c.fillText(`zoom in to see every frame (now ${(1 / pf).toFixed(1)} frames a pixel) · the frame on screen: ${f}`, L + 8, y + h / 2);
+    return;
+  }
+  const r = Math.min(3.2, pf * 0.27), cy = y + h - 9;
+  for (let i = f0; i <= f1; i++) {
+    const x = tx((i + 0.5) / fps); if (x < L - 4 || x > L + W + 4) continue;
+    const on = i === f, ten = i % 10 === 0;
+    c.fillStyle = on ? ph : V.hover?.kind === 'frame' && V.hover.f === i ? text : ten ? text2 : text3;
+    c.beginPath(); c.arc(x, cy, on ? r + 1.6 : ten ? r + 0.5 : r, 0, 7); c.fill();
+  }
+  c.font = LANE_FONT(500, 9.5); c.textAlign = 'center';
+  const room = c.measureText(String(f1)).width + 12;                          // a number's width and a gap
+  const k = [1, 2, 5, 10, 20, 50, 100, 200].find(k => k * pf >= room) || 500;  // a number every k frames
+  const xf = tx((f + 0.5) / fps);
+  for (let i = Math.ceil(f0 / k) * k; i <= f1; i += k) {
+    const x = tx((i + 0.5) / fps); if (x < L || x > L + W || (i !== f && Math.abs(x - xf) < room)) continue;
+    c.fillStyle = text2; c.fillText(String(i), x, y + 8);
+  }
+  if (xf >= L && xf <= L + W) { c.fillStyle = ph; c.font = LANE_FONT(700, 9.5); c.fillText(String(f), xf, y + 8); }   // the frame on screen, always
+}
 function drawTimeline(f) {
   if (TW - L - RPAD < 20) { resize(); if (TW - L - RPAD < 20) return; }
   const c = tctx, text = css('--text'), text2 = css('--text2'), text3 = css('--text3'), grid = css('--grid'), track = css('--track'),
@@ -5036,7 +5147,7 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // the label column, the group headers and the lanes (2026-10-22 redesign: space and type do the grouping)
-  const names = {angle: 'Facing', stance: 'Stance', distance: 'Distance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', steps: 'Steps', over: 'Overview', ...LNAME};
+  const names = {frames: 'Frames', angle: 'Facing', stance: 'Stance', distance: 'Distance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', steps: 'Steps', over: 'Overview', ...LNAME};
   const lane = css('--lane') || 'rgba(120,120,128,0.075)', F = LANE_FONT, KEY = LANE_KEY();
   const step = niceStep(V.t1 - V.t0, W), ticks = [];
   for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) ticks.push(t);
@@ -5166,6 +5277,7 @@ function drawTimeline(f) {
     }
     c.globalAlpha = 1;
   }
+  if (TR.frames) drawFrameRow(c, f, W, ph, text, text2, text3);
   drawLayerRows(c, f, W, text, grid);
   drawFaceVeil(c, W, text);                               // shift-click a facing band: everything else fades back
   drawExclVeil(c, W);                                     // the video's excluded time: no rule judges it
@@ -5449,7 +5561,8 @@ function draw(force) {
     const a = S.hasAngle && S.pose[f] ? S.angle[f] : null;
     $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
     eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f); comboCard($('comboCard'), f); frameCard($('frameCard'), f);
-    $('clock').textContent = `${fmtT(video.currentTime)} · f ${f}`;
+    $('clock').textContent = `${fmtT(f / S.fps)} · f ${f}`;           // the frame's own time, as the playhead pill
+    if (document.activeElement !== $('frameGo')) $('frameGo').value = f;
     const hud = [];
     for (const e of pNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}</span>`);
     if (S.punches.some(e => e.impact === f && !hid(e))) hud.push('<span class="pill impact">IMPACT</span>');
@@ -5490,6 +5603,7 @@ function hit(x, y) {
     const last = xs => xs.reduce((b, e) => (!b || e.sf >= b.sf ? e : b), null);
     return last(ok.filter(e => f >= e.sf && f <= e.ef)) || last(ok.filter(e => f >= e.sf - 1 && f <= e.ef + 1));
   };
+  if (inRow(TR.frames)) return f >= 0 && f < S.n ? {kind: 'frame', f, sf: f, ef: f} : null;   // a frame's dot: go to it
   if (inRow(TR.lead)) return find(S.punches, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, e => e.hand === 'rear');
   if (inRow(TR.distance)) return S.dist && f >= 0 && f < S.dist.n ? {kind: 'dist', f, sf: f, ef: f} : null;
@@ -5604,6 +5718,12 @@ function tip(e, cx, cy) {
       + `<b style="color:${ACT.outCol}">●</b> output <b class="num">${o == null ? '–' : o.toFixed(0)}</b> <span class="m">punches + defensive moves / min</span><br>`
       + `<b style="color:${ACT.movCol}">●</b> movement <b class="num">${m == null || !Number.isFinite(m) ? '–' : m.toFixed(2)}</b> <span class="m">torso lengths / s${A?.mov ? '' : ' (waiting for the video and skeleton)'}</span><br>`
       + `<span class="m">both smoothed over about ${ACT.sigmaS * 2} s; movement = how far the hip centre (averaged over ${ACT.posSmoothS} s) got in the last ${ACT.lagS} s, toward or from the camera included, and how far he turned (${ACT.turnDeg}° counts as one torso length), minus ${ACT.floor}; the row's top is ${ACT.outMax}/min and ${ACT.movMax} torso/s</span>`;
+  } else if (e.kind === 'frame') {                          // the Frames row: one frame
+    const here = [...S.punches.filter(p => !hid(p) && e.f >= p.sf && e.f <= p.ef).map(p => `${cap(p.hand)} ${styleP(p.type).name.toLowerCase()} (frames ${p.sf}–${p.ef}${p.impact === e.f ? ', its impact' : ''})`),
+                  ...S.defenses.filter(d => !hid(d) && e.f >= d.sf && e.f <= d.ef).map(d => `${styleD(d.type).name} (frames ${d.sf}–${d.ef})`)];
+    el.innerHTML = `<b>Frame ${e.f}</b> <span class="m num">${fmtT(e.f / fps)} (${(e.f / fps).toFixed(3)} s)</span><br>`
+      + (here.length ? here.map(x => `<span class="m">${x}</span>`).join('<br>') : '<span class="m">no punch or defensive move</span>')
+      + '<br><span class="m">click: go to this frame</span>';
   } else if (e.kind === 'dist') {                           // the Distance row at the cursor
     const D = S.dist, m = v => Number.isFinite(v) ? `${v.toFixed(2)} m` : '–';
     el.innerHTML = `<b style="color:${DIST.col}">●</b> <b>Distance to the camera</b> <span class="m num">${fmtT(e.f / fps)}</span><br>`
@@ -5629,6 +5749,11 @@ function tip(e, cx, cy) {
   el.style.left = Math.min(innerWidth - bw - 8, cx + 14) + 'px'; el.style.top = Math.max(8, cy - bh - 12) + 'px';
 }
 $('zoomSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; setSpan(+b.dataset.s); setFollow(true); };
+$('frameGo').addEventListener('keydown', e => {                   // type a frame number, Enter: go there
+  if (e.key !== 'Enter' || !S.src) return;
+  const n = parseInt($('frameGo').value, 10); if (!Number.isFinite(n)) return;
+  video.pause(); seekFrame(n); $('frameGo').blur();
+});
 $('frameSeg').onclick = e => { const b = e.target.closest('button'); if (!b || !S.src) return;   // one frame back / on, as ← / →
   video.pause(); seekFrame(frameNow() + (+b.dataset.d) * (e.shiftKey ? Math.round(S.fps) : 1)); };
 $('rateSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return;
@@ -5934,8 +6059,10 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [18, 'The same as rule 17, for the shoulders.',
        'every frame outside punches', `zero at ${fN(T(18, 'move.score.zero'))}° or less, full marks from ${fN(T(18, 'move.score.full'))}° (a coach’s cut-offs)`,
        'The upper body can square up while the hips stay turned, or the reverse, so it is judged on its own.'],
-  [19, `How much the hip line turns from the start of a punch to impact, seen from above in the 3D skeleton, against a normal range for that punch (e.g. ${fIv(T(19, 'move.score.full.rear cross'))}° for a cross, ${fIv(T(19, 'move.score.full.lead jab'))}° for a jab). Only the net turn counts, in either direction.`,
-       'every punch', `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(19, 'move.score.over.points_off'))}`,
+  [19, hipMinOnly() ? `How much the hip line turns from the start of a punch to impact, seen from above in the 3D skeleton, against a minimum for that punch (e.g. ${fMin(T(19, 'move.score.full.rear cross'))}° for a cross, ${fMin(T(19, 'move.score.full.lead hook'))}° for a lead hook). Only the net turn counts, in either direction.`
+                     : `How much the hip line turns from the start of a punch to impact, seen from above in the 3D skeleton, against a normal range for that punch (e.g. ${fIv(T(19, 'move.score.full.rear cross'))}° for a cross, ${fIv(T(19, 'move.score.full.lead jab'))}° for a jab). Only the net turn counts, in either direction.`,
+       'every punch', hipMinOnly() ? 'full marks at or above the minimum · too little falls to zero at no turn · turning more costs nothing'
+                                   : `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(19, 'move.score.over.points_off'))}`,
        'Power comes from the hips; without the turn the punch is all arm.'],
   [20, `The same as rule 19, for the shoulders, with their own ranges (e.g. ${fIv(T(20, 'move.score.full.rear cross'))}° for a cross). It isn’t compared with the hip line.`,
        'every punch', `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(20, 'move.score.over.points_off'))}`,
