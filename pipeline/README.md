@@ -58,7 +58,7 @@ the server's upload were removed 2026-10-12.
 
 ## Using it
 
-Timeline rows: **Frames** (since 2026-10-27, a VIDEO group of its own on top) — one dot per video frame at the frame's middle, (f + 0.5) / fps: the place the playhead sits on frame f, and the middle of the span every block draws a frame as (a punch from its start frame's dot to its end frame's, covering them exactly); the frame on screen is the red dot, numbers every few frames; click a dot to go to that frame; zoomed out past 3 px a frame it says so instead; then facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands (each gated rule judges its own, narrower window — its `camera_window_deg` in the video's thresholds snapshot; there is no default — shown beside its Front / Side / Back badges, e.g. "Side — 65–115°"), each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
+Timeline rows: **Frames** (since 2026-10-27, a VIDEO group of its own on top) — one dot per video frame at the frame's start, f / fps — where the playhead sits on frame f and where every block begins (a block covers its frames sf..ef as sf / fps to (ef + 1) / fps, the way a video editor draws a clip: it starts on its first frame's dot and ends where the frame after it begins; the facing, activity and distance lines are drawn at the frames' starts too; before 2026-10-27 the dots and the playhead sat at the frames' middles, half a frame into every block); the frame on screen is the red dot, numbers every few frames; click a dot to go to that frame; zoomed out past 3 px a frame it says so instead; then facing angle (0° = to the camera, ±180° = back) — split at ±45° and ±135° into the front / side-on / back bands (each gated rule judges its own, narrower window — its `camera_window_deg` in the video's thresholds snapshot; there is no default — shown beside its Front / Side / Back badges, e.g. "Side — 65–115°"), each frame’s dot coloured by its band, lead and rear punches (white tick = impact frame),
 defense — and an
 overview of the whole video (drag it to move the window). Scroll to zoom, drag to pan, click to seek,
 hover for details; the chips in the side panel hide or show a punch / defense type. Every row has a switch in the
@@ -397,8 +397,10 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   upper), rule 19's reading again with each punch's start `move.start_buffer.s` (0.2 s, 6 frames at 30 fps) earlier.
   Its own row (the block from the earlier start, the buffer part lighter), card and tooltip (beside rule 19's own
   reading), and its own animation, drawn per frame from the earlier start so it shows before the punch begins: the hip
-  line (dashed while in the buffer) and a second dial, below rule 19's, titled "Hip rotation + buffer", starting from
-  the earlier frame. Rule 19's round row names its round score; it is in no round total and not in `rule_scores.json`.
+  line (dashed while in the buffer) and a second dial, titled "Hip rotation + buffer", starting from the earlier frame.
+  Beside a portrait video the dials stack in the black bars: two per punch (rule 19's, the buffer's above it), the
+  punch under the playhead that started last first, from the bottom of the left bar up under the HUD's pills, then on
+  in the right bar from the top; a dial with no room left is not drawn. Rule 19's round row names its round score; it is in no round total and not in `rule_scores.json`.
   Switch on both Hip rotation layers to see the two animations together. The impact → end step is in the CSV but not shown
   (blank when the end frame hides a hip: only the start and impact frames decide whether a punch is judged).
 - **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
@@ -638,7 +640,11 @@ cuts; since 2026-10-06 the gated rules judge narrower windows inside them — si
 shift-click it again, click the chip, or press Esc to clear. Faded is not hidden on purpose — the shape of the round
 stays visible around the selection.
 
-Keys: Space play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact · Esc clear the angle filter.
+Keys: Space or K play · ← → one frame · Shift + ← → one second · ↑ ↓ previous / next event · I jump to the impact · M sound on / off · F full screen · Esc clear the angle filter.
+The video's control bar (since 2026-10-27, YouTube-style): shown while the mouse is over the video, gone 2.5 s after
+the mouse stops while it plays. A seek bar across the video (frame-exact: a click or a drag lands on whole frames,
+the time and frame under the cursor shown above it), play / pause, one frame back / on, sound (muted at first; the
+level is remembered), the time and frame, the speed (the same as the toolbar's ⅛× – 2×), full screen.
 Beside the playback speeds: ◀ ▶ (one frame back / on, Shift a second, as ← →) and a box with the frame on screen — type a
 frame number and Enter to go there. The clock on the video shows the frame's own time (frame / fps), the same as the
 playhead's pill (since 2026-10-27; before, the video's raw time, half a frame later after a frame step).

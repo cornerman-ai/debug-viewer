@@ -112,6 +112,34 @@
   .pill.impact { background: #fff; color: #000; letter-spacing: 0.04em; font-size: 11px; }
   .stage .media-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: #ddd; text-align: center; padding: 24px; }
   .stage .media-msg.show { display: flex; }
+  /* the control bar on the video, YouTube-style: shown while the mouse is over the video (and while paused under it) */
+  .stage .vctl { position: absolute; left: 0; right: 0; bottom: 0; padding: 28px 12px 6px; background: linear-gradient(transparent, rgba(0,0,0,0.65));
+                 opacity: 0; transition: opacity .18s; pointer-events: none; color: #fff; user-select: none; }
+  .stage.ctl .vctl { opacity: 1; pointer-events: auto; }
+  .stage.ctl.idle .vctl { opacity: 0; pointer-events: none; }
+  .stage.ctl.idle { cursor: none; }
+  .stage.ctl:not(.idle) .clock { opacity: 0; }
+  .stage .clock { transition: opacity .18s; }
+  .vseek { position: relative; height: 16px; cursor: pointer; display: flex; align-items: center; }
+  .vseek .vtrack { position: relative; width: 100%; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; transition: height .1s; }
+  .vseek:hover .vtrack, .vseek.drag .vtrack { height: 6px; }
+  .vseek .vprog { position: absolute; left: 0; top: 0; bottom: 0; background: var(--playhead); border-radius: 2px; }
+  .vseek .vhov { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,255,255,0.35); border-radius: 2px; display: none; }
+  .vseek:hover .vhov { display: block; }
+  .vseek .vthumb { position: absolute; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; border-radius: 50%; background: var(--playhead); transform: scale(0); transition: transform .1s; }
+  .vseek:hover .vthumb, .vseek.drag .vthumb { transform: scale(1); }
+  .vseek .vtip { position: absolute; bottom: 18px; transform: translateX(-50%); background: rgba(28,28,30,0.92); padding: 3px 7px; border-radius: 6px; font-size: 11.5px; white-space: nowrap; display: none; }
+  .vseek:hover .vtip, .vseek.drag .vtip { display: block; }
+  .vrow { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+  .vb { background: none; border: 0; color: #fff; padding: 4px; border-radius: 6px; cursor: pointer; display: inline-flex; opacity: 0.92; }
+  .vb:hover { opacity: 1; background: rgba(255,255,255,0.12); }
+  .vvol { display: inline-flex; align-items: center; }
+  .vvol input { width: 0; opacity: 0; transition: width .15s, opacity .15s; accent-color: #fff; }
+  .vvol:hover input, .vvol input:focus { width: 70px; opacity: 1; margin-right: 6px; }
+  .vtime { font-size: 12.5px; margin-left: 6px; white-space: nowrap; }
+  .vgrow { flex: 1; }
+  .vrate { background: rgba(255,255,255,0.12); color: #fff; border: 0; border-radius: 6px; padding: 3px 4px; font-size: 12px; cursor: pointer; }
+  .vrate option { color: #000; }
   .stage .clock { position: absolute; bottom: 12px; right: 12px; pointer-events: none; }
   .framego { width: 62px; padding: 3px 6px; border-radius: 7px; border: 0.5px solid var(--sep); background: var(--fill); color: var(--text); font-size: 12px; }
 
@@ -465,6 +493,19 @@
       <div class="hud" id="hud"></div>
       <div class="clock pill num" id="clock">0:00.000 · f 0</div>
       <button class="pill num zoombtn" id="zoomReset" title="reset the zoom (0 or double-click)">1.0× · reset</button>
+      <div class="vctl" id="vctl">
+        <div class="vseek" id="vseek"><div class="vtrack"><div class="vprog" id="vprog"></div><div class="vhov" id="vhov"></div></div><div class="vthumb" id="vthumb"></div><div class="vtip num" id="vtip"></div></div>
+        <div class="vrow">
+          <button class="vb" id="vPlay" title="play / pause (Space or k)"><svg viewBox="0 0 24 24" width="22" height="22"><path id="vPlayIcon" fill="currentColor" d="M8 5v14l11-7z"/></svg></button>
+          <button class="vb" id="vBack" title="previous frame (←; Shift a second)"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+          <button class="vb" id="vFwd" title="next frame (→; Shift a second)"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
+          <span class="vvol"><button class="vb" id="vMute" title="sound on / off (m)"><svg viewBox="0 0 24 24" width="21" height="21"><path id="vMuteIcon" fill="currentColor" d=""/></svg></button><input type="range" id="vVol" min="0" max="1" step="0.05" value="1" title="volume"></span>
+          <span class="vtime num" id="vTime">0:00.000 / 0:00.000</span>
+          <span class="vgrow"></span>
+          <select class="vrate" id="vRate" title="playback speed"><option value="0.125">⅛×</option><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+          <button class="vb" id="vFull" title="full screen (f)"><svg viewBox="0 0 24 24" width="21" height="21"><path fill="currentColor" d="M7 14H5v5h5v-2H7zm-2-4h2V7h3V5H5zm12 7h-3v2h5v-5h-2zM14 5v2h3v3h2V5z"/></svg></button>
+        </div>
+      </div>
       <div class="media-msg" id="mediaMsg">
         <div style="font-size:15px;font-weight:600" id="mediaHead">Video and skeleton are outside this folder</div>
         <div style="color:#aaa;max-width:420px" id="mediaBody">Link the Ambo <b>data</b> folder once (it is remembered), or pick the video file directly.</div>
@@ -4919,10 +4960,18 @@ function drawFrameOverlays(f, P) {
 function dialSpot(fallback, e, kind, f) {
   const Rv = videoRect(), r = 26;
   if (Rv.x < 190) return {c: fallback, r: 34, side: false};
+  // the punches with a dial now: those under the playhead first, the latest-started on top of the pile's priority
+  // (the one being watched), then those still in their buffer
   const act = S.punches.filter(p => !hid(p) && ((layerOn('hip') && p.hip?.status === 'ok' && f >= p.sf && f <= p.ef)
-    || (layerOn('hipBuf') && p.hipBuf?.status === 'ok' && f >= p.hipBuf.sfb && f <= p.ef))).sort((a, b) => a.sf - b.sf);
+    || (layerOn('hipBuf') && p.hipBuf?.status === 'ok' && f >= p.hipBuf.sfb && f <= p.ef)))
+    .sort((a, b) => (f < a.sf) - (f < b.sf) || b.sf - a.sf);
   const k = Math.max(0, act.indexOf(e)) * 2 + (kind === 'buf' ? 1 : 0);
-  return {c: [16 + r, Rv.H - 22 - r - k * 62], r, side: true};
+  const top = 20 + ($('hud')?.offsetHeight || 0) + r, base = Rv.H - 86 - r;   // under the HUD's pills, above the control bar
+  const leftCap = base < top ? 0 : Math.floor((base - top) / 62) + 1;
+  if (k < leftCap) return {c: [16 + r, base - k * 62], r, side: true};
+  const rx = Rv.x + Rv.w + 16 + r, ry = 50 + r + (k - leftCap) * 62;   // the left bar full: on in the right bar, from the top
+  if (Rv.W - (Rv.x + Rv.w) >= 240 && ry <= base) return {c: [rx, ry], r, side: true};
+  return null;                                                // no room left: this dial is not drawn
 }
 function rotationTopView(e, r, leadLeft, jl, jr, c, col, o = {}) {   // o: {start: the start frame (default the punch's), live: the frame on screen, title, slot}
   if (e.impact == null || r.facing == null || !S.skel) return;
@@ -4934,6 +4983,7 @@ function rotationTopView(e, r, leadLeft, jl, jr, c, col, o = {}) {   // o: {star
   const dir = fr => Math.atan2(Wc(fr, own, 3) - Wc(fr, oth, 3), -(Wc(fr, own, 5) - Wc(fr, oth, 5))) * 180 / Math.PI;
   const ds = dir(s0), di = dir(e.impact); if (!(Number.isFinite(ds) && Number.isFinite(di))) return;
   const spot = o.slot ? dialSpot(c, e, o.slot, o.live) : {c, r: 34, side: false};
+  if (!spot) return;
   c = spot.c;
   const wrap = d => ((d + 180) % 360 + 360) % 360 - 180, R = spot.r, rad = Math.PI / 180;
   const ray = (deg, cc, w, dash) => OV.line(c, [c[0] + R * Math.sin(deg * rad), c[1] + R * Math.cos(deg * rad)], cc, w, dash);
@@ -4941,12 +4991,12 @@ function rotationTopView(e, r, leadLeft, jl, jr, c, col, o = {}) {   // o: {star
   ray(F, '#8e8e93', 2); ray(ds, '#ffffff', 2, [3, 3]); ray(di, col, 3);
   const dl = o.live != null && o.live >= 0 && o.live < n ? dir(o.live) : NaN;   // the hip line now, as the video plays
   if (Number.isFinite(dl)) ray(dl, '#ffd60a', 2);
-  const reading = `start f ${s0} ${Math.abs(wrap(F - ds)).toFixed(1)}° → impact f ${e.impact} ${Math.abs(wrap(F - di)).toFixed(1)}°`
+  const reading = `f ${s0} ${Math.abs(wrap(F - ds)).toFixed(1)}° → impact f ${e.impact} ${Math.abs(wrap(F - di)).toFixed(1)}°`
     + (Number.isFinite(dl) ? ` · now ${Math.abs(wrap(F - dl)).toFixed(1)}°` : '');
   if (spot.side) {                                         // in the side bar: the title, then the reading under it
     overlayLabel(c[0] + R + 10, c[1] - 12, LABEL_TAG ? o.title || '' : `${cap(e.hand)} ${styleP(e.type).name.toLowerCase()} · ${o.title || ''}`, col);
-    overlayLabel(c[0] + R + 10, c[1] + 12, reading, col);
-  } else overlayLabel(c[0] + R + 10, c[1], `${o.title ? o.title + ' · ' : ''}from above, vs facing: ${reading}${Number.isFinite(dl) ? ' (yellow)' : ''}`, col);
+    const tag = LABEL_TAG; LABEL_TAG = ''; overlayLabel(c[0] + R + 10, c[1] + 12, reading, col); LABEL_TAG = tag;   // the title already names the punch
+  } else overlayLabel(c[0] + R + 10, c[1], `${o.title ? o.title + ' · ' : ''}from above, vs facing: start ${reading}${Number.isFinite(dl) ? ' (yellow)' : ''}`, col);
 }
 // Shared bits of overlay grammar, so thirteen rules do not each invent their own.
 const OV = {
@@ -5111,8 +5161,9 @@ function niceStep(span, px) {
   const target = span / (px / 90), steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
   return steps.find(s => s >= target) || 600;
 }
-// The Frames row: one dot per frame at the frame's middle, (f + 0.5) / fps - the playhead's place on frame f, and the
-// middle of the span every block draws a frame as (sf / fps to (ef + 1) / fps). The frame on screen is the red dot.
+// The Frames row: one dot per frame at the frame's START, f / fps - where the playhead sits on frame f, and where every
+// block begins (a block covers its frames sf..ef as sf / fps to (ef + 1) / fps, the way a video editor draws clips: it
+// starts on its first frame's dot and ends where the next frame begins). The frame on screen is the red dot.
 function drawFrameRow(c, f, W, ph, text, text2, text3) {
   const [y, h] = TR.frames, fps = S.fps, pf = W / ((V.t1 - V.t0) * fps);       // pixels per frame
   const f0 = Math.max(0, Math.floor(V.t0 * fps) - 1), f1 = Math.min(S.n - 1, Math.ceil(V.t1 * fps) + 1);
@@ -5124,7 +5175,7 @@ function drawFrameRow(c, f, W, ph, text, text2, text3) {
   }
   const r = Math.min(3.2, pf * 0.27), cy = y + h - 9;
   for (let i = f0; i <= f1; i++) {
-    const x = tx((i + 0.5) / fps); if (x < L - 4 || x > L + W + 4) continue;
+    const x = tx(i / fps); if (x < L - 4 || x > L + W + 4) continue;
     const on = i === f, ten = i % 10 === 0;
     c.fillStyle = on ? ph : V.hover?.kind === 'frame' && V.hover.f === i ? text : ten ? text2 : text3;
     c.beginPath(); c.arc(x, cy, on ? r + 1.6 : ten ? r + 0.5 : r, 0, 7); c.fill();
@@ -5132,9 +5183,9 @@ function drawFrameRow(c, f, W, ph, text, text2, text3) {
   c.font = LANE_FONT(500, 9.5); c.textAlign = 'center';
   const room = c.measureText(String(f1)).width + 12;                          // a number's width and a gap
   const k = [1, 2, 5, 10, 20, 50, 100, 200].find(k => k * pf >= room) || 500;  // a number every k frames
-  const xf = tx((f + 0.5) / fps);
+  const xf = tx(f / fps);
   for (let i = Math.ceil(f0 / k) * k; i <= f1; i += k) {
-    const x = tx((i + 0.5) / fps); if (x < L || x > L + W || (i !== f && Math.abs(x - xf) < room)) continue;
+    const x = tx(i / fps); if (x < L || x > L + W || (i !== f && Math.abs(x - xf) < room)) continue;
     c.fillStyle = text2; c.fillText(String(i), x, y + 8);
   }
   if (xf >= L && xf <= L + W) { c.fillStyle = ph; c.font = LANE_FONT(700, 9.5); c.fillText(String(f), xf, y + 8); }   // the frame on screen, always
@@ -5224,7 +5275,7 @@ function drawTimeline(f) {
     const r = (f1 - f0) / W > 1 ? 1.2 : 1.8;
     for (let i = f0; i <= f1; i += every) {
       if (!S.pose[i]) continue;
-      const a = S.angle[i], x = tx((i + 0.5) / fps);   // frame i's centre — where the playhead sits on frame i
+      const a = S.angle[i], x = tx(i / fps);           // frame i's start — where the playhead sits on frame i
       c.fillStyle = FACECOL[Math.abs(a) <= 45 ? 'front' : Math.abs(a) >= 135 ? 'back' : 'side-on'];
       c.fillRect(x - r, ymap(a) - r, 2 * r, 2 * r);          // the dot says which bucket this frame is in
     }
@@ -5282,7 +5333,7 @@ function drawTimeline(f) {
   drawFaceVeil(c, W, text);                               // shift-click a facing band: everything else fades back
   drawExclVeil(c, W);                                     // the video's excluded time: no rule judges it
   // playhead
-  const xp = tx((f + 0.5) / fps);
+  const xp = tx(f / fps);                                     // frame f's start, its dot in the Frames row
   c.strokeStyle = ph; c.lineWidth = 1.5; c.beginPath(); c.moveTo(xp, 22); c.lineTo(xp, TR.bottom); c.stroke();
   const pill = yy => {                                        // the playhead's time, a red pill in the ruler
     const s = fmtT(f / fps); c.font = LANE_FONT(600, 10.5); const pw = c.measureText(s).width + 14;
@@ -5474,20 +5525,20 @@ function drawActivity(c, W, grid, text3) {
   const step = Math.max(1, Math.floor((f1 - f0) / (W * 1.5)));
   // output: a filled area under its line
   c.beginPath(); c.moveTo(tx(f0 / fps), bot);
-  for (let f = f0; f <= f1; f += step) c.lineTo(tx((f + 0.5) / fps), ym(A.out[f], ACT.outMax));
+  for (let f = f0; f <= f1; f += step) c.lineTo(tx(f / fps), ym(A.out[f], ACT.outMax));
   c.lineTo(tx((f1 + 1) / fps), bot); c.closePath();
   const grad = c.createLinearGradient(0, top, 0, bot);
   grad.addColorStop(0, 'rgba(52,199,89,0.32)'); grad.addColorStop(1, 'rgba(52,199,89,0.02)');
   c.fillStyle = grad; c.fill();
   c.beginPath();
-  for (let f = f0; f <= f1; f += step) { const xx = tx((f + 0.5) / fps), yy = ym(A.out[f], ACT.outMax); f === f0 ? c.moveTo(xx, yy) : c.lineTo(xx, yy); }
+  for (let f = f0; f <= f1; f += step) { const xx = tx(f / fps), yy = ym(A.out[f], ACT.outMax); f === f0 ? c.moveTo(xx, yy) : c.lineTo(xx, yy); }
   c.strokeStyle = ACT.outCol; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke();
   // movement: a line, broken where there is no reading
   if (A.mov) {
     c.beginPath(); let on = false;
     for (let f = f0; f <= f1; f += step) {
       const v = A.mov[f]; if (!Number.isFinite(v)) { on = false; continue; }
-      const xx = tx((f + 0.5) / fps), yy = ym(v, ACT.movMax); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
+      const xx = tx(f / fps), yy = ym(v, ACT.movMax); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
     }
     c.strokeStyle = ACT.movCol; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke();
   }
@@ -5508,7 +5559,7 @@ function drawDistance(c, W, grid, text3) {
   c.beginPath(); let on = false;
   for (let f = f0; f <= f1; f += step) {
     const v = D.sm[f]; if (!Number.isFinite(v)) { on = false; continue; }
-    const xx = tx((f + 0.5) / fps), yy = ym(v); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
+    const xx = tx(f / fps), yy = ym(v); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
   }
   c.strokeStyle = DIST.col; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke();
   c.restore();
@@ -5562,6 +5613,7 @@ function draw(force) {
     $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
     eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f); comboCard($('comboCard'), f); frameCard($('frameCard'), f);
     $('clock').textContent = `${fmtT(f / S.fps)} · f ${f}`;           // the frame's own time, as the playhead pill
+    if (typeof VC !== 'undefined') VC.paint();
     if (document.activeElement !== $('frameGo')) $('frameGo').value = f;
     const hud = [];
     for (const e of pNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}</span>`);
@@ -5603,7 +5655,7 @@ function hit(x, y) {
     const last = xs => xs.reduce((b, e) => (!b || e.sf >= b.sf ? e : b), null);
     return last(ok.filter(e => f >= e.sf && f <= e.ef)) || last(ok.filter(e => f >= e.sf - 1 && f <= e.ef + 1));
   };
-  if (inRow(TR.frames)) return f >= 0 && f < S.n ? {kind: 'frame', f, sf: f, ef: f} : null;   // a frame's dot: go to it
+  if (inRow(TR.frames)) { const g = Math.round(t * S.fps); return g >= 0 && g < S.n ? {kind: 'frame', f: g, sf: g, ef: g} : null; }   // the nearest dot
   if (inRow(TR.lead)) return find(S.punches, e => e.hand === 'lead');
   if (inRow(TR.rear)) return find(S.punches, e => e.hand === 'rear');
   if (inRow(TR.distance)) return S.dist && f >= 0 && f < S.dist.n ? {kind: 'dist', f, sf: f, ef: f} : null;
@@ -5756,8 +5808,12 @@ $('frameGo').addEventListener('keydown', e => {                   // type a fram
 });
 $('frameSeg').onclick = e => { const b = e.target.closest('button'); if (!b || !S.src) return;   // one frame back / on, as ← / →
   video.pause(); seekFrame(frameNow() + (+b.dataset.d) * (e.shiftKey ? Math.round(S.fps) : 1)); };
-$('rateSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return;
-  video.playbackRate = +b.dataset.r; document.querySelectorAll('#rateSeg button').forEach(x => x.classList.toggle('on', x === b)); };
+function setRate(r) {                                         // the toolbar's speed buttons and the video bar's menu
+  video.playbackRate = r;
+  document.querySelectorAll('#rateSeg button').forEach(x => x.classList.toggle('on', +x.dataset.r === r));
+  $('vRate').value = String(r);
+}
+$('rateSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; setRate(+b.dataset.r); };
 $('followToggle').onclick = e => { e.preventDefault(); setFollow(!V.follow); if (V.follow) { const t = video.currentTime, w = V.t1 - V.t0; V.t0 = t - w / 2; V.t1 = t + w / 2; clampView(); V.dirty = true; } };
 $('skelToggle').onclick = e => { e.preventDefault(); V.skel = !V.skel; $('skelToggle').classList.toggle('on', V.skel); draw(true); };
 // ── video zoom: a CSS transform on the <video> (smooth while playing); the overlay redraws through the same
@@ -5782,13 +5838,14 @@ function zoomAt(px, py, factor) {
 const resetZoom = () => { Z.k = 1; Z.tx = 0; Z.ty = 0; applyZoom(); };
 stage.addEventListener('wheel', e => {
   if (!S.src) return;
+  if (e.target.closest('.vctl')) return;                       // over the control bar: no zoom
   e.preventDefault();
   const r = stage.getBoundingClientRect();
   zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)));   // ctrl = trackpad pinch
 }, {passive: false});
 let vdrag = null;
 stage.addEventListener('pointerdown', e => {
-  if (Z.k <= 1 || e.target.closest('button')) return;
+  if (Z.k <= 1 || e.target.closest('button') || e.target.closest('.vctl')) return;
   vdrag = {x: e.clientX, y: e.clientY, tx: Z.tx, ty: Z.ty, moved: false}; stage.setPointerCapture(e.pointerId);
 });
 stage.addEventListener('pointermove', e => {
@@ -5798,7 +5855,7 @@ stage.addEventListener('pointermove', e => {
   vdrag.moved = true; stage.classList.add('panning'); Z.tx = vdrag.tx + dx; Z.ty = vdrag.ty + dy; applyZoom();
 });
 stage.addEventListener('pointerup', () => { if (vdrag) { stage.classList.remove('panning'); setTimeout(() => { vdrag = null; }, 0); } });
-stage.addEventListener('dblclick', e => { if (!e.target.closest('button')) resetZoom(); });
+stage.addEventListener('dblclick', e => { if (!e.target.closest('button') && !e.target.closest('.vctl')) resetZoom(); });
 $('zoomReset').onclick = e => { e.stopPropagation(); resetZoom(); };
 $('stage').addEventListener('click', e => {
   if (vdrag?.moved) return;                                   // a pan is not a play / pause click
@@ -5809,7 +5866,9 @@ document.addEventListener('keydown', e => {
   if ($('upl').style.display !== 'none' || $('ovr').style.display !== 'none' || VP.open) return;   // a window is open
   if (e.code === 'Escape' && V.faceFilter) { e.preventDefault(); setFaceFilter(null); return; }
   const f = frameNow(), events = S.punches.filter(p => !hid(p)).concat(S.defenses.filter(d => !hid(d))).sort((a, b) => a.sf - b.sf);
-  if (e.code === 'Space') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
+  if (e.code === 'Space' || e.code === 'KeyK') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
+  else if (e.code === 'KeyM') { e.preventDefault(); VC.mute(); }
+  else if (e.code === 'KeyF') { e.preventDefault(); VC.full(); }
   else if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
     e.preventDefault(); video.pause(); seekFrame(f + (e.code === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? Math.round(S.fps) : 1));
   } else if (e.code === 'ArrowDown') { e.preventDefault(); video.pause(); const n = events.find(x => x.sf > f); if (n) seekFrame(n.sf); }
@@ -5822,6 +5881,80 @@ document.addEventListener('keydown', e => {
     if (p) { video.pause(); seekFrame(p.impact); }
   }
 });
+
+// ── the video's control bar (YouTube-style): shown while the mouse is over the video, hidden 2.5 s after the mouse
+// stops while it plays; the seek bar goes frame by frame (seekFrame), so a drag lands on whole frames ──
+var VC = (() => {                            // var: draw() may look it up before this line runs
+  const st = $('stage'), seek = $('vseek'), tip = $('vtip');
+  let idleT = null, drag = null;
+  const ICON = {play: 'M8 5v14l11-7z', pause: 'M6 5h4v14H6zm8 0h4v14h-4z',
+    on: 'M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z',
+    off: 'M3 9v6h4l5 5V4L7 9zm13.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4z'};
+  const frameAt = x => { const r = seek.getBoundingClientRect(); return Math.max(0, Math.min(S.n - 1, Math.floor((x - r.left) / r.width * S.n))); };
+  const show = () => {
+    if (!S.src) return;
+    st.classList.add('ctl'); st.classList.remove('idle'); clearTimeout(idleT);
+    idleT = setTimeout(() => { if (!video.paused && !drag) st.classList.add('idle'); }, 2500);
+  };
+  st.addEventListener('pointermove', show);
+  st.addEventListener('pointerenter', show);
+  st.addEventListener('pointerleave', () => { if (!drag) { st.classList.remove('ctl'); clearTimeout(idleT); } });
+  function paint() {                                          // called from draw(): progress, thumb, time, icons
+    if (!S.src) return;
+    const f = frameNow(), frac = S.n > 1 ? f / (S.n - 1) : 0;
+    $('vprog').style.width = `${frac * 100}%`; $('vthumb').style.left = `${frac * 100}%`;
+    $('vTime').textContent = `${fmtT(f / S.fps)} / ${fmtT(S.dur)} · f ${f}`;
+    $('vPlayIcon').setAttribute('d', video.paused ? ICON.play : ICON.pause);
+    $('vMuteIcon').setAttribute('d', video.muted || video.volume === 0 ? ICON.off : ICON.on);
+  }
+  seek.addEventListener('pointermove', e => {                 // the hover line and the time / frame under the cursor
+    const r = seek.getBoundingClientRect(), g = frameAt(e.clientX), x = Math.max(0, Math.min(r.width, e.clientX - r.left));
+    $('vhov').style.width = `${x}px`; tip.style.left = `${x}px`; tip.textContent = `${fmtT(g / S.fps)} · f ${g}`;
+    if (drag) seekFrame(g);
+  });
+  seek.addEventListener('pointerdown', e => {
+    e.stopPropagation(); try { seek.setPointerCapture(e.pointerId); } catch {}   // keep the drag when the mouse leaves the bar
+    drag = {playing: !video.paused}; video.pause(); seek.classList.add('drag'); seekFrame(frameAt(e.clientX));
+  });
+  seek.addEventListener('pointerup', () => {
+    if (!drag) return;
+    const again = drag.playing; drag = null; seek.classList.remove('drag');
+    if (again) video.play();
+  });
+  seek.addEventListener('click', e => e.stopPropagation());
+  $('vctl').addEventListener('click', e => e.stopPropagation()); // a click on the bar is not a play / pause click
+  $('vPlay').onclick = () => { video.paused ? video.play() : video.pause(); };
+  $('vBack').onclick = e => { video.pause(); seekFrame(frameNow() - (e.shiftKey ? Math.round(S.fps) : 1)); };
+  $('vFwd').onclick = e => { video.pause(); seekFrame(frameNow() + (e.shiftKey ? Math.round(S.fps) : 1)); };
+  function mute() {
+    if (video.muted || video.volume === 0) { video.muted = false; if (video.volume === 0) video.volume = 1; }
+    else video.muted = true;
+    $('vVol').value = video.muted ? 0 : video.volume;
+    try { localStorage.setItem('pipelineViewerSound', JSON.stringify({muted: video.muted, volume: video.volume})); } catch {}
+    paint();
+  }
+  $('vMute').onclick = mute;
+  $('vVol').addEventListener('input', () => {
+    video.volume = +$('vVol').value; video.muted = video.volume === 0;
+    try { localStorage.setItem('pipelineViewerSound', JSON.stringify({muted: video.muted, volume: video.volume})); } catch {}
+    paint();
+  });
+  try {                                                       // the sound as last left (the page starts muted)
+    const sd = JSON.parse(localStorage.getItem('pipelineViewerSound') || 'null');
+    if (sd) { video.volume = sd.volume; video.muted = sd.muted; $('vVol').value = sd.muted ? 0 : sd.volume; }
+    else $('vVol').value = 0;
+  } catch {}
+  $('vRate').onchange = () => setRate(+$('vRate').value);
+  function full() { document.fullscreenElement ? document.exitFullscreen() : st.requestFullscreen?.(); }
+  $('vFull').onclick = full;
+  document.addEventListener('fullscreenchange', () => { resize(); applyZoom(); draw(true); });
+  ['play', 'pause', 'volumechange', 'ratechange'].forEach(ev => video.addEventListener(ev, () => {
+    if (ev === 'ratechange') { document.querySelectorAll('#rateSeg button').forEach(x => x.classList.toggle('on', +x.dataset.r === video.playbackRate)); $('vRate').value = String(video.playbackRate); }
+    if (ev === 'pause') st.classList.remove('idle');
+    paint();
+  }));
+  return {paint, mute, full};
+})();
 video.addEventListener('loadedmetadata', () => draw(true));
 video.addEventListener('seeked', () => draw(true));
 addEventListener('resize', () => { resize(); applyZoom(); });
