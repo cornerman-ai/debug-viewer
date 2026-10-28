@@ -52,14 +52,17 @@ One entry in `RULE_LAYERS`; the toggle, the file loading, the row, the hover and
   card: (e, x) => `<div class="sub">…</div>`,                // the punch card's section in the Now view
   tip:  (e, x, {head, v}) => `…`,                            // the timeline tooltip
   row(e, x, {c, y, h, span, tag, ring, tx, fps}) { … },     // draws the punch's block in this rule's row
-  overlay(e, x, f, P, leadLeft) { … },                       // optional: drawn on the video for the punch under the playhead
+  overlay(e, x, f, P, leadLeft) { … },                       // the video, for the punch under the playhead (§3b)
 }
 ```
 
 A rule whose items are not punches (combos, stretches of frames, defensive moves) sets `items: true` and a
 `parseItem(r, num)`; `row` is then called once per item, `S.items[key]` holds them, and hover hits anything under the
 cursor in that row. `split: 'hand'` / `'arm'` / `'lane'` (with `halves` naming the two) splits a row in two;
-`window: true` draws a window before the punch; a per-frame rule draws on the video with `frameOverlay(f, P, …)`.
+`window: true` draws a window before the punch; a per-frame rule draws on the video with `frameOverlay(f, P, …)`. A
+per-punch row whose punches overlap in time is split by the page itself (lead on top, rear below, where two blocks
+overlap); a layer whose drawn block is not "judged" by the default test (`status === 'ok'`, else a `verdict` that is not
+`skip`, else a `score`) gives `shown: x => …`, and one whose block does not run sf..ef gives `spanOf: (e, x) => [a, b]`.
 
 House style for a row:
 
@@ -70,6 +73,26 @@ House style for a row:
 - Every number in a tooltip, card or overlay label comes from the video's thresholds snapshot — `T(n, 'move.score.full')`,
   `H(n, 'min_judged')` — inside `THR(() => …)`, so a missing file shows the marker instead of a number. Never a
   literal.
+
+## 3b. The video overlay
+
+Every rule draws on the video in one grammar (README, **Video overlay**): geometry on the body, words and numbers in the
+rail's cards. An `overlay` / `frameOverlay` does two things:
+
+- **A row on its subject's card**: `ovRow(SUBJ.punch(e), row)` — or `SUBJ.frame()` (a per-frame rule), `SUBJ.move(d)` (a
+  defensive move), `SUBJ.combo(it, 'offensive' | 'combined')` (a combination). A row is
+  `{no, score, mid, text, gauge | parts | dial}`, or `{no, word, wordCol, text}` for a verdict rule, or `{no, skip}` when
+  the rule did not judge it (the reason in plain words). `text` says what is measured in a short line ("the wrist before
+  the punch: 0.33 torso under the nose"); `gauge` is the bullet bar, `{v, full, zero, lo, hi, score, fmt, unit, marks}`
+  — the rule's own full-marks and zero lines from the snapshot, never a literal; `parts` is one bar per hand / leg /
+  axis (`{label, …gauge}` or `{label, skip}`); `dial` is a view from above (`{from, sweep, to, ticks, col, ray}`, the
+  turn rules). The rail sorts, fits and folds the cards; a rule never places text itself.
+- **Geometry on the body**, through `G`: `G.line` / `G.poly` / `G.dot` / `G.ring` / `G.arc` / `G.dim` (a dimension line) /
+  `G.trail` for what is measured, in its verdict's colour (`scoreCol(score)`); `G.ref` (dashed white) for the line it
+  is measured against, named with `G.note` beside it; `G.hollow` for a point the rule could not trust. A reading of the
+  impact frame is drawn around it only (`G.near(f, e.impact)` as the alpha, the impact frame's joints through `PAT`);
+  geometry two punches share is drawn once (`G.once(key)`). Nothing on the body without a name or a card row that
+  explains it.
 
 ## 4. A Round score row
 

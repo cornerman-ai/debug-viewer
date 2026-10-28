@@ -130,6 +130,12 @@
     background: rgba(0,0,0,0.55); color: #fff; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); width: max-content; }
   .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
   .pill.impact { background: #fff; color: #000; letter-spacing: 0.04em; font-size: 11px; }
+  .pill.prog { position: relative; padding-bottom: 8px; }          /* a punch / move: how far into it the frame is */
+  .pill .pp { position: absolute; left: 11px; right: 11px; bottom: 4px; height: 2px; border-radius: 1px; background: rgba(255,255,255,0.22); }
+  .pill .pp b { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 1px; background: #fff; }
+  .pill .pp u { position: absolute; top: -2px; width: 2px; height: 6px; margin-left: -1px; border-radius: 1px; background: #fff; }
+  .pill.quiet { font-weight: 500; font-size: 12px; color: rgba(255,255,255,0.88); }
+  .pill .hol { width: 9px; height: 9px; border-radius: 50%; border: 1.6px solid #fff; background: rgba(0,0,0,0.45); box-sizing: border-box; }
   .stage .media-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: #ddd; text-align: center; padding: 24px; }
   .stage .media-msg.show { display: flex; }
   /* the control bar on the video, YouTube-style: shown while the mouse is over the video (and while paused under it) */
@@ -967,6 +973,20 @@ function comboLayer(kind, label, short, what) {
       c.fillStyle = COMBO[kind]; c.globalAlpha = on ? 1 : 0.8; rr(x0, y + h / 2 - 7, w, 14, 5); c.fill(); c.globalAlpha = 1;
       tag(x0, w, y, h, `${x.n}`);
     },
+    frameOverlay(f) {                                      // the combination under the playhead: its card's rows
+      for (const it of (S.items[kind] || []).filter(x => f >= x.sf && f <= x.ef)) {
+        const card = SUBJ.combo(it, kind), no = kind === 'offensive' ? 30 : 31, n = reps(it);
+        if (it.excluded) { ovRow(card, {no, skip: 'not judged: it reaches into the video’s excluded time'}); continue; }
+        if (kind === 'offensive') {                         // rule 24 counts the long ones
+          const need = THR(() => T(24, 'move.min_long_combo_elements'), null), long = need != null && it.nP >= need;
+          ovRow(card, {no: 24, word: `${it.nP} punches`, wordCol: long ? OC.good : OC.text2,
+            text: need == null ? '' : long ? `long: ${fN(need)} punches or more count toward the round’s share` : `short: under ${fN(need)} punches`});
+        }
+        const top = (S.layerSum[kind]?.[kind]?.sequences || []).slice(0, 3).some(q => q.sequence === it.seq);
+        ovRow(card, {no, word: n === '–' ? '–' : `${n}×`, wordCol: OC.text,
+          text: `${n === 1 ? 'used once' : `this sequence ${n} times`} in the round${top && n !== 1 ? ' · one of the 3 most used, the share the score reads' : ''}`});
+      }
+    },
   };
 }
 const offTxt = v => v == null ? '–' : `${Math.abs(v).toFixed(2)} torso ${(S.mirrored ? -v : v) >= 0 ? 'right' : 'left'}`;   // image sides
@@ -1008,8 +1028,6 @@ const angleCol = v => v >= 100 ? '#34c759' : v > 0 ? '#ff9f0a' : '#ff3b30';   //
 const slipAxes = (n, f) => { const x = f('x'), y = f('y'); return x === y ? `${x}, sideways and up-down alike` : `sideways ${x}, up-down ${y}`; };
 const slipScale = n => slipAxes(n, a => n === 14 ? `${fN(T(14, `move.score_${a}.points`))} points from ${fD(T(14, `move.score_${a}.full`), 2)} torso of travel, 0 with no travel`
   : `${fN(T(15, `move.score_${a}.points`))} points up to ${fD(T(15, `move.score_${a}.full`), 2)} torso of travel, 0 at ${fD(T(15, `move.score_${a}.zero`), 2)}`) + '; the slip score is the sum of the two';
-// a slip's travel on both axes, for labels: "x 0.37 · y 0.20 torso"
-const slipTr = it => `x ${it.tx.toFixed(2)}${it.ty == null ? '' : ` · y ${it.ty.toFixed(2)}`} torso`;
 const slipCol = v => v == null ? '#8e8e93' : v >= 100 ? '#34c759' : v <= 0 ? '#ff3b30' : '#ff9f0a';
 function slipLayer(rule) {
   const key = `slip${rule}`, sk = `s${rule}`;
@@ -1019,7 +1037,18 @@ function slipLayer(rule) {
     key, label, short: label, items: true,
     frameOverlay(f, P) {                                   // the head point's path through the slip, and its furthest point
       const it = OV.at(key, f); if (!it || !it.verdict) return;
-      const col = slipCol(it[sk]), minVis = H(rule, 'min_visibility');
+      const minVis = H(rule, 'min_visibility'), d = S.defenses.find(m => m.sf === it.sf) || {...it, kind: 'd'};
+      if (hid(d)) return;
+      // the slip's row: each axis on its own bar (50 points each), the slip score the sum
+      const ax = a => rule === 14 ? {full: T(14, `move.score_${a}.full`), zero: 0, lo: 0, hi: Math.max(0.6, T(14, `move.score_${a}.full`) * 2)}
+                                  : {full: T(15, `move.score_${a}.full`), zero: T(15, `move.score_${a}.zero`), lo: 0, hi: T(15, `move.score_${a}.zero`) * 1.25};
+      const part = (a, label) => it[`t${a}`] == null ? {label, skip: 'no reading'}
+        : {label, v: it[`t${a}`], ...ax(a), score: 2 * it[`${sk}${a}`], mid: true};
+      ovRow(SUBJ.move(d), {no: rule, score: it[sk], mid: true, text: rule === 14
+        ? 'how far the head travelled from where it started, against the hips: each axis full from its line'
+        : 'the same travel, now against too much: each axis full up to its line, 0 at the end',
+        parts: [part('x', 'side'), part('y', 'up')]});
+      if (!G.once(`slip${it.sf}`)) return;                  // both rules on: one path
       // the rule's reading: the midpoint of the EXTENT of landmarks 0-10 at visibility >= 0.30, minus the hip centre.
       // Drawing the nose instead would show sideways steps the number excludes.
       const C = S.skelC;
@@ -1041,36 +1070,22 @@ function slipLayer(rule) {
         return head ? {head, hipx: (lh[0] + rh[0]) / 2, hipy: (lh[1] + rh[1]) / 2} : null;
       };
       const here = read(f); if (!here) return;
-      if (rule === 15 && layerOn('slip14')) {                 // both rows on: rule 14 drew the path, rule 15 adds its label
-        overlayLabel(here.head[0] + 16, here.head[1] + 6,
-          `rule 15: ${slipTr(it)} → ${it.s15 == null ? '–' : Math.floor(it.s15)}`, col);
-        return;
-      }
-      OV.line([here.hipx, here.hipy], [here.hipx, here.head[1]], '#8e8e93', 1.5, [4, 4]);   // the line it is read from
-      octx.save(); octx.strokeStyle = col; octx.lineWidth = 2.5; octx.lineCap = 'round'; octx.beginPath();
-      let base = null, started = false;                     // the path: the head point against the hip centre, held still
+      // the path: the head point against the hip centre, held still (a step does not count as a slip), in white - the
+      // two rules grade the same path differently, their cards carry the verdicts
       const rel = r => [here.hipx + (r.head[0] - r.hipx), here.hipy + (r.head[1] - r.hipy)];
-      for (let fr = it.sf; fr <= Math.min(f, it.ef); fr++) {
-        const r = read(fr); if (!r) continue;
-        if (!base) base = r;
-        const q = rel(r);
-        started ? octx.lineTo(...q) : octx.moveTo(...q); started = true;
+      const pts = []; let base = null;
+      for (let fr = it.sf; fr <= Math.min(f, it.ef); fr++) { const r = read(fr); if (!r) continue; if (!base) base = r; pts.push(rel(r)); }
+      if (base) {                                           // the rule's baseline: the first READABLE frame, and the two
+        const b0 = rel(base);                               // travels from it, sideways then up-down
+        G.ref(b0, [here.head[0], b0[1]], 0.8); G.ref([here.head[0], b0[1]], here.head, 0.8);
+        G.hollow(b0, '#ffffff', 6); G.note([b0[0], b0[1] + 13], 'start', {align: 'center', size: 10});
       }
-      if (started) octx.stroke();
-      octx.restore();
-      if (base) {                                           // the rule's baseline: the first READABLE frame
-        const b0 = rel(base);                               // and the two travels from it, x then y
-        OV.ring(b0, '#8e8e93', 8, 2);
-        OV.line(b0, [here.head[0], b0[1]], col, 2, [3, 3]);
-        OV.line([here.head[0], b0[1]], here.head, col, 2, [3, 3]);
-      }
-      for (const pf of [it.peakX, it.peakY]) {              // the furthest frame on each axis
+      G.poly(pts, '#ffffff', 2.5);
+      for (const pf of [it.peakX, it.peakY]) {              // the furthest frame on each axis, once it has passed
         const pk = pf == null ? null : read(pf);
-        if (pk && f >= pf) OV.ring(rel(pk), col, 11, 3);
+        if (pk && f >= pf) G.ring(rel(pk), '#ffffff', 7, 2);
       }
-      OV.dot(here.head, col, 4.5);
-      overlayLabel(here.head[0] + 16, here.head[1] + (rule === 14 ? -18 : 6),
-                   `rule ${rule}: ${slipTr(it)} → ${it[sk] == null ? '–' : Math.floor(it[sk])}`, col);
+      G.dot(here.head, styleD(d.type).c, 5);
     },
     csv: ['slip_distance', 'moves.csv'], json: ['slip_distance', 'slip_distance.json'],
     parseItem: (r, num) => r.verdict ? {type: r.defense_type, side: r.side, sf: num(r.start_frame), ef: num(r.end_frame),
@@ -1172,24 +1187,22 @@ function stanceLayer(kind) {
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
       min: num(r[`min_${C.metric}`]), mean: num(r[`mean_${C.metric}`])}),
     card: () => '',
-    frameOverlay(f, P, leadLeft, Q, torso) {               // the gap between the ankles, in this rule's own unit
-      const it = OV.at(`stance_${kind}`, f);
-      const col = !it ? '#8e8e93' : STANCESKIP[it.state] ? '#8e8e93' : STANCECOL[it.state] || '#8e8e93';
-      const la = P(J.lan), ra = P(J.ran); if (!(la && ra)) return;
-      const y = Math.max(la[1], ra[1]) + 16;
+    frameOverlay(f, P, leadLeft, Q, torso) {               // the gap between the ankles, as a dimension line
+      const it = OV.at(`stance_${kind}`, f); if (!it || it.state === 'excluded') return;
+      const card = SUBJ.frame();
+      if (STANCESKIP[it.state]) { ovRow(card, {no: C.no, skip: `not judged: ${STANCESKIP[it.state]}`}); return; }
+      const la = P(J.lan), ra = P(J.ran), t = torso(); if (!(la && ra && t)) return;
       const gap = kind === 'width' ? Math.hypot(la[0] - ra[0], la[1] - ra[1])   // the rule's ankle-to-ankle distance
                                    : Math.abs(la[0] - ra[0]);                   // depth counts the fore-aft gap only
-      if (kind === 'width') OV.line(la, ra, col, 3.5);                          // draw the segment that is measured
-      else {
-        OV.line([la[0], la[1]], [la[0], y], col, 1.5, [3, 3]);
-        OV.line([ra[0], ra[1]], [ra[0], y], col, 1.5, [3, 3]);
-        OV.line([la[0], y], [ra[0], y], col, 3.5);
+      const unit = gap / t, sc = stanceScore(kind, unit), col = scoreCol(sc);
+      if (kind === 'width') G.dim(la, ra, col);                                 // the span that is measured
+      else {                                                                    // fore-aft only: dropped under the feet
+        const y = Math.max(la[1], ra[1]) + 0.12 * t;
+        G.ref(la, [la[0], y], 0.7); G.ref(ra, [ra[0], y], 0.7); G.dim([la[0], y], [ra[0], y], col);
       }
-      let unit = null;
-      const judged = !!it && !STANCESKIP[it.state];         // gray on the timeline: draw the gap, state no number
-      const t = torso(); if (t) unit = gap / t;             // both rules: torso lengths
-      if (judged && unit != null) overlayLabel((la[0] + ra[0]) / 2 - 30, y + 18,
-        `${unit.toFixed(2)} torso → ${Math.floor(stanceScore(kind, unit))}`, col);
+      ovRow(card, {no: C.no, score: sc, text: kind === 'width' ? 'ankle to ankle, seen from the front, in torso lengths'
+                                                            : 'one ankle ahead of the other, seen from the side, in torso lengths',
+        gauge: {v: unit, full: stanceFull(kind), zero: stanceZero(kind), lo: 0, hi: Math.max(1, stanceFull(kind) * 1.6), score: sc}});
     },
     tip: (e, x) => {
       const t = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
@@ -1258,6 +1271,32 @@ const sameSpotRule = () => `per offensive combination, its punches thrown front-
   + `${fN(T(40, 'move.fist.forearm_extension'))} forearm): the farthest-apart two across the picture, in torso lengths — 100 at `
   + `${fD(T(40, 'move.score.full'), 2)} or less, 0 at ${fD(T(40, 'move.score.zero'), 2)} (punches side by side, each straight out of its own shoulder); `
   + `two punches read at least`;
+// rules 40 / 44 on the body: each fist where it landed, numbered in the order thrown - solid once it has landed, a faint
+// ring before - and the spread the rule reads as a dimension line between the outermost two, across the picture (x,
+// rule 40) or up and down it (y, rule 44), in the score's colour once every fist is in
+function spotsGlyph(it, f, P, axis) {
+  const pts = it.fists.map((q, i) => ({...q, i, p: PXY(S.mirrored ? 1 - q.nx : q.nx, q.ny)})).filter(q => q.p);
+  if (pts.length < 2) return;
+  const t = torsoOnScreen(P) || 60, k = axis === 'x' ? 0 : 1, done = pts.every(q => q.f <= f);
+  const a = pts.reduce((m, q) => q.p[k] < m.p[k] ? q : m), b = pts.reduce((m, q) => q.p[k] > m.p[k] ? q : m);
+  const col = it.excl ? OC.mute : scoreCol(it.score);
+  if (axis === 'x') {
+    const y = Math.min(...pts.map(q => q.p[1])) - 0.35 * t;
+    G.ref(a.p, [a.p[0], y], 0.6); G.ref(b.p, [b.p[0], y], 0.6);
+    G.dim([a.p[0], y], [b.p[0], y], col, 7, done ? 1 : 0.45); G.note([(a.p[0] + b.p[0]) / 2, y - 12], 'spread', {align: 'center', a: done ? 1 : 0.6});
+  } else {
+    const x = Math.max(...pts.map(q => q.p[0])) + 0.35 * t;
+    G.ref(a.p, [x, a.p[1]], 0.6); G.ref(b.p, [x, b.p[1]], 0.6);
+    G.dim([x, a.p[1]], [x, b.p[1]], col, 7, done ? 1 : 0.45); G.note([x + 10, (a.p[1] + b.p[1]) / 2], 'spread', {a: done ? 1 : 0.6});
+  }
+  for (const q of pts) {                                   // the landing spots, numbered
+    const pc = PUNCH[q.type]?.c || '#ffffff';
+    if (q.f > f) { G.ring(q.p, pc, 8, 2, [3, 3], 0.55); continue; }
+    G.dot(q.p, pc, q.f === f ? 10 : 8);
+    octx.save(); octx.font = OFONT(700, 10.5); octx.fillStyle = '#000'; octx.textAlign = 'center'; octx.textBaseline = 'middle';
+    octx.fillText(String(q.i + 1), q.p[0], q.p[1] + 0.5); octx.restore();
+  }
+}
 // rule 44's rule in words, every number from the snapshot
 const heightWindow = () => (T(44, 'camera_window_deg') || []).map(([a, b]) => `${fN(a)}–${fN(b)}°`).join(' + ') || '…';
 const sameHeightRule = () => `per offensive combination, its head punches thrown side-on (|facing| `
@@ -1297,38 +1336,39 @@ function chinLayer(kind) {
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame)}),
     card: () => '',
     frameOverlay(f, P, leadLeft, Q, torso) {               // the chin found on the face, and the line this axis reads it against
-      const it = OV.at(`chin_${kind}`, f);
-      const col = !it ? '#8e8e93' : CHINCOL[it.state] || '#8e8e93';
-      const lsh = P(J.lsh), rsh = P(J.rsh);
-      if (!(lsh && rsh)) return;
-      const no = kind === 'height' ? 8 : 7, minVis = H(no, 'min_visibility');
+      const it = OV.at(`chin_${kind}`, f); if (!it || it.state === 'excluded') return;
+      const no = kind === 'height' ? 8 : 7, card = SUBJ.frame();
+      if (CHINSKIP[it.state]) { ovRow(card, {no, skip: `not judged: ${CHINSKIP[it.state]}`}); return; }
+      const lsh = P(J.lsh), rsh = P(J.rsh), t = torso();
+      if (!(lsh && rsh && t)) return;
+      const minVis = H(no, 'min_visibility');
       for (const j of [J.lsh, J.rsh])                                        // run_chin_tuck.py MIN_VIS, the house floor:
         if (!(visAt(f, j, no) >= minVis)) return;                            // a joint it cannot read, so neither do we
       const fc = faceChinAt(f), chin = fc && PXY(fc[0], fc[1]);
       if (!chin) return;                                                     // no face at the gate: the rule guesses no chin
       const lead = leadLeft ? lsh : rsh;
-      OV.ring(chin, col, kind === 'height' ? 9 : 13, 3);                    // the face's chin tip — one ring per axis
-      const judged = !!it && !CHINSKIP[it.state];             // gray on the timeline: draw the geometry, state no number
-      if (kind === 'height') {
-        const t = torso(); if (!t) return;                                  // torso lengths, like the rule
+      if (kind === 'height') {                                               // torso lengths, like the rule
         const top = lead[1] - T(8, 'move.shoulder_top_torso') * t;          // the shoulder's TOP: run_chin_tuck.py SH_TOP
-        OV.level(top, Math.min(lsh[0], rsh[0]) - 45, Math.max(lsh[0], rsh[0]) + 45, col);
-        OV.line([chin[0], top], chin, col, 2, [3, 3]);
-        if (judged) {
-          const hv = (chin[1] - top) / t;                                     // canvas pixels are isotropic
-          const sc = chinHeightScore(hv);                                     // run_chin_tuck.py HEIGHT_FULL / ZERO
-          overlayLabel(chin[0] + 14, chin[1], `${hv.toFixed(2)} torso → ${Math.floor(sc)}`, col);
-        }
+        const hv = (chin[1] - top) / t, sc = chinHeightScore(hv), col = scoreCol(sc);   // + below the top
+        const xa = lead[0] - 0.45 * t, xb = lead[0] + 0.45 * t;
+        G.ref([xa, top], [xb, top]); G.note([Math.max(xa, xb) + 6, top], 'shoulder top');
+        if (Math.abs(chin[1] - top) > 2) G.line([chin[0], top], chin, col, 2.5);
+        G.ring(chin, col, 7, 2.5); G.dot(chin, col, 2.5);
+        ovRow(card, {no, score: sc, text: `the chin ${hv >= 0 ? 'below' : 'above'} the lead shoulder’s top, in torso lengths`,
+          gauge: {v: -hv, full: -T(8, 'move.score.full'), zero: -T(8, 'move.score.zero'), lo: -0.2, hi: 0.35, score: sc,
+                  fmt: v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fD(Math.abs(v), 2)}`, marks: [[-T(8, 'move.score.full'), 'top'], [-T(8, 'move.score.zero'), `+${fD(-T(8, 'move.score.zero'), 2)}`]]}});
       } else {
-        const t = torso(); if (!t) return;
         const a = S.hasAngle && S.pose?.[f] ? S.angle[f] : NaN;               // the rule's facing sign, not chin-vs-shoulder
         const d = Number.isFinite(a) ? Math.sign(Math.sin(a * Math.PI / 180)) : 0;
         if (!d) return;                                                      // run_chin_tuck.py gates on dsign != 0
         const front = lead[0] + d * T(7, 'move.shoulder_front_torso') * t;
-        OV.line([front, lead[1] - 30], [front, lead[1] + 60], col, 2.5);      // the shoulder's front, not its joint
-        OV.line([front, chin[1]], chin, col, 2, [3, 3]);
-        const g = d * (chin[0] - front) / t, sc = chinDepthScore(g);
-        if (judged) overlayLabel(chin[0] + 14, chin[1], `${g.toFixed(2)} torso → ${Math.floor(sc)}`, col);
+        const g = d * (chin[0] - front) / t, sc = chinDepthScore(g), col = scoreCol(sc);   // + in front of it
+        G.ref([front, lead[1] - 0.55 * t], [front, lead[1] + 0.25 * t]); G.note([front, lead[1] + 0.25 * t + 9], 'shoulder front', {align: 'center'});
+        if (Math.abs(chin[0] - front) > 2) G.line([front, chin[1]], chin, col, 2.5);
+        G.ring(chin, col, 7, 2.5); G.dot(chin, col, 2.5);
+        ovRow(card, {no, score: sc, text: `the chin ${g > 0 ? 'in front of' : 'behind'} the lead shoulder’s front, in torso lengths`,
+          gauge: {v: g, full: T(7, 'move.score.full'), zero: T(7, 'move.score.zero'), lo: -0.25, hi: T(7, 'move.score.zero') * 1.3, score: sc,
+                  fmt: v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fD(Math.abs(v), 2)}`}});
       }
     },
     tip: (e, x) => {
@@ -1373,20 +1413,22 @@ function bladeLayer(kind) {
     csv: [C.stage, 'runs.csv'], json: [C.stage, `${C.stage}.json`],
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), score: num(r.mean_score)}),
     card: () => '',
-    frameOverlay(f, P, leadLeft, Q) {                      // the line itself, its turn out of the image plane, its score
-      const it = OV.at(`blade_${kind}`, f);
-      const col = !it ? '#8e8e93' : BLADESKIP[it.state] ? '#8e8e93' : BLADECOL[it.state] || '#8e8e93';
+    frameOverlay(f, P, leadLeft, Q) {                      // the line on the body, and its turn from square seen from above
+      const it = OV.at(`blade_${kind}`, f); if (!it || it.state === 'excluded') return;
+      const card = SUBJ.frame();
+      if (BLADESKIP[it.state]) { ovRow(card, {no: C.no, skip: `not judged: ${BLADESKIP[it.state]}`}); return; }
       const [jl, jr] = kind === 'hips' ? [J.lhip, J.rhip] : [J.lsh, J.rsh];
       const a = P(jl), b = P(jr); if (!(a && b)) return;
-      OV.line(a, b, col, 5); OV.dot(a, col, 4); OV.dot(b, col, 4);
       const dx = Q(jl, 3) - Q(jr, 3), dz = Q(jl, 5) - Q(jr, 5);              // the world x and z channels
-      if (!(Number.isFinite(dx) && Number.isFinite(dz))) return;
       const fa = S.hasAngle && S.pose?.[f] ? S.angle[f] : NaN;
-      if (!Number.isFinite(fa)) return;
-      const deg = bladeDeg(dx, dz, fa);
-      const judged = it && !BLADESKIP[it.state];             // gray on the timeline: draw the line, state no number
-      if (judged) overlayLabel((a[0] + b[0]) / 2 - 24, (a[1] + b[1]) / 2 - 20,
-                               `${deg.toFixed(1)}\u00b0 \u2192 ${Math.floor(bladeScore(deg, C.cuts))}`, col);
+      if (!(Number.isFinite(dx) && Number.isFinite(dz) && Number.isFinite(fa))) return;
+      const deg = bladeDeg(dx, dz, fa), sc = bladeScore(deg, C.cuts), col = scoreCol(sc, true);
+      if (G.once(`line${jl}`)) { G.line(a, b, '#ffffff', 3); G.dot(a, '#ffffff', 3.5); G.dot(b, '#ffffff', 3.5); }
+      // from above, facing the opponent (up): square is across, the lead end comes forward as he blades (the fold to
+      // 0-90 keeps no side, so the drawing puts the lead side forward); the ticks are the coach's two cuts
+      const sq = leadLeft ? 270 : 90, fwd = leadLeft ? -1 : 1;
+      ovRow(card, {no: C.no, score: sc, mid: true, text: `${deg.toFixed(0)}\u00b0 from square to the opponent \u00b7 full from ${fN(C.cuts[1])}\u00b0, 0 at ${fN(C.cuts[0])}\u00b0`,
+        dial: {from: sq, sweep: fwd * deg, to: sq + fwd * deg, ticks: C.cuts.map(c => sq + fwd * c), col}});
     },
     tip: (e, x) => {
       const t = `\u00b7 ${fmtT(x.sf / S.fps)} \u00b7 ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
@@ -1442,6 +1484,7 @@ function rotLayer(key, n, part, jl, jr) {
   const name = RN(n);
   return {
     key, label: name, short: name,
+    spanOf: (e, r) => [r?.sfb ?? e.sf, e.ef],
     csv: [`${part}_rotation`, `${part}_rotation.csv`],
     parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), det: num(r.rot_detected_start_impact),
       sfb: num(r.best_start_frame), ie: num(r.rot_impact_end), vsi: r.verdict_start_impact, vie: r.verdict_impact_end,
@@ -1473,12 +1516,17 @@ function rotLayer(key, n, part, jl, jr) {
     frameOverlay(f, P, leadLeft) {                          // per frame, so it shows from the best start, before the detected one
       for (const e of S.punches) {
         const r = e[key];
-        if (!r || r.status !== 'ok' || hid(e) || f < (r.sfb ?? e.sf) || f > e.ef) continue;
-        const l = P(jl), rt = P(jr); if (!(l && rt)) continue;
-        const col = r.vsi === 'good' ? '#34c759' : '#ff3b30';
-        OV.line(l, rt, col, 5, f < e.sf ? [6, 5] : null);  // the line on the body: dashed until the detected start
-        turnDial(e, r, leadLeft, jl, jr, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + (part === 'hip' ? 70 : -40)], col,
-                 {live: f, title: name, slot: key});
+        if (!r || hid(e) || f < (r.sfb ?? e.sf) || f > e.ef) continue;
+        if (r.status !== 'ok') { if (f >= e.sf) ovRow(SUBJ.punch(e), {no: n, skip: rotSkip(r)}); continue; }
+        const l = P(jl), rt = P(jr);
+        // the line on the body, once however many punches read it: white, the cards hold each punch's verdict; dashed
+        // before the detected start
+        if (l && rt && G.once(`line${jl}`)) { G.line(l, rt, '#ffffff', 3, f < e.sf ? [6, 5] : null); G.dot(l, '#ffffff', 3.5); G.dot(rt, '#ffffff', 3.5); }
+        const t = turnDial(e, r, jl, jr, f);
+        const from = (r.sfb ?? e.sf) < e.sf ? ` · from ${e.sf - r.sfb} f early` : '';
+        ovRow(SUBJ.punch(e), t ? {no: n, score: r.score, word: t.growing ? '…' : undefined, wordCol: t.growing ? OC.live : undefined, dial: t.dial,
+                                  text: `from above: ${t.growing ? 'turning' : 'turned'} ${t.sofar.toFixed(0)}° · needs ${rotIv(r)}${from}`}
+                               : {no: n, score: r.score, text: `the ${part}s turned ${r.si.toFixed(0)}° · needs ${rotIv(r)}`});
       }
     },
   };
@@ -1493,7 +1541,9 @@ const RULE_LAYERS = [
     // judged (covered blank, skip_reason excluded): a gray strip over its window.
     key: 'defcov', label: RN(3), short: 'Defend after combos', items: true,
     csv: ['defense_after_combo', 'combos.csv'], json: ['defense_after_combo', 'defense_after_combo.json'],
-    parseItem: (r, num, fps) => r.covered === '' && r.skip_reason
+    // cs / wEnd: the combo's first frame and its window's last, for the card (shown from the combo's start to the
+    // window's end)
+    parseItem: (r, num, fps) => Object.assign(r.covered === '' && r.skip_reason
       ? {covered: null, skip: r.skip_reason, sf: num(r.end_frame), ef: Math.max(num(r.end_frame), Math.round(num(r.window_end_time) * fps) - 1),
          seq: r.sequence, endF: num(r.end_frame)}
       : r.covered === '1'
@@ -1501,6 +1551,20 @@ const RULE_LAYERS = [
          delay: num(r.delay_s), seq: r.sequence, endF: num(r.end_frame)}
       : {covered: false, sf: num(r.end_frame), ef: Math.max(num(r.end_frame), Math.round(num(r.window_end_time) * fps) - 1),
          seq: r.sequence, endF: num(r.end_frame), cut: r.cut_by_punch === '1'},
+      {cs: num(r.start_frame), wEnd: Math.max(num(r.end_frame), Math.round(num(r.window_end_time) * fps) - 1)}),
+    frameOverlay(f) {                                      // the combo and its window: covered or not, on the combo's card
+      for (const x of S.items.defcov || []) {
+        if (!(x.cs != null && f >= x.cs && f <= Math.max(x.ef, x.wEnd))) continue;
+        const card = SUBJ.combo({sf: x.cs, ef: x.endF, seq: x.seq}, 'offensive');
+        if (x.covered === null) { ovRow(card, {no: 3, skip: SKIPTXT[x.skip] || x.skip}); continue; }
+        const win = THR(() => `${fN(T(3, 'move.window_after_s'))} s`, '…'), left = (x.wEnd + 1 - f) / S.fps;
+        const watch = f > x.endF && f <= x.wEnd ? ` · ${left.toFixed(1)} s of the window left` : '';
+        ovRow(card, x.covered
+          ? {no: 3, word: 'covered', wordCol: OC.good, text: `${x.side ? x.side + ' ' : ''}${(styleD(x.type)?.name || x.type).toLowerCase()} `
+              + `${x.delay >= 0 ? `${x.delay.toFixed(2)} s after it` : 'during it'}`}
+          : {no: 3, word: 'none', wordCol: OC.bad, text: `no defensive move during it or in the ${x.cut ? 'time to the next punch' : win} after it${watch}`});
+      }
+    },
     card: () => '',
     tip: (e, x) => x.covered === null
       ? `<b>Not judged</b> · ${fmtT(x.endF / S.fps)}<br><span class="m">${x.seq.replaceAll(' > ', ' \u203a ')}</span><br>`
@@ -1579,12 +1643,17 @@ const RULE_LAYERS = [
       const win = Math.round(T(13, 'move.window_after_s') * S.fps), need = T(13, 'move.min_change_deg');
       const items = S.items.anglechg || [];
       const it = items.find(x => f >= x.sf && f <= x.ef) || [...items].reverse().find(x => f > x.ef && f <= x.ef + win);
-      if (!it || it.during == null || !S.hasAngle || !S.pose[f]) return;
+      if (!it) return;
+      const card = SUBJ.combo(it, 'combined');
+      if (it.changed !== 'yes' && it.changed !== 'no') { ovRow(card, {no: 13, skip: it.skip === 'excluded' || it.skip === 'window_in_edge'
+        ? 'not judged: it reaches into the video’s excluded time' : 'not judged: no facing angle during it or in the window after it'}); return; }
+      if (it.during == null || !S.hasAngle || !S.pose[f]) return;
+      // from above: up is where he faced during the combo, the solid line where he faces now, the ticks the turn that counts
       const during = S.mirrored ? -it.during : it.during, now = S.angle[f];
-      const d = Math.abs((((now - during) % 360) + 540) % 360 - 180);
-      overlayLabel(12, videoRect().H - 44, `${RN(13)} · ${f <= it.ef ? 'in the combo' : 'after the combo'}: facing `
-        + `${fN(+during.toFixed(1))}° during it, ${now.toFixed(1)}° now · turned ${d.toFixed(0)}° of ${fN(need)}°`,
-        d >= need ? '#34c759' : '#e5e5ea');
+      const turn = (((now - during) % 360) + 540) % 360 - 180, d = Math.abs(turn);
+      ovRow(card, {no: 13, score: it.score, mid: true, dial: {ray: true, from: 180, sweep: turn, to: 180 + turn, ticks: [180 - need, 180 + need],
+        col: d >= need ? OC.good : OC.live}, text: `${f <= it.ef ? 'in the combo' : `${((f - it.ef) / S.fps).toFixed(1)} s after it`}: `
+        + `turned ${d.toFixed(0)}° of the ${fN(need)}° that count · after it ${it.deg?.toFixed(0) ?? '–'}° at most`});
     },
   },
   {
@@ -1615,6 +1684,16 @@ const RULE_LAYERS = [
       if (w >= 12) {
         c.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
         c.fillStyle = 'rgba(0,0,0,0.72)'; c.textAlign = 'center'; c.fillText(PUNCH[x.type]?.l || '?', x0 + w / 2, y + h / 2 + 0.5);
+      }
+    },
+    frameOverlay(f) {                                      // the punch under the playhead: one of the round's two most used?
+      const js = S.layerSum.varpunch; if (!js?.top2_types) return;
+      for (const x of (S.items.varpunch || []).filter(x => f >= x.sf && f <= x.ef)) {
+        const e = punchOf(x.sf, x.hand); if (!e || hid(e)) continue;
+        const top = js.top2_types.includes(x.type), nm = t => (PUNCH[t]?.name || t).toLowerCase();
+        ovRow(SUBJ.punch(e), exclHits(x.sf, x.ef) ? {no: 27, skip: 'not counted: in the video’s excluded time'}
+          : {no: 27, word: top ? 'top 2' : 'other', wordCol: top ? VARCOL.top : VARCOL.other,
+             text: `${js.top2_types.map(nm).join(' + ')} are ${pct(js.top2_share)} of the punches${THR(() => ` · full marks up to ${fP(T(27, 'round.score.full'))} %`, '')}`});
       }
     },
   },
@@ -1650,6 +1729,19 @@ const RULE_LAYERS = [
       c.globalAlpha = 1;
       if (!x.side) skipStrip(c, x0, w, y + h / 2 + hh / 2, on, 'no_side');                                          // side
     },
+    frameOverlay(f) {                                      // the move under the playhead: the most used type, the most used side?
+      const js = S.layerSum.vardef; if (!js) return;
+      for (const x of (S.items.vardef || []).filter(x => f >= x.sf && f <= x.ef)) {
+        const d = S.defenses.find(m => m.sf === x.sf && m.type === x.type); if (!d || hid(d)) continue;
+        const mv = js.same_move, sd = js.same_side, topT = x.type === mv.top_type, topS = !!x.side && x.side === sd.top_side;
+        const nm = t => (DEF[t]?.name || t || '').toLowerCase();
+        if (mv.top_type == null) { ovRow(SUBJ.move(d), {no: 29, word: 'not rated', wordCol: OC.mute,
+          text: `${js.n_moves} move${js.n_moves === 1 ? '' : 's'} in the round; it needs ${js.thresholds?.min_moves ?? '…'}`}); continue; }
+        ovRow(SUBJ.move(d), {no: 29, word: topT ? 'most used' : 'other', wordCol: topT ? VARCOL.top : VARCOL.other,
+          text: `${nm(mv.top_type)}s are ${pct(mv.top_type_share)} of the moves · side: ${x.side
+            ? sd.top_side == null ? 'too few with one to rate' : `${topS ? 'the most used' : 'the other'} (${sd.top_side} ${pct(sd.top_side_share)})` : 'none, not counted'}`});
+      }
+    },
   },
   {
     // rule 43, form fades when tired (form_fade/thirds.csv + form_fade.json): the two thirds of the judged time it
@@ -1672,6 +1764,11 @@ const RULE_LAYERS = [
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x, w = Math.max(2, x1 - x0);
       c.fillStyle = FADECOL[x.third]; c.globalAlpha = on ? 0.9 : 0.7; rr(x0, y + 4, w, h - 8, 3); c.fill(); c.globalAlpha = 1;
       if (x.score != null) tag(x0, w, y, h, `${x.third} third ${x.score.toFixed(1)}`);
+    },
+    frameOverlay(f) {                                      // in a third it compares: that third's mean form score
+      const x = OV.at('formfade', f), js = S.layerSum.formfade; if (!x) return;
+      ovRow(SUBJ.frame(), {no: 43, word: `${x.third} third`, wordCol: FADECOL[x.third] || OC.text,
+        text: `the form rules here average ${x.score == null ? '–' : x.score.toFixed(0)} · first → last third: −${js?.fade ?? '–'} points → ${js?.score ?? 'not rated'}`});
     },
   },
   {
@@ -1709,6 +1806,15 @@ const RULE_LAYERS = [
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
       c.fillStyle = FADECOL[x.win]; c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 11, Math.max(2, x1 - x0 - 1), h - 14, 3); c.fill(); c.globalAlpha = 1;
     },
+    frameOverlay(f) {                                      // inside a window it compares: how many punches it counted
+      const D = fadeWins(); if (!D) return;
+      const t = f / S.fps, w = D.wins.find(v => t >= v.a && t <= v.b), js = S.layerSum.fade;
+      if (!w) { if (D.wins.length && t > D.wins[0].a && t < D.wins[D.wins.length - 1].b)
+        ovRow(SUBJ.frame(), {no: 26, word: '–', wordCol: OC.text2, text: 'between the two windows it compares: not counted'}); return; }
+      ovRow(SUBJ.frame(), {no: 26, word: w.name === 'middle' ? 'middle' : `${w.n} punches`, wordCol: FADECOL[w.name],
+        text: w.name === 'middle' ? 'the middle third: not compared'
+          : `the ${w.name} window, ${w.a.toFixed(0)}–${w.b.toFixed(0)} s · drop ${js?.drop == null ? '–' : Math.round(js.drop * 100) + ' %'} → ${js?.score ?? 'not rated'}`});
+    },
   },
   {
     // rule 28, body shots (bodyshots.json, over punch_impact/impacts.csv): the punches it counts — hooks and uppercuts
@@ -1738,6 +1844,17 @@ const RULE_LAYERS = [
       } else {                                                // a head hook / uppercut: the total, not the share
         c.strokeStyle = css('--text3') || '#aeaeb2'; c.lineWidth = 1.5; c.globalAlpha = on ? 1 : 0.8;
         rr(x0 + 0.75, y + 5.75, Math.max(2, w - 1.5), h - 11.5, 3); c.stroke(); c.globalAlpha = 1;
+      }
+    },
+    frameOverlay(f) {                                      // a hook or uppercut under the playhead: body or head?
+      const js = S.layerSum.bodyshot;
+      for (const x of (S.items.bodyshot || []).filter(x => f >= x.sf && f <= x.ef)) {
+        const e = punchOf(x.sf, x.hand); if (!e || hid(e)) continue;
+        const body = x.type === 'hook_or_uppercut';
+        ovRow(SUBJ.punch(e), exclHits(x.sf, x.ef) ? {no: 28, skip: 'not counted: in the video’s excluded time'}
+          : {no: 28, word: body ? 'body' : 'head', wordCol: body ? BODYCOL : OC.text2,
+             text: `${body ? 'a body shot: the share the rule wants' : 'to the head: counts in the total only'}`
+               + (js ? ` · ${js.n_body} of ${js.n_hooks_uppercuts} hooks and uppercuts to the body` : '')});
       }
     },
   },
@@ -1772,6 +1889,15 @@ const RULE_LAYERS = [
         c.fillStyle = 'rgba(0,0,0,0.72)'; c.textAlign = 'center'; c.fillText(PUNCH[x.type]?.l || '?', x0 + w / 2, yy + hh / 2 + 0.5);
       }
     },
+    frameOverlay(f) {                                      // the punch under the playhead: which hand, and the round's split
+      const js = S.layerSum.handbal, range = v => Array.isArray(v) ? v.map(fP).join('–') : fP(v);
+      for (const x of (S.items.handbal || []).filter(x => f >= x.sf && f <= x.ef)) {
+        const e = punchOf(x.sf, x.hand); if (!e || hid(e)) continue;
+        ovRow(SUBJ.punch(e), exclHits(x.sf, x.ef) ? {no: 5, skip: 'not counted: in the video’s excluded time'}
+          : {no: 5, word: x.hand, wordCol: HANDCOL[x.hand], text: js ? `the rear hand threw ${pct(js.rear_share)} of the round’s punches`
+             + THR(() => ` · full marks at ${range(T(5, 'round.score.full'))} %`, '') : ''});
+      }
+    },
   },
   {
     // rule 25, dead time (work_rate/segments.csv): the whole video as runs — work (a punch or a defensive move covers it),
@@ -1793,6 +1919,14 @@ const RULE_LAYERS = [
         c.fillStyle = '#fff'; c.font = '600 10px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle';
         c.fillText(`${x.s.toFixed(1)}s`, (x0 + x1) / 2, y + h / 2); c.textAlign = 'left'; c.textBaseline = 'alphabetic';
       }
+    },
+    frameOverlay(f) {                                      // what this frame counts as: work, a turn, a pause or dead time
+      if (exclAt((f + 0.5) / S.fps)) return;
+      const x = OV.at('work', f), gap = THR(() => `${fN(T(25, 'move.min_dead_gap_s'))} s`, '…');
+      ovRow(SUBJ.frame(), !x ? {no: 25, word: 'pause', wordCol: OC.text2, text: `a short pause: under ${gap}, not dead time`}
+        : x.kind === 'dead' ? {no: 25, word: `${((f + 1 - x.sf) / S.fps).toFixed(1)} s`, wordCol: OC.bad,
+                               text: `dead time: nothing for ${gap} or more · this stretch ${x.s.toFixed(1)} s`}
+        : {no: 25, word: x.kind === 'turn' ? 'turning' : 'working', wordCol: WORKKIND[x.kind]?.c || OC.good, text: WORKKIND[x.kind]?.why || ''});
     },
   },
   {
@@ -1818,6 +1952,12 @@ const RULE_LAYERS = [
         c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(xc, y + 1); c.lineTo(xc, y + h - 1); c.stroke();
       }
     },
+    frameOverlay(f) {                                      // the stance held here, and a change as it happens
+      const x = OV.at('stchg', f), win = THR(() => `${fN(T(34, 'move.window_s'))} s`, '…');
+      ovRow(SUBJ.frame(), !x ? {no: 34, word: 'not held', wordCol: OC.text2, text: `no one stance for ${win} here`}
+        : {no: 34, word: x.state, wordCol: STANCEROW[x.state], text: x.change && f - x.sf < 2 * S.fps
+            ? `a stance change: held the other way before` : `held ${((f + 1 - x.sf) / S.fps).toFixed(0)} of ${((x.ef + 1 - x.sf) / S.fps).toFixed(0)} s`});
+    },
   },
   {
     // rule 37, combos too long (combo_too_long/combos.csv): every combined combination of move.min_elements moves or
@@ -1839,6 +1979,12 @@ const RULE_LAYERS = [
       c.fillStyle = x.judged ? '#ff3b30' : '#8e8e93'; c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 4, w, h - 8, 4); c.fill(); c.globalAlpha = 1;
       tag(x0, w, y, h, `${x.n}`);
     },
+    frameOverlay(f) {                                      // a combination of too many moves, on its card
+      const x = OV.at('longcombo', f); if (!x) return;
+      ovRow(SUBJ.combo(x, 'combined'), x.judged ? {no: 37, word: `${x.n} moves`, wordCol: OC.bad,
+        text: THR(() => `${fN(T(37, 'move.min_elements'))} moves or more without a pause: too long`)}
+        : {no: 37, skip: 'not counted: it reaches into the video’s excluded time'});
+    },
   },
   {
     // rule 38, solo punches (solo_punches/punches.csv): every judged punch in no combined combination (rule 31's, the
@@ -1853,6 +1999,13 @@ const RULE_LAYERS = [
       const x0 = Math.max(L, tx(x.sf / fps)), x1 = tx((x.ef + 1) / fps); if (x1 <= L) return;
       const f = frameNow(), on = f >= x.sf && f <= x.ef || V.hover === x;
       c.fillStyle = '#ff9f0a'; c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 5, Math.max(3, x1 - x0 - 1), h - 10, 3); c.fill(); c.globalAlpha = 1;
+    },
+    frameOverlay(f) {                                      // a solo punch under the playhead, on its card
+      for (const x of (S.items.solo || []).filter(x => f >= x.sf && f <= x.ef)) {
+        const e = punchOf(x.sf, x.hand); if (!e || hid(e)) continue;
+        ovRow(SUBJ.punch(e), {no: 38, word: 'solo', wordCol: '#ff9f0a',
+          text: THR(() => `no punch or defensive move within ${fN(T(31, 'move.max_gap_s'))} s before or after it`)});
+      }
     },
   },
   {
@@ -1878,20 +2031,12 @@ const RULE_LAYERS = [
       c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 4, w, h - 8, 4); c.fill(); c.globalAlpha = 1;
       if (!x.excl) tag(x0, w, y, h, x.score.toFixed(1));
     },
-    frameOverlay(f) {                                      // inside a combination: where each of its fists landed
+    frameOverlay(f, P) {                                   // inside a combination: where each of its fists landed
       const it = OV.at('samespot', f); if (!it) return;
-      const col = it.excl ? '#8e8e93' : it.verdict === 'same_spot' ? '#34c759' : '#ff3b30';
-      const pts = it.fists.map(q => ({...q, p: PXY(S.mirrored ? 1 - q.nx : q.nx, q.ny)})).filter(q => q.p);
-      if (pts.length < 2) return;
-      const xs = pts.map(q => q.p[0]), ys = pts.map(q => q.p[1]);
-      const lo = Math.min(...xs), hi = Math.max(...xs), top = Math.min(...ys) - 70, bot = Math.max(...ys) + 70;
-      OV.line([lo, top], [lo, bot], col, 2, [5, 4]); OV.line([hi, top], [hi, bot], col, 2, [5, 4]);   // the spread
-      for (const q of pts) {
-        const pc = PUNCH[q.type]?.c || '#fff';
-        OV.ring(q.p, pc, q.f === f ? 13 : 9, 3);                                 // each landing spot; this frame's bigger
-      }
-      overlayLabel(lo, top - 12, it.excl ? `${RN(40)} · not judged (excluded time)`
-        : `${RN(40)} · fists ${it.spread.toFixed(2)} torso apart → ${it.score.toFixed(1)}`, col);
+      spotsGlyph(it, f, P, 'x');
+      ovRow(SUBJ.combo(it, 'offensive'), it.excl ? {no: 40, skip: 'not judged: it reaches into the video’s excluded time'}
+        : {no: 40, score: it.score, text: `the fists land ${it.spread.toFixed(2)} torso apart across the picture (${it.fists.length} read front-on)`,
+           gauge: {v: it.spread, full: T(40, 'move.score.full'), zero: T(40, 'move.score.zero'), lo: 0, hi: T(40, 'move.score.zero') * 1.3, score: it.score}});
     },
   },
   {
@@ -1918,20 +2063,12 @@ const RULE_LAYERS = [
       c.globalAlpha = on ? 1 : 0.85; rr(x0, y + 4, w, h - 8, 4); c.fill(); c.globalAlpha = 1;
       if (!x.excl) tag(x0, w, y, h, x.score.toFixed(1));
     },
-    frameOverlay(f) {                                      // inside a combination: how high each of its fists landed
+    frameOverlay(f, P) {                                   // inside a combination: how high each of its fists landed
       const it = OV.at('sameheight', f); if (!it) return;
-      const col = it.excl ? '#8e8e93' : it.verdict === 'one_height' ? '#34c759' : '#ff3b30';
-      const pts = it.fists.map(q => ({...q, p: PXY(S.mirrored ? 1 - q.nx : q.nx, q.ny)})).filter(q => q.p);
-      if (pts.length < 2) return;
-      const xs = pts.map(q => q.p[0]), ys = pts.map(q => q.p[1]);
-      const top = Math.min(...ys), bot = Math.max(...ys), left = Math.min(...xs) - 70, right = Math.max(...xs) + 70;
-      OV.line([left, top], [right, top], col, 2, [5, 4]); OV.line([left, bot], [right, bot], col, 2, [5, 4]);   // the spread
-      for (const q of pts) {
-        const pc = PUNCH[q.type]?.c || '#fff';
-        OV.ring(q.p, pc, q.f === f ? 13 : 9, 3);                                 // each landing spot; this frame's bigger
-      }
-      overlayLabel(left, top - 12, it.excl ? `${RN(44)} · not judged (excluded time)`
-        : `${RN(44)} · fists ${it.spread.toFixed(2)} torso apart up and down → ${it.score.toFixed(1)}`, col);
+      spotsGlyph(it, f, P, 'y');
+      ovRow(SUBJ.combo(it, 'offensive'), it.excl ? {no: 44, skip: 'not judged: it reaches into the video’s excluded time'}
+        : {no: 44, score: it.score, text: `the fists land ${it.spread.toFixed(2)} torso apart up and down (${it.fists.length} head punches read side-on)`,
+           gauge: {v: it.spread, full: T(44, 'move.score.full'), zero: T(44, 'move.score.zero'), lo: 0, hi: T(44, 'move.score.zero') * 1.3, score: it.score}});
     },
   },
   slipLayer(14), slipLayer(15),
@@ -1965,28 +2102,23 @@ const RULE_LAYERS = [
       ring(e, 'drop', bx, yy - 2, w, hh + 3);
     },
     frameOverlay(f, P, leadLeft, Q, torso) {               // inside the 0.25 s before a punch: what the rule reads
-      // windows overlap other punches all the time (a cross starting while the jab is out), so every window that
-      // holds this frame draws, each on its own wrist, each label named by hand
-      const es = S.punches.filter(p => p.drop?.verdict && f >= p.drop.a && f <= p.drop.b && !hid(p)); if (!es.length) return;
-      const nose = P(J.nose), sh = P(J.lsh), sh2 = P(J.rsh), t = torso(); if (!(nose && sh && sh2 && t)) return;
+      // windows overlap other punches all the time (a cross starting while the jab is out): every window holding this
+      // frame draws on its own wrist, each on its own punch's card; the card stays through the punch
       const low = T(2, 'move.score.full'), zero = T(2, 'move.score.zero'), minVis = H(2, 'min_visibility');
-      const x0 = Math.min(sh[0], sh2[0]) - 50, x1 = Math.max(sh[0], sh2[0]) + 50;
-      OV.level(nose[1], x0, x1, '#8e8e93', [3, 4]);                  // the nose
-      OV.level(nose[1] + low * t, x0, x1, '#8e8e93');                // the low line below it: 100 down to here
-      OV.level(nose[1] + zero * t, x0, x1, '#8e8e93', [2, 6]);       // the zero line: the score is 0 from here down
-      overlayLabel(x1 + 6, nose[1] + low * t, '100', '#8e8e93');
-      overlayLabel(x1 + 6, nose[1] + zero * t, '0', '#8e8e93');
-      for (const e of es) {
-        const x = e.drop, wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
-        const col = x.verdict === 'low' ? '#ff3b30' : '#34c759', name = `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()}`;
-        OV.level(nose[1] + x.drop * t, x0, x1, col);                 // this window's mean, the number that decides
-        OV.trail(x.a, f, wr, col);                                   // its wrist so far in the window
-        // this frame's own reading, with the rule's gate: nose, shoulders, hip points and the wrist at the house visibility
-        const seen = [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, wr].every(j => visAt(f, j, 2) >= minVis);
-        const w = P(wr), now = seen && w ? (w[1] - nose[1]) / t : null;
-        if (w) OV.ring(w, seen ? col : '#8e8e93', 11, 3);
-        overlayLabel(x0, nose[1] - 16,
-          `${name} in ${x.b - f + 1} f · mean ${x.drop.toFixed(3)} → ${x.score.toFixed(1)} · this frame ${now == null ? 'not read' : now.toFixed(3)}`, col);
+      for (const e of S.punches) {
+        const x = e.drop; if (!x || hid(e)) continue;
+        if (!x.verdict) { if (f >= e.sf && f <= e.ef) ovRow(SUBJ.punch(e), {no: 2, skip: x.skip === 'excluded' ? skipTxt('excluded') : 'not judged: no readable frame in the window before the punch'}); continue; }
+        if (!(f >= x.a && f <= Math.max(x.b, e.ef))) continue;
+        ovRow(SUBJ.punch(e), {no: 2, score: x.score, text: `the wrist before the punch: ${x.drop.toFixed(2)} torso under the nose, the mean of ${x.n} frames`,
+          gauge: {v: x.drop, full: low, zero, lo: 0, hi: zero * 1.35, score: x.score}});
+        if (f > x.b) continue;                              // the geometry: inside the window only
+        const nose = P(J.nose), t = torso(), wr = wristOf(e), w = P(wr); if (!(nose && t && w)) continue;
+        // the line the wrist has to start at or above (full marks), beside the wrist; its path so far in the window; and
+        // this frame's own reading, with the rule's gate: nose, shoulders, hips and the wrist at the house visibility
+        const y = nose[1] + low * t, seen = [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, wr].every(j => visAt(f, j, 2) >= minVis);
+        G.ref([w[0] - 0.4 * t, y], [w[0] + 0.4 * t, y]); G.note([w[0] + 0.4 * t + 6, y], 'start line');
+        G.trail(x.a, f, wr, scoreCol(x.score), 3);
+        seen ? G.dot(w, scoreCol(x.score), 5) : G.hollow(w, '#ffffff', 6);
       }
     },
   },
@@ -2027,30 +2159,24 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'resting', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                        // the resting wrist at the three frames read, and the scale
-      if (!x.verdict || e.impact == null) return;
-      const low = T(6, 'move.score.full'), zero = T(6, 'move.score.zero'), offs = restOffs();
-      const wr = (x.rest === 'lead') === leadLeft ? J.lwr : J.rwr;
-      const at = j => PAT(e.impact, j);                    // the scale is drawn at the impact frame
-      const nose = at(J.nose), sh = at(J.lsh), sh2 = at(J.rsh), hip = at(J.lhip), hip2 = at(J.rhip);
-      if (!(nose && sh && sh2 && hip && hip2)) return;
-      const torso = Math.hypot((sh[0] + sh2[0]) / 2 - (hip[0] + hip2[0]) / 2, (sh[1] + sh2[1]) / 2 - (hip[1] + hip2[1]) / 2);
-      const col = x.verdict === 'drops' ? '#ff3b30' : '#34c759';
-      const x0 = Math.min(sh[0], sh2[0]) - 40, x1 = Math.max(sh[0], sh2[0]) + 40;
-      OV.level(nose[1] + low * torso, x0, x1, '#8e8e93');                  // 100 down to here
-      OV.level(nose[1] + zero * torso, x0, x1, '#8e8e93', [2, 6]);         // 0 from here
-      overlayLabel(x1 + 6, nose[1] + low * torso, '100', '#8e8e93');
-      overlayLabel(x1 + 6, nose[1] + zero * torso, '0', '#8e8e93');
-      OV.level(nose[1] + x.drop * torso, x0, x1, col);                     // the weighted reading
-      // where it is read — the CSV's drop_before / drop_0 / drop_after; the before / after parts drawn at their outermost frame
-      for (const [off, r, v] of [[offs[0], 7, x.m2], [offs[1], 12, x.d0], [offs[2], 7, x.p2]]) {
-        if (v == null) continue;                                             // a frame the rule could not read
-        const q = PAT(e.impact + off, wr); if (q) OV.ring(q, col, r, off ? 2 : 3);
-        OV.line([x1 - 16, nose[1] + v * torso], [x1, nose[1] + v * torso], col, off ? 2 : 3);   // its reading, own nose + torso
+    overlay(e, x, f, P, leadLeft) {                        // the resting wrist around the impact, against its guard line
+      const card = SUBJ.punch(e);
+      if (!x.verdict) { ovRow(card, {no: 6, skip: x.skip === 'no_impact_frame' ? 'not judged: no impact frame for this punch'
+        : x.skip === 'excluded' ? skipTxt('excluded') : 'not judged: the resting wrist is not visible around the impact'}); return; }
+      const low = T(6, 'move.score.full'), zero = T(6, 'move.score.zero'), offs = restOffs(), col = scoreCol(x.score);
+      ovRow(card, {no: 6, score: x.score, text: `the ${x.rest} hand, not punching: ${x.drop.toFixed(2)} torso under the nose around the impact (${restWeights()})`,
+        gauge: {v: x.drop, full: low, zero, lo: 0, hi: zero * 1.3, score: x.score}});
+      const a = G.near(f, e.impact, 4); if (!a) return;    // the geometry: around the impact, at the frames it was read
+      const wr = (x.rest === 'lead') === leadLeft ? J.lwr : J.rwr, nose = PAT(e.impact, J.nose), t = torsoAt(e.impact), w0 = PAT(e.impact, wr);
+      if (!(nose && t && w0)) return;
+      const y = nose[1] + low * t;                          // the line it has to stay at or above, on the impact frame
+      G.ref([w0[0] - 0.4 * t, y], [w0[0] + 0.4 * t, y], 0.9 * a); G.note([w0[0] + 0.4 * t + 6, y], 'guard line', {a});
+      for (const [off, v] of [[offs[0], x.m2], [offs[1], x.d0], [offs[2], x.p2]]) {   // drop_before / drop_0 / drop_after
+        if (v == null) continue;                            // a frame the rule could not read
+        const q = PAT(e.impact + off, wr); if (!q) continue;
+        off ? G.hollow(q, col, 5, a) : G.ring(q, col, 8, 3, null, a);
       }
-      const now = P(wr); if (now && Math.abs(f - e.impact) > Math.max(...offs.map(Math.abs))) OV.dot(now, col, 4);
-      overlayLabel(x0, nose[1] + x.drop * torso - 16,
-        `resting ${x.rest} wrist · ${x.drop.toFixed(3)} torso below the nose → ${x.score.toFixed(1)}`, col);
+      if (Math.abs(w0[1] - y) > 2) G.line([w0[0], y], w0, col, 2.5, null, a);
     },
   },
   {
@@ -2087,28 +2213,32 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'bal', bx, y, w, h);
     },
-    overlay(e, x, f, P) {                                  // the base between the ankles, the nose over it, the hip centre
-      if (!x.verdict || e.impact == null) return;
-      const at = j => PAT(e.impact, j);                    // the rule reads the IMPACT frame, not the playhead
+    overlay(e, x, f, P) {                                  // at the impact: the base between the ankles, the nose and the hips over it
+      const card = SUBJ.punch(e);
+      if (!x.verdict) { ovRow(card, {no: 1, skip: x.skip === 'not_side_on' ? `not judged: not side-on (it judges ${THR(() => camRange(1), '…')})`
+        : x.skip === 'no_impact_frame' ? 'not judged: no impact frame' : x.skip === 'no_facing' ? 'not judged: no facing angle at the impact'
+        : x.skip === 'excluded' ? skipTxt('excluded') : 'not judged: the nose, a hip or an ankle is not visible at the impact'}); return; }
+      const hp = T(1, 'move.head.points'), pp = T(1, 'move.hips.points'), hs = 100 * x.headScore / hp, ps = 100 * x.hipsScore / pp;
+      ovRow(card, {no: 1, score: x.score, text: 'at the impact, in ankle-to-ankle widths: the nose past an ankle, the hips off the middle',
+        parts: [{label: 'nose', v: Math.max(0, -x.head, x.head - 1), full: T(1, 'move.head.full'), zero: T(1, 'move.head.zero'), lo: 0, hi: T(1, 'move.head.zero') * 1.3, score: hs},
+                {label: 'hips', v: x.off, full: T(1, 'move.hips.full'), zero: T(1, 'move.hips.zero'), lo: 0, hi: T(1, 'move.hips.zero') * 1.3, score: ps}]});
+      const a = G.near(f, e.impact, 4); if (!a) return;    // the rule reads the IMPACT frame: drawn around it, where it was
+      const at = j => PAT(e.impact, j);
       const la = at(J.lan), ra = at(J.ran), nose = at(J.nose), lh = at(J.lhip), rh = at(J.rhip);
       if (!(la && ra && nose && lh && rh)) return;
       const slack = T(1, 'move.head.full'), hipSlack = T(1, 'move.hips.full');
       const lo = la[0] < ra[0] ? la : ra, hi = la[0] < ra[0] ? ra : la;
-      const y = (la[1] + ra[1]) / 2, span = hi[0] - lo[0], mid = (lo[0] + hi[0]) / 2;
-      const hipx = (lh[0] + rh[0]) / 2, hipy = (lh[1] + rh[1]) / 2;
-      OV.line([lo[0], y], [hi[0], y], x.headOk ? '#34c759' : '#ff3b30', 4);   // the base itself
-      for (const px of [lo[0], hi[0]]) OV.line([px, y - 9], [px, y + 9], x.headOk ? '#34c759' : '#ff3b30', 3);
-      for (const px of [lo[0] - slack * span, hi[0] + slack * span])    // how far past an ankle the nose may go
-        OV.line([px, y - 12], [px, y + 12], x.headOk ? '#34c759' : '#ff3b30', 1.5, [3, 3]);
-      const hc = x.hipsOk ? '#34c759' : '#ff3b30';         // the middle, with the slack the hip centre is allowed
-      OV.line([mid - hipSlack * span, y - 5], [mid - hipSlack * span, y + 5], hc, 2);
-      OV.line([mid + hipSlack * span, y - 5], [mid + hipSlack * span, y + 5], hc, 2);
-      OV.line([mid, y - 3], [mid, y + 3], hc, 1.5);
-      OV.line([hipx, hipy], [hipx, y], hc, 2, [4, 4]); OV.dot([hipx, hipy], hc, 4.5);
-      const headCol = x.headOk ? '#34c759' : '#ff3b30';
-      OV.line([nose[0], nose[1]], [nose[0], y], headCol, 2.5, [6, 4]); OV.ring(nose, headCol, 13, 3);
-      overlayLabel(Math.min(lo[0], nose[0]) - 10, y + 26,
-        `nose ${(S.mirrored ? 1 - x.head : x.head).toFixed(2)} · hip centre ${x.off.toFixed(2)} off the middle${x.score != null ? ` → ${x.score.toFixed(1)}` : ''}`, x.verdict === 'balanced' ? '#34c759' : '#ff3b30');
+      const y = Math.max(la[1], ra[1]) + 14, span = hi[0] - lo[0], mid = (lo[0] + hi[0]) / 2;
+      const hipx = (lh[0] + rh[0]) / 2, hipy = (lh[1] + rh[1]) / 2, nc = scoreCol(hs), hc = scoreCol(ps);
+      // the base, ankle to ankle; the nose's slack past each ankle dashed; the hips' middle zone on it
+      G.ref([lo[0] - slack * span, y], [lo[0], y], 0.75 * a); G.ref([hi[0], y], [hi[0] + slack * span, y], 0.75 * a);
+      G.line([lo[0], y], [hi[0], y], '#ffffff', 2, null, a);
+      for (const px of [lo[0], hi[0]]) G.line([px, y - 6], [px, y + 6], '#ffffff', 2, null, a);
+      G.line([mid - hipSlack * span, y], [mid + hipSlack * span, y], OC.good, 6, null, 0.45 * a);
+      // the nose and the hip centre, dropped onto it
+      G.line(nose, [nose[0], y - 8], nc, 1.5, [4, 4], a); G.line([hipx, hipy], [hipx, y], hc, 1.5, [4, 4], a);
+      basePointer([nose[0], y], nc, a); G.dot([hipx, y], hc, 5, a);
+      G.note([nose[0], y - 20], 'nose', {align: 'center', a}); G.note([hipx, y + 15], 'hips', {align: 'center', a});
     },
   },
   {
@@ -2144,25 +2274,25 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'hookstop', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                        // the far shoulder it should stop at, and where it did
-      if (!x.verdict || x.lineNx == null) return;
-      const wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr;
-      const lsh = P(J.lsh), rsh = P(J.rsh), w = P(wr);
-      if (!(lsh && rsh && w)) return;
+    overlay(e, x, f, P, leadLeft) {                        // at the turnaround: how far across the fist went
+      if (e.type !== 'hook') return;                        // head hooks only; a body hook is the body-shot class
+      const card = SUBJ.punch(e);
+      if (!x.verdict) { ovRow(card, {no: 32, skip: x.skip === 'not_front_or_back_on' ? 'not judged: not thrown front-on or back-on'
+        : x.skip === 'shoulders_on_top_of_each_other' ? 'not judged: the shoulders overlap in the picture' : `not judged: ${skipTxt(x.skip)}`}); return; }
       const nx = v => v == null ? null : S.mirrored ? 1 - v : v;          // image x from a mirrored run, flipped back
-      const line = PXY(nx(x.lineNx), 0); if (!line) return;
-      const col = x.verdict === 'stops' ? '#34c759' : '#ff3b30';
-      const yTop = Math.min(lsh[1], rsh[1]) - 60, yBot = Math.max(lsh[1], rsh[1]) + 90;
-      const centre = PXY(nx(x.centreNx), 0), zero = PXY(nx(x.zeroNx), 0);
-      const cx = centre ? centre[0] : (lsh[0] + rsh[0]) / 2;
-      OV.line([cx, yTop], [cx, yBot], '#34c759', 3);                          // the centre line: 100 up to here
-      OV.line([line[0], yTop + 20], [line[0], yBot - 20], '#8e8e93', 1.5, [4, 4]);   // his far shoulder, for reference
-      if (zero) OV.line([zero[0], yTop], [zero[0], yBot], '#ff3b30', 3);      // a third of a torso past it: 0
-      const wpt = PAT(e.impact, wr) || w;
-      OV.line([cx, wpt[1]], wpt, col, 2, [3, 3]); OV.ring(wpt, col, 12, 3);
-      if (f !== e.impact) OV.dot(w, col, 4);
-      overlayLabel(Math.min(cx, wpt[0], zero ? zero[0] : cx) - 10, yTop - 8,
-        `score ${x.score.toFixed(1)} · ${x.cross > 0 ? '+' : ''}${x.cross.toFixed(3)} torso past the far shoulder`, col);
+      const cx = PXY(nx(x.centreNx), 0)?.[0], lx = PXY(nx(x.lineNx), 0)?.[0], zx = PXY(nx(x.zeroNx), 0)?.[0];
+      const wpt = e.impact != null ? PAT(e.impact, wristOf(e)) : null, ok = [cx, lx, zx].every(Number.isFinite) && zx !== cx;
+      const u = ok && wpt ? (wpt[0] - cx) / (zx - cx) : 1 - x.score / 100;  // 0 at his centre line, 1 at the zero line
+      const us = ok ? (lx - cx) / (zx - cx) : null, col = scoreCol(x.score);
+      ovRow(card, {no: 32, score: x.score, text: `where the hook stopped: ${Math.abs(x.cross).toFixed(2)} torso ${x.cross > 0 ? 'past' : 'short of'} his far shoulder`,
+        gauge: {v: u, full: 0, zero: 1, lo: -0.25, hi: 1.25, score: x.score, fmt: () => `${x.cross > 0 ? '+' : '−'}${Math.abs(x.cross).toFixed(2)}`,
+                marks: [[0, 'centre'], [us, 'far shoulder'], [1, '0']]}});
+      const a = G.near(f, e.impact, 4); if (!a || !ok || !wpt) return;
+      const t = torsoAt(e.impact) || 60, y = wpt[1];
+      G.ref([cx, y - 0.45 * t], [cx, y + 0.45 * t], a); G.note([cx, y - 0.45 * t - 9], 'centre line', {align: 'center', a});
+      G.ref([lx, y - 0.25 * t], [lx, y + 0.25 * t], 0.6 * a); G.note([lx, y + 0.25 * t + 9], 'far shoulder', {align: 'center', a});
+      G.line([zx, y - 0.25 * t], [zx, y + 0.25 * t], OC.bad, 2, null, a); G.note([zx, y - 0.25 * t - 9], 'score 0', {align: 'center', col: OC.bad, a});
+      G.line([cx, y], wpt, col, 3, null, a); G.dot(wpt, col, 5.5, a);
     },
   },
   {
@@ -2191,23 +2321,23 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'rpivot', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                         // the rear foot at impact: foot-index level, the line, the heel
-      if (!x.verdict) return;
+    overlay(e, x, f, P, leadLeft) {                         // at the impact: the rear heel against its toe tip
+      if (e.hand !== 'rear') return;                        // the rule reads rear-hand punches only
+      const card = SUBJ.punch(e);
+      if (!x.verdict) { ovRow(card, {no: 33, skip: x.skip === 'no_impact_frame' ? 'not judged: no impact frame' : x.skip === 'excluded' ? skipTxt('excluded')
+        : 'not judged: the rear heel, toe tip or torso is not visible at the impact'}); return; }
+      const full = T(33, 'move.score.full'), zero = T(33, 'move.score.zero'), col = scoreCol(x.score);
+      ovRow(card, {no: 33, score: x.score, text: `at the impact the rear heel is ${x.lift.toFixed(2)} torso above its toe tip (a planted foot sits near ${fD(PLANTED_LIFT, 2)})`,
+        gauge: {v: x.lift, full, zero, lo: Math.min(0, zero) - 0.05, hi: full * 1.6, score: x.score}});
+      const a = G.near(f, e.impact, 4); if (!a) return;
       // run_rear_pivot.py reads the right foot of an orthodox skeleton (heel 30, foot index 32); a southpaw's run is
       // mirrored, so on his real skeleton that is the left foot (heel 29, foot index 31)
-      const he = PAT(e.impact, leadLeft ? 30 : 29), to = PAT(e.impact, leadLeft ? 32 : 31);
-      const ls = PAT(e.impact, 11), rs = PAT(e.impact, 12), lh = PAT(e.impact, 23), rh = PAT(e.impact, 24);
-      if (!(he && to && ls && rs && lh && rh)) return;
-      const torso = Math.hypot((ls[0] + rs[0]) / 2 - (lh[0] + rh[0]) / 2, (ls[1] + rs[1]) / 2 - (lh[1] + rh[1]) / 2);
-      if (!(torso >= H(33, 'min_torso_px'))) return;
-      const full = T(33, 'move.score.full');
-      const col = x.verdict === 'pivots' ? '#34c759' : '#ff3b30';
-      const x0 = Math.min(he[0], to[0]) - 40, x1 = Math.max(he[0], to[0]) + 40;
-      OV.level(to[1], x0, x1, '#8e8e93', [3, 4]);           // the foot-index point's height
-      OV.level(to[1] - full * torso, x0, x1, col);           // where the heel has to reach for 100
-      OV.line(to, he, '#ffffff', 2);                         // heel to foot-index point
-      OV.line([he[0], to[1]], he, col, 2.5, [3, 3]); OV.ring(he, col, 9, 3); OV.dot(to, '#8e8e93', 4);
-      overlayLabel(x0, to[1] - full * torso - 16, `score ${x.score.toFixed(1)} · heel ${x.lift >= 0 ? '+' : ''}${x.lift.toFixed(3)} torso (100 at ${fD(full, 3)})`, col);
+      const he = PAT(e.impact, leadLeft ? 30 : 29), to = PAT(e.impact, leadLeft ? 32 : 31), t = torsoAt(e.impact);
+      if (!(he && to && t)) return;
+      const yF = to[1] - full * t;                          // where the heel has to reach for full marks
+      G.line(to, he, '#ffffff', 2, null, a);
+      G.ref([he[0] - 0.22 * t, yF], [he[0] + 0.22 * t, yF], a); G.note([he[0] + 0.22 * t + 6, yF], 'heel up', {a});
+      G.line([he[0], to[1]], he, col, 2.5, null, a); G.dot(he, col, 5, a); G.dot(to, '#ffffff', 3, a);
     },
   },
   {
@@ -2235,23 +2365,26 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'chinimp', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                         // this frame's chin against the lines the rule reads it by
-      if (!x.verdict) return;
+    overlay(e, x, f, P, leadLeft) {                         // around the impact: the chin against the covering shoulder's top
+      const card = SUBJ.punch(e);
+      if (!x.verdict) { ovRow(card, {no: 35, skip: `not judged: ${skipTxt(x.skip)}`}); return; }
       const dip = (T(35, 'move.dip_punches') || []).includes(e.type);
       const cover = dip ? (e.hand === 'lead' ? 'rear' : 'lead') : e.hand;  // the shoulder covering the chin (height)
-      const sideJ = hand => (hand === 'lead') === leadLeft ? J.lsh : J.rsh;  // orthodox lead = left; a southpaw's run is mirrored
-      const sh = P(sideJ(cover)), ls = P(J.lsh), rs = P(J.rsh), lh = P(J.lhip), rh = P(J.rhip);
-      if (!(sh && ls && rs && lh && rh)) return;
-      for (const j of [J.lsh, J.rsh, J.lhip, J.rhip]) if (!(visAt(f, j, 35) >= H(35, 'min_visibility'))) return;
-      const t = Math.hypot((ls[0] + rs[0]) / 2 - (lh[0] + rh[0]) / 2, (ls[1] + rs[1]) / 2 - (lh[1] + rh[1]) / 2);
-      if (!(t >= H(35, 'min_torso_px'))) return;
-      const fc = faceChinAt(f), chin = fc && PXY(fc[0], fc[1]);
-      const col = x.verdict === 'tucked' ? '#34c759' : '#ff3b30';
+      const full = -T(35, 'move.height.score.full'), zero = -T(35, 'move.height.score.zero');   // in "above the top" terms
+      const sgn = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fD(Math.abs(v), 2)}`;
+      ovRow(card, {no: 35, score: x.score, text: `around the impact the chin rose to ${Math.abs(x.h).toFixed(2)} torso ${x.h < 0 ? 'above' : 'below'} the ${cover} shoulder’s top (f ${x.hf})`,
+        gauge: {v: -x.h, full, zero, lo: -0.2, hi: 0.35, score: x.score, fmt: sgn, marks: [[full, 'top'], [zero, sgn(zero)]]}});
+      const win = Math.round(T(35, 'move.window_s') * S.fps), c0 = x.cf ?? e.impact;
+      if (c0 == null || Math.abs(f - c0) > win || f < e.sf || f > e.ef) return;   // the frames it reads, inside the punch
+      const sideJ = hand => (hand === 'lead') === leadLeft ? J.lsh : J.rsh;   // orthodox lead = left; a southpaw's run is mirrored
+      const sh = P(sideJ(cover)), t = torsoOnScreen(P);
+      if (!(sh && t) || [J.lsh, J.rsh, J.lhip, J.rhip].some(j => !(visAt(f, j, 35) >= H(35, 'min_visibility')))) return;
       const top = sh[1] - T(35, dip ? 'move.height.dip_shoulder_top_torso' : 'move.height.shoulder_top_torso') * t;
-      OV.level(top, Math.min(ls[0], rs[0]) - 45, Math.max(ls[0], rs[0]) + 45, col);   // the covering shoulder's top
-      if (chin) { OV.ring(chin, col, 10, 3); OV.line([chin[0], top], chin, col, 2, [3, 3]); }
-      overlayLabel(Math.min(ls[0], rs[0]) - 45, top - 16, `score ${x.score.toFixed(1)} · highest chin ${x.h.toFixed(2)} torso (frame ${x.hf})`
-        + (f === x.hf ? ' ← this frame' : ''), col);
+      G.ref([sh[0] - 0.45 * t, top], [sh[0] + 0.45 * t, top]); G.note([sh[0] + 0.45 * t + 6, top], 'shoulder top');
+      const fc = faceChinAt(f), chin = fc && PXY(fc[0], fc[1]); if (!chin) return;
+      const cc = scoreCol(linScore((top - chin[1]) / t, full, zero));   // this frame's own reading
+      if (Math.abs(chin[1] - top) > 2) G.line([chin[0], top], chin, cc, 2.5);
+      G.ring(chin, cc, 7, 2.5); G.dot(chin, cc, 2.5);
     },
   },
   {
@@ -2287,15 +2420,19 @@ const RULE_LAYERS = [
       ring(e, 'updrop', bx, yy - 2, w, hh + 3);
     },
     frameOverlay(f, P, leadLeft) {                         // inside a window: the punching forearm the rule reads
-      const es = S.punches.filter(p => p.updrop?.verdict && f >= p.updrop.a && f <= p.updrop.b && !hid(p)); if (!es.length) return;
-      for (const e of es) {
-        const x = e.updrop, left = (e.hand === 'lead') === leadLeft;
-        const el = P(left ? J.lel : J.rel), wr = P(left ? J.lwr : J.rwr); if (!(el && wr)) continue;
-        const col = x.verdict === 'dropped' ? '#ff3b30' : '#34c759';
-        OV.line(el, wr, col, f === x.df ? 6 : 3.5);                  // the forearm, thicker on the frame that decides
-        if (f === x.df) OV.ring(wr, col, 11, 3);
-        overlayLabel(Math.min(el[0], wr[0]) - 40, Math.min(el[1], wr[1]) - 16,
-          `${cap(e.hand)} uppercut · lowest ${x.drop.toFixed(2)} (frame ${x.df}) → ${x.score.toFixed(1)}${f === x.df ? ' ← this frame' : ''}`, col);
+      const deg = v => Math.asin(Math.max(-1, Math.min(1, v))) * 180 / Math.PI;   // the reading as degrees below level
+      for (const e of S.punches) {
+        const x = e.updrop; if (!x || hid(e) || e.type !== 'uppercut') continue;
+        if (!x.verdict) { if (f >= e.sf && f <= e.ef) ovRow(SUBJ.punch(e), {no: 36, skip: `not judged: ${skipTxt(x.skip)}${x.vis != null ? ` (arm visibility ${x.vis.toFixed(2)})` : ''}`}); continue; }
+        if (!(f >= x.a && f <= Math.max(x.b, e.ef))) continue;
+        ovRow(SUBJ.punch(e), {no: 36, score: x.score, text: `the forearm at its lowest before the uppercut: ${upDropWords(x.drop)} (f ${x.df})${x.trim ? ' · from the end of this hand’s last punch' : ''}`,
+          gauge: {v: deg(x.drop), full: deg(T(36, 'move.score.full')), zero: deg(T(36, 'move.score.zero')), lo: -20, hi: 90, score: x.score, fmt: v => `${Math.round(v)}°`}});
+        if (f > x.b) continue;                              // the geometry: inside the window only
+        const left = (e.hand === 'lead') === leadLeft, el = P(left ? J.lel : J.rel), wr = P(left ? J.lwr : J.rwr); if (!(el && wr)) continue;
+        const col = scoreCol(x.score), len = Math.hypot(wr[0] - el[0], wr[1] - el[1]), side = Math.sign(wr[0] - el[0]) || 1;
+        G.ref(el, [el[0] + side * len, el[1]], 0.8); G.note([el[0] + side * (len + 6), el[1]], 'level', {align: side > 0 ? 'left' : 'right'});
+        G.line(el, wr, col, f === x.df ? 5 : 3.5); G.dot(el, '#ffffff', 3);
+        if (f === x.df) G.ring(wr, col, 9, 3);              // the frame that decides
       }
     },
   },
@@ -2332,14 +2469,17 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'bite', bx, y, w, h);
     },
-    overlay(e, x, f, P, leadLeft) {                         // the punching wrist; ringed solid over the return window
-      if (!x.verdict) return;
-      const wr = P((e.hand === 'lead') === leadLeft ? J.lwr : J.rwr); if (!wr) return;
-      const col = x.verdict === 'snapping' ? '#34c759' : '#ff3b30', back = THR(() => T(41, 'move.return_s'), null);
-      const on = x.ff != null && back != null && f >= Math.floor(x.ff) && f <= Math.ceil(x.ff + back * (S.fps || 30));
-      OV.ring(wr, col, on ? 13 : 9, on ? 4 : 2);
-      overlayLabel(wr[0] + 16, wr[1] - 8, `${on ? 'coming back · ' : ''}straight ${(x.straight * 1000).toFixed(0)} ms · `
-        + `back ${x.back.toFixed(2)} m/s · p ${x.p.toFixed(2)} → ${x.score.toFixed(1)}`, col);
+    overlay(e, x, f, P, leadLeft) {                         // the fist coming back off the bag, over the return the rule times
+      if (e.type !== 'jab' && e.type !== 'cross') return;   // jabs and crosses only
+      const card = SUBJ.punch(e);
+      if (!x.verdict) { ovRow(card, {no: 41, skip: `not judged: ${skipTxt(x.skip)}${x.skip === 'arm_not_straightened' && x.elbow != null ? ` (the elbow reached ${x.elbow.toFixed(0)}°)` : ''}`}); return; }
+      ovRow(card, {no: 41, score: x.score, text: `elbow straight ${(x.straight * 1000).toFixed(0)} ms · back ${x.back.toFixed(2)} m/s · punch ${(x.len * 1000).toFixed(0)} ms: the chance it was pushed`,
+        gauge: {v: x.p, full: T(41, 'move.score.full'), zero: T(41, 'move.score.zero'), lo: 0, hi: 1, score: x.score}});
+      const back = THR(() => T(41, 'move.return_s'), null); if (x.ff == null || back == null) return;
+      const f0 = Math.floor(x.ff), f1 = Math.ceil(x.ff + back * (S.fps || 30));
+      if (f < f0 || f > f1) return;                         // from the arm out, the return_s it times the way back over
+      const wr = wristOf(e), w = P(wr), col = scoreCol(x.score);
+      G.trail(f0, f, wr, col, 3.5); if (w) { G.ring(w, col, 10, 3); G.note([w[0] + 15, w[1] - 13], 'coming back'); }
     },
   },
   {
@@ -2365,6 +2505,12 @@ const RULE_LAYERS = [
       rr(bx, y + 3, w, h - 6, 5); c.fill();
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'speed', bx, y, w, h);
+    },
+    overlay(e, x) {                                        // a duration has no geometry to draw: the card's row only
+      const card = SUBJ.punch(e);
+      if (!x.verdict) { ovRow(card, {no: 23, skip: `not judged: ${skipTxt(x.skip)}`}); return; }
+      ovRow(card, {no: 23, score: x.score, text: `start to impact, against the ${THR(() => `${ord(T(23, 'move.score.full_pctl'))}–${ord(T(23, 'move.score.zero_pctl'))}`, '…')} percentile of this punch type`,
+        gauge: {v: x.dur * 1000, full: x.full * 1000, zero: x.zero * 1000, lo: 0, hi: x.zero * 1000 * 1.35, score: x.score, fmt: v => `${Math.round(v)} ms`}});
     },
   },
   {
@@ -2405,38 +2551,40 @@ const RULE_LAYERS = [
       ring(e, 'hrp', x0, yy - 2, w, hh + 3);
     },
     frameOverlay(f, P, leadLeft) {                         // every window holding this frame: impact → end + 0.15 s
-      const es = S.punches.filter(p => (p.hrp?.verdict === 'pass' || p.hrp?.verdict === 'fail') && f >= p.hrp.ws && f <= p.hrp.we
-                                       && !hid(p));
-      for (const e of es) {
-        const a = e.hrp, lead = (e.hand === 'lead') === leadLeft, wr = lead ? J.lwr : J.rwr, sj = lead ? J.lsh : J.rsh;
-        const col = a.verdict === 'fail' ? '#ff3b30' : '#34c759';
-        OV.trail(a.ws, a.we, wr, col);                                       // the wrist's whole measured line
-        const st = PAT(a.ws, wr), en = PAT(a.we, wr);                       // the two end frames: the chord's ends
+      for (const e of S.punches) {
+        const a = e.hrp; if (!a || hid(e)) continue;
+        const judged = a.verdict === 'pass' || a.verdict === 'fail', inWin = judged && f >= a.ws && f <= a.we;
+        if (!inWin && !(f >= e.sf && f <= e.ef)) continue;
+        if (a.verdict === 'skip') { ovRow(SUBJ.punch(e), {no: 16, skip: `not judged: ${skipTxt(a.skip)}`}); continue; }
+        if (!judged) continue;
+        const fail = a.verdict === 'fail', col = fail ? OC.bad : OC.good;
+        ovRow(SUBJ.punch(e), {no: 16, word: fail ? 'a U' : 'okay', wordCol: col,
+          text: `the way back: ${a.below} of ${a.between} frames under the straight line, the deepest ${hrpDip(a)} torso${THR(() => ` (a U from ${fD(T(16, 'move.min_dip_torso'), 2)})`, '')}`});
+        if (!inWin) continue;
+        const lead = (e.hand === 'lead') === leadLeft, wr = lead ? J.lwr : J.rwr, sj = lead ? J.lsh : J.rsh;
         // The rule's chord is a straight line in (frame, wrist height above ITS shoulder), not in the image: at window
         // frame k it sits g(k) = g0 + (g1 - g0)·k/(K-1) px above that frame's shoulder (g = shoulder y - wrist y; the
         // rule's one median torso per window cancels). Drawn at the wrist's own x, a dot is under this dashed line exactly
         // when the rule counted it as under the chord (checked 2026-10-02: 0 of 12,628 dots differ from the rule's mask).
-        const s0 = PAT(a.ws, sj), s1 = PAT(a.we, sj), K = a.we - a.ws + 1;
+        const st = PAT(a.ws, wr), en = PAT(a.we, wr), s0 = PAT(a.ws, sj), s1 = PAT(a.we, sj), K = a.we - a.ws + 1;
+        G.trail(a.ws, Math.min(f, a.we), wr, col, 3);       // the wrist's way back so far
         if (st && en && s0 && s1) {
           const g0 = s0[1] - st[1], g1 = s1[1] - en[1], ref = [];
           for (let k = 0; k < K; k++) {
             const q = PAT(a.ws + k, wr), sh = PAT(a.ws + k, sj); if (!(q && sh)) continue;
             const r = [q[0], sh[1] - (g0 + (g1 - g0) * k / (K - 1))]; ref.push(r);
-            if (k > 0 && k < K - 1) { const dc = a.mask[k - 1] === '1' ? '#ff3b30' : '#34c759'; OV.line(r, q, dc, 1.5);
-              wristGuess(a.ws + k, wr) ? OV.hollow(q, dc, 4) : OV.dot(q, dc, 3.5); }
+            if (k > 0 && k < K - 1 && a.ws + k <= f) {        // each frame between the ends, once it has passed: under red
+              const dc = a.mask[k - 1] === '1' ? OC.bad : OC.good;
+              G.line(r, q, dc, 1.5); wristGuess(a.ws + k, wr) ? G.hollow(q, dc, 3.5) : G.dot(q, dc, 3);
+            }
           }
-          octx.save(); octx.strokeStyle = '#ffffff'; octx.lineWidth = 2; octx.setLineDash([5, 4]); octx.beginPath();
-          ref.forEach((pt, i) => i ? octx.lineTo(...pt) : octx.moveTo(...pt)); octx.stroke(); octx.restore();
+          G.poly(ref, '#ffffff', 1.5, [5, 4], 0.9);
+          if (ref.length) G.note([ref[ref.length - 1][0] + 8, ref[ref.length - 1][1] - 10], 'straight line');
         }
-        const gs = wristGuess(a.ws, wr), ge = wristGuess(a.we, wr);       // an end the wrist was hidden on: a guess
-        if (st) gs ? OV.hollow(st, '#8e8e93', 6) : OV.dot(st, '#8e8e93', 5);
-        if (en) ge ? OV.hollow(en, '#8e8e93', 6) : OV.dot(en, '#8e8e93', 5);
-        const w = P(wr); if (w) OV.ring(w, col, 9, 2.5, wristGuess(f, wr) ? [4, 3] : null);   // where the wrist is now
-        const name = `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()} · `;  // always: windows of both
-                                                                                               // hands overlap all the time
-        const vv = fr => visAt(fr, wr).toFixed(2);
-        const warn = gs || ge ? ` · wrist visibility ${[gs && `start ${vv(a.ws)}`, ge && `end ${vv(a.we)}`].filter(Boolean).join(', ')} — may be a guess` : '';
-        if (st) overlayLabel(st[0] + 14, st[1] - 18, `${name}${a.verdict === 'fail' ? 'not okay — a U' : 'okay'} · ${a.below}/${a.between} under the chord · deepest ${hrpDip(a)}${warn}`, col);
+        const gs = wristGuess(a.ws, wr), ge = wristGuess(a.we, wr);   // an end the wrist was hidden on: a guess
+        if (st) gs ? G.hollow(st, '#ffffff', 5) : G.dot(st, '#ffffff', 4);
+        if (en) ge ? G.hollow(en, '#ffffff', 5) : G.dot(en, '#ffffff', 4);
+        const w = P(wr); if (w) G.ring(w, col, 8, 2.5, wristGuess(f, wr) ? [4, 3] : null);
       }
     },
   },
@@ -2464,22 +2612,28 @@ const RULE_LAYERS = [
       if (a.score != null) tag(x, w, y, h, a.score.toFixed(1));
       ring(e, 'arm', x, y, w, h);
     },
-    overlay(e, a, f, P, leadLeft) {                        // the punching arm, colored by the rule's verdict
-      const [s, el, w] = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'], pa = P(s), pb = P(el), pc = P(w);
-      if (!(pa && pb && pc)) return;
-      const col = VERD[a.verdict] || '#8e8e93', peak = f === a.peakF;
-      octx.strokeStyle = col; octx.lineWidth = peak ? 7 : 5; octx.lineCap = 'round'; octx.lineJoin = 'round';
-      octx.beginPath(); octx.moveTo(...pa); octx.lineTo(...pb); octx.lineTo(...pc); octx.stroke();
-      // this frame's elbow bend in image space: the rule's own 2D reading (canvas pixels are isotropic)
-      const u = [pa[0] - pb[0], pa[1] - pb[1]], v = [pc[0] - pb[0], pc[1] - pb[1]];
-      if (!(Math.hypot(...u) && Math.hypot(...v))) return;                // a zero-length bone has no angle
-      const ang = Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v)))));
-      const bend = 180 - ang * 180 / Math.PI, a0 = Math.atan2(u[1], u[0]), a1 = Math.atan2(v[1], v[0]);
-      const ccw = ((a1 - a0 + 2 * Math.PI) % (2 * Math.PI)) > Math.PI;
-      octx.lineWidth = 2.5; octx.beginPath(); octx.arc(pb[0], pb[1], 18, a0, a1, ccw); octx.stroke();
+    overlay(e, a, f, P, leadLeft) {                        // the punching arm: its elbow angle, and the angle full marks need
       const judged = a.verdict === 'pass' || a.verdict === 'fail';
-      overlayLabel(pb[0] + 14, pb[1] + 28, `elbow ${(180 - bend).toFixed(0)}°` + (!judged ? ` · not judged (${(a.skip || a.verdict).replace(/_/g, ' ')})`
-        : peak && a.score != null ? ` · ${a.readAt === 'middle' ? 'middle frame' : 'straightest frame'} → ${a.score.toFixed(1)} (full at ${a.full}°)` : ''), col);
+      const [s, el, w] = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'], pa = P(s), pb = P(el), pc = P(w);
+      let now = null;
+      if (pa && pb && pc) {
+        const u = [pa[0] - pb[0], pa[1] - pb[1]], v = [pc[0] - pb[0], pc[1] - pb[1]], lu = Math.hypot(...u), lv = Math.hypot(...v);
+        if (lu && lv) {                                    // the rule's own 2D reading (canvas pixels are isotropic)
+          const a0 = Math.atan2(u[1], u[0]), a1 = Math.atan2(v[1], v[0]), d = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
+          now = Math.abs(d) * 180 / Math.PI;               // the angle at the elbow, 180 = dead straight
+          const col = judged ? scoreCol(a.score) : '#ffffff', peak = f === a.peakF;
+          if (judged && a.full != null) {                  // where the forearm would lie at full marks, dashed
+            const af = a0 + Math.sign(d || 1) * a.full * Math.PI / 180, tip = [pb[0] + lv * Math.cos(af), pb[1] + lv * Math.sin(af)];
+            G.ref(pb, tip, 0.7); G.note([pb[0] + (lv + 12) * Math.cos(af), pb[1] + (lv + 12) * Math.sin(af)], `${fN(a.full)}°`, {align: 'center'});
+          }
+          G.poly([pa, pb, pc], col, peak ? 5 : 3.5);
+          G.arc(pb, Math.max(8, Math.min(22, 0.45 * Math.min(lu, lv))), a0, a1, d < 0, col, 2.5);
+        }
+      }
+      const card = SUBJ.punch(e);
+      if (!judged) { ovRow(card, {no: 21, skip: `not judged: ${a.skip ? skipTxt(a.skip) : a.verdict}`}); return; }
+      ovRow(card, {no: 21, score: a.score, text: `the elbow ${a.readAt === 'middle' ? 'at the punch’s middle frame' : 'at its straightest'}: ${a.elbow.toFixed(0)}° (f ${a.peakF})${now != null ? ` · now ${now.toFixed(0)}°` : ''}`,
+        gauge: {v: a.elbow, full: a.full, zero: T(21, 'move.score.zero'), lo: 80, hi: 180, score: a.score, fmt: v => `${Math.round(v)}°`}});
     },
   },
   rotLayer('shoulder', 20, 'shoulder', 11, 12),
@@ -2539,26 +2693,28 @@ const RULE_LAYERS = [
       const la = P(leadLeft ? J.lan : J.ran), ra = P(leadLeft ? J.ran : J.lan), lh = P(J.lhip), rh = P(J.rhip);
       const fwd = la && ra && Math.abs(la[0] - ra[0]) > 4 ? la[0] - ra[0] : lh && rh ? nose[0] - (lh[0] + rh[0]) / 2 : 1;
       const gx = x => 2 * nose[0] - x + Math.sign(fwd || 1) * reach;   // mirrored at the nose, then one reach ahead
-      const G = j => { const p = P(j); return p ? [gx(p[0]), p[1]] : null; };
+      const GH = j => { const p = P(j); return p ? [gx(p[0]), p[1]] : null; };
       const ARMLESS = BONES.filter(([a, b]) => ![13, 14, 15, 16].includes(a) && ![13, 14, 15, 16].includes(b));
-      octx.save(); octx.lineCap = 'round'; octx.lineWidth = 3; octx.strokeStyle = 'rgba(255,255,255,0.75)'; octx.setLineDash([7, 5]);
+      octx.save(); octx.lineCap = 'round'; octx.lineWidth = 2.5; octx.strokeStyle = 'rgba(255,255,255,0.6)'; octx.setLineDash([6, 5]);
       for (const [a, b] of ARMLESS) {
-        const p = G(a), q = G(b); if (!(p && q)) continue;
+        const p = GH(a), q = GH(b); if (!(p && q)) continue;
         octx.beginPath(); octx.moveTo(...p); octx.lineTo(...q); octx.stroke();
       }
-      octx.setLineDash([]); octx.fillStyle = 'rgba(255,255,255,0.85)';
+      octx.setLineDash([]); octx.fillStyle = 'rgba(255,255,255,0.75)';
       for (const j of [J.nose, J.lsh, J.rsh, J.lhip, J.rhip, J.lkn, J.rkn, J.lan, J.ran]) {
-        const p = G(j); if (!p) continue;
-        octx.beginPath(); octx.arc(p[0], p[1], 3.6, 0, 7); octx.fill();
+        const p = GH(j); if (!p) continue;
+        octx.beginPath(); octx.arc(p[0], p[1], 3, 0, 7); octx.fill();
       }
       octx.restore();
-      const g = G(J.nose), dir = Math.sign(fwd || 1);
-      // the rule's zones on this frame (levels_at / zone_for): a bar at the ghost's face, green = hit (head: above the
-      // higher shoulder, up to head_top_over_shoulder_torso torso above it; body: the band of hip centre -> shoulder
-      // centre), red = miss (over the head, the shoulder gap, below the body), with dashed borders from the boxer to the
-      // ghost; the numbers are the video's thresholds. Needs both shoulders and both hips at the house floor, as the rule.
-      // The punch score's lines (move.score, since 2026-10-24): the over / below bars run to where the score reaches 0
-      // (zero torso past the zone), a dashed red line there and an orange one at the shoulder gap's middle (gap_middle).
+      const g = GH(J.nose), dir = Math.sign(fwd || 1);
+      const feet = [GH(J.lan), GH(J.ran)].filter(Boolean), fy = feet.length ? Math.max(...feet.map(p => p[1])) : g[1];
+      G.note([g[0], fy + 16], 'ghost opponent: him, mirrored, one reach away', {align: 'center', col: 'rgba(255,255,255,0.8)', size: 10});
+      // the rule's zones on this frame (levels_at / zone_for): the two targets as soft green bands from the boxer to the
+      // ghost (head: from the higher shoulder up to head_top_over_shoulder_torso torso above it; body: the band of hip
+      // centre -> shoulder centre), and a bar at the ghost's face naming every zone, green = hit, red = miss (over the
+      // head, the shoulder gap, below the body), the numbers the video's thresholds. Needs both shoulders and both hips at
+      // the house floor, as the rule. The punch score's lines (move.score, since 2026-10-24): the over / below parts of the
+      // bar run to where the score reaches 0 (zero torso past the zone); the card gives the punch's distance and score.
       const Z22 = S.th?.rules?.['22']?.move?.zones, band = Z22?.body_band_hip_to_shoulder, HT = Z22?.head_top_over_shoulder_torso;
       const SC22 = S.th?.rules?.['22']?.move?.score, Z0 = SC22?.zero, GM = SC22?.gap_middle;
       const ls = P(J.lsh), rs = P(J.rsh);
@@ -2569,46 +2725,43 @@ const RULE_LAYERS = [
           const torso = Math.hypot((ls[0] + rs[0]) / 2 - (lh[0] + rh[0]) / 2, shY - hipY), headTop = top - HT * torso;
           const ank = [P(J.lan), P(J.ran)].filter(Boolean).map(p => p[1]), low = ank.length ? Math.max(...ank) : hipY + span;
           const bx = g[0] - dir * 0.15 * reach, x0 = Math.min(nose[0], gx((lh[0] + rh[0]) / 2)), x1 = Math.max(nose[0], gx((lh[0] + rh[0]) / 2));
-          const HIT = '#34c759', MISS = '#ff3b30';
-          for (const y of [headTop, top, bodyTop, bodyBot]) OV.level(y, x0, x1, 'rgba(255,255,255,0.5)', [4, 4]);
+          octx.save(); octx.fillStyle = OC.good; octx.globalAlpha = 0.13;              // the targets, between the two
+          octx.fillRect(x0, headTop, x1 - x0, top - headTop); octx.fillRect(x0, bodyTop, x1 - x0, bodyBot - bodyTop); octx.restore();
           const graded = Z0 != null && GM != null, overTop = graded ? headTop - Z0 * torso : headTop - 0.35 * span;
-          const belowEnd = graded ? bodyBot + Z0 * torso : low, gapMid = (top + bodyTop) / 2;
-          if (graded) {
-            OV.level(overTop, x0, x1, 'rgba(255,59,48,0.8)', [3, 4]); OV.level(belowEnd, x0, x1, 'rgba(255,59,48,0.8)', [3, 4]);
-            OV.level(gapMid, x0, x1, 'rgba(255,159,10,0.85)', [3, 4]);
-          }
-          octx.save(); octx.lineCap = 'butt'; octx.lineWidth = 6; octx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-          octx.textAlign = dir > 0 ? 'right' : 'left';
-          for (const [a, b, col, name] of [[overTop, headTop, MISS, 'over'], [headTop, top, HIT, 'head'], [top, bodyTop, MISS, 'shoulder'], [bodyTop, bodyBot, HIT, 'body'], [bodyBot, belowEnd, MISS, 'below']]) {
+          const belowEnd = graded ? bodyBot + Z0 * torso : low;
+          octx.save(); octx.lineCap = 'butt';
+          for (const [a, b, col] of [[overTop, headTop, OC.bad], [headTop, top, OC.good], [top, bodyTop, OC.bad], [bodyTop, bodyBot, OC.good], [bodyBot, belowEnd, OC.bad]]) {
             if (!(b > a)) continue;
-            octx.strokeStyle = col; octx.beginPath(); octx.moveTo(bx, a + 1); octx.lineTo(bx, b - 1); octx.stroke();
-            octx.fillStyle = col; octx.fillText(name, bx - dir * 7, (a + b) / 2 + 3);
-          }
-          if (graded) {                                    // the score at the lines: 0 at both ends, gap_middle mid-gap
-            octx.textAlign = dir > 0 ? 'left' : 'right';
-            for (const [yy, t, col] of [[overTop, '0', MISS], [gapMid, String(+(+GM).toFixed(6)), '#ff9f0a'], [belowEnd, '0', MISS]]) {
-              octx.fillStyle = col; octx.fillText(t, bx + dir * 7, yy + 3);
-            }
+            octx.strokeStyle = OC.halo; octx.lineWidth = 9; octx.beginPath(); octx.moveTo(bx, a + 1); octx.lineTo(bx, b - 1); octx.stroke();
+            octx.strokeStyle = col; octx.lineWidth = 6; octx.beginPath(); octx.moveTo(bx, a + 1); octx.lineTo(bx, b - 1); octx.stroke();
           }
           octx.restore();
+          const side = dir > 0 ? 'right' : 'left';
+          for (const [a, b, name] of [[overTop, headTop, 'over'], [headTop, top, 'head'], [top, bodyTop, 'shoulder'], [bodyTop, bodyBot, 'body'], [bodyBot, belowEnd, 'below']])
+            if (b > a) G.note([bx - dir * 9, (a + b) / 2], name, {align: side, size: 10, col: name === 'head' || name === 'body' ? OC.good : 'rgba(255,255,255,0.85)'});
         }
       }
-      const feet = [G(J.lan), G(J.ran)].filter(Boolean), fy = feet.length ? Math.max(...feet.map(p => p[1])) : g[1];
-      overlayLabel(g[0] - 60, fy + 18, `ghost · mirrored skeleton · one arm’s reach ahead`, '#e5e5ea');
     },
-    overlay(e, x, f, P, leadLeft) {                        // the fist at the impact frame, with its zone
-      if (x.land == null || Math.abs(f - x.land) > 2 || !x.verdict || x.verdict === 'skip') return;
+    overlay(e, x, f, P, leadLeft) {                        // the fist where the rule read it, on its impact frame
+      if (!x.verdict) return;
+      const card = SUBJ.punch(e), zn = ZONE[x.zone]?.[1] || x.zone;
+      if (x.verdict === 'skip') { ovRow(card, {no: 22, skip: `not judged: ${skipTxt(x.skip)}`}); return; }
+      const col = x.score != null ? scoreCol(x.score) : VERD[x.verdict];
+      // the reading in a line: on target, how far into the shoulder gap, or how far past a zone (hitHow, shortened)
+      const how = x.zone === 'head' || x.zone === 'body' ? `in the ${zn} zone, on target`
+        : x.zone === 'shoulder' && x.gap != null ? `in the shoulder gap, ${Math.round(x.gap * 100)} % of the way to its middle`
+        : x.past != null ? `${x.past.toFixed(2)} torso ${x.zone === 'over_head' ? 'over the head zone' : 'under the body zone'}${THR(() => ` (0 at ${fD(T(22, 'move.score.zero'), 2)})`, '')}` : zn;
+      ovRow(card, x.score != null ? {no: 22, score: x.score, text: `the fist at the impact: ${how}`}
+        : {no: 22, word: VNAME[x.verdict], wordCol: col, text: `the fist at the impact: ${zn}`});   // a run before 2026-10-24
+      if (x.land == null || Math.abs(f - x.land) > 2) return;
       const wr = ARM3[(e.hand === 'lead') === leadLeft ? 'lead' : 'rear'][2];
       const q = x.fx != null ? PXY(S.mirrored ? 1 - x.fx : x.fx, x.fy) : PAT(x.land, wr); if (!q) return;   // where the rule read it
-      const col = VERD[x.verdict]; octx.strokeStyle = col; octx.lineWidth = 3; octx.setLineDash([5, 4]);
-      const rr = ringR(P, 0.11, 12);
-      octx.beginPath(); octx.arc(q[0], q[1], rr, 0, 7); octx.stroke(); octx.setLineDash([]);
-      const now = P(wr); if (now && f !== x.land) OV.dot(now, col, 4);   // the wrist now, off the frame that was judged
-      overlayLabel(q[0] + rr + 6, q[1] - rr * 0.8, `${x.hf != null ? x.hf.toFixed(2) + ' · ' : ''}${ZONE[x.zone]?.[1] || x.zone} · ${x.score != null ? 'score ' + x.score.toFixed(1) : VNAME[x.verdict]}`, col);
+      const a = G.near(f, x.land, 2), r = ringR(P, 0.11, 12);
+      G.ring(q, col, r, 3, [5, 4], a); G.dot(q, col, 3, a);
     },
   },
   {
-    key: 'hoc', label: RN(10), short: 'Head off center',
+    key: 'hoc', label: RN(10), short: 'Head off center', shown: x => x?.score != null,
     csv: ['head_offcenter', 'head_offcenter.csv'], json: ['head_offcenter', 'head_offcenter.json'],
     parse: (r, num) => ({score: num(r.score), verdict: r.verdict, impF: num(r.impact_frame), usedF: num(r.impact_used_frame),
       off: num(r.impact_offset), q25: num(r.q25_offset), q25F: num(r.q25_frame), q75: num(r.q75_offset), q75F: num(r.q75_frame),
@@ -2638,20 +2791,22 @@ const RULE_LAYERS = [
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'hoc', bx, y, w, h);
     },
-    overlay(e, x, f, P) {                                  // the vertical line through the hip centre and the head point's distance from it (label = the combined reading)
-      if (x.score == null) return;
+    overlay(e, x, f, P) {                                  // the centre line up from the hip centre, and the head point off it
+      const card = SUBJ.punch(e);
+      if (x.score == null) { ovRow(card, {no: 10, skip: x.skip === 'side_on' ? 'not judged: not front- or back-on, the head moves in depth'
+        : `not judged${x.skip ? ': ' + skipTxt(x.skip) : ''}`}); return; }
+      const h = hocParts(), full = T(10, 'move.score.full');
+      ovRow(card, {no: 10, score: x.score, text: `the head off the centre line, torso lengths (${fG(+h.w0)} at the impact, ${fG(+h.w25)} at ${h.q25}, ${fG(+h.w75)} at ${h.q75})`,
+        gauge: {v: x.comb, full, zero: 0, lo: 0, hi: full * 2, score: x.score}});
       const l = P(23), rt = P(24); if (!(l && rt)) return;
-      const minVis = H(10, 'min_visibility'), h = hocParts();
-      const vis = j => visAt(f, j, 10) >= minVis;                // run_head_offcenter.py: face landmarks 0-10 at the house floor
+      const minVis = H(10, 'min_visibility'), vis = j => visAt(f, j, 10) >= minVis;   // run_head_offcenter.py: face landmarks 0-10 at the house floor
       const hd = [...Array(11).keys()].filter(vis).map(P).filter(Boolean); if (!hd.length) return;
       const hx = (Math.min(...hd.map(q => q[0])) + Math.max(...hd.map(q => q[0]))) / 2, hy = hd.reduce((a, q) => a + q[1], 0) / hd.length;
-      const cx = (l[0] + rt[0]) / 2, cy = (l[1] + rt[1]) / 2, col = x.verdict === 'off' ? '#34c759' : '#ff3b30', atImpact = Math.abs(f - x.usedF) <= 1;
-      octx.strokeStyle = col; octx.lineWidth = 2; octx.setLineDash([6, 5]);
-      octx.beginPath(); octx.moveTo(cx, cy); octx.lineTo(cx, hy - 40); octx.stroke(); octx.setLineDash([]);
-      octx.lineWidth = atImpact ? 4 : 2.5; octx.beginPath(); octx.moveTo(cx, hy); octx.lineTo(hx, hy); octx.stroke();
-      octx.fillStyle = col; octx.beginPath(); octx.arc(hx, hy, atImpact ? 7 : 5, 0, 7); octx.fill();
-      const here = f === x.usedF ? ['impact', x.off] : f === x.q25F ? [h.q25, x.q25] : f === x.q75F ? [h.q75, x.q75] : null;
-      overlayLabel(Math.max(cx, hx) + 12, hy - 22, `head point off line · ${x.comb?.toFixed(2)} torso (${h.w0} impact + ${h.w25} · ${h.q25} + ${h.w75} · ${h.q75}) → ${x.score.toFixed(1)}${here ? ` · ${here[0]}: ${offTxt(here[1])}` : atImpact ? ' · IMPACT' : ''}`, col);
+      const cx = (l[0] + rt[0]) / 2, cy = (l[1] + rt[1]) / 2, t = torsoOnScreen(P) || 60;
+      const read = f === x.usedF || f === x.q25F || f === x.q75F;   // a frame the score reads: drawn heavier
+      const col = scoreCol(linScore(Math.abs(hx - cx) / t, full, 0));   // this frame's own offset
+      G.ref([cx, cy], [cx, hy - 0.4 * t]); G.note([cx, hy - 0.4 * t - 9], 'centre line', {align: 'center'});
+      G.line([cx, hy], [hx, hy], col, read ? 4 : 2.5); G.dot([hx, hy], col, read ? 6 : 4.5);
     },
   },
   {
@@ -2661,34 +2816,32 @@ const RULE_LAYERS = [
     // throwing a hook or a body shot. The row is continuous: the judged stretches coloured by state (tucked = full
     // marks, flared = below), every other frame a gray strip with its reason; lead in the top half, rear in the bottom.
     key: 'elbow', label: RN(9), short: 'Elbows tucked', items: true, split: 'arm',
-    frameOverlay(f, P, leadLeft, Q, torso) {               // the sideways gap between each shoulder and its elbow
+    frameOverlay(f, P, leadLeft, Q, torso) {               // each elbow against the line straight down from its shoulder
+      const now = (S.items.elbow || []).filter(it => f >= it.sf && f <= it.ef);      // the rule's own state, per arm
+      if (!now.length || now.every(it => it.state === 'excluded')) return;
       const t = torso(); if (!t) return;
       const fFull = T(9, 'move.score.full'), fZero = T(9, 'move.score.zero');
       const wL = T(9, 'move.score.points_per_arm.lead'), wR = T(9, 'move.score.points_per_arm.rear');
-      const now = (S.items.elbow || []).filter(it => f >= it.sf && f <= it.ef);      // the rule's own state, per arm
-      const part = {};
       // run_elbow_tuck.py reads lead = the left arm of an orthodox skeleton; a southpaw's run is mirrored to orthodox,
       // so the rule's lead arm is the boxer's lead arm — the right one on a southpaw's real skeleton
       const ARMS2 = leadLeft ? [['lead', J.lsh, J.lel, J.rsh], ['rear', J.rsh, J.rel, J.lsh]]
                              : [['lead', J.rsh, J.rel, J.lsh], ['rear', J.lsh, J.lel, J.rsh]];
+      const part = {}, parts = [];
       for (const [arm, sj, ej, oj] of ARMS2) {
-        const sh = P(sj), el = P(ej), os = P(oj); if (!(sh && el)) continue;
-        const st = now.find(it => it.arm === arm)?.state;
-        const skip = !st || !!ELBOWSKIP[st];               // no_pose / side_on / hook: the rule looked away
+        const sh = P(sj), el = P(ej), os = P(oj), st = now.find(it => it.arm === arm)?.state;
+        if (!st || ELBOWSKIP[st] || !(sh && el)) { parts.push({label: arm, skip: SKIPWORD[st] || 'not read'}); continue; }
         const out = os ? Math.sign(sh[0] - os[0]) : 0;     // the image direction away from the body's midline
-        const raw = out * (el[0] - sh[0]) / t, flare = Math.max(0, raw);   // pulled in = 0, as run_elbow_tuck.py
-        const col = skip ? '#8e8e93' : ELBOWSTATE[st] || '#8e8e93';      // the same colours as the timeline row
-        OV.line([sh[0], sh[1] - 10], [sh[0], el[1] + 10], '#8e8e93', 1.5, [4, 4]);   // straight down from the shoulder
-        OV.line([sh[0], el[1]], el, col, 3.5);                                       // and out to the elbow
-        OV.dot(el, col, 4);
-        overlayLabel(el[0] + (el[0] > sh[0] ? 10 : -84), el[1] - 14,
-          skip ? `${arm} · ${SKIPWORD[st] || 'not judged'}` : `${arm} ${flare.toFixed(2)}${raw < 0 ? ' · in' : ''}`, col);
-        if (!skip) part[arm] = Math.min(1, Math.max(0, (fZero - flare) / elbowSpan(fZero, fFull)));   // full to fFull, 0 at fZero
+        const flare = Math.max(0, out * (el[0] - sh[0]) / t);   // pulled in = 0, as run_elbow_tuck.py
+        part[arm] = Math.min(1, Math.max(0, (fZero - flare) / elbowSpan(fZero, fFull)));   // full to fFull, 0 at fZero
+        const col = scoreCol(100 * part[arm]);
+        G.ref(sh, [sh[0], el[1] + 0.12 * t], 0.75); if (arm === 'lead') G.note([sh[0], el[1] + 0.12 * t + 9], 'straight down', {align: 'center', size: 10});
+        if (flare > 0.005) G.line([sh[0], el[1]], el, col, 3);
+        G.dot(el, col, 5);
+        parts.push({label: arm, v: flare, full: fFull, zero: fZero, lo: 0, hi: fZero * 1.25, score: 100 * part[arm]});
       }
-      const hs = Object.keys(part), n = P(J.nose);          // the frame score: lead / rear weights, or one arm alone
-      const sc = hs.length === 2 ? wL * part.lead + wR * part.rear : hs.length === 1 ? 100 * part[hs[0]] : null;
-      if (n && sc != null) overlayLabel(n[0] - 60, n[1] - 30, `frame score ${sc.toFixed(1)}`
-        + (hs.length === 2 ? ` · lead ${(wL * part.lead).toFixed(1)}/${fN(wL)} · rear ${(wR * part.rear).toFixed(1)}/${fN(wR)}` : ` · ${hs[0]} arm alone`), '#e5e5ea');
+      const hs = Object.keys(part), sc = hs.length === 2 ? wL * part.lead + wR * part.rear : hs.length === 1 ? 100 * part[hs[0]] : null;
+      ovRow(SUBJ.frame(), sc == null ? {no: 9, skip: `not judged: ${parts.map(p => `${p.label} ${p.skip}`).join(', ')}`}
+        : {no: 9, score: sc, text: `each elbow out past the line straight down from its shoulder, torso lengths${hs.length === 1 ? ` · the ${hs[0]} arm alone` : ` · ${fN(wL)} + ${fN(wR)} points`}`, parts});
     },
     csv: ['elbow_tuck', 'runs.csv'], json: ['elbow_tuck', 'elbow_tuck.json'],
     parseItem: (r, num) => ({arm: r.arm, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
@@ -2721,37 +2874,29 @@ const RULE_LAYERS = [
     // guard height (guard_height/): per hand, how far the wrist sits below the nose while that hand is not punching.
     // Continuous row like elbow tuck — lead in the top half, rear in the bottom.
     key: 'guard', label: RN(4), short: 'Hands at guard', items: true, split: 'hand',
-    frameOverlay(f, P, leadLeft, Q, torso) {               // each hand's full-marks line, the zero line, and the wrists
-      const t = torso(), nose = P(J.nose), l = P(J.lsh), r = P(J.rsh);
-      if (!(t && nose && l && r)) return;
+    frameOverlay(f, P, leadLeft, Q, torso) {               // each wrist against its own guard line
+      const runs = (S.items.guard || []).filter(q => f >= q.sf && f <= q.ef);    // the rule's own verdict per hand
+      if (!runs.length || runs.every(q => q.state === 'excluded')) return;
+      const t = torso(), nose = P(J.nose); if (!(t && nose)) return;
       const dm = guardDef(f);                              // inside a defensive move: the defensive-move lines
       const GF = {lead: guardLine('lead', f), rear: guardLine('rear', f)}, zero = T(4, 'move.score.zero');
       const W4 = {lead: T(4, 'move.score.points.lead'), rear: T(4, 'move.score.points.rear')};
-      const x0 = Math.min(l[0], r[0]) - 45, x1 = Math.max(l[0], r[0]) + 45;
-      OV.level(nose[1] + GF.rear * t, x0, x1, '#8e8e93');                        // rear: full marks up to its line
-      OV.level(nose[1] + GF.lead * t, x0, x1, '#8e8e93', [3, 4]);                // lead: full marks up to its line
-      OV.level(nose[1] + zero * t, x0, x1, '#8e8e93', [2, 6]);                   // both: 0 from the zero line
-      overlayLabel(x1 + 6, nose[1] + GF.rear * t, 'rear 100', '#8e8e93');
-      overlayLabel(x1 + 6, nose[1] + GF.lead * t, 'lead 100', '#8e8e93');
-      overlayLabel(x1 + 6, nose[1] + zero * t, '0', '#8e8e93');
-      const runs = S.items.guard || [], part = {}, why = [];
+      const part = {}, parts = [];
       for (const [hand, j] of [['lead', leadLeft ? J.lwr : J.rwr], ['rear', leadLeft ? J.rwr : J.lwr]]) {
-        const w = P(j); if (!w) continue;
-        const it = runs.find(q => q.hand === hand && f >= q.sf && f <= q.ef);  // the rule's own verdict for this hand
-        const judged = it?.state === 'ok' || it?.state === 'low';             // throwing or unreadable: gray, no share
-        const d = (w[1] - nose[1]) / t, full = GF[hand];
-        if (judged) part[hand] = Math.min(1, Math.max(0, (zero - d) / (zero - full)));
-        else why.push(`${hand} ${SKIPWORD[it?.state] || 'not read'}`);
-        const col = !judged ? '#8e8e93' : it.state === 'ok' ? '#34c759' : '#ff3b30';
-        OV.dot(w, col, 5);
-        if (it?.state === 'low') OV.line([w[0], nose[1] + full * t], w, '#ff3b30', 2, [3, 3]);
+        const w = P(j), st = runs.find(q => q.hand === hand)?.state;
+        if (!(st === 'ok' || st === 'low') || !w) { parts.push({label: hand, skip: SKIPWORD[st] || 'not read'}); continue; }   // throwing or unreadable
+        const d = (w[1] - nose[1]) / t, full = GF[hand], y = nose[1] + full * t;
+        part[hand] = Math.min(1, Math.max(0, (zero - d) / (zero - full)));
+        const col = scoreCol(100 * part[hand]);
+        G.ref([w[0] - 0.38 * t, y], [w[0] + 0.38 * t, y]); G.note([w[0] + 0.38 * t + 6, y], `${hand} guard`);
+        if (d > full) G.line([w[0], y], w, col, 2.5);      // under its line: how far
+        G.dot(w, col, 5.5);
+        parts.push({label: hand, v: d, full, zero, lo: 0, hi: zero * 1.3, score: 100 * part[hand]});
       }
-      const hs = Object.keys(part);                        // the frame score: lead / rear weights, or one hand alone
-      const sc = hs.length === 2 ? W4.lead * part.lead + W4.rear * part.rear : hs.length === 1 ? 100 * part[hs[0]] : null;
-      overlayLabel(x0, nose[1] - 16, sc == null ? 'frame not scored — no hand can be judged'
-        : `frame score ${sc.toFixed(1)}` + (hs.length === 2 ? ` · lead ${(W4.lead * part.lead).toFixed(1)}/${fN(W4.lead)} · rear ${(W4.rear * part.rear).toFixed(1)}/${fN(W4.rear)}`
-                                                              : ` · ${hs[0]} hand alone${why.length ? ` (${why.join(', ')})` : ''}`)
-        + (dm && sc != null ? ` · defensive move: lead line ${fD(GF.lead, 2)}, rear ${fD(GF.rear, 2)}` : ''), '#e5e5ea');
+      const hs = Object.keys(part), sc = hs.length === 2 ? W4.lead * part.lead + W4.rear * part.rear : hs.length === 1 ? 100 * part[hs[0]] : null;
+      ovRow(SUBJ.frame(), sc == null ? {no: 4, skip: 'not judged: no hand can be read on this frame (punching, or a joint hidden)'}
+        : {no: 4, score: sc, parts, text: `each wrist under the nose, torso lengths${dm ? ` · in a defensive move: lines ${fD(GF.lead, 2)} and ${fD(GF.rear, 2)}` : ''}`
+            + (hs.length === 2 ? ` · lead ${fN(W4.lead)} + rear ${fN(W4.rear)} points` : ` · the ${hs[0]} hand alone`)});
     },
     csv: ['guard_height', 'runs.csv'], json: ['guard_height', 'guard_height.json'],
     parseItem: (r, num) => ({hand: r.hand, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
@@ -2791,14 +2936,19 @@ const RULE_LAYERS = [
     csv: ['flat_feet', 'runs.csv'], json: ['flat_feet', 'flat_feet.json'],
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), min: num(r.min_heel), mean: num(r.mean_heel)}),
     card: () => '',
-    frameOverlay(f, P, leadLeft, Q, torso) {               // each foot: heel -> toe tip, red when both heels are down
-      const it = OV.at('flat', f); if (!it || FLATSKIP[it.state]) return;
-      const t_ = torso(); const col = it.state === 'flat' ? '#ff3b30' : '#34c759';
-      for (const [heel, toe] of [[29, 31], [30, 32]]) {
-        const a = P(heel), b = P(toe); if (!(a && b)) continue;
-        OV.line(a, b, col, 3);
-        if (t_) overlayLabel(a[0] - 18, a[1] - 10, `${((b[1] - a[1]) / t_).toFixed(2)}`, col);
+    frameOverlay(f, P, leadLeft, Q, torso) {               // each foot: its heel against its toe tip
+      const it = OV.at('flat', f); if (!it || it.state === 'excluded') return;
+      if (FLATSKIP[it.state]) { ovRow(SUBJ.frame(), {no: 39, skip: `not judged: ${FLATSKIP[it.state]}`}); return; }
+      const t = torso(), down = T(39, 'move.heel_down_below'), parts = [];
+      for (const [leg, heel, toe] of leadLeft ? [['lead', 29, 31], ['rear', 30, 32]] : [['lead', 30, 32], ['rear', 29, 31]]) {
+        const a = P(heel), b = P(toe); if (!(a && b && t)) continue;
+        const lift = (b[1] - a[1]) / t, up = lift >= down, col = up ? OC.good : OC.bad;
+        G.line(b, a, '#ffffff', 2); if (Math.abs(b[1] - a[1]) > 2) G.line([a[0], b[1]], a, col, 2.5); G.dot(a, col, 4.5);
+        parts.push({label: leg, v: lift, full: down, zero: down, up: true, lo: -0.05, hi: Math.max(0.25, down * 4), score: up ? 100 : 0});
       }
+      const flat = it.state === 'flat';
+      ovRow(SUBJ.frame(), {no: 39, word: flat ? 'flat' : 'heel up', wordCol: flat ? OC.bad : OC.good, parts,
+        text: `each heel above its toe tip, torso lengths: under ${fD(down, 2)} it is down, both down is flat-footed`});
     },
     tip: (e, x) => {
       const tt = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
@@ -2822,20 +2972,27 @@ const RULE_LAYERS = [
     // least to its line), red below, gray where it is not judged (the leg not seen, its foot turned, not side-on,
     // excluded time).
     key: 'knee', label: RN(42), short: RN(42), items: true, split: 'leg',
-    frameOverlay(f, P, leadLeft) {                         // each leg's hip - knee - ankle and the angle at the knee
+    frameOverlay(f, P, leadLeft) {                         // each leg's knee angle in the picture, against its line
       const now = (S.items.knee || []).filter(it => f >= it.sf && f <= it.ef);      // the rule's own state, per leg
+      if (!now.length || now.every(it => it.state === 'excluded')) return;
       // run_knee_bend.py reads lead = the left leg of an orthodox skeleton; a southpaw's run is mirrored to orthodox,
       // so the rule's lead leg is the boxer's lead leg — the right one on a southpaw's real skeleton
       const LEGS2 = leadLeft ? [['lead', J.lhip, J.lkn, J.lan], ['rear', J.rhip, J.rkn, J.ran]]
                              : [['lead', J.rhip, J.rkn, J.ran], ['rear', J.lhip, J.lkn, J.lan]];
+      const parts = [], scores = [];
       for (const [leg, hj, kj, aj] of LEGS2) {
-        const hp = P(hj), kn = P(kj), an = P(aj); if (!(hp && kn && an)) continue;
-        const st = now.find(it => it.leg === leg)?.state, skip = !st || !!KNEESKIP[st];
-        const deg = kneeDeg(hp, kn, an), col = skip ? '#8e8e93' : KNEECOL[st] || '#8e8e93';
-        OV.line(hp, kn, col, 3); OV.line(kn, an, col, 3); OV.dot(kn, col, 4);
-        overlayLabel(kn[0] + 10, kn[1] - 6, skip ? `${leg} · ${SKIPWORD[st] || 'not judged'}`
-          : `${leg} ${deg.toFixed(0)}° → ${THR(() => Math.floor(kneeScore(leg, deg)))}`, col);
+        const hp = P(hj), kn = P(kj), an = P(aj), st = now.find(it => it.leg === leg)?.state;
+        if (!st || KNEESKIP[st] || !(hp && kn && an)) { parts.push({label: leg, skip: SKIPWORD[st] || 'not read'}); continue; }
+        const deg = kneeDeg(hp, kn, an), sc = kneeScore(leg, deg), col = scoreCol(sc);
+        const a0 = Math.atan2(hp[1] - kn[1], hp[0] - kn[0]), a1 = Math.atan2(an[1] - kn[1], an[0] - kn[0]);
+        const d = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
+        G.poly([hp, kn, an], col, 3); G.arc(kn, 15, a0, a1, d < 0, col, 2.5); G.dot(kn, col, 4);
+        parts.push({label: leg, v: deg, full: T(42, `move.score.full.${leg}`), zero: T(42, 'move.score.zero'), lo: 120, hi: 180, score: sc, fmt: v => `${Math.round(v)}°`});
+        scores.push(sc);
       }
+      ovRow(SUBJ.frame(), !scores.length ? {no: 42, skip: `not judged: ${parts.map(p => `${p.label} ${p.skip}`).join(', ')}`}
+        : {no: 42, score: scores.reduce((s, v) => s + v, 0) / scores.length, parts,
+           text: `the knee angle in the picture, 180° a straight leg: bent to its line is full marks`});
     },
     csv: ['knee_bend', 'runs.csv'], json: ['knee_bend', 'knee_bend.json'],
     parseItem: (r, num) => ({leg: r.leg, state: r.state, sf: num(r.start_frame), ef: num(r.end_frame),
@@ -2873,16 +3030,27 @@ const RULE_LAYERS = [
     parseItem: (r, num) => ({state: r.state, sf: num(r.start_frame), ef: num(r.end_frame), hips: num(r.mean_hips),
       head: num(r.mean_head), score: num(r.mean_score)}),
     card: () => '',                                        // per-frame rule: nothing punch-specific to show
-    frameOverlay(f, P, leadLeft) {                         // the ankle line, its two marks, the hip centre and the nose on it
-      const it = OV.at('heavy', f); if (!it || HEAVYSKIP[it.state]) return;
+    frameOverlay(f, P, leadLeft) {                         // the line from the rear ankle (0) to the front one (1), the hips and the nose on it
+      const it = OV.at('heavy', f); if (!it || it.state === 'excluded') return;
+      if (HEAVYSKIP[it.state]) { ovRow(SUBJ.frame(), {no: 45, skip: `not judged: ${HEAVYSKIP[it.state]}`}); return; }
       const q = heavyPos(P, leadLeft); if (!q) return;
-      const y = Math.max(q.fa[1], q.ra[1]) + 14, at = v => q.ra[0] + v * (q.fa[0] - q.ra[0]), col = HEAVYCOL[it.state];
-      OV.line([q.ra[0], y], [q.fa[0], y], '#ffffff', 2);
-      THR(() => { const h1 = at(T(45, 'move.hips.full')), n1 = at(T(45, 'move.head.full'));
-        OV.line([h1, y - 7], [h1, y + 7], '#ff9f0a', 2); OV.line([n1, y - 7], [n1, y + 7], '#64d2ff', 2); });
-      OV.line(q.hip, [q.hip[0], y], col, 1.5, [4, 3]); OV.dot([q.hip[0], y], col, 5);
-      OV.line(q.no, [q.no[0], y], '#64d2ff', 1.5, [4, 3]); OV.dot([q.no[0], y], '#64d2ff', 4);
-      overlayLabel(Math.max(q.fa[0], q.ra[0]) + 10, y + 4, `hips ${q.hips.toFixed(2)} · head ${q.head.toFixed(2)}`, col);
+      const y = Math.max(q.fa[1], q.ra[1]) + 14, at = v => q.ra[0] + v * (q.fa[0] - q.ra[0]);
+      const hFull = T(45, 'move.hips.full'), nFull = T(45, 'move.head.full');
+      const hs = 100 * heavyPart(q.hips, 'hips') / T(45, 'move.hips.points'), ns = 100 * heavyPart(q.head, 'head') / T(45, 'move.head.points');
+      const out = Math.sign(q.fa[0] - q.ra[0]) || 1;        // the front foot's side
+      G.line([q.ra[0], y], [q.fa[0], y], '#ffffff', 2);
+      for (const px of [q.ra[0], q.fa[0]]) G.line([px, y - 6], [px, y + 6], '#ffffff', 2);
+      G.note([q.ra[0] - out * 8, y], 'rear foot', {align: out > 0 ? 'right' : 'left', size: 10});
+      G.ref([q.fa[0], y], [at(Math.max(nFull, 1.25)), y], 0.6);   // past the front foot, out to the nose's line
+      G.note([at(Math.max(nFull, 1.25)) + out * 8, y], 'front foot →', {align: out > 0 ? 'left' : 'right', size: 10});
+      for (const v of [hFull, nFull]) G.line([at(v), y - 7], [at(v), y + 7], '#ffffff', 1.5, [2, 2]);   // each half's line
+      G.line(q.hip, [q.hip[0], y], scoreCol(hs), 1.5, [4, 3]); G.dot([q.hip[0], y], scoreCol(hs), 5);
+      G.line(q.no, [q.no[0], y - 8], scoreCol(ns), 1.5, [4, 3]); basePointer([q.no[0], y], scoreCol(ns));
+      G.note([q.no[0], y - 20], 'nose', {align: 'center'}); G.note([q.hip[0], y + 15], 'hips', {align: 'center'});
+      ovRow(SUBJ.frame(), {no: 45, score: heavyPart(q.hips, 'hips') + heavyPart(q.head, 'head'), mid: true,
+        text: 'where the hips and the nose sit between the rear foot (0) and the front foot (1)',
+        parts: [{label: 'hips', v: q.hips, full: hFull, zero: T(45, 'move.hips.zero'), lo: 0, hi: 1.8, score: hs},
+                {label: 'nose', v: q.head, full: nFull, zero: T(45, 'move.head.zero'), lo: 0, hi: 1.8, score: ns}]});
     },
     tip: (e, x) => {
       const tt = `· ${fmtT(x.sf / S.fps)} · ${((x.ef + 1 - x.sf) / S.fps).toFixed(2)} s`;
@@ -5040,25 +5208,507 @@ function layerSections(e) {
 const at = (arr, f) => arr.filter(e => e.sf <= f && f <= e.ef && !hid(e));
 
 // ════════════════════════════ video overlay ════════════════════════════
+// The overlay's grammar (rebuilt 2026-10-28, the user's call: "make all animations intuitive, clean, understandable,
+// self-explanatory, easy to read" - before, every rule drew its own lines and long labels on the body, two punches
+// under the playhead drew their dials and labels on top of each other, and most lines carried no explanation).
+// Two places, one job each:
+//   on the body   geometry only, one vocabulary for every rule: the thing measured solid in its verdict's colour (green
+//                 full marks, red below, orange a middle state the rule names); the line it is measured against thin
+//                 dashed white with its name written beside it (G.ref + G.note), so no line goes unexplained; a point
+//                 the rule could not trust hollow. Every stroke has a dark halo, so it reads on any footage. What two
+//                 punches share (the hip line) is drawn once (G.once).
+//   in the rail   the words and the numbers: a card per subject - this frame, a punch, a defensive move, a combination -
+//                 with a row per rule that is on: its name, the score, the reading in plain words, and a bullet bar
+//                 (after Stephen Few's bullet graph: the rule's own scale, green where it gives full marks, red where it
+//                 gives 0, the reading a white marker, the two lines' numbers under it) or, for the turn rules, a view
+//                 from above. Two punches at once are two cards, never two labels on one spot - external labelling,
+//                 the cartographers' answer to labels that do not fit on the picture (Bekos, Niedermann & Nöllenburg,
+//                 "External Labeling Techniques: A Taxonomy and Survey", 2019); a card's dot is its punch's or move's
+//                 colour, the colour of the fist's trail on the body, which ties the two without a leader line across
+//                 the boxer. The rail docks on the right while the room beside the boxer (a black bar counts) takes a
+//                 card, else on the left under the HUD, and keeps its side and its order while its cards live (labels
+//                 that jump are not read: Vaaraniemi et al. 2012, temporally coherent labelling); out of room, the
+//                 oldest cards fold to one line per rule, then the last ones to a "+N more".
 const ov = $('overlay'), octx = ov.getContext('2d');
 function videoRect() {
   const W = ov.clientWidth, H = ov.clientHeight, vw = video.videoWidth || 16, vh = video.videoHeight || 9;
   const sc = Math.min(W / vw, H / vh);
   return {x: (W - vw * sc) / 2, y: (H - vh * sc) / 2, w: vw * sc, h: vh * sc, W, H};
 }
-let PAT = () => null;                                      // set each frame by drawOverlay
+let PAT = () => null;                                      // set each frame by drawOverlay: a joint at any frame
 let PXY = () => null;                                      // and the same mapping for a computed point
+let PNOW = () => null;                                     // this frame's joints: where the rail looks for room beside the boxer
+let OV_MISS = false;                                       // a rule on this frame had no thresholds snapshot
+const OC = {good: '#34c759', mid: '#ff9f0a', bad: '#ff3b30', mute: '#8e8e93', live: '#ffd60a', halo: 'rgba(0,0,0,0.5)',
+            text: '#f5f5f7', text2: 'rgba(235,235,245,0.66)', text3: 'rgba(235,235,245,0.4)'};
+const OFONT = (w, s) => `${w} ${s}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif`;
+// a score's colour as the rule rows draw it: green at full marks, red below - orange between where the rule names a
+// middle state - and how the cards write it (100 and 0 plain, one decimal between, as the rows' tags)
+const scoreCol = (s, mid) => s == null || !Number.isFinite(s) ? OC.mute : s >= 100 - 1e-9 ? OC.good : mid && s > 0 ? OC.mid : OC.bad;
+const scoreTxt = s => s == null || !Number.isFinite(s) ? '–' : s >= 100 - 1e-9 ? '100' : s <= 1e-9 ? '0' : s.toFixed(1);
+// the linear score between a full-marks line and a zero line, either way round (a bar's own colour when a rule gives none)
+const linScore = (v, full, zero) => full === zero ? (v <= full === full <= zero ? 100 : 0)
+  : 100 * Math.min(1, Math.max(0, (v - zero) / (full - zero)));
+const lead2 = () => S.stance !== 'southpaw';               // the lead side is the left one on an orthodox skeleton
+const wristOf = e => (e.hand === 'lead') === lead2() ? J.lwr : J.rwr;   // a punch's fist
+
+// ── on the body: the glyphs ──
+const NOTES = [];                                          // the notes written on this frame: a second one moves off the first
+const G = {
+  seen: new Set(),                                         // geometry already drawn on this frame (two punches, one hip line)
+  once: key => !G.seen.has(key) && !!G.seen.add(key),
+  stroke(path, col, w = 3, dash = null, a = 1) {           // a stroke over a dark halo, so it reads on any footage
+    octx.save(); octx.lineCap = 'round'; octx.lineJoin = 'round'; octx.globalAlpha *= a;
+    if (dash) octx.setLineDash(dash);
+    octx.beginPath(); path();
+    octx.strokeStyle = OC.halo; octx.lineWidth = w + 3; octx.stroke();
+    octx.strokeStyle = col; octx.lineWidth = w; octx.stroke(); octx.restore();
+  },
+  line(p, q, col, w = 3, dash = null, a = 1) { if (p && q) G.stroke(() => { octx.moveTo(...p); octx.lineTo(...q); }, col, w, dash, a); },
+  // the line a reading is measured against: thin dashed white
+  ref(p, q, a = 0.9) { G.line(p, q, '#ffffff', 1.5, [5, 4], a); },
+  poly(pts, col, w = 3, dash = null, a = 1) {
+    const q = pts.filter(Boolean); if (q.length < 2) return;
+    G.stroke(() => q.forEach((p, i) => i ? octx.lineTo(...p) : octx.moveTo(...p)), col, w, dash, a);
+  },
+  dot(p, col, r = 4.5, a = 1) {
+    if (!p) return;
+    octx.save(); octx.globalAlpha *= a;
+    octx.beginPath(); octx.arc(p[0], p[1], r + 1.5, 0, 7); octx.fillStyle = OC.halo; octx.fill();
+    octx.beginPath(); octx.arc(p[0], p[1], r, 0, 7); octx.fillStyle = col; octx.fill(); octx.restore();
+  },
+  ring(p, col, r = 10, w = 2.5, dash = null, a = 1) { if (p) G.stroke(() => octx.arc(p[0], p[1], r, 0, 7), col, w, dash, a); },
+  hollow(p, col, r = 4.5, a = 1) { if (p) G.stroke(() => octx.arc(p[0], p[1], r, 0, 7), col, 2, [2, 2.4], a); },   // a guess
+  // an arc around c from one direction to another (canvas angles), the way a protractor marks an angle
+  arc(c, r, a0, a1, ccw, col, w = 2.5, a = 1) { if (c) G.stroke(() => octx.arc(c[0], c[1], r, a0, a1, ccw), col, w, null, a); },
+  // a dimension line, as a measuring app draws one: the span measured, with a cap at each end
+  dim(p, q, col, cap = 7, a = 1) {
+    if (!(p && q)) return;
+    const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (!d) return;
+    const nx = -(q[1] - p[1]) / d * cap, ny = (q[0] - p[0]) / d * cap;
+    G.stroke(() => { octx.moveTo(...p); octx.lineTo(...q); octx.moveTo(p[0] - nx, p[1] - ny); octx.lineTo(p[0] + nx, p[1] + ny);
+                     octx.moveTo(q[0] - nx, q[1] - ny); octx.lineTo(q[0] + nx, q[1] + ny); }, col, 2.5, null, a);
+  },
+  // a joint's path over frames fr0..fr1, fading toward where it started
+  trail(fr0, fr1, j, col, w = 3, a = 1) {
+    const pts = []; for (let fr = Math.max(0, fr0); fr <= fr1; fr++) { const p = PAT(fr, j); if (p) pts.push(p); }
+    if (pts.length < 2) return;
+    G.poly(pts, OC.halo, w + 3, null, a * 0.6);
+    octx.save(); octx.lineCap = 'round'; octx.lineWidth = w; octx.strokeStyle = col;
+    for (let i = 1; i < pts.length; i++) {
+      octx.globalAlpha = a * (0.12 + 0.88 * i / (pts.length - 1));
+      octx.beginPath(); octx.moveTo(...pts[i - 1]); octx.lineTo(...pts[i]); octx.stroke();
+    }
+    octx.restore();
+  },
+  // a few words beside a line on the body, so it is never unexplained; a note that would cover another moves down
+  note(p, s, {col = 'rgba(255,255,255,0.94)', align = 'left', size = 10.5, a = 1} = {}) {
+    if (!p || !s) return;
+    octx.save(); octx.globalAlpha *= a; octx.font = OFONT(600, size);
+    const w = octx.measureText(s).width, B = RAIL.box;
+    let x = align === 'right' ? p[0] - w : align === 'center' ? p[0] - w / 2 : p[0], y = p[1];
+    if (B && x < B.x + B.w + 4 && B.x - 4 < x + w) x = B.side === 'right' ? B.x - w - 6 : B.x + B.w + 6;   // not under the rail
+    const hit_ = yy => NOTES.some(b => x < b.x + b.w + 4 && b.x < x + w + 4 && Math.abs(yy - b.y) < 13);
+    for (const dy of [0, -13, 13, -26, 26, -39, 39]) if (!hit_(p[1] + dy)) { y = p[1] + dy; break; }
+    NOTES.push({x, y, w});
+    octx.textAlign = 'left'; octx.textBaseline = 'middle'; octx.lineJoin = 'round';
+    octx.strokeStyle = 'rgba(0,0,0,0.66)'; octx.lineWidth = 3.4; octx.strokeText(s, x, y);
+    octx.fillStyle = col; octx.fillText(s, x, y); octx.restore();
+  },
+  // a reading taken on another frame (the impact) drawn only near it, fading out over k frames either side
+  near: (f, at, k = 4) => at == null ? 0 : Math.max(0, 1 - Math.abs(f - at) / (k + 1)),
+};
+const torsoAt = (fr) => {                                  // the torso on screen (shoulder centre to hip centre) at any frame
+  const a = PAT(fr, J.lsh), b = PAT(fr, J.rsh), c = PAT(fr, J.lhip), d = PAT(fr, J.rhip);
+  if (!(a && b && c && d)) return null;
+  const t = Math.hypot((a[0] + b[0]) / 2 - (c[0] + d[0]) / 2, (a[1] + b[1]) / 2 - (c[1] + d[1]) / 2);
+  return t > 0 ? t : null;
+};
+const midOf = (p, q) => p && q ? [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2] : null;
+// a pointer standing on a line (rules 1 and 45 put the nose on the line between the feet with it)
+function basePointer(p, col, a = 1) {
+  octx.save(); octx.globalAlpha *= a; octx.fillStyle = col; octx.strokeStyle = OC.halo; octx.lineWidth = 2; octx.lineJoin = 'round';
+  octx.beginPath(); octx.moveTo(p[0], p[1] - 1); octx.lineTo(p[0] - 6, p[1] - 11); octx.lineTo(p[0] + 6, p[1] - 11); octx.closePath();
+  octx.stroke(); octx.fill(); octx.restore();
+}
+const OV = {at: (key, f) => (S.items[key] || []).find(it => f >= it.sf && f <= it.ef) || null};   // an items layer's item at f
+
+// ── in the rail: the cards ──
+// A card per subject, created by the first row a rule adds to it; its rows sort by rule number.
+const RAIL = {cards: new Map(), side: null, lean: 0, x: new Map(), y: new Map(), a: new Map(), moving: false, box: null};
+function ovCard(key, init) {
+  let c = RAIL.cards.get(key);
+  if (!c) RAIL.cards.set(key, c = Object.assign({key, rows: []}, init()));
+  return c;
+}
+const elWord = s => s.replace(/\b(lead|rear) /g, '').replace(/_/g, '-').replace(/hook-or-uppercut/g, 'body shot');
+const SUBJ = {
+  frame: () => ovCard('frame', () => ({order: -1e9, title: 'This frame'})),
+  punch: e => ovCard(`p${e.sf}${e.hand}`, () => ({order: e.sf, span: e, dot: styleP(e.type).c, joint: wristOf(e),
+    title: `${cap(e.hand)} ${styleP(e.type).name.toLowerCase()}`})),
+  move: d => ovCard(`d${d.sf}`, () => ({order: d.sf + 0.5, span: d, dot: styleD(d.type).c, joint: J.nose,
+    title: `${d.side ? cap(d.side) + ' ' : ''}${styleD(d.type).name.toLowerCase()}`})),
+  // a combination: one card for each stretch - the offensive and the combined grouping of the same punches share it
+  combo: (it, kind) => ovCard(`c${it.sf}-${it.ef}`, () => ({order: it.sf + 0.25, span: {sf: it.sf, ef: it.ef}, dot: COMBO[kind],
+    title: it.seq ? it.seq.split(' > ').map(t => cap(elWord(t))).join(' › ') : 'Combination'})),
+};
+const punchOf = (sf, hand) => S.punches.find(p => p.sf === sf && p.hand === hand) || null;
+const ovRow = (card, r) => { if (card) card.rows.push(r); };
+
+// a card's text, cut to fit
+function fitTxt(s, w) {
+  if (octx.measureText(s).width <= w) return s;
+  while (s.length > 1 && octx.measureText(s + '…').width > w) s = s.slice(0, -1);
+  return s + '…';
+}
+function wrapTxt(s, w, max = 2) {
+  const out = []; let cur = '';
+  for (const word of String(s).split(' ')) {
+    const t = cur ? `${cur} ${word}` : word;
+    if (!cur || octx.measureText(t).width <= w) cur = t; else { out.push(cur); cur = word; }
+  }
+  if (cur) out.push(cur);
+  if (out.length > max) { out.length = max; out[max - 1] = fitTxt(out[max - 1] + ' …', w); }
+  return out.map(l => fitTxt(l, w));
+}
+function rrO(x, y, w, h, r) { octx.beginPath(); octx.roundRect ? octx.roundRect(x, y, w, h, r) : octx.rect(x, y, w, h); }
+const CARD = {pad: 12, head: 33, gap: 8, rowGap: 7, line: 15, gauge: 27, part: 27, dial: 48, compact: 21};
+// A row: {no, name?, score?, mid?, word?, wordCol?, text?, skip?, gauge?, parts?, dial?}. The right column is the score,
+// or a verdict's word; text is the reading in plain words; skip, why the rule did not judge it.
+function rowH(r, w, compact = r.fold) {
+  if (compact) return CARD.compact;
+  const skip = r.skip != null, dx = r.dial && !skip ? 56 : 0;
+  let h = 18 + 15 * (rowName(r, w).length - 1);
+  octx.font = OFONT(400, 11.5);
+  h += CARD.line * ((skip ? r.skip : r.text) ? wrapTxt(skip ? r.skip : r.text, w - dx).length : 0);
+  if (!skip && r.gauge) h += CARD.gauge;
+  if (!skip && r.parts) h += CARD.part * r.parts.length;
+  if (dx) h = Math.max(h, 18 + 15 * (rowName(r, w).length - 1) + CARD.dial);
+  return h + CARD.rowGap;
+}
+// a row's name as it fits beside its score: one line, or two
+function rowName(r, w) {
+  const skip = r.skip != null, right = skip ? '–' : r.word ?? scoreTxt(r.score);
+  octx.font = OFONT(700, 13); const rw = octx.measureText(right).width;
+  octx.font = OFONT(500, 12);
+  return wrapTxt(r.name ?? RN(r.no) ?? '', w - rw - 10, 2);
+}
+const cardH = (c, w) => CARD.head + c.rows.reduce((s, r) => s + rowH(r, w - 2 * CARD.pad), 0) + 2;
+
+// A bullet bar (after Stephen Few's bullet graph): the rule's own scale with the reading on it - green where the rule
+// gives full marks, red where it gives 0, the linear stretch between shaded from one to the other, a white tick at the
+// full-marks line, the reading a white marker and its value at the bar's end in its score's colour; the two lines'
+// numbers under the bar. g: {v, full, zero, lo?, hi?, fmt?, unit?, score?, mid?, marks?: [[value, word]]}
+function drawGauge(x, y, w, g) {
+  const fmt = g.fmt || (v => fD(v, 2)), ok = Number.isFinite(g.v);
+  octx.font = OFONT(600, 11.5);
+  const vs = ok ? `${fmt(g.v)}${g.unit || ''}` : '–', vw = Math.max(36, octx.measureText(vs).width + 8);
+  const bw = Math.max(36, w - vw), by = y + 6, bh = 5;
+  const span = [g.full, g.zero].filter(Number.isFinite);
+  let lo = g.lo ?? Math.min(0, ...span), hi = g.hi ?? Math.max(...span) * 1.3;
+  if (!(hi > lo)) hi = lo + 1;
+  const X = v => x + (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * bw;
+  const xf = X(g.full), xz = X(g.zero), fullLeft = g.full === g.zero ? !g.up : g.full < g.zero;
+  octx.save();
+  rrO(x, by, bw, bh, bh / 2); octx.clip();
+  octx.globalAlpha = 0.9;
+  octx.fillStyle = OC.good; fullLeft ? octx.fillRect(x, by, xf - x, bh) : octx.fillRect(xf, by, x + bw - xf, bh);
+  if (Math.abs(xz - xf) > 0.5) {                           // the linear stretch: green to red through the middle orange
+    const gr = octx.createLinearGradient(xf, 0, xz, 0);
+    gr.addColorStop(0, OC.good); gr.addColorStop(0.5, OC.mid); gr.addColorStop(1, OC.bad);
+    octx.fillStyle = gr; octx.fillRect(Math.min(xf, xz), by, Math.abs(xz - xf), bh);
+  }
+  octx.fillStyle = OC.bad; fullLeft ? octx.fillRect(xz, by, x + bw - xz, bh) : octx.fillRect(x, by, xz - x, bh);
+  octx.restore();
+  octx.save();
+  octx.fillStyle = '#ffffff'; octx.fillRect(Math.round(xf) - 0.75, by - 3, 1.5, bh + 6);   // the full-marks line
+  if (ok) {                                                // the reading; past the bar's end, an arrow at that end
+    const xm = X(g.v), out = g.v < lo || g.v > hi;
+    octx.lineWidth = 1.5; octx.strokeStyle = 'rgba(0,0,0,0.7)'; octx.fillStyle = '#ffffff';
+    if (out) {
+      const d = g.v > hi ? 1 : -1; octx.beginPath();
+      octx.moveTo(xm + d * 5, by + bh / 2); octx.lineTo(xm - d * 2, by - 4); octx.lineTo(xm - d * 2, by + bh + 4); octx.closePath();
+      octx.stroke(); octx.fill();
+    } else { rrO(xm - 2, by - 4.5, 4, bh + 9, 2); octx.stroke(); octx.fill(); }
+  }
+  const s = g.score ?? (ok ? linScore(g.v, g.full, g.zero) : null);
+  octx.font = OFONT(600, 11.5); octx.textAlign = 'right'; octx.textBaseline = 'middle';
+  octx.fillStyle = ok ? scoreCol(s, g.mid) : OC.text3; octx.fillText(vs, x + w, by + bh / 2);
+  octx.font = OFONT(500, 9.5); octx.fillStyle = OC.text3; octx.textAlign = 'center';
+  const marks = g.marks || [[g.full, fmt(g.full)], [g.zero, fmt(g.zero)]];
+  const placed = [];
+  for (const [v, t] of marks) {                            // the lines' numbers, none on top of another
+    if (!Number.isFinite(v) || t == null) continue;
+    const mx = Math.max(x + 8, Math.min(x + bw - 8, X(v))), tw = octx.measureText(t).width;
+    if (placed.some(([a, b]) => mx - tw / 2 < b + 4 && a < mx + tw / 2 + 4)) continue;
+    placed.push([mx - tw / 2, mx + tw / 2]); octx.fillText(t, mx, by + bh + 10);
+  }
+  octx.restore();
+}
+// one of a row's parts (the lead and the rear hand, the two legs): its name, then its own bar
+function drawPart(x, y, w, p) {
+  octx.save(); octx.font = OFONT(500, 11.5); octx.textAlign = 'left'; octx.textBaseline = 'middle';
+  octx.fillStyle = p.skip != null ? OC.text3 : OC.text2; octx.fillText(p.label, x, y + 8.5);
+  if (p.skip != null) { octx.font = OFONT(400, 11); octx.fillText(fitTxt(p.skip, w - 46), x + 46, y + 8.5); }
+  octx.restore();
+  if (p.skip == null) drawGauge(x + 46, y, w - 46, p);
+}
+// A view from above (the turn rules): the boxer faces up, the small mark on the rim. Angles on the dial: 0 = straight
+// down the screen, 180 = up, + toward the screen's right side of the bottom (the turn dial's own convention since
+// 2026-10-27: at(deg) = centre + r (sin deg, cos deg)). d: {from, sweep, to, ticks, col, live}: the dashed line is the
+// reference (where the line started, or square to the opponent), the solid one where it is now, the wedge the turn
+// between them, the ticks on the rim what the rule asks for.
+function drawDial(cx, cy, r, d) {
+  const rad = Math.PI / 180, ca = deg => (90 - deg) * rad, at = (deg, rr = r) => [cx + rr * Math.sin(deg * rad), cy + rr * Math.cos(deg * rad)];
+  octx.save();
+  octx.fillStyle = 'rgba(255,255,255,0.06)'; octx.beginPath(); octx.arc(cx, cy, r, 0, 7); octx.fill();
+  octx.strokeStyle = 'rgba(255,255,255,0.22)'; octx.lineWidth = 1; octx.stroke();
+  octx.fillStyle = 'rgba(255,255,255,0.75)'; octx.beginPath();                    // facing: up
+  octx.moveTo(cx, cy - r - 5); octx.lineTo(cx - 4, cy - r + 1.5); octx.lineTo(cx + 4, cy - r + 1.5); octx.closePath(); octx.fill();
+  if (d.sweep) {                                           // the turn, as a wedge
+    octx.globalAlpha = 0.42; octx.fillStyle = d.col; octx.beginPath(); octx.moveTo(cx, cy);
+    octx.arc(cx, cy, r - 1, ca(d.from), ca(d.from + d.sweep), d.sweep > 0); octx.closePath(); octx.fill(); octx.globalAlpha = 1;
+  }
+  octx.lineCap = 'round';
+  for (const t of d.ticks || []) {                         // what the rule asks for, on the rim
+    const [a, b] = [at(t, r - 5), at(t, r + 3)];
+    octx.strokeStyle = '#ffffff'; octx.lineWidth = 2; octx.beginPath(); octx.moveTo(...a); octx.lineTo(...b); octx.stroke();
+  }
+  // a line (the hips, the shoulders) is drawn across the dial; a direction (the facing: d.ray) from the centre out
+  const [p0, p1] = d.ray ? [[cx, cy], at(d.from, r - 2)] : [at(d.from, r - 2), at(d.from + 180, r - 2)];
+  octx.setLineDash([3, 3]); octx.strokeStyle = 'rgba(255,255,255,0.85)'; octx.lineWidth = 1.5;
+  octx.beginPath(); octx.moveTo(...p0); octx.lineTo(...p1); octx.stroke(); octx.setLineDash([]);
+  if (d.to != null) {
+    const [q0, q1] = d.ray ? [[cx, cy], at(d.to, r - 3)] : [at(d.to, r - 2), at(d.to + 180, r - 2)];
+    octx.strokeStyle = d.col; octx.lineWidth = 3; octx.beginPath(); octx.moveTo(...q0); octx.lineTo(...q1); octx.stroke();
+    if (d.ray) {                                           // the direction's arrowhead
+      const [tx_, ty_] = at(d.to, r + 1), [lx, ly] = at(d.to - 14, r - 6), [rx, ry] = at(d.to + 14, r - 6);
+      octx.fillStyle = d.col; octx.beginPath(); octx.moveTo(tx_, ty_); octx.lineTo(lx, ly); octx.lineTo(rx, ry); octx.closePath(); octx.fill();
+    }
+  }
+  octx.fillStyle = '#ffffff'; octx.beginPath(); octx.arc(cx, cy, 2, 0, 7); octx.fill();
+  octx.restore();
+}
+function drawRow(r, x, y, w, compact = r.fold) {
+  const skip = r.skip != null, right = skip ? '–' : r.word ?? scoreTxt(r.score);
+  const rc = skip ? OC.text3 : r.wordCol || scoreCol(r.score, r.mid);
+  octx.save(); octx.textBaseline = 'middle';
+  octx.font = OFONT(700, 13); const rw = octx.measureText(right).width;
+  octx.textAlign = 'right'; octx.fillStyle = rc; octx.fillText(right, x + w, y + 8);
+  octx.textAlign = 'left';
+  const nm = compact ? [null] : rowName(r, w);
+  octx.font = OFONT(500, 12); octx.fillStyle = skip ? OC.text2 : OC.text;
+  if (compact) octx.fillText(fitTxt(r.name ?? RN(r.no) ?? '', w - rw - 10), x, y + 8);
+  else nm.forEach((ln, i) => octx.fillText(ln, x, y + 8 + 15 * i));
+  octx.restore();
+  if (compact) return y + CARD.compact;
+  let yy = y + 18 + 15 * (nm.length - 1);
+  const dx = r.dial && !skip ? 56 : 0;
+  if (dx) drawDial(x + 23, yy + CARD.dial / 2, 21, r.dial);
+  const t = skip ? r.skip : r.text;
+  if (t) {
+    octx.save(); octx.font = OFONT(400, 11.5); octx.fillStyle = OC.text2; octx.textAlign = 'left'; octx.textBaseline = 'middle';
+    for (const ln of wrapTxt(t, w - dx)) { octx.fillText(ln, x + dx, yy + 7); yy += CARD.line; }
+    octx.restore();
+  }
+  if (!skip && r.gauge) { drawGauge(x + dx, yy + 2, w - dx, r.gauge); yy += CARD.gauge; }
+  if (!skip && r.parts) for (const p of r.parts) { drawPart(x, yy + 2, w, p); yy += CARD.part; }
+  if (dx) yy = Math.max(yy, y + 18 + 15 * (nm.length - 1) + CARD.dial);
+  return yy + CARD.rowGap;
+}
+// where the playhead is inside a punch or a move: a small track, the impact a tick
+function drawProgress(x, y, w, s, f) {
+  const n = s.ef - s.sf + 1, X = fr => x + Math.max(0, Math.min(1, (fr - s.sf) / n)) * w;
+  octx.save();
+  if (f < s.sf) {                                          // a window before it (rules 2, 19, 20, 36): not started yet
+    octx.font = OFONT(500, 10.5); octx.fillStyle = OC.text3; octx.textAlign = 'right'; octx.textBaseline = 'middle';
+    octx.fillText(`in ${s.sf - f} f`, x + w, y); octx.restore(); return;
+  }
+  octx.fillStyle = 'rgba(255,255,255,0.18)'; rrO(x, y - 1.5, w, 3, 1.5); octx.fill();
+  octx.fillStyle = '#ffffff'; rrO(x, y - 1.5, Math.max(3, X(Math.min(f + 1, s.ef + 1)) - x), 3, 1.5); octx.fill();
+  if (s.impact != null && s.impact >= s.sf && s.impact <= s.ef) {
+    const xi = Math.round(X(s.impact)) + 0.5; octx.fillStyle = f >= s.impact ? '#ffffff' : 'rgba(255,255,255,0.6)';
+    octx.fillRect(xi - 1, y - 5, 2, 10);
+  }
+  octx.restore();
+}
+function drawCard(c, x, y, w, h, a, f) {
+  octx.save(); octx.globalAlpha = a;
+  octx.shadowColor = 'rgba(0,0,0,0.4)'; octx.shadowBlur = 18; octx.shadowOffsetY = 6;
+  octx.fillStyle = 'rgba(28,28,30,0.86)'; rrO(x, y, w, h, 13); octx.fill();
+  octx.shadowColor = 'transparent'; octx.shadowBlur = 0; octx.shadowOffsetY = 0;
+  octx.strokeStyle = 'rgba(255,255,255,0.1)'; octx.lineWidth = 1; rrO(x + 0.5, y + 0.5, w - 1, h - 1, 12.5); octx.stroke();
+  const ty = y + 16, pw = c.span?.ef != null && c.span.sf != null ? 46 : 0;
+  let tx0 = x + CARD.pad;
+  if (c.dot) { octx.fillStyle = c.dot; octx.beginPath(); octx.arc(x + 17, ty, 4.5, 0, 7); octx.fill(); tx0 = x + 28; }
+  octx.font = OFONT(600, 13); octx.fillStyle = OC.text; octx.textAlign = 'left'; octx.textBaseline = 'middle';
+  octx.fillText(fitTxt(c.title, x + w - CARD.pad - pw - (pw ? 10 : 0) - tx0), tx0, ty);
+  if (pw) drawProgress(x + w - CARD.pad - pw, ty, pw, c.span, f);
+  octx.fillStyle = 'rgba(255,255,255,0.08)'; octx.fillRect(x + CARD.pad, y + 28, w - 2 * CARD.pad, 1);
+  let yy = y + CARD.head;
+  for (const r of c.rows) yy = drawRow(r, x + CARD.pad, yy, w - 2 * CARD.pad);
+  octx.restore();
+}
+// the rail: where it docks, what fits, then the cards (eased into place: RAIL.moving asks for a redraw)
+// Where the rail docks, decided before anything is drawn on the body (so a note keeps out of it): the right side (the HUD
+// holds the top left) while the room beside the boxer - a black bar counts - takes a card, else the left one, else the
+// roomier; a change waits half a second, so a step across the picture does not throw the rail from side to side.
+function railPlace(R) {
+  const W = R.W, H = R.H, cw = Math.round(Math.max(W < 700 ? 190 : 214, Math.min(264, W * 0.25)));
+  const xs = Object.values(J).map(j => PNOW(j)).filter(Boolean).map(p => p[0]);
+  const roomL = xs.length ? Math.min(...xs) : W / 2, roomR = xs.length ? W - Math.max(...xs) : W / 2, need = cw + 24;
+  const want = roomR >= need ? 'right' : roomL >= need ? 'left' : roomR >= roomL ? 'right' : 'left';
+  if (!RAIL.side) RAIL.side = want;
+  RAIL.lean = want !== RAIL.side ? RAIL.lean + 1 : 0;
+  if (RAIL.lean > Math.round(0.5 * (S.fps || 30))) { RAIL.side = want; RAIL.lean = 0; }
+  // the card's x: next to the picture when a black bar beside it holds the rail (the eye travels less), else at the edge
+  const x0 = Math.max(0, Z.tx + R.x * Z.k), x1 = Math.min(W, Z.tx + (R.x + R.w) * Z.k), side = RAIL.side;
+  const x = side === 'right' ? (W - x1 >= cw + 28 ? x1 + 16 : W - 12 - cw) : (x0 >= cw + 28 ? x0 - 16 - cw : 12);
+  const rect = el => el && el.offsetParent ? el.getBoundingClientRect() : null, sr = ov.getBoundingClientRect();
+  let top = 12;                                            // under whatever already sits in that corner
+  for (const el of side === 'right' ? [$('modeSeg'), $('zoomReset')] : [$('hud')]) {
+    const b = rect(el); if (b && b.height && b.right > sr.left + x && b.left < sr.left + x + cw) top = Math.max(top, b.bottom - sr.top + 10);
+  }
+  // a second column beyond the first when the room on that side takes it
+  const x2 = side === 'right' ? x + cw + 12 : x - cw - 12, two = side === 'right' ? x2 + cw <= W - 12 : x2 >= 12;
+  RAIL.box = {side, x, w: cw, top, bottom: side === 'right' ? H - 50 : H - 14, cols: two ? [x, x2] : [x]};   // the clock sits bottom right
+}
+// The rail's fit, when its cards are taller than the room: rows fold to one line each, the least telling first - a rule
+// that did not judge, then full marks, then a reading still in progress, then below full - oldest card first, so the
+// detail stays where something is wrong; then the rules that did not judge leave, then the last cards, counted in a
+// "+N more". Cards fill the column next to the picture, then a second one beyond it when the room allows (a black bar
+// beside a portrait video).
+function railDraw(R, f) {
+  const cards = [...RAIL.cards.values()].filter(c => c.rows.length)
+    .sort((a, b) => a.order - b.order || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  RAIL.moving = false;
+  if (!cards.length || !RAIL.box) { RAIL.y.clear(); RAIL.a.clear(); RAIL.x.clear(); return; }
+  for (const c of cards) c.rows.sort((a, b) => (a.no ?? 99) - (b.no ?? 99));
+  const {cols, w: cw, top, bottom} = RAIL.box, avail = bottom - top;
+  const pack = n => {                                      // the first n cards into the columns, in order; null if they do not fit
+    const at = []; let c = 0, used = 0;
+    for (let i = 0; i < n; i++) {
+      const h = cardH(cards[i], cw);
+      if (used && used + CARD.gap + h > avail) { if (++c >= cols.length) return null; used = 0; }
+      const y0 = used ? used + CARD.gap : 0;
+      if (y0 + h > avail) return null;                     // taller than what is left of a whole column
+      at.push([cols[c], top + y0]); used = y0 + h;
+    }
+    return at;
+  };
+  for (const c of cards) for (const r of c.rows) r.fold = false;
+  // what a row is worth keeping open: a rule that did not judge 0, full marks 1, still in progress 2, below full 3
+  const keep = r => r.skip != null ? 0 : (r.score != null && r.score >= 100 - 1e-9 && r.word == null) || r.wordCol === OC.good ? 1
+    : r.word === '…' ? 2 : 3;
+  let at = pack(cards.length);
+  for (let p = 0; p <= 3 && !at; p++)
+    for (const c of cards) { if (at) break; for (const r of c.rows) if (keep(r) === p) r.fold = true; at = pack(cards.length); }
+  let shown = cards.length, cut = 0;
+  if (!at) {                                               // still too tall: the rules that judged nothing here go first
+    for (const c of cards) { const n = c.rows.length; c.rows = c.rows.filter(r => r.skip == null); cut += n - c.rows.length; }
+    for (let i = cards.length - 1; i >= 0; i--) if (!cards[i].rows.length) cards.splice(i, 1);
+    shown = cards.length; at = shown ? pack(shown) : [];
+  }
+  while (!at && shown > 1) at = pack(--shown);
+  if (!at) {                                               // one card, too tall even folded: its least telling rows go
+    const c = cards[0], byKeep = [...c.rows].sort((a, b) => keep(a) - keep(b) || (b.no ?? 0) - (a.no ?? 0));
+    while (c.rows.length > 1 && cardH(c, cw) + 34 > avail) { const r = byKeep.shift(); c.rows = c.rows.filter(q => q !== r); cut++; }
+    at = [[cols[0], top]];
+  }
+  // eased positions and fade-ins, so a card that appears or goes does not make the rest jump
+  const live = new Set();
+  for (let i = 0; i < shown; i++) {
+    const k = cards[i].key, [tx_, ty_] = at[i], px = RAIL.x.get(k), py = RAIL.y.get(k);
+    const ease = (p, t) => p == null || Math.abs(p - t) < 0.5 ? t : p + (t - p) * 0.38;
+    const nx = ease(px, tx_), ny = ease(py, ty_), a = Math.min(1, (RAIL.a.get(k) ?? 0) + 0.34);
+    if (nx !== tx_ || ny !== ty_ || a < 1) RAIL.moving = true;
+    RAIL.x.set(k, nx); RAIL.y.set(k, ny); RAIL.a.set(k, a); live.add(k);
+  }
+  for (const k of [...RAIL.y.keys()]) if (!live.has(k)) { RAIL.y.delete(k); RAIL.a.delete(k); RAIL.x.delete(k); }
+  for (let i = 0; i < shown; i++) { const k = cards[i].key; drawCard(cards[i], RAIL.x.get(k), RAIL.y.get(k), cw, cardH(cards[i], cw), RAIL.a.get(k), f); }
+  if (shown < cards.length || cut) {                       // the cards (or a card's rows) with no room left
+    const s = shown < cards.length ? `+${cards.length - shown + cut} more · the Now tab has every rule`
+      : `+${cut} more rule${cut > 1 ? 's' : ''} · the Now tab has every rule`, lx = shown ? at[shown - 1][0] : cols[0];
+    const y = shown ? Math.min(bottom - 26, at[shown - 1][1] + cardH(cards[shown - 1], cw) + CARD.gap) : top;
+    octx.save(); octx.font = OFONT(500, 11.5); const tw = Math.min(cw, octx.measureText(s).width + 22);
+    octx.fillStyle = 'rgba(28,28,30,0.86)'; rrO(lx, y, tw, 26, 13); octx.fill();
+    octx.fillStyle = OC.text2; octx.textBaseline = 'middle'; octx.fillText(fitTxt(s, tw - 22), lx + 11, y + 13); octx.restore();
+  }
+}
+// a message across the top of the picture: the excluded time, a missing thresholds snapshot
+const NOTICE = {n: 0};
+function notice(s, col = OC.text) {
+  octx.save(); octx.font = OFONT(600, 12.5);
+  const w = octx.measureText(s).width + 28, x = (ov.clientWidth - w) / 2, y = 14 + NOTICE.n++ * 36;
+  octx.fillStyle = 'rgba(28,28,30,0.86)'; rrO(x, y, w, 28, 14); octx.fill();
+  octx.fillStyle = col; octx.textAlign = 'center'; octx.textBaseline = 'middle'; octx.fillText(s, x + w / 2, y + 14.5);
+  octx.restore();
+}
+
+// The skeleton: the rules read a joint only from the house visibility floor (the video's snapshot), so under it a joint
+// is hollow and its bones dashed - what the rules skip shows on the footage (the HUD counts them). With a rule drawing,
+// it steps back, so the rule's geometry is the figure and the body the ground.
+function drawSkeleton(f, P, quiet) {
+  const floor = S.th?.house?.min_visibility, seen = j => floor == null || !(visAt(f, j) < floor);
+  octx.save(); octx.lineCap = 'round';
+  for (const [a, b] of BONES) {
+    const p = P(a), q = P(b); if (!(p && q)) continue;
+    const on = seen(a) && seen(b);
+    octx.lineWidth = quiet ? 2.4 : 3; octx.strokeStyle = `rgba(255,255,255,${(on ? 0.85 : 0.45) * (quiet ? 0.62 : 1)})`;
+    octx.setLineDash(on ? [] : [5, 6]); octx.beginPath(); octx.moveTo(...p); octx.lineTo(...q); octx.stroke();
+  }
+  octx.setLineDash([]);
+  for (const j of Object.values(J)) {
+    const p = P(j); if (!p) continue;
+    const r = (j >= 29 ? 2.6 : 3.6) * (quiet ? 0.85 : 1);  // heel and toe tip: smaller, beside the ankle
+    octx.beginPath(); octx.arc(p[0], p[1], r, 0, 7);
+    if (seen(j)) { octx.fillStyle = quiet ? 'rgba(10,132,255,0.75)' : '#0a84ff'; octx.fill(); continue; }
+    octx.fillStyle = 'rgba(0,0,0,0.45)'; octx.fill(); octx.lineWidth = 1.8; octx.strokeStyle = '#fff'; octx.stroke();
+  }
+  octx.restore();
+}
+// joints under the house visibility floor on frame f (drawn hollow; the HUD says how many the rules skip)
+function hiddenJoints(f) {
+  const floor = S.th?.house?.min_visibility, C = S.skelC;
+  if (floor == null || !S.skel || !C || f >= S.skel.length / (33 * C)) return 0;
+  let n = 0;
+  for (const j of Object.values(J)) {
+    const b = (f * 33 + j) * C;
+    if (Number.isFinite(S.skel[b]) && Number.isFinite(S.skel[b + 1]) && visAt(f, j) < floor) n++;
+  }
+  return n;
+}
+// What the detectors found, on the body, with the skeleton: a punch's fist leaves a short fading trail in the punch's
+// colour (two punches at once: two trails, each its own colour) and ripples on its impact frame; a defensive move's head
+// leaves its path in the move's colour; a moving foot is ringed in its row's colour.
+function drawDetections(f, P, pNow) {
+  if (!V.skel) return;
+  const back = Math.round(0.4 * S.fps);
+  for (const e of pNow) G.trail(Math.max(e.sf, f - back), f, wristOf(e), styleP(e.type).c, 3);
+  for (const e of new Set(pNow.concat(S.punches.filter(p => p.impact != null && Math.abs(p.impact - f) <= 3 && !hid(p))))) {
+    if (e.impact == null) continue;
+    const d = f - e.impact; if (Math.abs(d) > 3) continue;
+    const wr = wristOf(e), p = P(wr); if (!p) continue;
+    const guess = wristGuess(f, wr), a = d <= 0 ? 1 - Math.abs(d) / 4 : 1 - d / 4;
+    const r = ringR(P, 0.09 + Math.max(0, d + 3) * 0.022, 10 + (d + 3) * 2.5);   // grows through the impact: a ripple
+    G.ring(p, styleP(e.type).c, r, d === 0 ? 4 : 3, guess ? [6, 5] : null, guess ? a * 0.6 : a);
+    if (d === 0 && !guess) G.ring(p, '#ffffff', r + 5, 1.5, null, 0.9);
+  }
+  if (baseOn('def')) for (const d of at(S.defenses, f)) G.trail(Math.max(d.sf, f - back), f, J.nose, styleD(d.type).c, 2.5, 0.9);
+  if (baseOn('steps')) for (const s of S.steps) {
+    if (f < s.sf || f > s.ef) continue;
+    const an = P((s.foot === 'lead') === lead2() ? J.lan : J.ran); if (an) G.ring(an, STEPCOL[s.foot], ringR(P, 0.1, 10), 2, null, 0.8);
+  }
+}
 function drawOverlay(f, punchesNow) {
   const dpr = devicePixelRatio || 1, R = videoRect();
   if (ov.width !== Math.round(R.W * dpr) || ov.height !== Math.round(R.H * dpr)) { ov.width = Math.round(R.W * dpr); ov.height = Math.round(R.H * dpr); }
   octx.setTransform(dpr, 0, 0, dpr, 0, 0); octx.clearRect(0, 0, R.W, R.H);
-  LABELS.length = 0;
-  const ex = exclAt((f + 0.5) / S.fps);
-  if (ex) {                                                // the video's excluded time: no rule judges this frame
-    const r = videoRect(); octx.fillStyle = 'rgba(60,60,67,0.45)'; octx.fillRect(0, 0, r.W, r.H);   // the whole stage: zoom moves the video
-    overlayLabel(12, r.H / 2, `not judged · excluded time ${fD(ex[0], 1)}–${fD(ex[1], 1)} s`, '#e5e5ea');
-  }
-  if (!S.skel || f >= S.skel.length / (33 * S.skelC)) return;
+  RAIL.cards = new Map(); G.seen.clear(); NOTES.length = 0; NOTICE.n = 0; OV_MISS = false;
+  const ex = exclAt((f + 0.5) / S.fps);                    // the video's excluded time: no rule judges this frame
+  if (ex) { octx.fillStyle = 'rgba(0,0,0,0.42)'; octx.fillRect(0, 0, R.W, R.H); }   // the whole stage: zoom moves the video
+  const say = () => { if (ex) notice(`Not judged · excluded time ${fD(ex[0], 1)}–${fD(ex[1], 1)} s`); if (OV_MISS) notice(TH_MISSING, OC.mid); };
+  if (!S.skel || f >= S.skel.length / (33 * S.skelC)) { PNOW = () => null; RAIL.moving = false; say(); return; }
   const C = S.skelC, base = f * 33 * C;
   const P = j => { const x = S.skel[base + j * C], y = S.skel[base + j * C + 1];
     return Number.isFinite(x) && Number.isFinite(y) ? [Z.tx + (R.x + x * R.w) * Z.k, Z.ty + (R.y + y * R.h) * Z.k] : null; };
@@ -5069,211 +5719,63 @@ function drawOverlay(f, punchesNow) {
   };
   PXY = (x, y) => Number.isFinite(x) && Number.isFinite(y)  // a point a rule computes, not a joint of the skeleton
     ? [Z.tx + (R.x + x * R.w) * Z.k, Z.ty + (R.y + y * R.h) * Z.k] : null;
-  if (V.skel) {
-    // the rules read a joint only from the house visibility floor (the video's snapshot): under it the joint is drawn
-    // hollow and its bones dashed, so what the rules skip shows on the footage. No snapshot: every joint drawn alike
-    const floor = S.th?.house?.min_visibility, seen = j => floor == null || !(visAt(f, j) < floor);
-    octx.lineCap = 'round'; octx.lineWidth = 3;
-    for (const [a, b] of BONES) {
-      const p = P(a), q = P(b); if (!(p && q)) continue;
-      const on = seen(a) && seen(b);
-      octx.strokeStyle = on ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.45)'; octx.setLineDash(on ? [] : [5, 6]);
-      octx.beginPath(); octx.moveTo(...p); octx.lineTo(...q); octx.stroke();
-    }
-    octx.setLineDash([]);
-    let hollow = 0;
-    for (const j of Object.values(J)) {
-      const p = P(j); if (!p) continue;
-      octx.beginPath(); octx.arc(p[0], p[1], j >= 29 ? 2.6 : 3.6, 0, 7);     // heel and toe tip: smaller, beside the ankle
-      if (seen(j)) { octx.fillStyle = '#0a84ff'; octx.fill(); continue; }
-      hollow++; octx.fillStyle = 'rgba(0,0,0,0.45)'; octx.fill();
-      octx.lineWidth = 1.8; octx.strokeStyle = '#fff'; octx.stroke(); octx.lineWidth = 3;
-    }
-    if (hollow) overlayLabel(12, R.H - 20, `○ ${hollow} joint${hollow > 1 ? 's' : ''} under ${fD(floor, 2)} visibility — `
-      + `the rules skip ${hollow > 1 ? 'them' : 'it'}`, '#e5e5ea');
+  PNOW = P;
+  // in the excluded time no rule judges anything: the notice says so, and no rule draws
+  const rules = !ex && RULE_LAYERS.some(L => (L.overlay || L.frameOverlay) && layerOn(L.key));
+  RAIL.box = null; if (rules) railPlace(R);
+  if (V.skel) drawSkeleton(f, P, rules);
+  drawDetections(f, P, punchesNow);
+  if (rules) {
+    for (const e of punchesNow) drawRuleOverlay(e, f, P);  // every punch under the playhead: each its own card
+    drawFrameOverlays(f, P);                               // per-frame rules, windows around a punch, moves, combinations
   }
-  for (const e of punchesNow) {                            // every punch under the playhead draws, both hands
-    LABEL_TAG = punchesNow.length > 1 ? `${cap(e.hand)} ${(PUNCH[e.type]?.name || e.type).toLowerCase()} · ` : '';
-    drawRuleOverlay(e, f, P);
-  }
-  LABEL_TAG = '';
-  drawFrameOverlays(f, P);                                // per-frame rules: not tied to a punch under the playhead
-  // impact: a ring on the punching wrist, strongest on the impact frame, fading over ±3 frames
-  for (const e of new Set(punchesNow.concat(S.punches.filter(p => p.impact !== null && Math.abs(p.impact - f) <= 3 && !hid(p))))) {
-    if (e.impact === null) continue;
-    const d = Math.abs(e.impact - f); if (d > 3) continue;
-    const leadLeft = S.stance !== 'southpaw', wr = (e.hand === 'lead') === leadLeft ? J.lwr : J.rwr, p = P(wr); if (!p) continue;
-    const a = 1 - d / 4, guess = wristGuess(f, wr);          // a hidden wrist: BlazePose's guess, drawn dashed
-    octx.save(); octx.strokeStyle = styleP(e.type).c; octx.globalAlpha = guess ? a * 0.6 : a; octx.lineWidth = 4;
-    if (guess) octx.setLineDash([6, 5]);
-    octx.beginPath(); octx.arc(p[0], p[1], ringR(P, 0.10 + (3 - d) * 0.02, 10 + (3 - d) * 2), 0, 7); octx.stroke(); octx.restore();
-    if (guess) { overlayLabel(p[0] + 22, p[1] + 4, `${cap(e.hand)} wrist visibility ${visAt(f, wr).toFixed(2)} — may be a guess`, '#8e8e93'); continue; }
-    octx.globalAlpha = a * 0.35; octx.fillStyle = styleP(e.type).c; octx.beginPath(); octx.arc(p[0], p[1], ringR(P, 0.07, 8), 0, 7); octx.fill();
-    octx.globalAlpha = 1;
-  }
-}
-
-// Labels drawn this frame, so a second one never lands on the first (overlapping punches, both hands' windows).
-// LABEL_TAG names the punch a label belongs to while more than one punch is under the playhead.
-const LABELS = []; let LABEL_TAG = '';
-function overlayLabel(x, y, text, color) {
-  octx.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
-  text = LABEL_TAG + text;
-  const w = octx.measureText(text).width + 14;
-  for (let k = 0; k < 12 && LABELS.some(b => x < b.x + b.w && b.x < x + w && Math.abs(y - b.y) < 23); k++) y += 24;
-  LABELS.push({x, y, w});
-  octx.fillStyle = 'rgba(0,0,0,0.62)'; octx.beginPath();
-  octx.roundRect ? octx.roundRect(x, y - 11, w, 22, 11) : octx.rect(x, y - 11, w, 22); octx.fill();
-  octx.fillStyle = color; octx.fillText(text, x + 7, y + 4.5);
+  railDraw(R, f);
+  say();
 }
 // A rule overlay draws its threshold lines from the video's snapshot; without it the overlay stops and says so.
-function overlayThMissing() { overlayLabel(12, 22, TH_MISSING, '#ff9f0a'); }
 function drawRuleOverlay(e, f, P) {
-  const leadLeft = S.stance !== 'southpaw';
-  let miss = false;
+  const leadLeft = lead2();
   for (const L of RULE_LAYERS) if (L.overlay && layerOn(L.key) && e[L.key]) {
-    try { L.overlay(e, e[L.key], f, P, leadLeft); } catch (err) { if (!(err instanceof ThMissing)) throw err; miss = true; }
+    try { L.overlay(e, e[L.key], f, P, leadLeft); } catch (err) { if (!(err instanceof ThMissing)) throw err; OV_MISS = true; }
   }
-  if (miss) overlayThMissing();
 }
-// A rule that judges frames rather than punches draws through frameOverlay instead: it is called once per frame
-// for every layer that is on, with the raw BlazePose-33 channels, because these rules read joints (mouth, heels,
-// foot indexes) and channels (the world x/z) the punch overlays never need.
+// A rule that judges frames rather than punches draws through frameOverlay instead: it is called once per frame for
+// every layer that is on, with the raw BlazePose-33 channels, because these rules read joints (mouth, heels, foot
+// indexes) and channels (the world x/z) the punch overlays never need. So do the rules whose window runs outside the
+// punch (2, 16, 19, 20, 36), the defensive moves' and the combinations' rules.
 function drawFrameOverlays(f, P) {
   if (!video.videoWidth) return;                             // no video size: a 16:9 stand-in box would skew every ratio
-  const leadLeft = S.stance !== 'southpaw', C = S.skelC, base = f * 33 * C;
+  const leadLeft = lead2(), C = S.skelC, base = f * 33 * C;
   const Q = (j, ch) => S.skel[base + j * C + ch];            // raw channel: 0 x, 1 y, 3 world x, 5 world z, 6 visibility
-  const torso = () => {                                      // torso length in screen pixels, the rules' unit
-    const a = P(J.lsh), b = P(J.rsh), c = P(J.lhip), d = P(J.rhip);
-    if (!(a && b && c && d)) return null;
-    return Math.hypot((a[0] + b[0]) / 2 - (c[0] + d[0]) / 2, (a[1] + b[1]) / 2 - (c[1] + d[1]) / 2);
-  };
-  let miss = false;
+  const torso = () => torsoOnScreen(P);                      // torso length in screen pixels, the rules' unit
   for (const L of RULE_LAYERS) if (L.frameOverlay && layerOn(L.key)) {
-    try { L.frameOverlay(f, P, leadLeft, Q, torso); } catch (err) { if (!(err instanceof ThMissing)) throw err; miss = true; }
+    try { L.frameOverlay(f, P, leadLeft, Q, torso); } catch (err) { if (!(err instanceof ThMissing)) throw err; OV_MISS = true; }
   }
-  if (miss) overlayThMissing();
 }
-// The rotation dials of rules 19 / 20 stack in the black bar beside a portrait video, from the bottom up, one per rule
-// and punch (shoulders, then hips) in the order the punches start; a video that fills the stage keeps them next to the
-// body.
-const ROT_DIALS = ['shoulder', 'hip'];
-function dialSpot(fallback, e, kind, f) {
-  const Rv = videoRect(), r = 26, gap = 72;
-  if (Rv.x < 190) return {c: fallback, r: 34, side: false};
-  const on = ROT_DIALS.filter(k => layerOn(k));
-  // the punches with a dial now: those under the playhead first, the latest-started on top of the pile's priority
-  // (the one being watched), then those still before their detected start
-  const act = S.punches.filter(p => !hid(p) && on.some(k => p[k]?.status === 'ok' && f >= (p[k].sfb ?? p.sf) && f <= p.ef))
-    .sort((a, b) => (f < a.sf) - (f < b.sf) || b.sf - a.sf);
-  const k = Math.max(0, act.indexOf(e)) * on.length + Math.max(0, on.indexOf(kind));
-  const top = 20 + ($('hud')?.offsetHeight || 0) + r, base = Rv.H - 86 - r;   // under the HUD's pills, above the control bar
-  const leftCap = base < top ? 0 : Math.floor((base - top) / gap) + 1;
-  if (k < leftCap) return {c: [16 + r, base - k * gap], r, side: true};
-  const rx = Rv.x + Rv.w + 16 + r, ry = 50 + r + (k - leftCap) * gap;   // the left bar full: on in the right bar, from the top
-  if (Rv.W - (Rv.x + Rv.w) >= 240 && ry <= base) return {c: [rx, ry], r, side: true};
-  return null;                                                // no room left: this dial is not drawn
-}
-// The turn dial of rules 19 / 20: the hips' or shoulders' turn seen from above, as the rules measure it (world x =
-// channel 3, z = channel 5; 0° = toward the camera, drawn down; +90° = the camera's right).
-//   grey arrow     where the boxer faces at the impact (the facing model)
-//   white dashes   the joint line at the punch's best start
-//   thin white arc the turn the punch needs (its minimum), from the start line on, ending in a tick
-//   wedge          the turn so far: yellow while it grows with the video, from the best start to the impact, then in
-//                  the verdict's colour - it reaches the tick = full score (green), short of it = red
-//   coloured ray   the joint line at the impact; the yellow ray: the line on the frame on screen
-// The rule's number is |angle(facing, impact) - angle(facing, start)| (the CSV's rot_start_impact), and the wedge is drawn
-// that wide from the start line toward the impact line - the angle between the two lines unless the line crosses the
-// facing. Beside it: the punch and the rule, then what turned of what it needs and the score. The angles reproduce the
-// CSV's rotations to 0.11 deg on 945 punches per rule (checked 2026-10-02).
-function turnDial(e, r, leadLeft, jl, jr, c, col, o = {}) {
-  if (e.impact == null || r.facing == null || !S.skel) return;
+// The turn of the hip / shoulder line from above for rules 19 / 20, as the rules measure it (world x = channel 3, z =
+// channel 5): the line's direction from the punching side's joint to the other one, on the dial's scale (0 = toward
+// the camera, + the camera's right), so its angle to the facing at the impact is the rule's: |angle(facing, impact) -
+// angle(facing, start)| (the CSV's rot_start_impact; checked to 0.11 deg on 945 punches per rule, 2026-10-02). The
+// dial turns the picture so the boxer faces up: the dashed line where the line was at the best start, the solid one
+// where it is now (to the impact; then where it was at the impact), the wedge the turn so far (yellow while it grows,
+// then the verdict's colour), the tick on the rim the turn the punch needs.
+function turnDial(e, r, jl, jr, live) {
+  if (e.impact == null || r.facing == null || !S.skel) return null;
   const F = S.mirrored ? -r.facing : r.facing;             // a mirrored run's facing, back on the real skeleton
   const C = S.skelC, n = S.skel.length / (33 * C), Wc = (fr, j, ch) => S.skel[(fr * 33 + j) * C + ch];
   const s0 = r.sfb ?? e.sf;
-  if (!(s0 >= 0 && s0 < n && e.impact >= 0 && e.impact < n)) return;
-  const own = (e.hand === 'lead') === leadLeft ? jl : jr, oth = own === jl ? jr : jl;
+  if (!(s0 >= 0 && s0 < n && e.impact >= 0 && e.impact < n)) return null;
+  const own = (e.hand === 'lead') === lead2() ? jl : jr, oth = own === jl ? jr : jl;
   const dir = fr => Math.atan2(Wc(fr, own, 3) - Wc(fr, oth, 3), -(Wc(fr, own, 5) - Wc(fr, oth, 5))) * 180 / Math.PI;
   const wrap = d => ((d + 180) % 360 + 360) % 360 - 180, ang = d => Math.abs(wrap(F - d));   // ang: the rule's angle, 0-180
-  const ds = dir(s0), di = dir(e.impact); if (!(Number.isFinite(ds) && Number.isFinite(di))) return;
-  const spot = o.slot ? dialSpot(c, e, o.slot, o.live) : {c, r: 34, side: false};
-  if (!spot) return;
-  c = spot.c;
-  const R = spot.r, rad = Math.PI / 180, sgn = wrap(di - ds) < 0 ? -1 : 1;
-  const at = (deg, rr = R) => [c[0] + rr * Math.sin(deg * rad), c[1] + rr * Math.cos(deg * rad)];
-  const ca = deg => (90 - deg) * rad;                      // a dial angle on the canvas's arc() scale
-  const total = r.si ?? Math.abs(ang(di) - ang(ds));
-  const live = o.live != null && o.live >= 0 && o.live < n ? o.live : null, dl = live == null ? NaN : dir(live);
-  const growing = live != null && live < e.impact && Number.isFinite(dl);
-  const sofar = growing ? Math.min(total, Math.abs(ang(dl) - ang(ds))) : total;
-  const need = r.bsi?.[0] ?? null;
-  octx.save();
-  octx.fillStyle = 'rgba(0,0,0,0.55)'; octx.beginPath(); octx.arc(c[0], c[1], R + 9, 0, 7); octx.fill();        // the disc
-  if (need != null && need > 0) {                          // the needed turn: a thin arc from the start line, and its tick
-    octx.strokeStyle = 'rgba(255,255,255,0.5)'; octx.lineWidth = 2;
-    octx.beginPath(); octx.arc(c[0], c[1], R + 4, ca(ds), ca(ds + sgn * need), sgn > 0); octx.stroke();
-  }
-  if (sofar > 0) {                                         // the wedge: the turn so far
-    octx.fillStyle = (growing ? '#ffd60a' : col) + '73';
-    octx.beginPath(); octx.moveTo(c[0], c[1]); octx.arc(c[0], c[1], R, ca(ds), ca(ds + sgn * sofar), sgn > 0); octx.closePath(); octx.fill();
-  }
-  octx.restore();
-  if (need != null && need > 0) OV.line(at(ds + sgn * need, R - 5), at(ds + sgn * need, R + 9), '#ffffff', 2);   // the tick
-  const tip = at(F, R + 7), base = at(F, R - 3), px = Math.cos(F * rad) * 4, py = -Math.sin(F * rad) * 4;    // the facing arrow
-  OV.line(c, base, '#8e8e93', 2);
-  octx.save(); octx.fillStyle = '#8e8e93'; octx.beginPath(); octx.moveTo(...tip);
-  octx.lineTo(base[0] + px, base[1] + py); octx.lineTo(base[0] - px, base[1] - py); octx.closePath(); octx.fill(); octx.restore();
-  OV.line(c, at(ds), '#ffffff', 2, [3, 3]);                // the line at the best start
-  OV.line(c, at(di), col, 3);                              // the line at the impact
-  if (live != null && live <= e.ef && Number.isFinite(dl)) OV.line(c, at(dl), '#ffd60a', 2);   // the line now
-  const reading = (growing ? `turning… ${sofar.toFixed(1)}°` : `turned ${total.toFixed(1)}°`)
-    + (need != null ? ` · needs ${fN(need)}°` : '') + (growing ? '' : ` → ${r.score == null ? '–' : r.score.toFixed(0)}`)
-    + (s0 < e.sf ? ` · read from ${e.sf - s0} f before the punch` : '');
-  if (spot.side) {                                         // in the side bar: the punch and the rule, then the reading
-    overlayLabel(c[0] + R + 14, c[1] - 12, `${cap(e.hand)} ${styleP(e.type).name.toLowerCase()} · ${o.title || ''}`, col);
-    overlayLabel(c[0] + R + 14, c[1] + 12, reading, col);
-  } else overlayLabel(c[0] + R + 14, c[1], `${o.title ? o.title + ': ' : ''}${reading}`, col);
+  const ds = dir(s0), di = dir(e.impact); if (!(Number.isFinite(ds) && Number.isFinite(di))) return null;
+  const sgn = wrap(di - ds) < 0 ? -1 : 1, total = r.si ?? Math.abs(ang(di) - ang(ds));
+  const dl = live >= 0 && live < n ? dir(live) : NaN, growing = live < e.impact && Number.isFinite(dl);
+  const sofar = growing ? Math.min(total, Math.abs(ang(dl) - ang(ds))) : total, need = r.bsi?.[0] ?? null;
+  const up = d => d - F + 180;                              // turned so the facing points up
+  return {growing, sofar, total, need, dial: {from: up(ds), sweep: sgn * sofar, to: up(growing ? dl : di),
+    ticks: need != null && need > 0 ? [up(ds) + sgn * need] : [], col: growing ? OC.live : r.vsi === 'good' ? OC.good : OC.bad}};
 }
-// Shared bits of overlay grammar, so thirteen rules do not each invent their own.
-const OV = {
-  at(key, f) { return (S.items[key] || []).find(it => f >= it.sf && f <= it.ef) || null; },
-  trail(fr0, fr1, j, col) {                                // a joint's path over a span of frames
-    octx.save(); octx.strokeStyle = col; octx.lineWidth = 2.5; octx.lineCap = 'round'; octx.beginPath();
-    let started = false;
-    for (let fr = fr0; fr <= fr1; fr++) {
-      const q = PAT(fr, j); if (!q) continue;
-      started ? octx.lineTo(...q) : octx.moveTo(...q); started = true;
-    }
-    if (started) octx.stroke();
-    octx.restore();
-  },
-  line(p, q, col, w = 3, dash = null) {
-    if (!(p && q)) return;
-    octx.save(); octx.strokeStyle = col; octx.lineWidth = w; octx.lineCap = 'round';
-    if (dash) octx.setLineDash(dash);
-    octx.beginPath(); octx.moveTo(...p); octx.lineTo(...q); octx.stroke(); octx.restore();
-  },
-  dot(p, col, r = 5) {
-    if (!p) return;
-    octx.save(); octx.fillStyle = col; octx.beginPath(); octx.arc(p[0], p[1], r, 0, 7); octx.fill();
-    octx.strokeStyle = 'rgba(0,0,0,0.35)'; octx.lineWidth = 1.5; octx.stroke(); octx.restore();
-  },
-  ring(p, col, r = 14, w = 3, dash = null) {
-    if (!p) return;
-    octx.save(); octx.strokeStyle = col; octx.lineWidth = w; if (dash) octx.setLineDash(dash);
-    octx.beginPath(); octx.arc(p[0], p[1], r, 0, 7); octx.stroke(); octx.restore();
-  },
-  hollow(p, col, r = 5) {                                  // a point that is probably a guess (see GUESS_VIS)
-    if (!p) return;
-    octx.save(); octx.strokeStyle = col; octx.lineWidth = 2; octx.setLineDash([2, 2]);
-    octx.beginPath(); octx.arc(p[0], p[1], r, 0, 7); octx.stroke(); octx.restore();
-  },
-  // a horizontal rule across the body, the way every guard-height style limit reads
-  level(y, x0, x1, col, dash = [7, 5]) {
-    octx.save(); octx.strokeStyle = col; octx.lineWidth = 2; octx.setLineDash(dash);
-    octx.beginPath(); octx.moveTo(x0, y); octx.lineTo(x1, y); octx.stroke(); octx.restore();
-  },
-};
 
 // ════════════════════════════ timeline ════════════════════════════
 const tl = $('tl'), tctx = tl.getContext('2d');
@@ -5817,9 +6319,23 @@ function drawLayerRows(c, f, W, text, grid) {
     if (!TR[L.key]) continue;
     const [y, h] = TR[L.key], g = {c, y, h, span, tag, ring, tx, fps};
     if (L.items) { for (const it of S.items[L.key] || []) L.row(it, it, g); }   // items layers: their own rows, chips ignored
-    else for (const e of S.punches) if (e[L.key] && vis(e)) L.row(e, e[L.key], g);
+    else if (L.window || L.split) { for (const e of S.punches) if (e[L.key] && vis(e)) L.row(e, e[L.key], g); }   // split already
+    else {
+      // two punches judged at once (a jab still out as the cross starts) drew one block over the other: where two blocks
+      // overlap, each takes its own half - lead on top, rear below, as the Lead / Rear rows - and a punch alone keeps the
+      // full height (the way a calendar lays out two meetings at once)
+      const ps = S.punches.filter(e => e[L.key] && !hid(e) && rowShown(L, e[L.key]));
+      for (const e of ps) {
+        if (!vis(e)) continue;
+        const [a0, a1] = rowSpan(L, e), both = ps.some(o => { const [b0, b1] = rowSpan(L, o); return o !== e && b0 <= a1 && a0 <= b1; });
+        L.row(e, e[L.key], both ? {...g, y: e.hand === 'lead' ? y - 1 : y + h / 2 - 2, h: h / 2 + 3} : g);
+      }
+    }
   }
 }
+// a per-punch row's block: is it drawn (the rule judged the punch), and over which frames (rules 19 / 20 from the best start)
+const rowShown = (L, x) => L.shown ? L.shown(x) : !!x && (x.status ? x.status === 'ok' : x.verdict ? x.verdict !== 'skip' : x.score != null);
+const rowSpan = (L, e) => L.spanOf ? L.spanOf(e, e[L.key]) : [e.sf, e.ef];
 
 // ════════════════════════════ frame loop ════════════════════════════
 // The frame the clock is INSIDE, not the nearest frame boundary. seekFrame aims at the middle of a frame's slot,
@@ -5855,14 +6371,20 @@ function draw(force) {
     $('clock').textContent = `${fmtT(f / S.fps)} · f ${f}`;           // the frame's own time, as the playhead pill
     if (typeof VC !== 'undefined') VC.paint();
     if (document.activeElement !== $('frameGo')) $('frameGo').value = f;
-    const hud = [];
-    for (const e of pNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}</span>`);
+    // the HUD: what the detectors found under the playhead, each with a thin track of how far into it the frame is (the
+    // impact a tick) - so two punches at once read as two, each at its own point
+    const hud = [], track = e => { const n = e.ef - e.sf + 1, pc = v => `${(100 * Math.max(0, Math.min(1, v))).toFixed(1)}%`;
+      return `<i class="pp"><b style="width:${pc((f - e.sf + 1) / n)}"></b>${e.impact != null && e.impact >= e.sf && e.impact <= e.ef
+        ? `<u style="left:${pc((e.impact - e.sf) / n)}"></u>` : ''}</i>`; };
+    for (const e of pNow) hud.push(`<span class="pill prog"><span class="dot" style="background:${styleP(e.type).c}"></span>${cap(e.hand)} ${styleP(e.type).name}${track(e)}</span>`);
     if (S.punches.some(e => e.impact === f && !hid(e))) hud.push('<span class="pill impact">IMPACT</span>');
-    for (const e of dNow) hud.push(`<span class="pill"><span class="dot" style="background:${styleD(e.type).c}"></span>${e.side ? cap(e.side) + ' ' : ''}${styleD(e.type).name}</span>`);
+    for (const e of dNow) hud.push(`<span class="pill prog"><span class="dot" style="background:${styleD(e.type).c}"></span>${e.side ? cap(e.side) + ' ' : ''}${styleD(e.type).name}${track(e)}</span>`);
     const stNow = baseOn('stance') ? S.stanceRuns.find(e => f >= e.sf && f <= e.ef && e.reason !== 'no_reading') : null;
     for (const e of baseOn('steps') ? S.steps.filter(e => f >= e.sf && f <= e.ef) : [])
       hud.push(`<span class="pill"><span class="dot" style="background:${STEPCOL[e.foot]}"></span>${cap(e.foot)} foot step</span>`);
     if (stNow) hud.push(`<span class="pill"><span class="dot" style="background:${STANCEROW[stNow.state]}"></span>${STANCENAME[stNow.state] || cap(stNow.state)}</span>`);
+    const hj = V.skel ? hiddenJoints(f) : 0;                // joints under the house visibility floor: hollow on the skeleton
+    if (hj) hud.push(`<span class="pill quiet"><span class="hol"></span>${hj} joint${hj > 1 ? 's' : ''} under ${fD(S.th.house.min_visibility, 2)} visibility · the rules skip ${hj > 1 ? 'them' : 'it'}</span>`);
     $('hud').innerHTML = hud.join('');
     drawOverlay(f, pNow);
     if (V.view !== 'video') draw3d(f);
@@ -5873,7 +6395,7 @@ function draw(force) {
       else if (t < V.t0 || t > V.t1) { V.t0 = t - w / 2; V.t1 = t + w / 2; clampView(); }
     }
     V.dirty = true;
-  }
+  } else if (RAIL.moving) drawOverlay(f, at(S.punches, f));   // the rail's cards still easing into place
   if (V.dirty) { drawTimeline(f); V.dirty = false; }
 }
 (function loop() {
@@ -5924,7 +6446,8 @@ function hit(x, y) {
       const at = S.punches.filter(p => p[k]?.verdict && f >= p[k].a && f <= p[k].b);
       e = at.find(p => p.hand === side) || at[0];
     } else {
-      e = find(S.punches, p => !!p[k]);
+      const [ry, rh] = TR[k], both = S.punches.filter(p => p[k] && !hid(p) && rowShown(L_, p[k]) && f >= rowSpan(L_, p)[0] && f <= rowSpan(L_, p)[1]);
+      e = both.length > 1 ? both.find(p => p.hand === (y < ry + rh / 2 ? 'lead' : 'rear')) || both[0] : find(S.punches, p => !!p[k]);
     }
     V.hoverLayer = e ? k : null; return e || null;
   }
