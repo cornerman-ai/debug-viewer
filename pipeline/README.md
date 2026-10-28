@@ -201,6 +201,15 @@ second starts a move, back under 0.35 ends it. Against 545 labeled foot moves (Y
 its settings swept on the same labels) it found 87 % at precision 0.70, and about one labeled step in six comes out as
 two moves - so read the row as when the feet move, not an exact step count. No rule reads it yet.
 
+**Lead / Rear / Defense probability** (three base rows, each under its own row, off by default, since 2026-10-28;
+the backend's `punch_classification/punch_probs.json` and `defense_classification/defense_probs.json`): the models'
+probability on every frame, before their decoders. Grey = some punch / move (1 − idle), one line per class in its
+block colour where it is over 0.02 (defense: lead solid, rear dashed), dashed grey = the decoder's line (punches 0.95
+for ≥ 4 frames, defense6 0.40 for ≥ 9); hover for every class's number. Zoomed out, each pixel shows its frames'
+highest value. On the defense row, hatched = frontal footage, where the frontal detectors decide instead: they are
+rules with no probability, so only defense6 has a curve. A folder run before 2026-10-28 has neither file and the
+switches say "not in this folder".
+
 **Distance** (the base row under Stance, on by default, since 2026-10-24; the backend's `camera_distance` stage,
 `camera_distance/distance.csv`): how far the boxer stands from the camera, camera → hips in metres, every frame — the
 line is its median over 0.5 s, on a fixed 0–6 m scale (gridlines every 2 m, the same for every video, so videos compare

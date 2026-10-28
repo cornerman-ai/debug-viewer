@@ -805,6 +805,7 @@ const STAGES = {
   punches: ['punch_impact', 'impacts.csv'], punchesFallback: ['punch_classification', 'punches.csv'],
   punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
   angle: ['facing_angle', 'facing_angle.csv'],
+  punchProbs: ['punch_classification', 'punch_probs.json'], defProbs: ['defense_classification', 'defense_probs.json'],
 };
 // verdict pills and tooltips → semantic Apple colors (green = pass / on target / inside the range, red = fail / off
 // target; hip and shoulder rotation name the side of the range: orange = too little, red = too much (hip rotation has
@@ -2954,7 +2955,8 @@ const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover
            layers: Object.fromEntries(LAYERS.map(k => [k, false]))};
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
-V.base = {frames: true, angle: true, stance: true, distance: true, activity: true, lead: true, rear: true, def: true, steps: true};
+V.base = {frames: true, angle: true, stance: true, distance: true, activity: true, lead: true, rear: true, def: true, steps: true,
+          leadP: false, rearP: false, defP: false};                // the probability rows: on when asked for
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
 // the sub-switches under Lead / Rear / Defense: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
@@ -3002,7 +3004,7 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, chj, cdj, exj, stRuns, stepCsv, distCsv] = await Promise.all([
+  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, chj, cdj, exj, stRuns, stepCsv, distCsv, ppj, dpj] = await Promise.all([
     jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
     jsn(['stance', 'stance.json']),                         // the stance stage (2026-10-09): who run_all mirrored, and why
     jsn(['gloves', 'gloves.json']),                         // the gloves stage (2026-10-09): no rule reads it yet
@@ -3012,7 +3014,9 @@ async function buildVideo(src, sig, lite = false) {
     jsn(['excluded_segments.json']),                        // the excluded time (2026-10-12): see N.excl below
     lite ? null : txt(['stance', 'runs.csv']),              // every frame's stance (2026-10-20): the Stance row
     lite ? null : txt(['steps', 'steps.csv']),              // every foot move (2026-10-23): the Steps row
-    lite ? null : txt(['camera_distance', 'distance.csv'])]);   // camera -> hips every frame (2026-10-24): the Distance row
+    lite ? null : txt(['camera_distance', 'distance.csv']),    // camera -> hips every frame (2026-10-24): the Distance row
+    lite ? null : jsn(STAGES.punchProbs),                   // the models' per-frame probabilities (2026-10-28): the
+    lite ? null : jsn(STAGES.defProbs)]);                   // probability rows
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
@@ -3037,6 +3041,7 @@ async function buildVideo(src, sig, lite = false) {
   // lead is lead either way)
   N.steps = (stepCsv ? parseCSV(stepCsv) : []).map(r => ({kind: 'step', foot: r.foot, sf: +r.start_frame, ef: +r.end_frame}));
   N.hasSteps = !!stepCsv;
+  N.probs = probRows(ppj, dpj);
   // the Distance row (camera_distance/distance.csv): camera -> hips every frame and its 0.5 s median; a distance is the
   // same on a mirrored run, so nothing to flip back
   N.dist = null;
@@ -3502,6 +3507,75 @@ function sortLayers() {
     sortLayers(); layout(); resize(); draw(true);
   });
 }
+// ── the probability rows (2026-10-28): the models' per-frame probabilities, before their decoders, from
+//    punch_classification/punch_probs.json (the punch classifier, per hand) and defense_classification/defense_probs.json
+//    (defense6). Grey area = some punch / move (1 − idle), one line per class where it is over 0.02, dashed = the
+//    decoder's line. Off by default; a folder run before 2026-10-28 has no file and the switch says so ──
+const PROB_KEYS = ['leadP', 'rearP', 'defP'];
+const PROB_WHAT = {
+  punch: 'the punch classifier’s probability on every frame, before the decoder: grey = some punch (1 − idle), a line per class (its colour), dashed = the decoder’s line (0.95: a punch where the grey stays over it for ≥ 4 frames, one class per punch, the highest summed); hover for every class',
+  def: 'defense6’s probability on every frame, before its decoder: grey = some move (1 − idle), a line per move (lead solid, rear dashed), dashed grey = its line (0.40 for ≥ 9 frames); hatched = frontal footage, where the frontal detectors decide instead (rules, with no probability)'};
+// a class name → [its name in words, colour, dashed]: the checkpoint's 'lead_hook_head', defense6's 'rear_slip'
+const PROB_CLASS = {jab: 'jab', cross: 'cross', hook_head: 'hook', uppercut_head: 'uppercut', bodyshot: 'hook_or_uppercut'};
+function probClass(n, def) {
+  const side = /^(lead|rear)_/.exec(n)?.[1], t = n.replace(/^(lead|rear)_/, '');
+  if (def) { const s = styleD(t); return [side ? `${cap(side)} ${s.name.toLowerCase()}` : s.name, s.c, side === 'rear']; }
+  const s = styleP(PROB_CLASS[t] || t); return [s.name, s.c, false];
+}
+function probRows(pp, dp) {
+  const row = (classes, def, j) => {
+    const cls = Object.entries(classes || {}), idle = cls.find(([n]) => /(^|_)idle$/.test(n));
+    if (!idle || !idle[1].length) return null;
+    const n = idle[1].length, act = new Float32Array(n);
+    for (let i = 0; i < n; i++) act[i] = 1 - idle[1][i];
+    return {n, act, thr: j.threshold, min: j.min_event_frames, frontal: j.frontal || [], def,
+            cls: cls.filter(c => c !== idle).map(([name, v]) => [name, ...probClass(name, def), Float32Array.from(v)])};
+  };
+  const out = {leadP: pp && row(pp.probs?.lead, false, pp), rearP: pp && row(pp.probs?.rear, false, pp),
+               defP: dp && row(dp.probs, true, dp)};
+  return Object.values(out).some(Boolean) ? out : null;
+}
+function drawProbs(c, k, W, text3) {
+  const P = S.probs?.[k], fps = S.fps; if (!P) return;
+  const [y, h] = TR[k], top = y + 5, bot = y + h - 5, ym = v => bot - Math.min(1, Math.max(0, v)) * (bot - top);
+  const f0 = Math.max(0, Math.floor(V.t0 * fps) - 1), f1 = Math.min(P.n - 1, Math.ceil(V.t1 * fps) + 1);
+  const step = Math.max(1, Math.floor((f1 - f0) / (W * 1.5)));
+  const peak = (a, f) => { let m = a[f]; for (let i = f + 1; i < Math.min(f + step, P.n); i++) if (a[i] > m) m = a[i]; return m; };   // zoomed out: a bucket's highest, so no peak is lost
+  for (const [a, e] of P.frontal) {                         // frontal footage: not defense6's to decide
+    const x0 = Math.max(L, tx(a / fps)), x1 = Math.min(L + W, tx((e + 1) / fps)); if (x1 <= x0) continue;
+    c.save(); c.beginPath(); c.rect(x0, y + 2, x1 - x0, h - 4); c.clip();
+    c.fillStyle = 'rgba(142,142,147,0.10)'; c.fillRect(x0, y + 2, x1 - x0, h - 4);
+    c.strokeStyle = 'rgba(142,142,147,0.30)'; c.lineWidth = 1; c.beginPath();
+    for (let xx = x0 - h; xx < x1; xx += 7) { c.moveTo(xx, y + h); c.lineTo(xx + h, y); }
+    c.stroke(); c.restore();
+    if (x1 - x0 > 120) { c.fillStyle = text3; c.font = LANE_FONT(500, 9.5); c.textAlign = 'left'; c.fillText('frontal: the frontal detectors decide', x0 + 6, y + 10); }
+  }
+  c.beginPath(); c.moveTo(tx(f0 / fps), bot);                // some punch / move: a grey area
+  for (let f = f0; f <= f1; f += step) c.lineTo(tx((f + 0.5) / fps), ym(peak(P.act, f)));
+  c.lineTo(tx((f1 + 1) / fps), bot); c.closePath();
+  c.fillStyle = 'rgba(142,142,147,0.22)'; c.fill();
+  c.lineJoin = 'round';
+  for (const [, , col, dash, v] of P.cls) {                  // each class, only where it is over 0.02
+    c.beginPath(); let on = false;
+    for (let f = f0; f <= f1; f += step) {
+      const p = peak(v, f); if (p < 0.02) { on = false; continue; }
+      const xx = tx((f + 0.5) / fps), yy = ym(p); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
+    }
+    c.strokeStyle = col; c.lineWidth = 1.6; c.setLineDash(dash ? [4, 3] : []); c.stroke();
+  }
+  c.setLineDash([3, 3]); c.strokeStyle = text3; c.lineWidth = 1;   // the decoder's line
+  const yt = Math.round(ym(P.thr)) + 0.5; c.beginPath(); c.moveTo(L, yt); c.lineTo(L + W, yt); c.stroke(); c.setLineDash([]);
+  c.fillStyle = text3; c.font = LANE_FONT(500, 9); c.textAlign = 'right'; c.fillText(P.thr.toFixed(2), L + W - 4, yt - 6);
+}
+function probTip(k, f) {
+  const P = S.probs[k], inFront = P.frontal.some(([a, e]) => f >= a && f <= e);
+  const what = k === 'defP' ? 'some move' : 'some punch', who = k === 'defP' ? 'defense6' : `${k === 'leadP' ? 'lead' : 'rear'}-hand classifier`;
+  const rows = P.cls.map(([, name, col, , v]) => [name, col, v[f]]).sort((a, b) => b[2] - a[2]);
+  return `<b>${who}</b> <span class="m num">f ${f} · ${fmtT(f / S.fps)}</span><br>`
+    + `<b class="num">${P.act[f].toFixed(3)}</b> ${what} (1 − idle) <span class="m">· the decoder's line ${P.thr} for ≥ ${P.min} frames</span><br>`
+    + rows.map(([name, col, p]) => `<b style="color:${col}">●</b> ${name} <b class="num">${p.toFixed(3)}</b>`).join('<br>')
+    + (inFront ? `<br><span class="m">frontal footage: the frontal detectors decide here, not defense6</span>` : '');
+}
 // The base rows: [key, the card's name, what it shows, whether this video has it]. Order = top to bottom.
 const BASE_ROWS = [
   ['frames', 'Frames', 'one dot per video frame, at the frame’s middle — where the playhead sits on it; the frame on screen is the red dot; numbers every few frames. A punch block covers its frames’ dots exactly, from its start frame’s to its end frame’s. Click a dot to go to that frame (or type a frame number in the box beside ◀ ▶). Zoom in until the dots show', () => true],
@@ -3510,8 +3584,11 @@ const BASE_ROWS = [
   ['distance', 'Distance', 'how far he stands from the camera, camera → hips in metres, every frame (the line: its median over 0.5 s, on a fixed 0–6 m scale): BlazePose’s metre skeleton fitted onto its pixel one, with an assumed 65° field of view and BlazePose’s size of the body — both guesses, so a whole video can read too near or too far by the same factor', () => S.hasDist],
   ['activity', 'Activity', 'two lines, each smoothed over about 2 s: green = output, punches + defensive moves per minute; purple = movement, how far he actually travels and turns — the hip centre against where it was a second before (toward and from the camera included, bouncing in place averaged out) and the change of his facing angle (a quarter turn counts as one torso length) — both near 0 when he just stands', () => S.punches.length > 0 || S.defenses.length > 0 || !!S.skel],
   ['lead', 'Lead', 'lead-hand punches, white tick = the impact frame', () => true],
+  ['leadP', 'Lead probability', PROB_WHAT.punch, () => !!S.probs?.leadP],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
+  ['rearP', 'Rear probability', PROB_WHAT.punch, () => !!S.probs?.rearP],
   ['def', 'Defense', 'defensive moves: facing the camera the frontal detectors (slips by the Slip exploration lens rule, rolls, ducks), defense6 at every other angle (backend run_defense.py)', () => S.hasDef],
+  ['defP', 'Defense probability', PROB_WHAT.def, () => !!S.probs?.defP],
   ['steps', 'Steps', 'every foot move, lead foot on top, rear below: the app’s foot-move counter (Feet stance) — a foot’s speed over 0.6 torso lengths a second until back under 0.35. Measured on 545 labeled foot moves (any angle): it finds 87 %, about 3 in 10 of its moves are not real steps, and about one step in six shows as two', () => S.hasSteps],
 ];
 // the rows with a sub-switch per type: [the type table, the events, which of them sit on this row]
@@ -5082,10 +5159,11 @@ let TR = {}, laneTop = 0;                                       // laneTop: the 
 // each base row's height and the gap under it: lead / rear sit close as a pair
 // Every lane's height; lanes sit LANE_GAP apart, groups GROUP_GAP apart under a HEAD_H header (2026-10-22 redesign:
 // grouping by space and type, no bands or outlines - the way Apple's own charts and track views read).
-const BASE_GEOM = {frames: 30, angle: 150, stance: 32, distance: 80, activity: 96, lead: 30, rear: 30, def: 30, steps: 36};
+const BASE_GEOM = {frames: 30, angle: 150, stance: 32, distance: 80, activity: 96, lead: 30, rear: 30, def: 30, steps: 36, leadP: 56, rearP: 56, defP: 56};
 const LANE_GAP = 6, GROUP_GAP = 20, HEAD_H = 24, RULE_H = 28;
 // The base rows in two groups (the rule rows are the third): what the body does and what he does.
-const BASE_GROUP = {frames: 'Video', angle: 'Body', stance: 'Body', distance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions', steps: 'Actions'};
+const BASE_GROUP = {frames: 'Video', angle: 'Body', stance: 'Body', distance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions', steps: 'Actions',
+                    leadP: 'Actions', rearP: 'Actions', defP: 'Actions'};
 // the Steps row's two feet
 const STEPCOL = {lead: '#64d2ff', rear: '#5e5ce6'};
 // the Distance row: its colour, its fixed scale (the same for every video, so videos compare by eye) and gridlines
@@ -5221,7 +5299,8 @@ function drawTimeline(f) {
   c.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'; c.textBaseline = 'middle';
   const W = TW - L - RPAD;
   // the label column, the group headers and the lanes (2026-10-22 redesign: space and type do the grouping)
-  const names = {frames: 'Frames', angle: 'Facing', stance: 'Stance', distance: 'Distance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', steps: 'Steps', over: 'Overview', ...LNAME};
+  const names = {frames: 'Frames', angle: 'Facing', stance: 'Stance', distance: 'Distance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', steps: 'Steps', 
+                 leadP: 'Lead prob.', rearP: 'Rear prob.', defP: 'Defense prob.', over: 'Overview', ...LNAME};
   const lane = css('--lane') || 'rgba(120,120,128,0.075)', F = LANE_FONT, KEY = LANE_KEY();
   const step = niceStep(V.t1 - V.t0, W), ticks = [];
   for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) ticks.push(t);
@@ -5338,6 +5417,7 @@ function drawTimeline(f) {
     c.globalAlpha = 1;
   }
   if (TR.activity) drawActivity(c, W, grid, text3);
+  for (const k of PROB_KEYS) if (TR[k]) drawProbs(c, k, W, text3);
   if (TR.distance) drawDistance(c, W, grid, text3);
   if (TR.def) for (const e of S.defenses) if (!hid(e)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
   if (TR.steps) {                                             // the Steps row: lead foot's moves on the top half, rear's below
@@ -5686,6 +5766,7 @@ function hit(x, y) {
   if (inRow(TR.activity)) { const A = activityData(); return A && f >= 0 && f < A.n ? {kind: 'act', f, sf: f, ef: f} : null; }
   if (inRow(TR.stance)) return S.stanceRuns.find(e => f >= e.sf && f <= e.ef && e.reason !== 'no_reading') || null;
   if (inRow(TR.def)) return find(S.defenses, () => true);
+  for (const k of PROB_KEYS) if (inRow(TR[k])) return f >= 0 && f < S.probs[k].n ? {kind: 'prob', row: k, f, sf: f, ef: f} : null;
   if (inRow(TR.steps)) {                                      // the cursor's half picks the foot
     const foot = y < TR.steps[0] + TR.steps[1] / 2 ? 'lead' : 'rear';
     return S.steps.find(e => e.foot === foot && f >= e.sf - 1 && f <= e.ef + 1) || null;
@@ -5805,6 +5886,8 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b style="color:${DIST.col}">●</b> <b>Distance to the camera</b> <span class="m num">${fmtT(e.f / fps)}</span><br>`
       + `<b class="num">${m(D.sm[e.f])}</b> <span class="m">median over 0.5 s · this frame ${m(D.raw[e.f])}</span><br>`
       + `<span class="m">${S.distInfo?.rule || ''}</span>`;
+  } else if (e.kind === 'prob') {
+    el.innerHTML = probTip(e.row, e.f);
   } else if (e.kind === 'step') {
     el.innerHTML = `<b style="color:${STEPCOL[e.foot]}">●</b> <b>${cap(e.foot)} foot moves</b><br>`
       + `<span class="m num">frames ${e.sf}–${e.ef} (${n}) · ${fmtT(e.sf / fps)} · ${(n / fps).toFixed(2)} s</span><br>`
