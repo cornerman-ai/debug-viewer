@@ -71,6 +71,16 @@ current video. On the video: the skeleton (each foot drawn whole since 2026-10-2
 on the punching wrist around impact (dashed, with its visibility and "may be a guess", when the wrist is under 0.6 —
 see Hand return path), and pills naming the current punch / move.
 
+**Video / 3D skeleton** (top right of the video, or **v**; remembered in the browser; since 2026-10-28): 3D swaps the
+footage for BlazePose's world landmarks (the skeleton's channels 3-5: metres, origin = the hip centre) on a 0.5 m floor
+grid, with the body's shadow on the floor (seen from straight above, so a hip or shoulder turn reads at a glance) and a
+mark toward the recording camera. The video keeps playing hidden underneath, so play, ← / →, the timeline, the pills
+and the side panel work as before. Drag turns the camera, shift-drag (or the right button) moves it, the wheel or + / −
+zooms, double-click or 0 goes back to the recording camera's view; a click plays / pauses. Lead side blue, rear orange
+(the hands' colours); a joint under the house visibility floor hollow, its bones dashed. The hips stay at the centre —
+the world landmarks carry no position in the room, so steps across the floor do not show — and the rule overlays are
+drawn on the video only.
+
 The side panel has five views, switched at its top:
 
 - **Now** — what is under the playhead: the facing angle, then three cards, each judged on every rule that applies

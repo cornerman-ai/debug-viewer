@@ -102,7 +102,16 @@
   .stage video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; transform-origin: 0 0; }
   .stage.zoomed { cursor: grab; }
   .stage.panning { cursor: grabbing; }
-  .stage .zoombtn { position: absolute; top: 12px; right: 12px; display: none; border: 0; cursor: pointer; pointer-events: auto; }
+  .stage .zoombtn { position: absolute; top: 48px; right: 12px; display: none; border: 0; cursor: pointer; pointer-events: auto; }
+  .stage .modeseg { position: absolute; top: 12px; right: 12px; display: flex; gap: 2px; padding: 2px; border-radius: 999px;
+    background: rgba(0,0,0,0.55); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .stage .modeseg button { border: 0; background: transparent; color: #c7c7cc; font: 600 12px/1 inherit; font-family: inherit;
+    padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+  .stage .modeseg button.on { background: rgba(255,255,255,0.22); color: #fff; }
+  .stage #sk3d { display: none; pointer-events: auto; cursor: grab; }
+  .stage #sk3d.dragging { cursor: grabbing; }
+  .stage.mode3d #sk3d { display: block; }
+  .stage.mode3d video, .stage.mode3d #overlay { visibility: hidden; }   /* the video keeps running: it is the clock */
   .stage .zoombtn.show { display: inline-flex; }
   .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .stage .hud { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
@@ -490,8 +499,10 @@
     <div class="stage" id="stage">
       <video id="video" preload="auto" muted playsinline></video>
       <canvas id="overlay"></canvas>
+      <canvas id="sk3d"></canvas>
       <div class="hud" id="hud"></div>
       <div class="clock pill num" id="clock">0:00.000 · f 0</div>
+      <div class="modeseg" id="modeSeg" title="the video, or BlazePose's 3D skeleton alone (v)"><button data-m="video" class="on">Video</button><button data-m="3d">3D skeleton</button></div>
       <button class="pill num zoombtn" id="zoomReset" title="reset the zoom (0 or double-click)">1.0× · reset</button>
       <div class="vctl" id="vctl">
         <div class="vseek" id="vseek"><div class="vtrack"><div class="vprog" id="vprog"></div><div class="vhov" id="vhov"></div></div><div class="vthumb" id="vthumb"></div><div class="vtip num" id="vtip"></div></div>
@@ -5637,6 +5648,7 @@ function draw(force) {
     if (stNow) hud.push(`<span class="pill"><span class="dot" style="background:${STANCEROW[stNow.state]}"></span>${STANCENAME[stNow.state] || cap(stNow.state)}</span>`);
     $('hud').innerHTML = hud.join('');
     drawOverlay(f, pNow);
+    if (V.mode3d) draw3d(f);
     // follow: keep the playhead inside the window, scrolling continuously while playing
     if (V.follow && V.span && V.t1 - V.t0 < S.dur) {
       const t = f / S.fps, w = V.t1 - V.t0;
@@ -5840,7 +5852,7 @@ function applyZoom() {
   clampZoom();
   video.style.transform = Z.k === 1 ? '' : `translate(${Z.tx}px, ${Z.ty}px) scale(${Z.k})`;
   stage.classList.toggle('zoomed', Z.k > 1);
-  $('zoomReset').classList.toggle('show', Z.k > 1); $('zoomReset').textContent = `${Z.k.toFixed(1)}× · reset`;
+  $('zoomReset').classList.toggle('show', Z.k > 1 && !V.mode3d); $('zoomReset').textContent = `${Z.k.toFixed(1)}× · reset`;
   draw(true);
 }
 function zoomAt(px, py, factor) {
@@ -5849,7 +5861,7 @@ function zoomAt(px, py, factor) {
 }
 const resetZoom = () => { Z.k = 1; Z.tx = 0; Z.ty = 0; applyZoom(); };
 stage.addEventListener('wheel', e => {
-  if (!S.src) return;
+  if (!S.src || V.mode3d) return;                              // 3D: the canvas zooms its own camera
   if (e.target.closest('.vctl')) return;                       // over the control bar: no zoom
   e.preventDefault();
   const r = stage.getBoundingClientRect();
@@ -5857,7 +5869,7 @@ stage.addEventListener('wheel', e => {
 }, {passive: false});
 let vdrag = null;
 stage.addEventListener('pointerdown', e => {
-  if (Z.k <= 1 || e.target.closest('button') || e.target.closest('.vctl')) return;
+  if (Z.k <= 1 || V.mode3d || e.target.closest('button') || e.target.closest('.vctl')) return;
   vdrag = {x: e.clientX, y: e.clientY, tx: Z.tx, ty: Z.ty, moved: false}; stage.setPointerCapture(e.pointerId);
 });
 stage.addEventListener('pointermove', e => {
@@ -5867,8 +5879,133 @@ stage.addEventListener('pointermove', e => {
   vdrag.moved = true; stage.classList.add('panning'); Z.tx = vdrag.tx + dx; Z.ty = vdrag.ty + dy; applyZoom();
 });
 stage.addEventListener('pointerup', () => { if (vdrag) { stage.classList.remove('panning'); setTimeout(() => { vdrag = null; }, 0); } });
-stage.addEventListener('dblclick', e => { if (!e.target.closest('button') && !e.target.closest('.vctl')) resetZoom(); });
+stage.addEventListener('dblclick', e => { if (!V.mode3d && !e.target.closest('button') && !e.target.closest('.vctl')) resetZoom(); });
 $('zoomReset').onclick = e => { e.stopPropagation(); resetZoom(); };
+// ── 3D skeleton: the stage shows BlazePose's world landmarks (channels 3-5: metres, origin = the hip centre, y down,
+//    more negative z = nearer the camera) instead of the video, which keeps playing hidden underneath as the clock - so
+//    play, ← / →, the timeline and the side panel work as with the video. Drag turns the camera, shift-drag (or the
+//    right button) moves it, wheel zooms, double-click (or 0) is back to the recording camera's view. The hips stay at
+//    the centre: steps across the floor do not show. Lead / rear coloured as the hands everywhere else (HANDCOL);
+//    a joint under the house visibility floor hollow and its bones dashed, as on the video ──
+const sk3d = $('sk3d'), s3 = sk3d.getContext('2d');
+const CAM3_HOME = {yaw: 0, pitch: 0.18, zoom: 1, px: 0, py: 0}, CAM3 = {...CAM3_HOME}, EYE3 = 4;   // eye 4 m from the hips
+const reset3d = () => { Object.assign(CAM3, CAM3_HOME); draw3d(frameNow()); };
+const zoom3d = k => { CAM3.zoom = Math.min(8, Math.max(0.3, CAM3.zoom * k)); draw3d(frameNow()); };
+// the floor: per video, the median over frames of the lowest foot point, so a jump lifts him off it
+let FLOOR3 = {skel: null, y: 0.9};
+function floor3() {
+  if (FLOOR3.skel === S.skel) return FLOOR3.y;
+  const C = S.skelC, n = S.skel.length / (33 * C), ys = [];
+  for (let fr = 0; fr < n; fr += 3) {
+    let m = -Infinity;
+    for (const j of [27, 28, 29, 30, 31, 32]) { const y = S.skel[(fr * 33 + j) * C + 4]; if (y > m) m = y; }
+    if (Number.isFinite(m)) ys.push(m);
+  }
+  ys.sort((a, b) => a - b);
+  FLOOR3 = {skel: S.skel, y: ys.length ? ys[ys.length >> 1] : 0.9};
+  return FLOOR3.y;
+}
+// a point in the page's frame (x right, y up, z toward the camera; metres) → [screen x, y, depth, perspective scale]
+function proj3(x, y, z, W, H) {
+  const {yaw, pitch} = CAM3, cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  y += 0.1;                                                   // aim a little under the hips: the body's middle
+  const x1 = x * cy + z * sy, z1 = -x * sy + z * cy, y1 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
+  if (z2 > EYE3 - 0.2) return null;                           // at or behind the eye
+  const k = EYE3 / (EYE3 - z2), m = Math.min(W, H) * 0.34 * CAM3.zoom;
+  return [W / 2 + CAM3.px + x1 * k * m, H / 2 + CAM3.py - y1 * k * m, z2, k];
+}
+function draw3d(f) {
+  const dpr = devicePixelRatio || 1, W = stage.clientWidth, H = stage.clientHeight;
+  if (sk3d.width !== Math.round(W * dpr) || sk3d.height !== Math.round(H * dpr)) { sk3d.width = Math.round(W * dpr); sk3d.height = Math.round(H * dpr); }
+  s3.setTransform(dpr, 0, 0, dpr, 0, 0); s3.clearRect(0, 0, W, H);
+  s3.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  const say = (x, y, t, c) => { s3.fillStyle = c; s3.fillText(t, x, y); };
+  const C = S.skelC;
+  if (!S.skel || C < 6) { say(16, H / 2, !S.skel ? 'no skeleton loaded' : 'this skeleton has no world landmarks (channels 3-5)', '#e5e5ea'); return; }
+  const fl = -floor3(), line = (a, b) => { s3.beginPath(); s3.moveTo(a[0], a[1]); s3.lineTo(b[0], b[1]); s3.stroke(); };
+  // the floor: a 4 × 4 m grid every 0.5 m, and a mark pointing to where the recording camera is
+  s3.lineWidth = 1; s3.strokeStyle = 'rgba(255,255,255,0.13)';
+  for (let v = -2; v <= 2.001; v += 0.5) {
+    const a = proj3(v, fl, -2, W, H), b = proj3(v, fl, 2, W, H), c = proj3(-2, fl, v, W, H), d = proj3(2, fl, v, W, H);
+    if (a && b) line(a, b); if (c && d) line(c, d);
+  }
+  const c0 = proj3(0, fl, 1.4, W, H), c1 = proj3(0, fl, 2.2, W, H);
+  if (c0 && c1) { s3.strokeStyle = '#8e8e93'; s3.setLineDash([4, 4]); line(c0, c1); s3.setLineDash([]); say(c1[0] + 6, c1[1] + 4, 'camera', '#8e8e93'); }
+  if (f >= S.skel.length / (33 * C)) { say(16, H - 20, 'past the skeleton', '#e5e5ea'); return; }
+  const b = f * 33 * C, pt = j => {                          // world → the page's frame: y up, z toward the camera
+    const x = S.skel[b + j * C + 3], y = S.skel[b + j * C + 4], z = S.skel[b + j * C + 5];
+    return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) ? [x, -y, -z] : null;
+  };
+  const W3 = Array.from({length: 33}, (_, j) => pt(j));
+  if (!W3[23] && !W3[11]) { say(16, H - 20, 'no pose on this frame', '#e5e5ea'); return; }
+  const P3 = W3.map(p => p && proj3(p[0], p[1], p[2], W, H));
+  // the shadow on the floor: the body seen straight from above, so a turn of the hips or shoulders reads at a glance
+  s3.lineCap = 'round'; s3.lineWidth = 3; s3.strokeStyle = 'rgba(255,255,255,0.10)';
+  for (const [a, c] of BONES) {
+    if (!W3[a] || !W3[c]) continue;
+    const p = proj3(W3[a][0], fl, W3[a][2], W, H), q = proj3(W3[c][0], fl, W3[c][2], W, H); if (p && q) line(p, q);
+  }
+  const leadLeft = S.stance !== 'southpaw', floorV = S.th?.house?.min_visibility;
+  const seen = j => floorV == null || !(visAt(f, j) < floorV);
+  const col = j => j === 0 ? '#e5e5ea' : (j % 2 === 1) === leadLeft ? HANDCOL.lead : HANDCOL.rear;   // BlazePose: odd = left
+  // bones and joints far-to-near, so the near arm paints over the far one
+  const items = [];
+  for (const [a, c] of BONES) if (P3[a] && P3[c]) items.push({d: (P3[a][2] + P3[c][2]) / 2, bone: [a, c]});
+  for (let j = 0; j < 33; j++) if (P3[j] && (j === 0 || j >= 11)) items.push({d: P3[j][2] + 0.001, j});
+  items.sort((u, v) => u.d - v.d);
+  let hollow = 0;
+  for (const it of items) {
+    if (it.bone) {
+      const [a, c] = it.bone, on = seen(a) && seen(c), k = (P3[a][3] + P3[c][3]) / 2;
+      s3.strokeStyle = col(a) === col(c) ? col(a) : 'rgba(255,255,255,0.85)'; s3.globalAlpha = on ? 0.95 : 0.5;
+      s3.lineWidth = Math.max(1.5, 3.5 * k * Math.sqrt(CAM3.zoom)); s3.setLineDash(on ? [] : [5, 6]);
+      line(P3[a], P3[c]); s3.setLineDash([]); s3.globalAlpha = 1; continue;
+    }
+    const j = it.j, p = P3[j], r = Math.max(2, (j >= 29 ? 2.8 : 4.2) * p[3] * Math.sqrt(CAM3.zoom));
+    s3.beginPath(); s3.arc(p[0], p[1], r, 0, 7);
+    if (seen(j)) { s3.fillStyle = col(j); s3.fill(); s3.lineWidth = 1; s3.strokeStyle = '#000'; s3.stroke(); continue; }
+    hollow++; s3.fillStyle = 'rgba(0,0,0,0.6)'; s3.fill(); s3.lineWidth = 1.8; s3.strokeStyle = col(j); s3.stroke();
+  }
+  // the hip centre (the world landmarks' origin)
+  const o = proj3(0, 0, 0, W, H);
+  if (o) { s3.beginPath(); s3.arc(o[0], o[1], 3, 0, 7); s3.fillStyle = '#fff'; s3.fill(); }
+  let y = H - 66;                                             // above the control bar, shown on hover
+  if (hollow) { say(16, y, `○ ${hollow} joint${hollow > 1 ? 's' : ''} under ${fD(floorV, 2)} visibility — the rules skip ${hollow > 1 ? 'them' : 'it'}`, '#e5e5ea'); y -= 18; }
+  say(16, y, 'drag turn · shift-drag move · wheel zoom · double-click camera view · v video', '#8e8e93'); y -= 18;
+  s3.fillStyle = HANDCOL.lead; s3.fillRect(16, y - 9, 10, 10); say(31, y, 'lead side', '#e5e5ea');
+  s3.fillStyle = HANDCOL.rear; s3.fillRect(100, y - 9, 10, 10); say(115, y, 'rear side', '#e5e5ea');
+  say(190, y, '· BlazePose world landmarks, metres, hips fixed at the centre · grid 0.5 m', '#8e8e93');
+}
+function setMode3d(on) {
+  V.mode3d = on; stage.classList.toggle('mode3d', on);
+  document.querySelectorAll('#modeSeg button').forEach(x => x.classList.toggle('on', (x.dataset.m === '3d') === on));
+  $('zoomReset').classList.toggle('show', !on && Z.k > 1);
+  try { localStorage.setItem('pipelineViewerMode', on ? '3d' : 'video'); } catch {}
+  if (S.src) draw(true);
+}
+$('modeSeg').onclick = e => { const x = e.target.closest('button'); if (x) { e.stopPropagation(); setMode3d(x.dataset.m === '3d'); } };
+let drag3 = null;
+sk3d.addEventListener('pointerdown', e => {
+  drag3 = {x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2, moved: false};
+  sk3d.setPointerCapture(e.pointerId); sk3d.classList.add('dragging');
+});
+sk3d.addEventListener('pointermove', e => {
+  if (!drag3) return;
+  const dx = e.clientX - drag3.x, dy = e.clientY - drag3.y;
+  if (!drag3.moved && Math.hypot(dx, dy) < 4) return;
+  drag3.moved = true; drag3.x = e.clientX; drag3.y = e.clientY;
+  if (drag3.pan) { CAM3.px += dx; CAM3.py += dy; }
+  else { CAM3.yaw += dx * 0.01; CAM3.pitch = Math.max(-1.45, Math.min(1.45, CAM3.pitch + dy * 0.01)); }
+  draw3d(frameNow());
+});
+const end3 = () => { sk3d.classList.remove('dragging'); setTimeout(() => { drag3 = null; }, 0); };
+sk3d.addEventListener('pointerup', end3); sk3d.addEventListener('pointercancel', end3);
+sk3d.addEventListener('contextmenu', e => e.preventDefault());
+sk3d.addEventListener('click', e => { if (S.src && !drag3?.moved) video.paused ? video.play() : video.pause(); });   // a turn is not a click
+sk3d.addEventListener('dblclick', e => { e.preventDefault(); reset3d(); });
+sk3d.addEventListener('wheel', e => { e.preventDefault(); zoom3d(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))); }, {passive: false});
+new ResizeObserver(() => { if (V.mode3d && S.src) draw3d(frameNow()); }).observe(stage);
+try { if (localStorage.getItem('pipelineViewerMode') === '3d') setMode3d(true); } catch {}
 $('stage').addEventListener('click', e => {
   if (vdrag?.moved) return;                                   // a pan is not a play / pause click
   if (e.target === video || e.target.id === 'overlay' || e.target.id === 'stage') video.paused ? video.play() : video.pause();
@@ -5887,8 +6024,10 @@ document.addEventListener('keydown', e => {
   } else if (e.code === 'ArrowDown') { e.preventDefault(); video.pause(); const n = events.find(x => x.sf > f); if (n) seekFrame(n.sf); }
   else if (e.code === 'ArrowUp') { e.preventDefault(); video.pause(); const p = events.filter(x => x.sf < f).pop(); if (p) seekFrame(p.sf); }
   else if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.code === 'Minus' || e.code === 'NumpadSubtract') {
-    e.preventDefault(); zoomAt(stage.clientWidth / 2, stage.clientHeight / 2, /Equal|Add/.test(e.code) ? 1.25 : 0.8);
-  } else if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); resetZoom(); }
+    e.preventDefault(); const k = /Equal|Add/.test(e.code) ? 1.25 : 0.8;
+    if (V.mode3d) zoom3d(k); else zoomAt(stage.clientWidth / 2, stage.clientHeight / 2, k);
+  } else if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); V.mode3d ? reset3d() : resetZoom(); }
+  else if (e.code === 'KeyV') { e.preventDefault(); setMode3d(!V.mode3d); }
   else if (e.code === 'KeyI') {
     const p = at(S.punches, f).find(x => x.impact !== null) || S.punches.find(x => x.impact !== null && x.impact > f && !hid(x));
     if (p) { video.pause(); seekFrame(p.impact); }
