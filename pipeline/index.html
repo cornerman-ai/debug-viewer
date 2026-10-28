@@ -156,16 +156,26 @@
   /* a switch in progress: the old video stays, paused and dimmed, until the new one is swapped in */
   .loading .inspector { opacity: .55; transition: opacity .15s; }
   .loading { cursor: progress; }
-  .inspector .card { padding: 14px 16px; }
+  .inspector .card { padding: 18px 18px 16px; }
+  .inspector .card > .label { margin-bottom: 12px; }
   .label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
   .facing { display: flex; align-items: center; gap: 14px; }
   .facing .deg { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
   .facing .hint { color: var(--text2); font-size: 12px; }
-  .event .name { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .event .name { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 9px; }
   .event .name .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-  .event .rows { margin-top: 8px; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; color: var(--text2); font-size: 12px; }
-  .event .rows b { color: var(--text); font-weight: 500; text-align: right; }
-  .event .empty { color: var(--text3); font-size: 13px; }
+  /* a rule section's readings: label left, value right, a hairline between pairs */
+  .event .rows { margin-top: 4px; display: grid; grid-template-columns: fit-content(50%) minmax(0, 1fr); column-gap: 0; color: var(--text2); font-size: 13px; line-height: 1.4; }
+  .event .rows > span, .event .rows > b { padding: 8px 0; border-top: 0.5px solid var(--sep); }
+  .event .rows > :nth-child(-n+2) { border-top: 0; }
+  .event .rows b { color: var(--text); font-weight: 500; text-align: right; padding-left: 16px; }
+  .event .empty { color: var(--text3); font-size: 13px; line-height: 1.45; }
+  /* a card with nothing under the playhead: one quiet line, its name and "None" */
+  .inspector .card.none { display: flex; align-items: center; justify-content: space-between; padding: 13px 18px; }
+  .inspector .card.none > .label { margin: 0; color: var(--text3); }
+  .inspector .card.none .empty { font-size: 13px; color: var(--text3); }
+  .lrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .lrow .lmeta { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; color: var(--text3); }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; background: var(--fill); cursor: pointer; font-size: 12px; user-select: none; border: 0; }
   .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -213,16 +223,41 @@
   .hp i { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,.25); }
   @keyframes hpfill { from { width: 0; } }
   @media (prefers-reduced-motion: reduce) { .hp .fill { animation: none; } }
-  /* the Now tab's rule lists: one rule per line, its result right after the name */
-  .evctx { font-size: 12px; color: var(--text2); margin: 2px 0 6px; }
-  .evh { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 2px; }
-  .ev { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; font-size: 13px; padding: 2px 0; }
-  .ev .bn { min-width: 18px; text-align: right; font-size: 11px; color: var(--text2); opacity: .6; }
-  .ev b { font-weight: 600; }
-  .ev .evtier { font-size: 11px; font-weight: 600; }
-  .ev.off > span:nth-child(2) { color: var(--text2); }
-  .ev .evna { font-size: 11px; color: var(--text2); opacity: .8; }
-  .evskip { font-size: 11.5px; color: var(--text2); opacity: .8; margin: -1px 0 2px 24px; line-height: 1.35; }
+  /* the Now tab's rule lists: a grouped list - one rule a row, its number, name and result on the right, how the score
+     was made under the name - and the rules not judged folded under it, grouped by reason */
+  .evctx { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; color: var(--text2); margin: 4px 0 16px; }
+  .evctx .imp { color: #ff3b30; font-weight: 600; }
+  .evh { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 11px; font-weight: 600;
+         color: var(--text2); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 6px; }
+  .evh .n { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; color: var(--text3); }
+  .evl { background: color-mix(in srgb, var(--fill) 45%, transparent); border-radius: 12px; padding: 0 14px; }
+  .ev { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; column-gap: 10px; align-items: baseline;
+        padding: 11px 0; font-size: 14px; line-height: 1.3; }
+  .ev + .ev { border-top: 0.5px solid var(--sep); }
+  .ev .bn { font-size: 11px; color: var(--text3); text-align: right; font-variant-numeric: tabular-nums; }
+  .ev .en { min-width: 0; }
+  .ev .enote { display: block; margin-top: 3px; font-size: 12px; line-height: 1.4; color: var(--text2); }
+  .ev .evlong { display: block; margin-top: 3px; font-size: 13px; font-weight: 600; line-height: 1.35; }
+  .ev .evv { display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap; }
+  .ev .evv b { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ev .evtier { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; color: var(--c);
+                background: color-mix(in srgb, var(--c) 15%, transparent); }
+  .ev .evtxt { font-size: 13px; font-weight: 600; text-align: right; }
+  .evoff { margin-top: 10px; }
+  .evoff > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 7px; padding: 4px 2px;
+                     font-size: 13px; color: var(--text2); user-select: none; }
+  .evoff > summary::-webkit-details-marker { display: none; }
+  .evoff > summary::before { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor;
+                             border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s; opacity: .7; }
+  .evoff[open] > summary::before { transform: rotate(45deg); }
+  .evoff > summary .nos { color: var(--text3); font-variant-numeric: tabular-nums; }
+  .evwhy { padding: 6px 0 2px 15px; }
+  .evwhy .w + .w { margin-top: 12px; }
+  .evwhy .why { font-size: 12px; line-height: 1.45; color: var(--text2); }
+  .evwhy .rs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .evwhy .rs span { display: inline-flex; gap: 5px; align-items: baseline; font-size: 12px; padding: 3px 9px; border-radius: 999px;
+                    background: var(--fill); color: var(--text); }
+  .evwhy .rs span em { font-style: normal; color: var(--text3); font-variant-numeric: tabular-nums; }
   /* the Frame card's joint visibility: a bar per joint, the house floor as a tick, red under it */
   .jvh { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin: 10px 0 4px; }
   .jvh .evh { margin: 0; }
@@ -247,7 +282,8 @@
   .floors > b { font-weight: 600; margin-right: 2px; }
   .floors .chip-f { padding: 1px 7px; border-radius: 4px; background: var(--fill); cursor: help; }
   .floors .per { flex-basis: 100%; color: var(--text3); }
-  .cseq { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; font-size: 12px; margin: 2px 0 4px; }
+  .cseq { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 6px; font-size: 13px; margin: 2px 0 14px; }
+  .cseq .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .cseq .cel { display: inline-flex; align-items: center; gap: 4px; }
   .cseq .csep { color: var(--text2); }
   /* All videos: the overlay with every video × every rule */
@@ -369,9 +405,11 @@
   .angnote { font-size: 11px; color: var(--text3, var(--text2)); }
   .rmeta .angs { margin-left: 2px; }
 
-  .event .sub { margin-top: 10px; padding-top: 8px; border-top: 0.5px solid var(--sep); }
-  .event .sub .h { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
-    display: flex; align-items: center; gap: 6px; }
+  .event .sub { margin-top: 20px; padding-top: 16px; border-top: 0.5px solid var(--sep); }
+  .event .sub .h { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px; }
+  .event .sub .h .lmeta { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; color: var(--text3); }
+  .event .lrow + .sub { margin-top: 0; padding-top: 0; border-top: 0; }
   .verdict { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #fff; text-transform: none; letter-spacing: 0; }
   kbd { font: 500 11px/1 -apple-system, system-ui, sans-serif; background: var(--fill); border-radius: 4px; padding: 2px 5px; color: var(--text); }
 
@@ -555,9 +593,9 @@
           <div><div class="deg num" id="deg">–</div><div class="hint">0° to camera · 180° back</div></div>
         </div>
       </div>
-      <div class="card event" id="punchCard"><div class="label">Punch</div><div class="empty">No punch</div></div>
-      <div class="card event" id="defCard"><div class="label">Defense</div><div class="empty">No defensive move</div></div>
-      <div class="card event" id="comboCard"><div class="label">Combo</div><div class="empty">No combo</div></div>
+      <div class="card event none" id="punchCard"><div class="label">Punch</div><div class="empty">None</div></div>
+      <div class="card event none" id="defCard"><div class="label">Defense</div><div class="empty">None</div></div>
+      <div class="card event none" id="comboCard"><div class="label">Combo</div><div class="empty">None</div></div>
       <div class="card event" id="frameCard"><div class="label">Frame</div><div class="empty">–</div></div>
     </div>
 
@@ -4621,42 +4659,67 @@ function failMix(no) {
       return `<span><i style="background:${s.c}"></i>${s.name} <b>${pc(b.failed)}</b> <span class="m">${b.failed}/${b.judged}</span></span>`; }).join('')}</div>` +
     `<div class="note">the ${nF} failed punch${nF === 1 ? '' : 'es'} (${what}) by punch type · after each: failed / judged</div></div>`;
 }
-function evRow(no, r) {
-  const t = r.score != null && Number.isFinite(r.score) ? tierOf(r.score) : null;
-  if (r.skip !== undefined)                                // not judged: the reason on its own line, under the name
-    return `<div class="ev off"><span class="bn">${no}</span><span>${RULE_NAME(no)}</span><span class="evna">not judged</span></div>`
-      + `<div class="evskip">${skipTxt(r.skip)}</div>`;
-  const val = t ? `<b class="num" style="color:${t[2]}">${r.score.toFixed(1)}</b><span class="evtier" style="color:${t[2]}">${t[1]}</span>`
-    : `<b style="color:${r.col || 'var(--text)'}">${r.text}</b>`;
-  return `<div class="ev"><span class="bn">${no}</span><span>${RULE_NAME(no)}</span>${val}</div>`
-    + (r.note ? `<div class="evskip">${r.note}</div>` : '');      // how the score was made: its parts, its reading
+// a rule with no result: skipped, or no reading of it in the rule's output
+const isSkip = r => r.skip !== undefined || !(r.score != null && Number.isFinite(r.score)) && r.text == null;
+function evRow(no, r) {                                   // a judged rule: number, name (how it was made under it), result
+  const t = r.score != null && Number.isFinite(r.score) ? tierOf(r.score) : null, col = r.col || 'var(--text)';
+  const long = !t && String(r.text).length > 24;           // a long verdict goes under the name, not squeezed on the right
+  const val = t ? `<span class="evv"><b style="color:${t[2]}">${r.score.toFixed(1)}</b><span class="evtier" style="--c:${t[2]}">${t[1]}</span></span>`
+    : long ? '<span></span>' : `<span class="evtxt" style="color:${col}">${r.text}</span>`;
+  return `<div class="ev"><span class="bn">${no}</span><span class="en">${RULE_NAME(no)}`
+    + (long ? `<span class="evlong" style="color:${col}">${r.text}</span>` : '')
+    + (r.note ? `<span class="enote">${r.note}</span>` : '') + `</span>${val}</div>`;
 }
-function evList(rows) {
-  const judged = rows.filter(([, r]) => r.skip === undefined).length;
-  return `<div class="evh">${judged} of ${rows.length} rule${rows.length === 1 ? '' : 's'} judged</div>` +
-    rows.sort((a, b) => a[0] - b[0]).map(([no, r]) => evRow(no, r)).join('');
+// the not-judged fold's open / closed, shared by every card and remembered per browser
+let NOW_OFF_OPEN = (() => { try { return localStorage.getItem('pipelineViewerNowOff') === '1'; } catch { return false; } })();
+function evList(rows, title = 'Rules') {
+  rows = rows.slice().sort((a, b) => a[0] - b[0]);
+  const on = rows.filter(([, r]) => !isSkip(r)), off = rows.filter(([, r]) => isSkip(r));
+  const why = new Map();                                    // the reasons, each with its rules
+  for (const [no, r] of off) { const w = r.skip ? skipTxt(r.skip) : 'no reading in the rule’s output'; why.set(w, [...(why.get(w) || []), no]); }
+  return `<div class="evh"><span>${title}</span><span class="n">${on.length} of ${rows.length} judged</span></div>`
+    + (on.length ? `<div class="evl">${on.map(([no, r]) => evRow(no, r)).join('')}</div>` : '')
+    + (off.length ? `<details class="evoff"${NOW_OFF_OPEN ? ' open' : ''}><summary>${off.length} not judged <span class="nos">${off.map(([no]) => no).join(', ')}</span></summary>`
+      + `<div class="evwhy">${[...why].map(([w, nos]) => `<div class="w"><div class="why">${w}</div><div class="rs">`
+        + nos.map(no => `<span><em>${no}</em>${RULE_NAME(no)}</span>`).join('') + '</div></div>').join('')}</div></details>` : '');
 }
-function eventCard(el, label, e, f) {
-  if (!e) { el.innerHTML = `<div class="label">${label}</div><div class="empty">${label === 'Punch' ? 'No punch' : 'No defensive move'}</div>`; return; }
+document.querySelector('.inspector').addEventListener('toggle', ev => {   // one fold opened: every fold opens
+  if (!ev.target.matches?.('details.evoff')) return;
+  NOW_OFF_OPEN = ev.target.open;
+  try { localStorage.setItem('pipelineViewerNowOff', NOW_OFF_OPEN ? '1' : '0'); } catch {}
+  document.querySelectorAll('#nowView details.evoff').forEach(d => { if (d.open !== NOW_OFF_OPEN) d.open = NOW_OFF_OPEN; });
+}, true);
+// a card with nothing to show: one quiet line
+function emptyCard(el, label, txt = 'None') {
+  el.classList.add('none'); el.innerHTML = `<div class="label">${label}</div><div class="empty">${txt}</div>`;
+}
+const cardHead = (label, meta) => `<div class="label lrow"><span>${label}</span><span class="lmeta num">${meta}</span></div>`;
+function eventCard(el, label, list, f) {
+  if (!list.length) return emptyCard(el, label);
+  el.classList.remove('none');
   const fps = S.fps;
-  if (e.kind === 'p') {
-    const s = styleP(e.type), imp = e.impact;
-    const impTxt = imp === null ? 'no impact frame' : f === imp ? '<span style="color:#ff3b30">impact now</span>'
-      : f < imp ? `impact in ${imp - f} f` : `impact ${f - imp} f ago`;
-    const rows = PUNCH_RULES.filter(([k, applies]) => S.has[k] && applies(e)).map(([k, , read]) => [LAYER_RULES[k][0], read(e[k])]);
-    el.innerHTML = `<div class="label">Punch</div><div class="name"><span class="dot" style="background:${s.c}"></span>${cap(e.hand)} ${s.name}</div>
-      <div class="evctx num">${fmtT(e.sf / fps)} · ${impTxt}</div>` + evList(rows) + layerSections(e);
-  } else {
+  const one = e => {
+    if (e.kind === 'p') {
+      const s = styleP(e.type), imp = e.impact;
+      const impTxt = imp === null ? 'no impact frame' : f === imp ? '<span class="imp">impact now</span>'
+        : f < imp ? `impact in ${imp - f} f` : `impact ${f - imp} f ago`;
+      const rows = PUNCH_RULES.filter(([k, applies]) => S.has[k] && applies(e)).map(([k, , read]) => [LAYER_RULES[k][0], read(e[k])]);
+      return `<div class="name"><span class="dot" style="background:${s.c}"></span>${cap(e.hand)} ${s.name}</div>
+        <div class="evctx num">${fmtT(e.sf / fps)} – ${fmtT((e.ef + 1) / fps)} · ${impTxt}</div>` + evList(rows) + layerSections(e);
+    }
     const s = styleD(e.type);
-    el.innerHTML = `<div class="label">Defense</div><div class="name"><span class="dot" style="background:${s.c}"></span>${e.side ? cap(e.side) + ' ' : ''}${s.name}</div>
+    return `<div class="name"><span class="dot" style="background:${s.c}"></span>${e.side ? cap(e.side) + ' ' : ''}${s.name}</div>
       <div class="evctx num">${fmtT(e.sf / fps)} · ${((e.ef - e.sf + 1) / fps).toFixed(2)} s</div>` + defenseRules(e);
-  }
+  };
+  const name = label === 'Punch' ? 'Punches' : 'Defensive moves';
+  el.innerHTML = (list.length > 1 ? cardHead(name, `${list.length} at once`) : `<div class="label">${label}</div>`)
+    + list.map((e, i) => i ? `<div class="sub">${one(e)}</div>` : one(e)).join('');
 }
 // a slip is judged by rules 14 and 15; no rule scores a single roll, duck or pull-back (rule 29 is whole-round)
 function defenseRules(e) {
   if (e.type !== 'slip')
-    return `<div class="empty">No rule scores a single ${styleD(e.type).name.toLowerCase()} — rules 14 and 15 judge slips only;
-      rule 29 (defense variety) looks at the whole round.</div>`;
+    return `<div class="empty">No rule scores a single ${styleD(e.type).name.toLowerCase()}: rules 14 and 15 judge slips only,
+      and rule 29 (defense variety) looks at the whole round.</div>`;
   if (!S.has.slip14) return '<div class="empty">slip distance is not in this folder</div>';
   const it = (S.items.slip14 || []).find(x => x.sf === e.sf);
   let rows;
@@ -4678,7 +4741,8 @@ function defenseRules(e) {
 function comboCard(el, f) {
   const off = (S.items.offensive || []).filter(c => c.sf <= f && f <= c.ef);
   const cmb = (S.items.combined || []).filter(c => c.sf <= f && f <= c.ef);
-  if (!off.length && !cmb.length) { el.innerHTML = '<div class="label">Combo</div><div class="empty">No combo</div>'; return; }
+  if (!off.length && !cmb.length) return emptyCard(el, 'Combo');
+  el.classList.remove('none');
   const seqHtml = c => c.els.map(m => { const st = elName(m); return `<span class="cel"><span class="dot" style="background:${st.c}"></span>${st.name}</span>`; }).join('<span class="csep">›</span>');
   const reps = (kind, c) => (S.layerSum[kind]?.[kind]?.sequences || []).find(q => q.sequence === c.seq)?.count;
   const block = (kind, c) => {
@@ -4719,19 +4783,21 @@ function comboCard(el, f) {
       if (c.excluded) rows.push([31, {skip: 'excluded'}]);
       else if (r != null) rows.push([31, {text: r > 1 ? `this sequence ${r}× in the round` : 'used once in the round', col: 'var(--text)'}]);
     }
-    return `<div class="sub"><div class="h">${kind === 'offensive' ? 'Offensive combo' : 'Combined combo'} · ${c.n} elements</div>
+    return `<div class="sub"><div class="h">${kind === 'offensive' ? 'Offensive' : 'Combined'}<span class="lmeta">${c.n} elements</span></div>
       <div class="cseq">${seqHtml(c)}</div>${evList(rows)}</div>`;
   };
-  el.innerHTML = '<div class="label">Combo</div>' + off.map(c => block('offensive', c)).join('') + cmb.map(c => block('combined', c)).join('');
+  el.innerHTML = cardHead('Combo', fmtT(Math.min(...[...off, ...cmb].map(c => c.sf)) / S.fps))
+    + off.map(c => block('offensive', c)).join('') + cmb.map(c => block('combined', c)).join('');
 }
 // ── the Frame card: this frame on every per-frame rule. Judged or not, and why, is the rule's own (its runs.csv
 // state for the stretch holding the frame); the score is the rule's formula on this frame's skeleton — the same
 // numbers the video overlay draws ──
 function frameCard(el, f) {
-  if (!S.skel) { el.innerHTML = `<div class="label">Frame · f ${f}</div><div class="empty">no skeleton loaded</div>`; return; }
-  if (!video.videoWidth) { el.innerHTML = `<div class="label">Frame · f ${f}</div><div class="empty">video not loaded — no pixel scale to read the skeleton in</div>`; return; }
+  if (!S.skel) return emptyCard(el, 'Frame', 'no skeleton loaded');
+  if (!video.videoWidth) return emptyCard(el, 'Frame', 'video not loaded');
   const C = S.skelC, b = f * 33 * C, W = video.videoWidth, H = video.videoHeight;
-  if (f >= S.skel.length / (33 * C)) { el.innerHTML = `<div class="label">Frame · f ${f}</div><div class="empty">past the skeleton</div>`; return; }
+  if (f >= S.skel.length / (33 * C)) return emptyCard(el, 'Frame', `f ${f} · past the skeleton`);
+  el.classList.remove('none');
   const J2 = j => { const x = S.skel[b + j * C], y = S.skel[b + j * C + 1];      // image pixels, so ratios are true
     return Number.isFinite(x) && Number.isFinite(y) ? [x * W, y * H] : null; };
   const dist = (p, q) => p && q ? Math.hypot(p[0] - q[0], p[1] - q[1]) : NaN;
@@ -4858,7 +4924,7 @@ function frameCard(el, f) {
   }
   const ex = exclAt((f + 0.5) / S.fps);                    // the video's excluded time: no rule judges this frame
   const shown = ex ? rows.map(([no]) => [no, {skip: `excluded time ${fD(ex[0], 1)}–${fD(ex[1], 1)} s — no rule judges this frame`}]) : rows;
-  el.innerHTML = `<div class="label">Frame · f ${f}</div>` + evList(shown) + jointVis(f);
+  el.innerHTML = cardHead('Frame', `f ${f} · ${fmtT(f / S.fps)}`) + evList(shown) + jointVis(f);
 }
 // The house joint floors as the rules apply them (the video's snapshot). BlazePose scores each joint twice:
 // visibility (is it hidden?) and presence (is it in the picture at all?). The pipeline applies the presence floor
@@ -5763,7 +5829,7 @@ function draw(force) {
     const pNow = at(S.punches, f), dNow = at(S.defenses, f);
     const a = S.hasAngle && S.pose[f] ? S.angle[f] : null;
     $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
-    eventCard($('punchCard'), 'Punch', pNow[0], f); eventCard($('defCard'), 'Defense', dNow[0], f); comboCard($('comboCard'), f); frameCard($('frameCard'), f);
+    eventCard($('punchCard'), 'Punch', pNow, f); eventCard($('defCard'), 'Defense', dNow, f); comboCard($('comboCard'), f); frameCard($('frameCard'), f);
     $('clock').textContent = `${fmtT(f / S.fps)} · f ${f}`;           // the frame's own time, as the playhead pill
     if (typeof VC !== 'undefined') VC.paint();
     if (document.activeElement !== $('frameGo')) $('frameGo').value = f;
