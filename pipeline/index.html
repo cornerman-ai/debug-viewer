@@ -110,8 +110,19 @@
   .stage .modeseg button.on { background: rgba(255,255,255,0.22); color: #fff; }
   .stage #sk3d { display: none; pointer-events: auto; cursor: grab; }
   .stage #sk3d.dragging { cursor: grabbing; }
-  .stage.mode3d #sk3d { display: block; }
-  .stage.mode3d video, .stage.mode3d #overlay { visibility: hidden; }   /* the video keeps running: it is the clock */
+  .stage.v3d #sk3d, .stage.split #sk3d { display: block; }
+  .stage.v3d video, .stage.v3d #overlay { visibility: hidden; }   /* the video keeps running: it is the clock */
+  /* split: the video and its overlay in the left pane, the 3D in the right one, the divider between them dragged */
+  .stage.split video { width: var(--sl, 50%); flex: none; margin-right: auto; }   /* the stage centres its children */
+  .stage.split #overlay { right: auto; width: var(--sl, 50%); }
+  .stage.split #sk3d { left: var(--sl, 50%); width: calc(100% - var(--sl, 50%)); }   /* a canvas's auto width is its pixel size */
+  .stage .vsplit { position: absolute; top: 0; bottom: 0; left: var(--sl, 50%); width: 14px; margin-left: -7px; display: none;
+    cursor: col-resize; pointer-events: auto; touch-action: none; }
+  .stage.split .vsplit { display: block; }
+  .stage.split .zoombtn { top: 12px; right: auto; left: calc(var(--sl, 50%) - 12px); transform: translateX(-100%); }   /* the video's zoom, on the video's pane */
+  .stage .vsplit::before { content: ''; position: absolute; top: 0; bottom: 0; left: 6px; width: 2px; background: rgba(255,255,255,0.75); }
+  .stage .vsplit::after { content: ''; position: absolute; top: 50%; left: 0; width: 14px; height: 36px; margin-top: -18px; border-radius: 7px;
+    background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
   .stage .zoombtn.show { display: inline-flex; }
   .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .stage .hud { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
@@ -540,7 +551,8 @@
       <canvas id="sk3d"></canvas>
       <div class="hud" id="hud"></div>
       <div class="clock pill num" id="clock">0:00.000 · f 0</div>
-      <div class="modeseg" id="modeSeg" title="the video, or BlazePose's 3D skeleton alone (v)"><button data-m="video" class="on">Video</button><button data-m="3d">3D skeleton</button></div>
+      <div class="vsplit" id="vsplit" title="drag to move · double-click: half and half"></div>
+      <div class="modeseg" id="modeSeg" title="the video, the two side by side, or BlazePose's 3D skeleton alone (v)"><button data-m="video" class="on">Video</button><button data-m="split">Split</button><button data-m="3d">3D skeleton</button></div>
       <button class="pill num zoombtn" id="zoomReset" title="reset the zoom (0 or double-click)">1.0× · reset</button>
       <div class="vctl" id="vctl">
         <div class="vseek" id="vseek"><div class="vtrack"><div class="vprog" id="vprog"></div><div class="vhov" id="vhov"></div></div><div class="vthumb" id="vthumb"></div><div class="vtip num" id="vtip"></div></div>
@@ -5843,7 +5855,7 @@ function draw(force) {
     if (stNow) hud.push(`<span class="pill"><span class="dot" style="background:${STANCEROW[stNow.state]}"></span>${STANCENAME[stNow.state] || cap(stNow.state)}</span>`);
     $('hud').innerHTML = hud.join('');
     drawOverlay(f, pNow);
-    if (V.mode3d) draw3d(f);
+    if (V.view !== 'video') draw3d(f);
     // follow: keep the playhead inside the window, scrolling continuously while playing
     if (V.follow && V.span && V.t1 - V.t0 < S.dur) {
       const t = f / S.fps, w = V.t1 - V.t0;
@@ -6045,7 +6057,7 @@ $('skelToggle').onclick = e => { e.preventDefault(); V.skel = !V.skel; $('skelTo
 //    mapping (Z in drawOverlay's P), so skeleton lines stay crisp and exactly on the body at any zoom ──
 const Z = {k: 1, tx: 0, ty: 0}, stage = $('stage'), ZMAX = 8;
 function clampZoom() {
-  const W = stage.clientWidth, H = stage.clientHeight;
+  const W = video.clientWidth, H = video.clientHeight;          // the video's own box: the left pane in split
   Z.k = Math.min(ZMAX, Math.max(1, Z.k));
   Z.tx = Math.min(0, Math.max(W - W * Z.k, Z.tx)); Z.ty = Math.min(0, Math.max(H - H * Z.k, Z.ty));
 }
@@ -6053,7 +6065,7 @@ function applyZoom() {
   clampZoom();
   video.style.transform = Z.k === 1 ? '' : `translate(${Z.tx}px, ${Z.ty}px) scale(${Z.k})`;
   stage.classList.toggle('zoomed', Z.k > 1);
-  $('zoomReset').classList.toggle('show', Z.k > 1 && !V.mode3d); $('zoomReset').textContent = `${Z.k.toFixed(1)}× · reset`;
+  $('zoomReset').classList.toggle('show', Z.k > 1 && V.view !== '3d'); $('zoomReset').textContent = `${Z.k.toFixed(1)}× · reset`;
   draw(true);
 }
 function zoomAt(px, py, factor) {
@@ -6062,7 +6074,7 @@ function zoomAt(px, py, factor) {
 }
 const resetZoom = () => { Z.k = 1; Z.tx = 0; Z.ty = 0; applyZoom(); };
 stage.addEventListener('wheel', e => {
-  if (!S.src || V.mode3d) return;                              // 3D: the canvas zooms its own camera
+  if (!S.src || V.view === '3d' || e.target === sk3d || e.target.closest('.vsplit')) return;   // 3D: the canvas zooms its own camera
   if (e.target.closest('.vctl')) return;                       // over the control bar: no zoom
   e.preventDefault();
   const r = stage.getBoundingClientRect();
@@ -6070,7 +6082,7 @@ stage.addEventListener('wheel', e => {
 }, {passive: false});
 let vdrag = null;
 stage.addEventListener('pointerdown', e => {
-  if (Z.k <= 1 || V.mode3d || e.target.closest('button') || e.target.closest('.vctl')) return;
+  if (Z.k <= 1 || V.view === '3d' || e.target === sk3d || e.target.closest('.vsplit') || e.target.closest('button') || e.target.closest('.vctl')) return;
   vdrag = {x: e.clientX, y: e.clientY, tx: Z.tx, ty: Z.ty, moved: false}; stage.setPointerCapture(e.pointerId);
 });
 stage.addEventListener('pointermove', e => {
@@ -6080,7 +6092,7 @@ stage.addEventListener('pointermove', e => {
   vdrag.moved = true; stage.classList.add('panning'); Z.tx = vdrag.tx + dx; Z.ty = vdrag.ty + dy; applyZoom();
 });
 stage.addEventListener('pointerup', () => { if (vdrag) { stage.classList.remove('panning'); setTimeout(() => { vdrag = null; }, 0); } });
-stage.addEventListener('dblclick', e => { if (!V.mode3d && !e.target.closest('button') && !e.target.closest('.vctl')) resetZoom(); });
+stage.addEventListener('dblclick', e => { if (V.view !== '3d' && e.target !== sk3d && !e.target.closest('.vsplit') && !e.target.closest('button') && !e.target.closest('.vctl')) resetZoom(); });
 $('zoomReset').onclick = e => { e.stopPropagation(); resetZoom(); };
 // ── 3D skeleton: the stage shows BlazePose's world landmarks (channels 3-5: metres, origin = the hip centre, y down,
 //    more negative z = nearer the camera) instead of the video, which keeps playing hidden underneath as the clock - so
@@ -6116,9 +6128,9 @@ function proj3(x, y, z, W, H) {
   return [W / 2 + CAM3.px + x1 * k * m, H / 2 + CAM3.py - y1 * k * m, z2, k];
 }
 function draw3d(f) {
-  const dpr = devicePixelRatio || 1, W = stage.clientWidth, H = stage.clientHeight;
+  const dpr = devicePixelRatio || 1, W = sk3d.clientWidth, H = sk3d.clientHeight;
   if (sk3d.width !== Math.round(W * dpr) || sk3d.height !== Math.round(H * dpr)) { sk3d.width = Math.round(W * dpr); sk3d.height = Math.round(H * dpr); }
-  s3.setTransform(dpr, 0, 0, dpr, 0, 0); s3.clearRect(0, 0, W, H);
+  s3.setTransform(dpr, 0, 0, dpr, 0, 0); s3.fillStyle = '#000'; s3.fillRect(0, 0, W, H);   // opaque: a zoomed video runs under it
   s3.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
   const say = (x, y, t, c) => { s3.fillStyle = c; s3.fillText(t, x, y); };
   const C = S.skelC;
@@ -6172,19 +6184,34 @@ function draw3d(f) {
   if (o) { s3.beginPath(); s3.arc(o[0], o[1], 3, 0, 7); s3.fillStyle = '#fff'; s3.fill(); }
   let y = H - 66;                                             // above the control bar, shown on hover
   if (hollow) { say(16, y, `○ ${hollow} joint${hollow > 1 ? 's' : ''} under ${fD(floorV, 2)} visibility — the rules skip ${hollow > 1 ? 'them' : 'it'}`, '#e5e5ea'); y -= 18; }
-  say(16, y, 'drag turn · shift-drag move · wheel zoom · double-click camera view · v video', '#8e8e93'); y -= 18;
+  say(16, y, 'drag turn · shift-drag move · wheel zoom · double-click camera view', '#8e8e93'); y -= 18;
+  say(16, y, 'BlazePose world landmarks (m) · hips fixed at the centre · grid 0.5 m', '#8e8e93'); y -= 18;
   s3.fillStyle = HANDCOL.lead; s3.fillRect(16, y - 9, 10, 10); say(31, y, 'lead side', '#e5e5ea');
   s3.fillStyle = HANDCOL.rear; s3.fillRect(100, y - 9, 10, 10); say(115, y, 'rear side', '#e5e5ea');
-  say(190, y, '· BlazePose world landmarks, metres, hips fixed at the centre · grid 0.5 m', '#8e8e93');
 }
-function setMode3d(on) {
-  V.mode3d = on; stage.classList.toggle('mode3d', on);
-  document.querySelectorAll('#modeSeg button').forEach(x => x.classList.toggle('on', (x.dataset.m === '3d') === on));
-  $('zoomReset').classList.toggle('show', !on && Z.k > 1);
-  try { localStorage.setItem('pipelineViewerMode', on ? '3d' : 'video'); } catch {}
-  if (S.src) draw(true);
+// the stage's three views: 'video', 'split' (the video left of the divider, the 3D right of it; V.splitF the video's
+// share of the width) and '3d'; remembered in the browser
+const VIEWS = ['video', 'split', '3d'];
+function setView(v) {
+  V.view = VIEWS.includes(v) ? v : 'video';
+  stage.classList.toggle('v3d', V.view === '3d'); stage.classList.toggle('split', V.view === 'split');
+  stage.style.setProperty('--sl', `${(V.splitF * 100).toFixed(2)}%`);
+  document.querySelectorAll('#modeSeg button').forEach(x => x.classList.toggle('on', x.dataset.m === V.view));
+  try { localStorage.setItem('pipelineViewerMode', V.view); } catch {}
+  applyZoom();                                                // the video's box changed: clamp, redraw both
 }
-$('modeSeg').onclick = e => { const x = e.target.closest('button'); if (x) { e.stopPropagation(); setMode3d(x.dataset.m === '3d'); } };
+$('modeSeg').onclick = e => { const x = e.target.closest('button'); if (x) { e.stopPropagation(); setView(x.dataset.m); } };
+let dragS = null;
+$('vsplit').addEventListener('pointerdown', e => { e.preventDefault(); dragS = true; $('vsplit').setPointerCapture(e.pointerId); });
+$('vsplit').addEventListener('pointermove', e => {
+  if (!dragS) return;
+  const r = stage.getBoundingClientRect();
+  V.splitF = Math.min(0.85, Math.max(0.15, (e.clientX - r.left) / r.width)); setView('split');
+});
+const endS = () => { if (!dragS) return; dragS = null; try { localStorage.setItem('pipelineViewerSplit', String(V.splitF)); } catch {} };
+$('vsplit').addEventListener('pointerup', endS); $('vsplit').addEventListener('pointercancel', endS);
+$('vsplit').addEventListener('click', e => e.stopPropagation());
+$('vsplit').addEventListener('dblclick', e => { e.stopPropagation(); V.splitF = 0.5; dragS = true; endS(); setView('split'); });
 let drag3 = null;
 sk3d.addEventListener('pointerdown', e => {
   drag3 = {x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2, moved: false};
@@ -6205,8 +6232,10 @@ sk3d.addEventListener('contextmenu', e => e.preventDefault());
 sk3d.addEventListener('click', e => { if (S.src && !drag3?.moved) video.paused ? video.play() : video.pause(); });   // a turn is not a click
 sk3d.addEventListener('dblclick', e => { e.preventDefault(); reset3d(); });
 sk3d.addEventListener('wheel', e => { e.preventDefault(); zoom3d(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))); }, {passive: false});
-new ResizeObserver(() => { if (V.mode3d && S.src) draw3d(frameNow()); }).observe(stage);
-try { if (localStorage.getItem('pipelineViewerMode') === '3d') setMode3d(true); } catch {}
+new ResizeObserver(() => { if (V.view !== 'video' && S.src) draw3d(frameNow()); }).observe(stage);
+V.view = 'video'; V.splitF = 0.5;
+try { const f = parseFloat(localStorage.getItem('pipelineViewerSplit')); if (f >= 0.15 && f <= 0.85) V.splitF = f; } catch {}
+try { setView(localStorage.getItem('pipelineViewerMode') || 'video'); } catch { setView('video'); }
 $('stage').addEventListener('click', e => {
   if (vdrag?.moved) return;                                   // a pan is not a play / pause click
   if (e.target === video || e.target.id === 'overlay' || e.target.id === 'stage') video.paused ? video.play() : video.pause();
@@ -6226,9 +6255,9 @@ document.addEventListener('keydown', e => {
   else if (e.code === 'ArrowUp') { e.preventDefault(); video.pause(); const p = events.filter(x => x.sf < f).pop(); if (p) seekFrame(p.sf); }
   else if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.code === 'Minus' || e.code === 'NumpadSubtract') {
     e.preventDefault(); const k = /Equal|Add/.test(e.code) ? 1.25 : 0.8;
-    if (V.mode3d) zoom3d(k); else zoomAt(stage.clientWidth / 2, stage.clientHeight / 2, k);
-  } else if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); V.mode3d ? reset3d() : resetZoom(); }
-  else if (e.code === 'KeyV') { e.preventDefault(); setMode3d(!V.mode3d); }
+    if (V.view === '3d') zoom3d(k); else zoomAt(video.clientWidth / 2, video.clientHeight / 2, k);
+  } else if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); V.view === '3d' ? reset3d() : resetZoom(); }
+  else if (e.code === 'KeyV') { e.preventDefault(); setView(VIEWS[(VIEWS.indexOf(V.view) + 1) % 3]); }   // video → split → 3D
   else if (e.code === 'KeyI') {
     const p = at(S.punches, f).find(x => x.impact !== null) || S.punches.find(x => x.impact !== null && x.impact > f && !hid(x));
     if (p) { video.pause(); seekFrame(p.impact); }
