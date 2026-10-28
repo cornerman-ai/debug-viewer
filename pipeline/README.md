@@ -382,40 +382,37 @@ continuous, so a gray stretch never means "nothing happened" — it means the ru
   tick at the frame measured; on the video the punching arm in the same colour with this frame's elbow angle (a punch
   the rule did not judge says why: head-on, too far from the camera…). The round is the mean punch score, a plain
   number with no bands.
-- **Hip rotation** (`hip_rotation/`): per punch the start → impact rotation against a set minimum per punch type (lead
-  jab 0°, lead hook 30°, lead uppercut 20°, lead body shot 30°, rear cross 25°, rear hook 30°, rear uppercut 25°, rear
-  body shot 30°, each 5° higher than before 2026-10-27 but the jab's — the card reads them from the video's thresholds
-  copy): 100 at or above it, linear from 0° to the minimum below it; no cost for turning more (until
-  2026-10-27 a range, and up to 20 off above its upper end — the user took that out; a snapshot from before still reads
-  as a range). Green at 100, red below, the score on the block; the round is the mean punch score with every punch
-  under 100 counted three times, then 10 off (once) when any punch scored under 40 (since 2026-10-27, the thresholds'
-  `round.weight_below_full` and `round.low_punch`; the Explanations say how many punches were under 40), no bands
-  (from `hip_rotation.json`); on the video the hip line coloured by the rule's verdict, and — since that line is not the
-  measurement — a dial of what is: seen from above (the world landmarks), the direction other hip → punching hip at
-  the start (dashed white), at impact, and on the frame on screen (yellow, since 2026-10-27: the turn as it plays),
-  against the facing angle (grey), labelled with the start frame and the angles; the start → impact difference
-  is the rule's number (checked to 0.14° on 5,352 punches, 2026-10-02).
-- **Hip rotation + buffer** (the same `hip_rotation/` files, since 2026-10-27, the user's call; a test, not a rule): on
-  the videos the backend ran it for (`move.start_buffer.videos`: Good and Mistake - picking up their handbag with the
-  upper), rule 19's reading again from each punch's best start: of the frames from `move.start_buffer.s` (0.2 s, 6
-  frames at 30 fps) before the punch's start to the start itself, the one with the most turn to the impact (the CSV's
-  `buffer_start_frame`; the same day's first version moved every start the full 0.2 s earlier). Its own row (a dashed
-  outline over the whole buffer searched, the block from the best start, the part before the punch's own start
-  lighter), card and tooltip (the best start, how many frames before the punch, the frames searched, beside rule 19's
-  own reading), and its own animation, drawn per frame from the best start so it shows before the punch begins: the
-  hip line (dashed until the punch's own start), the label "best start k f before the …" and a second dial, titled
-  "Hip rotation + buffer, best start −k f", starting from that frame. The Explanations count how many punches had their
-  best start k frames before their own (`buffer.best_start_frames_before` in `hip_rotation.json`).
-  Beside a portrait video the dials stack in the black bars: two per punch (rule 19's, the buffer's above it), the
-  punch under the playhead that started last first, from the bottom of the left bar up under the HUD's pills, then on
-  in the right bar from the top; a dial with no room left is not drawn. Rule 19's round row names its round score; it is in no round total and not in `rule_scores.json`.
-  Switch on both Hip rotation layers to see the two animations together. The impact → end step is in the CSV but not shown
-  (blank when the end frame hides a hip: only the start and impact frames decide whether a punch is judged).
-- **Shoulder rotation** (`shoulder_rotation/`): the hip rule moved to the shoulders — per punch the start → impact
-  turn of the punching shoulder against a set range per punch type (lead jab 5–30°, lead hook 35–70°, lead uppercut
-  25–60°, lead body shot 40–75°, rear cross 30–60°, rear hook 40–75°, rear uppercut 30–75°, rear body shot 50–75°),
-  scored as hip rotation was until 2026-10-27 (100 inside, linear from 0° below, above up to 20 off at twice the upper end) — green at 100, red below, the score on the block; on the video the shoulder line in the
-  verdict's colour and the same dial from above. The round is the mean punch score, no bands.
+- **Hip rotation** (`hip_rotation/`) and **Shoulder rotation** (`shoulder_rotation/`), rules 19 and 20: one layer
+  builder (`rotLayer`), as the backend runs both rules through one module (`rotation_rule.py`, since 2026-10-28, the
+  user's call: "they must work the same way"). Per punch the turn of the hip / shoulder line, seen from above against
+  the facing at the impact, from the punch's **best start** — of the frames from `move.start_buffer.s` (0.2 s, 6 frames
+  at 30 fps) before the detected start to that start, the one with the most turn to the impact (the CSV's
+  `best_start_frame`) — to the impact, against a minimum per punch type (hips: lead jab 0°, lead hook 30°, lead uppercut
+  20°, lead body shot 30°, rear cross 25°, rear hook 30°, rear uppercut 25°, rear body shot 30°; shoulders: 5°, 40°,
+  30°, 45°, 35°, 45°, 35°, 55° — the card reads them from the video's thresholds copy): 100 at or above it, linear from
+  0° below it, no cost for turning more. The round is the mean punch score with every punch under 100 counted three
+  times, then 10 off once when any punch scored under 40; the Explanations say how many were under 40 and how many
+  frames before the detected start the best starts sat. A snapshot from before reads as it was computed (rule 20 with
+  its ranges, both rules from the detected start).
+  - **Row**: the block runs from the best start to the punch's end, the stretch before the detected start lighter and
+    the whole buffer searched outlined dashed; green at 100, red below, the score on the block.
+  - **Card / tooltip**: what turned to the impact, what the punch needs, the score, where the reading starts (the best
+    start, how many frames before the detected start, the frames searched) and what the detected start alone reads.
+  - **Animation**, drawn on every frame from the best start to the punch's end, so it begins before the detected
+    start: the hip / shoulder line on the body in the verdict's colour (dashed until the detected start), and the
+    **turn dial** — seen from above: the grey arrow is where the boxer faces, the white dashes the line at the best
+    start, the thin white arc the turn the punch needs ending in a tick, the wedge the turn so far (yellow while it
+    grows with the video, from the best start to the impact; then in the verdict's colour: it reaches the tick = full
+    score), the coloured ray the line at the impact and the yellow ray the line on the frame on screen. Beside it the
+    punch and the rule, then "turning… 12.3° · needs 25°" while it grows and "turned 25.4° · needs 25° → 100" from the
+    impact on, with "read from 4 f before the punch" when the best start is earlier. The wedge is drawn as wide as the
+    rule's number (|angle(facing, impact) − angle(facing, start)|), from the start line toward the impact line.
+  - Beside a portrait video the dials stack in the black bars, one per rule and punch (shoulders, then hips), the punch
+    under the playhead that started last first, from the bottom of the left bar up under the HUD's pills, then on in the
+    right bar from the top; a dial with no room left is not drawn; a video that fills the stage keeps them by the body.
+    The impact → end step is in the CSV but not shown (blank when the end frame hides a joint).
+  - Until 2026-10-28 rule 19's buffer was a test variant on two videos with its own layer, **Hip rotation + buffer**
+    (2026-10-27), and rule 20 kept ranges with up to 20 off above them and a plain mean.
 - **Hit height** (`hit_height/`): per punch of every type — jab, cross, hook, uppercut, body shot — read side-on
   (|facing| 65–115°; 75–105° on a video filmed from the floor or above the head - the camera_height stage's ground /
   above_head, since 2026-10-24 - and the angle badges, the Rules tab and the Round row show that video's window),

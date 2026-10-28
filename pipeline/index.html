@@ -719,10 +719,12 @@ const ord = v => { if (v == null) return '…'; const n = Math.round(v), t = n %
   return n + (t >= 11 && t <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'); };   // 30 → "30th"
 const fOff = v => v == null ? '…' : v < 0 ? `−${-v}` : `+${v}`;                  // a frame offset: −1, +1
 const fIv = a => a == null ? '…' : `${fN(a[0])}–${fN(a[1])}`;                          // [20, 60] → "20–60"
-// rule 19 since 2026-10-27: a minimum per punch type, no upper end (an older snapshot's [lo, hi]: its lo)
+// rules 19 / 20: a minimum per punch type, no upper end (rule 19 since 2026-10-27, rule 20 since 2026-10-28; an older
+// snapshot's [lo, hi]: its lo)
 const minOf = v => Array.isArray(v) ? v[0] : v;
 const fMin = v => v == null ? '…' : `≥ ${fN(minOf(v))}`;                               // 20 → "≥ 20"
-const hipMinOnly = () => S.th?.rules?.[19]?.move?.score?.over == null;                // the snapshot's rule 19 has no over-rotation cost
+const minOnly = n => S.th?.rules?.[n]?.move?.score?.over == null;                    // the snapshot's rule n has no over-rotation cost
+const hipMinOnly = () => minOnly(19);
 // rule 6: the frames read around the impact — the impact frame, and the frames within around_impact.window_s before
 // and after it (round(window_s × fps) each side: 1 at 30 fps). restOffs → [−k, 0, k] in this video's frames,
 // restWeights → the three parts' weights "¼ · ½ · ¼", restWin → the window in seconds
@@ -738,19 +740,23 @@ const guardLine = (hand, f) => guardDef(f) ? T(4, `move.full_in_defensive_move.$
 // rule 9's linear stretch, zero - full flare: rounded so 0.50 - 0.15 is the 0.35 the score always divided by
 const elbowSpan = (zero, full) => +(zero - full).toFixed(12);
 // rules 19 / 20 on the Rules tab: the ranges and the cost above them, from the snapshot
-// rule 19's round since 2026-10-27: every punch under 100 counts round.weight_below_full times in the mean (1 = a plain
-// mean, also for a video computed before, whose thresholds copy has no weight)
-const hipWeight = () => THR(() => T(19, 'round.weight_below_full'), 1) ?? 1;
-// and its points off, once, when any punch scored under a line (round.low_punch: below 40, 10 off); null before
-const hipLow = () => THR(() => { const b = T(19, 'round.low_punch.below'), o = T(19, 'round.low_punch.points_off'); return b == null || o == null ? null : {below: b, off: o}; }, null);
+// rules 19 / 20's round (rule 19 since 2026-10-27, rule 20 since 2026-10-28): every punch under 100 counts
+// round.weight_below_full times in the mean (1 = a plain mean, also for a video computed before, whose thresholds copy
+// has no weight), then round.low_punch.points_off off - once - when any punch scored under round.low_punch.below
+const rotWeight = n => THR(() => T(n, 'round.weight_below_full'), 1) ?? 1;
+const rotLow = n => THR(() => { const b = T(n, 'round.low_punch.below'), o = T(n, 'round.low_punch.points_off'); return b == null || o == null ? null : {below: b, off: o}; }, null);
+// and where each punch is read from: its best start, in move.start_buffer.s before the detected one (null before)
+const rotBuf = n => THR(() => T(n, 'move.start_buffer.s'), null);
 function rotTh(n, part, nj) {
-  if (n === 19 && hipMinOnly())                            // rule 19 since 2026-10-27: a minimum only
-    return {event: {label: 'per punch', rule: `the ${part} turn from start to impact against a set minimum per punch type — `
+  const from = rotBuf(n) == null ? 'from start to impact'
+    : `from its best start — the frame in the ${fN(rotBuf(n))} s before the detected start with the most turn — to impact`;
+  if (minOnly(n))                                          // rule 19 since 2026-10-27, rule 20 since 2026-10-28: a minimum only
+    return {event: {label: 'per punch', rule: `the ${part} turn ${from} against a set minimum per punch type — `
                           + `${ivList(n)}. 100 at or above it; below, linear from 0° (0) to the minimum (100); no cost for turning more`,
                    bands: [['at or above', '100'], ['below', '0 → 100 (linear)']],
                    pal: {'100': '#34c759', '0 → 100 (linear)': '#ff3b30'}},
-            round: {label: 'per round', rule: `the mean punch score${hipWeight() > 1 ? `, every punch under 100 counted ${fN(hipWeight())}×` : ''}`
-                          + `${hipLow() ? `, then ${fN(hipLow().off)} off (once, not below 0) when any punch scored under ${fN(hipLow().below)}` : ''}`
+            round: {label: 'per round', rule: `the mean punch score${rotWeight(n) > 1 ? `, every punch under 100 counted ${fN(rotWeight(n))}×` : ''}`
+                          + `${rotLow(n) ? `, then ${fN(rotLow(n).off)} off (once, not below 0) when any punch scored under ${fN(rotLow(n).below)}` : ''}`
                           + ` — a plain number, no bands; fewer than ${nj} judged punches: not rated`}};
   const over = T(n, 'move.score.over.points_off'), at = T(n, 'move.score.over.max_at_x_upper');
   const top = `100 → ${fN(100 - over)} (linear to ${fN(at)} × upper)`;
@@ -779,9 +785,9 @@ const pivotZeroTxt = () => say(T(33, 'move.score.zero'), [[0, 'level with the fo
 const hookZeroTxt = () => say(T(32, 'move.score.zero'), [[1 / 3, 'a third of a torso']], v => `${fD(v, 2)} torso`);
 // rule 1, in ankle distances: the hip centre's zero line is "over an ankle" while it is half the ankle distance
 const overAnkle = (txt) => say(T(1, 'move.hips.zero'), [[0.5, txt]], () => '');
-// rules 19 / 20: the per-hand-and-type ranges in the file's order, "lead jab 0–25°, …, rear body shot 25–50°"
+// rules 19 / 20: the per-hand-and-type minimums (an older snapshot's ranges) in the file's order, "lead jab ≥ 0°, …"
 const ivList = n => Object.entries(T(n, 'move.score.full'))
-  .map(([k, a]) => `${k.replace('hook_or_uppercut', 'body shot')} ${n === 19 && hipMinOnly() ? fMin(a) : fIv(a)}°`).join(', ');
+  .map(([k, a]) => `${k.replace('hook_or_uppercut', 'body shot')} ${minOnly(n) ? fMin(a) : fIv(a)}°`).join(', ');
 const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[0,11],[0,12],
                [27,29],[29,31],[27,31],[28,30],[30,32],[28,32]];   // each foot: ankle - heel - toe tip
 const STAGES = {
@@ -1337,9 +1343,78 @@ function bladeLayer(kind) {
 // rules 19 / 20: a punch with no score - in the excluded time the rotation is still measured, only the judgement goes
 const rotSkip = r => !r ? 'no rotation (not run)' : r.status === 'excluded'
   ? `not judged: in the video’s excluded time · start → impact ${r.si == null ? '–' : r.si.toFixed(1) + '°'}` : `no rotation (${r.status})`;
-// Hip rotation + buffer: the first frame of a punch's buffer, move.start_buffer.s before its start (the backend's
+// rules 19 / 20: the first frame of a punch's buffer, move.start_buffer.s before its detected start (the backend's
 // max(0, start - round(s x fps))); null when the video's thresholds copy has no buffer
-const bufFirst = e => THR(() => { const b = T(19, 'move.start_buffer.s'); return b == null ? null : Math.max(0, e.sf - Math.round(b * S.fps)); }, null);
+const bufFirst = (e, n = 19) => THR(() => { const b = T(n, 'move.start_buffer.s'); return b == null ? null : Math.max(0, e.sf - Math.round(b * S.fps)); }, null);
+const rotIv = r => r.bsi[1] == null ? `≥ ${r.bsi[0] == null ? '–' : fN(r.bsi[0])}°` : iqr(r.bsi);   // a minimum, or an older snapshot's range
+// where a punch's reading starts, for its card and tooltip: its best start, how far before the detected one, and what
+// the detected start alone reads
+const startRows = (e, r, n) => r.sfb == null ? '' :
+  `<span>Read from</span><b>f ${r.sfb}: ${e.sf > r.sfb ? `${e.sf - r.sfb} f before the detected start f ${e.sf}` : 'the detected start'}${bufFirst(e, n) == null ? '' : ` (the best of f ${bufFirst(e, n)}–${e.sf})`}</b>
+   <span>From the detected start alone</span><b>${r.det == null ? '–' : r.det.toFixed(1) + '°'}</b>`;
+const startNote = (e, r) => r.sfb == null || r.sfb >= e.sf ? ' · read from the detected start'
+  : ` · read from f ${r.sfb}, ${e.sf - r.sfb} f before the detected start (that start alone reads ${r.det == null ? '–' : r.det.toFixed(1) + '°'})`;
+// rules 19 / 20's round on the Explanations tab, from <part>_rotation.json
+const rotCalc = s => (s.n_too_much != null
+  ? `mean of ${s.n_judged} punch scores · ${s.n_good} inside · ${s.n_too_little} below · ${s.n_too_much} above`
+  : s.thresholds?.weight_below_full > 1
+    ? `mean of ${s.n_judged} punch scores, the ${s.n_too_little} below 100 counted ${fN(s.thresholds.weight_below_full)}× · ${s.n_good} at or above the minimum`
+      + (s.thresholds.low_punch && s.n_low != null ? ` · ${s.n_low ? `−${fN(s.thresholds.low_punch.points_off)}: ${s.n_low} ${s.n_low === 1 ? 'punch' : 'punches'} under ${fN(s.thresholds.low_punch.below)}` : `none under ${fN(s.thresholds.low_punch.below)}, nothing off`}` : '')
+    : `mean of ${s.n_judged} punch scores · ${s.n_good} at or above the minimum · ${s.n_too_little} below`)
+  + (s.best_start_frames_before && s.thresholds?.start_buffer_s != null
+     ? ` · each punch read from its best start in the ${fN(s.thresholds.start_buffer_s)} s before the detected one (that many frames before: `
+       + `${Object.entries(s.best_start_frames_before).filter(([, c]) => c).map(([k, c]) => `${k} ×${c}`).join(', ')})` : '');
+// Rules 19 / 20 (backend rotation_rule.py, one implementation since 2026-10-28, so one layer builder here): the turn of
+// the hip / shoulder line from each punch's best start - the frame in move.start_buffer.s (0.2 s) before the detected
+// start with the most turn to the impact (best_start_frame) - to the impact, against a minimum per hand and type. The row
+// runs from the best start (the stretch before the detected start lighter, the whole buffer searched outlined); the
+// animation is drawn per frame from the best start to the punch's end: the joint line on the body (dashed until the
+// detected start) and the turn dial (turnDial).
+function rotLayer(key, n, part, jl, jr) {
+  const name = RN(n);
+  return {
+    key, label: name, short: name,
+    csv: [`${part}_rotation`, `${part}_rotation.csv`],
+    parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), det: num(r.rot_detected_start_impact),
+      sfb: num(r.best_start_frame), ie: num(r.rot_impact_end), vsi: r.verdict_start_impact, vie: r.verdict_impact_end,
+      qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)], bsi: [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)],
+      facing: num(r.facing_at_impact), score: num(r.score)}),
+    card: (e, r) => `<div class="sub"><div class="h">${name} ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">${rotSkip(r)}</div>` :
+      `<div class="rows num" style="margin-top:0"><span>Turned to the impact</span><b>${r.si.toFixed(1)}°</b>
+       <span>${r.bsi[1] == null ? 'Needs' : 'Good range'}</span><b>${rotIv(r)}</b>
+       <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}</b>
+       ${startRows(e, r, n)}
+       <span>Study IQR, for reference</span><b>${iqr(r.qsi)}</b></div>`) + '</div>',
+    tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">${rotSkip(r)}</span>` :
+      head + `<span class="num">the ${part}s turned <b>${r.si.toFixed(1)}°</b> to the impact ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
+      `<span class="num">a ${e.hand} ${styleP(e.type).name.toLowerCase()} needs <b>${rotIv(r)}</b>${startNote(e, r)}</span><br>` +
+      `<span class="m">100 at or above the minimum; below it linear from 0° (0) to the minimum (100); no cost for turning more · the study's IQR ${iqr(r.qsi)}</span>`,
+    row(e, r, {c, y, h, span, tag, ring, tx, fps}) {        // from the best start to the punch's end
+      if (r.status !== 'ok') return;
+      const s0 = r.sfb ?? e.sf, [x1, w1] = span(e), x = tx(s0 / fps), w = x1 + w1 - x, b0 = bufFirst(e, n);
+      if (b0 != null && b0 < e.sf) {                          // the whole buffer searched: a dashed outline
+        const xb = tx(b0 / fps);
+        c.save(); c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1; c.setLineDash([3, 2]);
+        rr(xb + 0.5, y + 3.5, Math.max(1, x1 - xb), h - 7, 5); c.stroke(); c.restore();
+      }
+      c.fillStyle = r.vsi === 'good' ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
+      if (x < x1) { c.fillStyle = 'rgba(255,255,255,0.35)'; rr(x, y + 3, x1 - x, h - 6, 5); c.fill(); }   // best start → detected start, lighter
+      tag(x, w, y, h, r.score == null ? `${r.si.toFixed(0)}°` : r.score.toFixed(1));
+      ring(e, key, x, y, w, h);
+    },
+    frameOverlay(f, P, leadLeft) {                          // per frame, so it shows from the best start, before the detected one
+      for (const e of S.punches) {
+        const r = e[key];
+        if (!r || r.status !== 'ok' || hid(e) || f < (r.sfb ?? e.sf) || f > e.ef) continue;
+        const l = P(jl), rt = P(jr); if (!(l && rt)) continue;
+        const col = r.vsi === 'good' ? '#34c759' : '#ff3b30';
+        OV.line(l, rt, col, 5, f < e.sf ? [6, 5] : null);  // the line on the body: dashed until the detected start
+        turnDial(e, r, leadLeft, jl, jr, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + (part === 'hip' ? 70 : -40)], col,
+                 {live: f, title: name, slot: key});
+      }
+    },
+  };
+}
 const RULE_LAYERS = [
   comboLayer('offensive', 'Offensive combos', 'Offensive combos', 'punches only'),
   comboLayer('combined', 'Combined combos', 'Combined combos', 'punches + defensive moves'),
@@ -2339,121 +2414,8 @@ const RULE_LAYERS = [
         : peak && a.score != null ? ` · ${a.readAt === 'middle' ? 'middle frame' : 'straightest frame'} → ${a.score.toFixed(1)} (full at ${a.full}°)` : ''), col);
     },
   },
-  {
-    key: 'shoulder', label: RN(20), short: RN(20),
-    csv: ['shoulder_rotation', 'shoulder_rotation.csv'],
-    parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
-      vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
-      bsi: [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)],
-      qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact), score: num(r.score)}),
-    card: (e, r) => `<div class="sub"><div class="h">${RN(20)} ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">${rotSkip(r)}</div>` :
-      `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
-       <span>Good range</span><b>${iqr(r.bsi)}</b>
-       <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}${r.vsi === 'bad_high' ? ` ${THR(() => `(above the range: up to ${fN(T(20, 'move.score.over.points_off'))} off, all ${fN(T(20, 'move.score.over.points_off'))} at ${overAt(20)})`)}` : ''}</b>
-       <span>Study IQR, for reference</span><b>${iqr(r.qsi)}</b></div>`) + '</div>',
-    tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">${rotSkip(r)}</span>` :
-      head + `<span class="num">shoulder rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
-      `<span class="num">good range for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${iqr(r.bsi)}</b></span>` +
-      iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi) +
-      `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); ${THR(() => `above it up to ${fN(T(20, 'move.score.over.points_off'))} off, all ${fN(T(20, 'move.score.over.points_off'))} at ${overAt(20)}`)} · `
-      + `dark: the study's IQR ${iqr(r.qsi)}</span>`,
-    row(e, r, {c, y, h, span, tag, ring}) {                // the start → impact verdict
-      if (r.status !== 'ok') return;
-      const [x, w] = span(e);
-      c.fillStyle = r.vsi === 'good' ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
-      tag(x, w, y, h, r.score == null ? `${r.si.toFixed(0)}°` : r.score.toFixed(1));
-      ring(e, 'shoulder', x, y, w, h);
-    },
-    overlay(e, r, f, P, leadLeft) {                        // the shoulder line, colored by the start → impact verdict
-      if (r.status !== 'ok') return;
-      const l = P(11), rt = P(12); if (!(l && rt)) return;
-      const col = r.vsi === 'good' ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
-      octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
-      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `shoulders start → impact ${r.si.toFixed(1)}° (range ${iqr(r.bsi)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
-      rotationTopView(e, r, leadLeft, 11, 12, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 70], col);
-    },
-  },
-  {
-    key: 'hip', label: RN(19), short: RN(19),
-    csv: ['hip_rotation', 'hip_rotation.csv'],
-    parse: (r, num) => ({status: r.status, si: num(r.rot_start_impact), ie: num(r.rot_impact_end),
-      vsi: r.verdict_start_impact, vie: r.verdict_impact_end, qsi: [num(r.ref_start_impact_q25), num(r.ref_start_impact_q75)],
-      bsi: [num(r.ref_start_impact_lo), num(r.ref_start_impact_hi)],
-      qie: [num(r.ref_impact_end_q25), num(r.ref_impact_end_q75)], facing: num(r.facing_at_impact), score: num(r.score)}),
-    card: (e, r) => `<div class="sub"><div class="h">${RN(19)} ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">${rotSkip(r)}</div>` :
-      `<div class="rows num" style="margin-top:0"><span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
-       <span>${r.bsi[1] == null ? 'Minimum' : 'Good range'}</span><b>${hipIv(r)}</b>
-       <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}${r.vsi === 'bad_high' ? ` ${THR(() => `(above the range: up to ${fN(T(19, 'move.score.over.points_off'))} off, all ${fN(T(19, 'move.score.over.points_off'))} at ${overAt(19)})`)}` : ''}</b>
-       <span>Study IQR, for reference</span><b>${iqr(r.qsi)}</b></div>`) + '</div>',
-    tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">${rotSkip(r)}</span>` :
-      head + `<span class="num">hip rotation start → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
-      `<span class="num">${r.bsi[1] == null ? 'minimum' : 'good range'} for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: <b>${hipIv(r)}</b></span>` +
-      (r.bsi[1] == null ? '<br>' : iqrBar(r.si, r.qsi, VERD[r.vsi], r.bsi)) +
-      (r.bsi[1] == null ? `<span class="m">100 at or above the minimum; below it linear from 0° (0) to the minimum (100); no cost for turning more · the study's IQR ${iqr(r.qsi)}</span>`
-        : `<span class="m">100 inside the range; below it linear from 0° (0) to the lower bound (100); ${THR(() => `above it up to ${fN(T(19, 'move.score.over.points_off'))} off, all ${fN(T(19, 'move.score.over.points_off'))} at ${overAt(19)}`)} · `
-          + `dark: the study's IQR ${iqr(r.qsi)}</span>`),
-    row(e, r, {c, y, h, span, tag, ring}) {                // the start → impact verdict
-      if (r.status !== 'ok') return;
-      const [x, w] = span(e);
-      c.fillStyle = r.vsi === 'good' ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
-      tag(x, w, y, h, r.score == null ? `${r.si.toFixed(0)}°` : r.score.toFixed(1));
-      ring(e, 'hip', x, y, w, h);
-    },
-    overlay(e, r, f, P, leadLeft) {                        // the hip line, colored by the start → impact verdict
-      if (r.status !== 'ok') return;
-      const l = P(23), rt = P(24); if (!(l && rt)) return;
-      const col = r.vsi === 'good' ? '#34c759' : '#ff3b30'; octx.strokeStyle = col; octx.lineWidth = 6; octx.lineCap = 'round';
-      octx.beginPath(); octx.moveTo(...l); octx.lineTo(...rt); octx.stroke();
-      overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2, `Hip rotation ${r.si.toFixed(1)}° (${r.bsi[1] == null ? 'min' : 'range'} ${hipIv(r)}) → ${r.score == null ? '–' : r.score.toFixed(1)}`, col);
-      rotationTopView(e, r, leadLeft, 23, 24, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 70], col, {live: f, title: 'Hip rotation', slot: 'hip'});
-    },
-  },
-  {
-    // 'Hip rotation + buffer' (backend run_hip_rotation.py, since 2026-10-27, the user's call; not a rule of its own):
-    // rule 19's reading again from each punch's best start - of the frames from move.start_buffer.s (0.2 s) before its
-    // start to the start itself, the one with the most turn to the impact (buffer_start_frame) - on the videos the
-    // backend ran it for (move.start_buffer.videos); its own row, card and animation, drawn from the best start
-    key: 'hipBuf', label: 'Hip rotation + buffer', short: 'Hip rotation + buffer', only: true,
-    csv: ['hip_rotation', 'hip_rotation.csv'],
-    parse: (r, num) => !r.status_buffer ? null : ({status: r.status_buffer, sfb: num(r.buffer_start_frame), si: num(r.rot_buffer_impact),
-      vsi: r.verdict_buffer_impact, score: num(r.score_buffer), lo: num(r.ref_start_impact_lo), facing: num(r.facing_at_impact),
-      base: {si: num(r.rot_start_impact), score: num(r.score), status: r.status}}),
-    card: (e, r) => `<div class="sub"><div class="h">Hip rotation + buffer ${r?.status === 'ok' ? pillV(r.vsi) : ''}</div>` + (!r || r.status !== 'ok' ? `<div class="empty">${rotSkip(r)}</div>` :
-      `<div class="rows num" style="margin-top:0"><span>Best start</span><b>f ${r.sfb} (${e.sf > r.sfb ? `${e.sf - r.sfb} f before the punch’s f ${e.sf}` : 'the punch’s own start'}${bufFirst(e) == null ? '' : `; searched f ${bufFirst(e)}–${e.sf}`})</b>
-       <span>Start → impact</span><b>${r.si.toFixed(1)}°</b>
-       <span>Minimum</span><b>${r.lo == null ? '–' : `≥ ${fN(r.lo)}°`}</b>
-       <span>Score</span><b>${r.score == null ? '–' : r.score.toFixed(1) + ' / 100'}</b>
-       <span>${RN(19)}, from f ${e.sf}</span><b>${r.base.si == null ? '–' : r.base.si.toFixed(1) + '°'} → ${r.base.score == null ? '–' : r.base.score.toFixed(1)}</b></div>`) + '</div>',
-    tip: (e, r, {head, v}) => r.status !== 'ok' ? head + `<span class="m">${rotSkip(r)}</span>` :
-      head + `<span class="num">hip rotation + buffer: best start f ${r.sfb} (${e.sf > r.sfb ? `${e.sf - r.sfb} f before the punch` : 'its own start'}) → impact <b>${r.si.toFixed(1)}°</b> ${v(r.vsi)} · score <b>${r.score == null ? '–' : r.score.toFixed(1)}</b></span><br>` +
-      `<span class="num">${RN(19)} from the punch’s own start f ${e.sf}: <b>${r.base.si == null ? '–' : r.base.si.toFixed(1) + '°'}</b> · score <b>${r.base.score == null ? '–' : r.base.score.toFixed(1)}</b></span><br>` +
-      `<span class="m">minimum for a ${e.hand} ${styleP(e.type).name.toLowerCase()}: ${r.lo == null ? '–' : `≥ ${fN(r.lo)}°`} · the best start = the frame in the ${THR(() => fN(T(19, 'move.start_buffer.s')))} s before the punch (its own start included) with the most turn to the impact; the block starts there, the dashed outline is the whole buffer searched · a test on this video, not a rule</span>`,
-    row(e, r, {c, y, h, span, tag, ring, tx, fps}) {        // from the best start to the punch's end
-      if (r.status !== 'ok') return;
-      const [x1, w1] = span(e), x = tx(r.sfb / fps), w = x1 + w1 - x, b0 = bufFirst(e);
-      if (b0 != null && b0 < e.sf) {                          // the whole buffer searched: a dashed outline
-        const xb = tx(b0 / fps);
-        c.save(); c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1; c.setLineDash([3, 2]);
-        rr(xb + 0.5, y + 3.5, Math.max(1, x1 - xb), h - 7, 5); c.stroke(); c.restore();
-      }
-      c.fillStyle = r.vsi === 'good' ? '#34c759' : '#ff3b30'; rr(x, y + 3, w, h - 6, 5); c.fill();
-      c.fillStyle = 'rgba(255,255,255,0.35)'; rr(x, y + 3, Math.max(1, x1 - x), h - 6, 5); c.fill();   // best start → the punch's start, lighter
-      tag(x, w, y, h, r.score == null ? `${r.si.toFixed(0)}°` : r.score.toFixed(1));
-      ring(e, 'hipBuf', x, y, w, h);
-    },
-    // drawn per frame (not per punch under the playhead), so it shows from the earlier start, before the punch begins
-    frameOverlay(f, P, leadLeft) {
-      for (const e of S.punches) {
-        const r = e.hipBuf;
-        if (!r || r.status !== 'ok' || hid(e) || f < r.sfb || f > e.ef) continue;
-        const l = P(23), rt = P(24); if (!(l && rt)) continue;
-        const col = r.vsi === 'good' ? '#34c759' : '#ff3b30';
-        OV.line(l, rt, col, 4, f < e.sf ? [6, 5] : null);  // dashed while inside the buffer, before the punch's own start
-        overlayLabel(Math.max(l[0], rt[0]) + 12, (l[1] + rt[1]) / 2 + 26, `+ buffer ${r.si.toFixed(1)}° → ${r.score == null ? '–' : r.score.toFixed(1)} · best start ${e.sf > r.sfb ? `${e.sf - r.sfb} f before the ${styleP(e.type).name.toLowerCase()}` : `= the ${styleP(e.type).name.toLowerCase()}’s own start`}`, col);
-        rotationTopView(e, r, leadLeft, 23, 24, [Math.max(l[0], rt[0]) + 70, (l[1] + rt[1]) / 2 + 170], col, {start: r.sfb, live: f, title: `Hip rotation + buffer, best start ${e.sf > r.sfb ? `−${e.sf - r.sfb} f` : '= own start'}`, slot: 'buf'});
-      }
-    },
-  },
+  rotLayer('shoulder', 20, 'shoulder', 11, 12),
+  rotLayer('hip', 19, 'hip', 23, 24),
   {
     key: 'hit', label: RN(22), short: 'Target height',
     csv: ['hit_height', 'hit_height.csv'], json: ['hit_height', 'hit_height.json'],
@@ -2880,7 +2842,7 @@ const LAYER_RULES = {
   bal: [1], drop: [2], defcov: [3], guard: [4], resting: [6], chin_depth: [7], chin_height: [8], elbow: [9], anglechg: [13],
   varpunch: [27], vardef: [29], fade: [26], bodyshot: [28], handbal: [5],
   hoc: [10], stance_depth: [11], stance_width: [12], slip14: [14], slip15: [15], hrp: [16], blade_hips: [17], blade_shoulders: [18],
-  hip: [19], hipBuf: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
+  hip: [19], shoulder: [20], arm: [21], hit: [22], speed: [23], offensive: [24, 30], combined: [31], hookstop: [32],
   rpivot: [33], work: [25], stchg: [34], chinimp: [35], updrop: [36], longcombo: [37], solo: [38], flat: [39], samespot: [40], bite: [41], knee: [42], formfade: [43], sameheight: [44], heavy: [45],
 };
 // The one order every layer list uses — the Timeline layers card, the timeline rows and the punch card's sections:
@@ -3642,9 +3604,8 @@ const SCOPE = {
   updrop:    {get moves() { return `every head uppercut, ${THR(() => fN(T(36, 'move.window_before_s')))} s before it → impact`; }},
   speed:     {moves: 'every punch with an impact frame'},
   arm:       {moves: 'jab, cross'},
-  hip:       {moves: 'every punch'},
-  hipBuf:    {get moves() { return `every punch, read from its best start in the ${THR(() => fN(T(19, 'move.start_buffer.s')))} s before it: the frame there (its own start included) with the most turn to the impact (a test on this video, not a rule)`; }},
-  shoulder:  {moves: 'every punch'},
+  hip:       {get moves() { return rotBuf(19) == null ? 'every punch' : `every punch, each read from its best start in the ${fN(rotBuf(19))} s before the detected start`; }},
+  shoulder:  {get moves() { return rotBuf(20) == null ? 'every punch' : `every punch, each read from its best start in the ${fN(rotBuf(20))} s before the detected start`; }},
   hit:       {moves: 'every punch'},
   hoc:       {moves: 'every punch'},
   elbow:     {moves: 'every frame except that arm’s hooks and body shots'},
@@ -3819,16 +3780,7 @@ function ruleCard() {
     what: 'does the hip line turn into the punch, or does he arm-punch?',
     on: `${hp.n_punches} punches · ${hp.n_judged} judged from start to impact, ${hp.n_punches - hp.n_judged} skipped (in excluded time, no impact frame or no readable hip line)`,
     th: THR(() => rotTh(19, 'hip', NJ(19)), thMiss),
-    calc: (hp.n_too_much == null ? (hp.thresholds?.weight_below_full > 1
-                                    ? `mean of ${hp.n_judged} punch scores, the ${hp.n_too_little} below 100 counted ${fN(hp.thresholds.weight_below_full)}× · ${hp.n_good} at or above the minimum`
-                                      + (hp.thresholds.low_punch && hp.n_low != null ? ` · ${hp.n_low ? `−${fN(hp.thresholds.low_punch.points_off)}: ${hp.n_low} ${hp.n_low === 1 ? 'punch' : 'punches'} under ${fN(hp.thresholds.low_punch.below)}` : `none under ${fN(hp.thresholds.low_punch.below)}, nothing off`}` : '')
-                                    : `mean of ${hp.n_judged} punch scores · ${hp.n_good} at or above the minimum · ${hp.n_too_little} below`)
-                                  : `mean of ${hp.n_judged} punch scores · ${hp.n_good} inside · ${hp.n_too_little} below · ${hp.n_too_much} above`)
-      + (hp.buffer ? ` · Hip rotation + buffer (each punch from its best start in the ${fN(hp.buffer.s)} s = ${hp.buffer.frames} frames before it, `
-                     + `a test on this video, not a rule): ${hp.buffer.score ?? 'not rated'} (${hp.buffer.n_judged} judged, ${hp.buffer.n_good} at or above the minimum`
-                     + `${hp.buffer.mean_punch_score != null && hp.buffer.score == null ? `, mean ${hp.buffer.mean_punch_score}` : ''}`
-                     + `${hp.buffer.best_start_frames_before ? `; the best start k frames before the punch: ${Object.entries(hp.buffer.best_start_frames_before)
-                         .filter(([, n]) => n).map(([k, n]) => `${k} ×${n}`).join(', ')}` : ''})` : '')});
+    calc: rotCalc(hp)});
   if (bs) add(RN(28), bs.score ?? 'not rated', bs.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'does he go downstairs, or hunt the head only?',
     on: `${bs.n_hooks_uppercuts} hooks and uppercuts · all judged · the ${bs.n_jab_cross_not_counted} jabs and crosses are left out (the model cannot tell a head jab from a body jab)${exNote(bs.n_excluded, 'punches')}`,
@@ -3899,7 +3851,7 @@ function ruleCard() {
     on: `${shr.n_punches} punches · ${shr.n_judged} judged from start to impact, ${shr.n_punches - shr.n_judged} `
         + `skipped (in excluded time, no impact frame or no readable shoulder line)`,
     th: THR(() => rotTh(20, 'shoulder', NJ(20)), thMiss),
-    calc: `mean of ${shr.n_judged} punch scores · ${shr.n_good} inside · ${shr.n_too_little} below · ${shr.n_too_much} above`});
+    calc: rotCalc(shr)});
   const hd = S.handDrop;
   if (hd) add(RN(2), hd.score ?? 'not rated', hd.score == null ? '#8e8e93' : 'var(--text)', {
     what: 'is the punching wrist up at guard just before the punch?',
@@ -4844,7 +4796,6 @@ $('frameCard').addEventListener('click', e => {           // the switch: re-draw
   if (S.skel) frameCard($('frameCard'), frameNow());
 });
 const iqr = q => q.map(x => x == null ? '–' : x.toFixed(1)).join('–') + '°';
-const hipIv = r => r.bsi[1] == null ? `≥ ${r.bsi[0] == null ? '–' : r.bsi[0].toFixed(1)}°` : iqr(r.bsi);   // rule 19: a minimum (since 2026-10-27) or a range
 // a small scale 0°..max: the IQR as a shaded band, this punch's value as a marker in its verdict color
 function iqrBar(val, q, col, good) {
   const max = Math.max(60, Math.ceil(Math.max(val, (good || q)[1] ?? 0) / 15) * 15 + 15), pct = x => `${Math.min(100, x / max * 100)}%`;
@@ -4979,54 +4930,85 @@ function drawFrameOverlays(f, P) {
   }
   if (miss) overlayThMissing();
 }
-// Hip / shoulder rotation as the rule measures it: seen from above (world x = channel 3, z = channel 5; 0° = toward
-// the camera, drawn down; +90° = the camera's right), the direction other joint → punching joint at the start and at
-// impact, against the facing angle at impact. The rule's number is |angle(facing, impact) - angle(facing, start)|, so
-// the label prints both angles rather than the arc between the rays — the rays can sit on either side of the facing.
-// Checked 2026-10-02: reproduces the CSV's rot_start_impact to 0.11 deg on 945 punches per rule.
-// The rotation dials of the two hip rotation layers stack in the black bar beside a portrait video, from the bottom
-// up, two per punch - rule 19's, and the buffer's right above it - in the order the punches start; a video that fills
-// the stage keeps them next to the hips.
+// The rotation dials of rules 19 / 20 stack in the black bar beside a portrait video, from the bottom up, one per rule
+// and punch (shoulders, then hips) in the order the punches start; a video that fills the stage keeps them next to the
+// body.
+const ROT_DIALS = ['shoulder', 'hip'];
 function dialSpot(fallback, e, kind, f) {
-  const Rv = videoRect(), r = 26;
+  const Rv = videoRect(), r = 26, gap = 72;
   if (Rv.x < 190) return {c: fallback, r: 34, side: false};
+  const on = ROT_DIALS.filter(k => layerOn(k));
   // the punches with a dial now: those under the playhead first, the latest-started on top of the pile's priority
-  // (the one being watched), then those still in their buffer
-  const act = S.punches.filter(p => !hid(p) && ((layerOn('hip') && p.hip?.status === 'ok' && f >= p.sf && f <= p.ef)
-    || (layerOn('hipBuf') && p.hipBuf?.status === 'ok' && f >= p.hipBuf.sfb && f <= p.ef)))
+  // (the one being watched), then those still before their detected start
+  const act = S.punches.filter(p => !hid(p) && on.some(k => p[k]?.status === 'ok' && f >= (p[k].sfb ?? p.sf) && f <= p.ef))
     .sort((a, b) => (f < a.sf) - (f < b.sf) || b.sf - a.sf);
-  const k = Math.max(0, act.indexOf(e)) * 2 + (kind === 'buf' ? 1 : 0);
+  const k = Math.max(0, act.indexOf(e)) * on.length + Math.max(0, on.indexOf(kind));
   const top = 20 + ($('hud')?.offsetHeight || 0) + r, base = Rv.H - 86 - r;   // under the HUD's pills, above the control bar
-  const leftCap = base < top ? 0 : Math.floor((base - top) / 62) + 1;
-  if (k < leftCap) return {c: [16 + r, base - k * 62], r, side: true};
-  const rx = Rv.x + Rv.w + 16 + r, ry = 50 + r + (k - leftCap) * 62;   // the left bar full: on in the right bar, from the top
+  const leftCap = base < top ? 0 : Math.floor((base - top) / gap) + 1;
+  if (k < leftCap) return {c: [16 + r, base - k * gap], r, side: true};
+  const rx = Rv.x + Rv.w + 16 + r, ry = 50 + r + (k - leftCap) * gap;   // the left bar full: on in the right bar, from the top
   if (Rv.W - (Rv.x + Rv.w) >= 240 && ry <= base) return {c: [rx, ry], r, side: true};
   return null;                                                // no room left: this dial is not drawn
 }
-function rotationTopView(e, r, leadLeft, jl, jr, c, col, o = {}) {   // o: {start: the start frame (default the punch's), live: the frame on screen, title, slot}
+// The turn dial of rules 19 / 20: the hips' or shoulders' turn seen from above, as the rules measure it (world x =
+// channel 3, z = channel 5; 0° = toward the camera, drawn down; +90° = the camera's right).
+//   grey arrow     where the boxer faces at the impact (the facing model)
+//   white dashes   the joint line at the punch's best start
+//   thin white arc the turn the punch needs (its minimum), from the start line on, ending in a tick
+//   wedge          the turn so far: yellow while it grows with the video, from the best start to the impact, then in
+//                  the verdict's colour - it reaches the tick = full score (green), short of it = red
+//   coloured ray   the joint line at the impact; the yellow ray: the line on the frame on screen
+// The rule's number is |angle(facing, impact) - angle(facing, start)| (the CSV's rot_start_impact), and the wedge is drawn
+// that wide from the start line toward the impact line - the angle between the two lines unless the line crosses the
+// facing. Beside it: the punch and the rule, then what turned of what it needs and the score. The angles reproduce the
+// CSV's rotations to 0.11 deg on 945 punches per rule (checked 2026-10-02).
+function turnDial(e, r, leadLeft, jl, jr, c, col, o = {}) {
   if (e.impact == null || r.facing == null || !S.skel) return;
   const F = S.mirrored ? -r.facing : r.facing;             // a mirrored run's facing, back on the real skeleton
   const C = S.skelC, n = S.skel.length / (33 * C), Wc = (fr, j, ch) => S.skel[(fr * 33 + j) * C + ch];
-  const s0 = o.start ?? e.sf;
+  const s0 = r.sfb ?? e.sf;
   if (!(s0 >= 0 && s0 < n && e.impact >= 0 && e.impact < n)) return;
   const own = (e.hand === 'lead') === leadLeft ? jl : jr, oth = own === jl ? jr : jl;
   const dir = fr => Math.atan2(Wc(fr, own, 3) - Wc(fr, oth, 3), -(Wc(fr, own, 5) - Wc(fr, oth, 5))) * 180 / Math.PI;
+  const wrap = d => ((d + 180) % 360 + 360) % 360 - 180, ang = d => Math.abs(wrap(F - d));   // ang: the rule's angle, 0-180
   const ds = dir(s0), di = dir(e.impact); if (!(Number.isFinite(ds) && Number.isFinite(di))) return;
   const spot = o.slot ? dialSpot(c, e, o.slot, o.live) : {c, r: 34, side: false};
   if (!spot) return;
   c = spot.c;
-  const wrap = d => ((d + 180) % 360 + 360) % 360 - 180, R = spot.r, rad = Math.PI / 180;
-  const ray = (deg, cc, w, dash) => OV.line(c, [c[0] + R * Math.sin(deg * rad), c[1] + R * Math.cos(deg * rad)], cc, w, dash);
-  octx.save(); octx.fillStyle = 'rgba(0,0,0,0.45)'; octx.beginPath(); octx.arc(c[0], c[1], R + 6, 0, 7); octx.fill(); octx.restore();
-  ray(F, '#8e8e93', 2); ray(ds, '#ffffff', 2, [3, 3]); ray(di, col, 3);
-  const dl = o.live != null && o.live >= 0 && o.live < n ? dir(o.live) : NaN;   // the hip line now, as the video plays
-  if (Number.isFinite(dl)) ray(dl, '#ffd60a', 2);
-  const reading = `f ${s0} ${Math.abs(wrap(F - ds)).toFixed(1)}° → impact f ${e.impact} ${Math.abs(wrap(F - di)).toFixed(1)}°`
-    + (Number.isFinite(dl) ? ` · now ${Math.abs(wrap(F - dl)).toFixed(1)}°` : '');
-  if (spot.side) {                                         // in the side bar: the title, then the reading under it
-    overlayLabel(c[0] + R + 10, c[1] - 12, LABEL_TAG ? o.title || '' : `${cap(e.hand)} ${styleP(e.type).name.toLowerCase()} · ${o.title || ''}`, col);
-    const tag = LABEL_TAG; LABEL_TAG = ''; overlayLabel(c[0] + R + 10, c[1] + 12, reading, col); LABEL_TAG = tag;   // the title already names the punch
-  } else overlayLabel(c[0] + R + 10, c[1], `${o.title ? o.title + ' · ' : ''}from above, vs facing: start ${reading}${Number.isFinite(dl) ? ' (yellow)' : ''}`, col);
+  const R = spot.r, rad = Math.PI / 180, sgn = wrap(di - ds) < 0 ? -1 : 1;
+  const at = (deg, rr = R) => [c[0] + rr * Math.sin(deg * rad), c[1] + rr * Math.cos(deg * rad)];
+  const ca = deg => (90 - deg) * rad;                      // a dial angle on the canvas's arc() scale
+  const total = r.si ?? Math.abs(ang(di) - ang(ds));
+  const live = o.live != null && o.live >= 0 && o.live < n ? o.live : null, dl = live == null ? NaN : dir(live);
+  const growing = live != null && live < e.impact && Number.isFinite(dl);
+  const sofar = growing ? Math.min(total, Math.abs(ang(dl) - ang(ds))) : total;
+  const need = r.bsi?.[0] ?? null;
+  octx.save();
+  octx.fillStyle = 'rgba(0,0,0,0.55)'; octx.beginPath(); octx.arc(c[0], c[1], R + 9, 0, 7); octx.fill();        // the disc
+  if (need != null && need > 0) {                          // the needed turn: a thin arc from the start line, and its tick
+    octx.strokeStyle = 'rgba(255,255,255,0.5)'; octx.lineWidth = 2;
+    octx.beginPath(); octx.arc(c[0], c[1], R + 4, ca(ds), ca(ds + sgn * need), sgn > 0); octx.stroke();
+  }
+  if (sofar > 0) {                                         // the wedge: the turn so far
+    octx.fillStyle = (growing ? '#ffd60a' : col) + '73';
+    octx.beginPath(); octx.moveTo(c[0], c[1]); octx.arc(c[0], c[1], R, ca(ds), ca(ds + sgn * sofar), sgn > 0); octx.closePath(); octx.fill();
+  }
+  octx.restore();
+  if (need != null && need > 0) OV.line(at(ds + sgn * need, R - 5), at(ds + sgn * need, R + 9), '#ffffff', 2);   // the tick
+  const tip = at(F, R + 7), base = at(F, R - 3), px = Math.cos(F * rad) * 4, py = -Math.sin(F * rad) * 4;    // the facing arrow
+  OV.line(c, base, '#8e8e93', 2);
+  octx.save(); octx.fillStyle = '#8e8e93'; octx.beginPath(); octx.moveTo(...tip);
+  octx.lineTo(base[0] + px, base[1] + py); octx.lineTo(base[0] - px, base[1] - py); octx.closePath(); octx.fill(); octx.restore();
+  OV.line(c, at(ds), '#ffffff', 2, [3, 3]);                // the line at the best start
+  OV.line(c, at(di), col, 3);                              // the line at the impact
+  if (live != null && live <= e.ef && Number.isFinite(dl)) OV.line(c, at(dl), '#ffd60a', 2);   // the line now
+  const reading = (growing ? `turning… ${sofar.toFixed(1)}°` : `turned ${total.toFixed(1)}°`)
+    + (need != null ? ` · needs ${fN(need)}°` : '') + (growing ? '' : ` → ${r.score == null ? '–' : r.score.toFixed(0)}`)
+    + (s0 < e.sf ? ` · read from ${e.sf - s0} f before the punch` : '');
+  if (spot.side) {                                         // in the side bar: the punch and the rule, then the reading
+    overlayLabel(c[0] + R + 14, c[1] - 12, `${cap(e.hand)} ${styleP(e.type).name.toLowerCase()} · ${o.title || ''}`, col);
+    overlayLabel(c[0] + R + 14, c[1] + 12, reading, col);
+  } else overlayLabel(c[0] + R + 14, c[1], `${o.title ? o.title + ': ' : ''}${reading}`, col);
 }
 // Shared bits of overlay grammar, so thirteen rules do not each invent their own.
 const OV = {
@@ -6223,13 +6205,15 @@ const explainRows = () => [   // [number, what it measures, judged on, scoring, 
   [18, 'The same as rule 17, for the shoulders.',
        'every frame outside punches', `zero at ${fN(T(18, 'move.score.zero'))}° or less, full marks from ${fN(T(18, 'move.score.full'))}° (a coach’s cut-offs)`,
        'The upper body can square up while the hips stay turned, or the reverse, so it is judged on its own.'],
-  [19, hipMinOnly() ? `How much the hip line turns from the start of a punch to impact, seen from above in the 3D skeleton, against a minimum for that punch (e.g. ${fMin(T(19, 'move.score.full.rear cross'))}° for a cross, ${fMin(T(19, 'move.score.full.lead hook'))}° for a lead hook). Only the net turn counts, in either direction.`
+  [19, hipMinOnly() ? `How much the hip line turns into a punch, seen from above in the 3D skeleton, against a minimum for that punch (e.g. ${fMin(T(19, 'move.score.full.rear cross'))}° for a cross, ${fMin(T(19, 'move.score.full.lead hook'))}° for a lead hook)${rotBuf(19) == null ? ', from its start to impact' : `, from its best start — the frame in the ${fN(rotBuf(19))} s before the detected start with the most turn — to impact`}. Only the net turn counts, in either direction.`
                      : `How much the hip line turns from the start of a punch to impact, seen from above in the 3D skeleton, against a normal range for that punch (e.g. ${fIv(T(19, 'move.score.full.rear cross'))}° for a cross, ${fIv(T(19, 'move.score.full.lead jab'))}° for a jab). Only the net turn counts, in either direction.`,
        'every punch', hipMinOnly() ? 'full marks at or above the minimum · too little falls to zero at no turn · turning more costs nothing'
                                    : `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(19, 'move.score.over.points_off'))}`,
        'Power comes from the hips; without the turn the punch is all arm.'],
-  [20, `The same as rule 19, for the shoulders, with their own ranges (e.g. ${fIv(T(20, 'move.score.full.rear cross'))}° for a cross). It isn’t compared with the hip line.`,
-       'every punch', `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(20, 'move.score.over.points_off'))}`,
+  [20, minOnly(20) ? `The same as rule 19 — the same reading, best start and scoring — for the shoulders, with their own minimums (e.g. ${fMin(T(20, 'move.score.full.rear cross'))}° for a cross). It isn’t compared with the hip line.`
+                   : `The same as rule 19, for the shoulders, with their own ranges (e.g. ${fIv(T(20, 'move.score.full.rear cross'))}° for a cross). It isn’t compared with the hip line.`,
+       'every punch', minOnly(20) ? 'full marks at or above the minimum · too little falls to zero at no turn · turning more costs nothing'
+                                  : `full marks inside the range · too little falls to zero at no turn · too much costs at most ${fN(T(20, 'move.score.over.points_off'))}`,
        'The shoulders’ turn carries the punch’s reach and weight; the arm alone is short and light.'],
   [21, `How straight the arm gets — the largest angle at the elbow over the punch (on the frames where the shoulder, elbow and wrist are visible) when that frame is within ${fD(T(21, 'move.max_from_middle_s'), 3)} s of the punch's middle frame; otherwise the angle at the middle frame.`,
        'jabs and crosses', `full marks at ${fN(T(21, 'move.score.full.near'))}° or straighter (${fN(T(21, 'move.score.full.far'))}° when the boxer is small in the picture), zero at ${fN(T(21, 'move.score.zero'))}° · very small: not judged`,
