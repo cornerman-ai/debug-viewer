@@ -1036,7 +1036,7 @@ function slipLayer(rule) {
       c.fillStyle = slipCol(x[sk]); c.globalAlpha = on ? 1 : 0.9;
       rr(x0, y + 3, w, h - 6, 5); c.fill(); c.globalAlpha = 1;
       const pkF = x.ty == null || x[sk + 'x'] <= x[sk + 'y'] ? x.peakX : x.peakY;    // the axis with fewer points
-      if (pkF != null) { const xi = tx((pkF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
+      if (pkF != null) { const xi = tx(pkF / fps); c.strokeStyle = '#fff'; c.lineWidth = 2;
         c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       tag(x0, w, y, h, x[sk] == null ? '' : `${x[sk].toFixed(0)}`);
     },
@@ -2405,7 +2405,7 @@ const RULE_LAYERS = [
       if (!judged) return;                                 // skipped punches are not drawn
       const [x, w] = span(e), col = VERD[a.verdict] || '#8e8e93';
       c.fillStyle = col; rr(x, y + 3, w, h - 6, 5); c.fill();
-      if (a.peakF != null) { const xi = tx((a.peakF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      if (a.peakF != null) { const xi = tx(a.peakF / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       if (a.score != null) tag(x, w, y, h, a.score.toFixed(1));
       ring(e, 'arm', x, y, w, h);
     },
@@ -2459,7 +2459,7 @@ const RULE_LAYERS = [
       if (!x.verdict || x.verdict === 'skip') return;      // skipped punches are not drawn
       const [bx, w] = span(e), col = VERD[x.verdict] || '#8e8e93';   // green on target (100), red off target (under 100)
       c.fillStyle = col; rr(bx, y + 3, w, h - 6, 5); c.fill();
-      if (x.land != null) { const xi = tx((x.land + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      if (x.land != null) { const xi = tx(x.land / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       const zn = w > 70 ? ZONE[x.zone]?.[1] || x.zone : ZONE[x.zone]?.[0] || '?';
       if (x.zone) tag(bx, w, y, h, x.score != null ? `${x.score.toFixed(1)} · ${zn}` : x.hf == null ? zn : `${x.hf.toFixed(2)} · ${zn}`);
       ring(e, 'hit', bx, y, w, h);
@@ -2579,7 +2579,7 @@ const RULE_LAYERS = [
       if (x.score == null) return;
       const [bx, w] = span(e);
       c.fillStyle = x.verdict === 'off' ? '#34c759' : '#ff3b30'; rr(bx, y + 3, w, h - 6, 5); c.fill();
-      if (x.usedF != null) { const xi = tx((x.usedF + 0.5) / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
+      if (x.usedF != null) { const xi = tx(x.usedF / fps); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(xi, y + 5); c.lineTo(xi, y + h - 5); c.stroke(); }
       tag(bx, w, y, h, x.score.toFixed(1));
       ring(e, 'hoc', bx, y, w, h);
     },
@@ -3554,7 +3554,7 @@ function drawProbs(c, k, W, text3) {
     if (x1 - x0 > 120) { c.fillStyle = text3; c.font = LANE_FONT(500, 9.5); c.textAlign = 'left'; c.fillText('frontal: the frontal detectors decide', x0 + 6, y + 10); }
   }
   c.beginPath(); c.moveTo(tx(f0 / fps), bot);                // some punch / move: a grey area
-  for (let f = f0; f <= f1; f += step) c.lineTo(tx((f + 0.5) / fps), ym(peak(P.act, f)));
+  for (let f = f0; f <= f1; f += step) c.lineTo(tx(f / fps), ym(peak(P.act, f)));
   c.lineTo(tx((f1 + 1) / fps), bot); c.closePath();
   c.fillStyle = 'rgba(142,142,147,0.22)'; c.fill();
   c.lineJoin = 'round';
@@ -3562,7 +3562,7 @@ function drawProbs(c, k, W, text3) {
     c.beginPath(); let on = false;
     for (let f = f0; f <= f1; f += step) {
       const p = peak(v, f); if (p < 0.02) { on = false; continue; }
-      const xx = tx((f + 0.5) / fps), yy = ym(p); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
+      const xx = tx(f / fps), yy = ym(p); on ? c.lineTo(xx, yy) : c.moveTo(xx, yy); on = true;
     }
     c.strokeStyle = col; c.lineWidth = 1.6; c.setLineDash(dash ? [4, 3] : []); c.stroke();
   }
@@ -3596,7 +3596,7 @@ function drawImpact(c, W, f) {
   const [y, h] = TR.impP, top = y + 5, bot = y + h - 5, ym = v => bot - Math.min(1, Math.max(0, v)) * (bot - top), fps = S.fps;
   c.lineJoin = 'round';
   for (const q of S.impCurves) {
-    const n = q.p.length, xs = i => tx(q.t0 + i * q.dt + 0.5 / fps);
+    const n = q.p.length, xs = i => tx(q.t0 + i * q.dt);
     if (xs(n - 1) < L || xs(0) > L + W) continue;
     const col = styleP(q.type).c, on = V.hover === q || (q.punch && q.punch.sf <= f && f <= q.punch.ef);
     c.setLineDash(q.hand === 'rear' ? [4, 3] : []);
@@ -3607,7 +3607,7 @@ function drawImpact(c, W, f) {
     }
     c.setLineDash([]); c.globalAlpha = 1;
     if (q.impact != null) {                                 // the frame it picked, on the curve
-      const t = (q.impact + 0.5) / fps, i = Math.max(0, Math.min(n - 1, Math.round((q.impact / fps - q.t0) / q.dt)));
+      const t = q.impact / fps, i = Math.max(0, Math.min(n - 1, Math.round((q.impact / fps - q.t0) / q.dt)));
       c.beginPath(); c.arc(tx(t), ym(q.p[i]), on ? 4 : 3, 0, 2 * Math.PI);
       c.fillStyle = '#fff'; c.fill(); c.strokeStyle = col; c.lineWidth = 1.5; c.stroke();
     }
@@ -5442,7 +5442,7 @@ function drawTimeline(f) {
       c.fillText(big ? s.name : s.l, big ? x0 + 7 : x0 + Math.min(8, w / 2), y + h / 2 + 0.5);
     }
     if (e.impact != null) {                                     // the impact frame, drawn on the block itself
-      const xi = tx((e.impact + 0.5) / fps);
+      const xi = tx(e.impact / fps);
       c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(xi, y + 3); c.lineTo(xi, y + h - 3); c.stroke();
       c.fillStyle = '#fff'; c.beginPath(); c.moveTo(xi, y - 1); c.lineTo(xi + 4.5, y + 3.5); c.lineTo(xi - 4.5, y + 3.5); c.closePath(); c.fill();
       c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 1; c.stroke();
