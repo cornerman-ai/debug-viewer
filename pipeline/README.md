@@ -145,9 +145,10 @@ before the file existed (2026-10-12) is read with its snapshot's `house.edge_ski
 
 **Floors**: the house floors from the video's thresholds snapshot are shown where they act. On the skeleton, a joint
 under the visibility floor (0.30) is drawn hollow and its bones dashed, with a note naming how many the rules skip; the
-**Now** tab's Frame card ends with **Joint visibility** — a bar per joint (nose, then lead / rear shoulder to ankle), a
-tick at the floor, red under it, the value beside it, and a **Visibility / Presence** switch (presence: is the joint in
-the picture at all, its floor 0.75 since 2026-10-06); the **Rules** tab's **Floors** line lists visibility, presence,
+**Now** tab's **Joints** card (its own card under Facing, since 2026-10-28; before, the end of the Frame card) heads
+with how many of the 13 joints are under the floor on this frame, then a bar per joint (nose, then lead / rear shoulder
+to ankle), a tick at the floor, red under it, the value beside it, and a **Visibility / Presence** switch (presence: is
+the joint in the picture at all, its floor 0.75 since 2026-10-06); the **Rules** tab's **Floors** line lists visibility, presence,
 the judged minimum (10 punches / combos / moves, 5 s of judged frames) and the torso minimum, plus the rules that change one;
 **Explanations** says what both mean. Every reading the page recomputes (and the hollow joints) drops a joint under
 the presence floor exactly as the pipeline does (`visAt`).

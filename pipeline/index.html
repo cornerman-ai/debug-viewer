@@ -270,25 +270,29 @@
                     background: var(--fill); color: var(--text); }
   .evwhy .rs span em { font-style: normal; color: var(--text3); font-variant-numeric: tabular-nums; }
   /* the Frame card's joint visibility: a bar per joint, the house floor as a tick, red under it */
-  .jvh { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin: 10px 0 4px; }
-  .jvh .evh { margin: 0; }
-  .jvh .m { flex-basis: 100%; font-size: 11px; color: var(--text2); }
-  .jvh .jvseg { display: inline-flex; gap: 2px; margin-left: auto; }
-  .jvh .jvseg button { border: 0; border-radius: 5px; padding: 1px 7px; font: inherit; font-size: 10.5px; background: var(--fill);
-                       color: var(--text2); cursor: pointer; }
-  .jvh .jvseg button.on { background: var(--accent); color: #fff; }
-  .jv { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px 10px; align-items: center; font-size: 11.5px; }
-  .jv .jh { font-size: 10.5px; color: var(--text3); text-align: center; }
-  .jv .jn { color: var(--text2); }
-  .jv .jc { display: flex; align-items: center; gap: 6px; min-width: 0; }
-  .jv .jc.wide { grid-column: span 2; }
-  .jv .jb { position: relative; flex: 1; height: 6px; border-radius: 3px; background: var(--fill); min-width: 24px; }
-  .jv .jb i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--text3); }
-  .jv .jb.lo i { background: #EF4444; }
-  .jv .jb b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--text); opacity: .55; }
-  .jv .jv-n { width: 28px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text2); }
-  .jv .jc.lo .jv-n { color: #EF4444; font-weight: 600; }
-  /* the Rules tab's floors: what every rule needs before it reads a joint or rates a round */
+  /* the Joints card: this frame's joints against the floor the rules read them from */
+  .jhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .jhead .label { margin: 0; }
+  .jseg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--fill); }
+  .jseg button { border: 0; background: transparent; font: inherit; font-size: 11.5px; font-weight: 500; padding: 3px 10px;
+                 border-radius: 6px; color: var(--text2); cursor: pointer; }
+  .jseg button.on { background: var(--panel-solid); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.05); }
+  .jsum { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .jsum i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .jsub { font-size: 12px; color: var(--text2); margin: 3px 0 14px 16px; }
+  .jgrid { display: grid; grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1fr); column-gap: 18px; align-items: center;
+           background: color-mix(in srgb, var(--fill) 45%, transparent); border-radius: 12px; padding: 2px 14px 4px; font-size: 13px; }
+  .jgrid .jh { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; padding: 9px 0 6px; }
+  .jgrid > .jn, .jgrid > .jc { padding: 9px 0; border-top: 0.5px solid var(--sep); }
+  .jgrid .jn { color: var(--text); }
+  .jgrid .jc { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .jgrid .jc.wide { grid-column: span 2; }
+  .jgrid .jb { position: relative; flex: 1; height: 6px; border-radius: 3px; background: var(--fill); min-width: 24px; }
+  .jgrid .jb i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: #8e8e93; }
+  .jgrid .jb.lo i { background: #ff3b30; }
+  .jgrid .jb b { position: absolute; top: -4px; bottom: -4px; width: 1.5px; margin-left: -0.75px; border-radius: 1px; background: var(--text); opacity: .4; }
+  .jgrid .jv-n { width: 32px; text-align: right; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--text2); }
+  .jgrid .jc.lo .jv-n { color: #ff3b30; font-weight: 600; }
   .floors { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: -2px 0 10px; font-size: 11px; color: var(--text2); }
   .floors > b { font-weight: 600; margin-right: 2px; }
   .floors .chip-f { padding: 1px 7px; border-radius: 4px; background: var(--fill); cursor: help; }
@@ -605,6 +609,7 @@
           <div><div class="deg num" id="deg">–</div><div class="hint">0° to camera · 180° back</div></div>
         </div>
       </div>
+      <div class="card none" id="jointCard"><div class="label">Joints</div><div class="empty">None</div></div>
       <div class="card event none" id="punchCard"><div class="label">Punch</div><div class="empty">None</div></div>
       <div class="card event none" id="defCard"><div class="label">Defense</div><div class="empty">None</div></div>
       <div class="card event none" id="comboCard"><div class="label">Combo</div><div class="empty">None</div></div>
@@ -4936,7 +4941,7 @@ function frameCard(el, f) {
   }
   const ex = exclAt((f + 0.5) / S.fps);                    // the video's excluded time: no rule judges this frame
   const shown = ex ? rows.map(([no]) => [no, {skip: `excluded time ${fD(ex[0], 1)}–${fD(ex[1], 1)} s — no rule judges this frame`}]) : rows;
-  el.innerHTML = cardHead('Frame', `f ${f} · ${fmtT(f / S.fps)}`) + evList(shown) + jointVis(f);
+  el.innerHTML = cardHead('Frame', `f ${f} · ${fmtT(f / S.fps)}`) + evList(shown);
 }
 // The house joint floors as the rules apply them (the video's snapshot). BlazePose scores each joint twice:
 // visibility (is it hidden?) and presence (is it in the picture at all?). The pipeline applies the presence floor
@@ -4969,23 +4974,26 @@ const visAt = (fr, j, n) => {
   const C = S.skelC, b = (fr * 33 + j) * C;
   return C >= 8 && S.skel[b + 7] < presFloor(n) ? 0 : S.skel[b + 6];
 };
-// The Frame card's joint visibility: how sure BlazePose is of each drawn joint in this frame (0-1), against the house
-// floor every rule reads a joint from (the video's snapshot). Under the floor the joint is skipped by every rule —
-// red here, hollow on the skeleton. Lead / rear through the stance, as the rules name the hands.
+// The Joints card: how sure BlazePose is of each drawn joint in this frame (0-1), against the house floor every rule
+// reads a joint from (the video's snapshot). Under the floor the joint is skipped by every rule - red here, hollow on
+// the skeleton. Lead / rear through the stance, as the rules name the hands.
 const JV_ROWS = [['Nose', 'nose', 'nose'], ['Shoulder', 'lsh', 'rsh'], ['Elbow', 'lel', 'rel'], ['Wrist', 'lwr', 'rwr'],
                  ['Hip', 'lhip', 'rhip'], ['Knee', 'lkn', 'rkn'], ['Ankle', 'lan', 'ran']];
 // A switch shows presence instead (remembered per browser), against its own floor.
 let JV_METRIC = (() => { try { return localStorage.getItem('pipelineViewerJV') === 'pres' ? 'pres' : 'vis'; } catch { return 'vis'; } })();
-function jointVis(f) {
+function jointCard(el, f) {
   const vFloor = S.th?.house?.min_visibility, C = S.skelC;
-  if (vFloor == null || !S.skel || C < 7) return '';
-  const b = f * 33 * C, leadLeft = S.stance !== 'southpaw', pres = JV_METRIC === 'pres' && C >= 8, pFloor = presFloor();
-  const floor = pres ? pFloor : vFloor, word = pres ? 'presence' : 'visibility';
-  let under = 0;
+  if (!S.skel || C < 7) return emptyCard(el, 'Joints', 'no skeleton loaded');
+  if (vFloor == null) return emptyCard(el, 'Joints', 'no thresholds in this folder');
+  if (f >= S.skel.length / (33 * C)) return emptyCard(el, 'Joints', 'past the skeleton');
+  el.classList.remove('none');
+  const b = f * 33 * C, leadLeft = S.stance !== 'southpaw', hasPres = C >= 8, pres = JV_METRIC === 'pres' && hasPres;
+  const floor = pres ? presFloor() : vFloor, word = pres ? 'presence' : 'visibility';
+  let under = 0, n = 0;
   const cell = (j, wide) => {
-    const vis = S.skel[b + J[j] * C + 6], pr = C >= 8 ? S.skel[b + J[j] * C + 7] : NaN, v = pres ? pr : vis;
+    const vis = S.skel[b + J[j] * C + 6], pr = hasPres ? S.skel[b + J[j] * C + 7] : NaN, v = pres ? pr : vis;
     const ok = Number.isFinite(v), lo = !ok || v < floor;
-    under += lo;
+    under += lo; n++;
     const both = `visibility ${Number.isFinite(vis) ? vis.toFixed(3) : '–'} · presence ${Number.isFinite(pr) ? pr.toFixed(3) : '–'}`;
     return `<span class="jc${lo ? ' lo' : ''}${wide ? ' wide' : ''}" title="${ok ? both : 'not detected'}`
       + `${lo ? ` — ${word} under ${fD(floor, 2)}, the rules skip it` : ''}"><span class="jb${lo ? ' lo' : ''}">`
@@ -4996,18 +5004,20 @@ function jointVis(f) {
     const [a, z] = leadLeft ? [l, r] : [r, l];
     return `<span class="jn">${name}</span>` + (a === z ? cell(a, true) : cell(a) + cell(z));
   }).join('');
-  const note = `the rules use a joint from ${word} ${fD(floor, 2)}${under ? ` · ${under} under it` : ''}`;
-  return `<div class="jvh"><span class="evh">Joint ${word}</span><span class="jvseg">`
-    + `<button data-jv="vis" class="${pres ? '' : 'on'}" title="is the joint hidden?">Visibility</button>`
-    + `<button data-jv="pres" class="${pres ? 'on' : ''}" title="is the joint in the picture at all?">Presence</button></span>`
-    + `<span class="m">${note}</span></div>`
-    + `<div class="jv"><span></span><span class="jh">lead</span><span class="jh">rear</span>${body}</div>`;
+  const sum = under ? `<i style="background:#ff3b30"></i>${under} of ${n} joints under the ${fD(floor, 2)} floor`
+                    : `<i style="background:#34c759"></i>All ${n} joints over the ${fD(floor, 2)} floor`;
+  el.innerHTML = `<div class="jhead"><span class="label">Joints</span>`
+    + (hasPres ? `<span class="jseg"><button data-jv="vis" class="${pres ? '' : 'on'}" title="is the joint hidden?">Visibility</button>`
+      + `<button data-jv="pres" class="${pres ? 'on' : ''}" title="is the joint in the picture at all?">Presence</button></span>` : '')
+    + `</div><div class="jsum num">${sum}</div>`
+    + `<div class="jsub">${under ? `every rule skips ${under === 1 ? 'it' : 'them'} on this frame · ` : ''}the tick on each bar is the floor</div>`
+    + `<div class="jgrid"><span></span><span class="jh">Lead</span><span class="jh">Rear</span>${body}</div>`;
 }
-$('frameCard').addEventListener('click', e => {           // the switch: re-draw the card on the other score
+$('jointCard').addEventListener('click', e => {           // the switch: re-draw the card on the other score
   const btn = e.target.closest('[data-jv]'); if (!btn) return;
   JV_METRIC = btn.dataset.jv;
   try { localStorage.setItem('pipelineViewerJV', JV_METRIC); } catch {}
-  if (S.skel) frameCard($('frameCard'), frameNow());
+  jointCard($('jointCard'), frameNow());
 });
 const iqr = q => q.map(x => x == null ? '–' : x.toFixed(1)).join('–') + '°';
 // a small scale 0°..max: the IQR as a shaded band, this punch's value as a marker in its verdict color
@@ -5841,7 +5851,7 @@ function draw(force) {
     const pNow = at(S.punches, f), dNow = at(S.defenses, f);
     const a = S.hasAngle && S.pose[f] ? S.angle[f] : null;
     $('deg').textContent = a === null ? '–' : `${a.toFixed(1)}°`; compass(a);
-    eventCard($('punchCard'), 'Punch', pNow, f); eventCard($('defCard'), 'Defense', dNow, f); comboCard($('comboCard'), f); frameCard($('frameCard'), f);
+    eventCard($('punchCard'), 'Punch', pNow, f); eventCard($('defCard'), 'Defense', dNow, f); comboCard($('comboCard'), f); frameCard($('frameCard'), f); jointCard($('jointCard'), f);
     $('clock').textContent = `${fmtT(f / S.fps)} · f ${f}`;           // the frame's own time, as the playhead pill
     if (typeof VC !== 'undefined') VC.paint();
     if (document.activeElement !== $('frameGo')) $('frameGo').value = f;
