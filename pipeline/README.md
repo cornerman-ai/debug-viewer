@@ -210,6 +210,14 @@ highest value. On the defense row, hatched = frontal footage, where the frontal 
 rules with no probability, so only defense6 has a curve. A folder run before 2026-10-28 has neither file and the
 switches say "not in this folder".
 
+**Impact confidence** (a base row under Rear probability, off by default, since 2026-10-28; the backend's
+`punch_impact/impact_probs.json`): each punch's impact spotter confidence (0-1) on every point of its 2.1 s window, on
+the spotter's 30 fps grid, before its decode. Solid over the punch itself - the only part the decode searches - and
+faint around it, in the punch's colour (rear dashed); the white dot is the impact frame it picked, the one impacts.csv
+and the rules use. It picks from the curve smoothed and weighed by where impacts usually fall in a punch, so the dot
+is not always on the highest point; hover for the confidence at the impact, the highest inside the punch and the frames
+searched. A punch the spotter refused (a joint hidden the whole window) has no curve.
+
 **Distance** (the base row under Stance, on by default, since 2026-10-24; the backend's `camera_distance` stage,
 `camera_distance/distance.csv`): how far the boxer stands from the camera, camera → hips in metres, every frame — the
 line is its median over 0.5 s, on a fixed 0–6 m scale (gridlines every 2 m, the same for every video, so videos compare

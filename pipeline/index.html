@@ -806,6 +806,7 @@ const STAGES = {
   punchJson: ['punch_classification', 'punches.json'], defenses: ['defense_classification', 'defenses.csv'],
   angle: ['facing_angle', 'facing_angle.csv'],
   punchProbs: ['punch_classification', 'punch_probs.json'], defProbs: ['defense_classification', 'defense_probs.json'],
+  impProbs: ['punch_impact', 'impact_probs.json'],
 };
 // verdict pills and tooltips → semantic Apple colors (green = pass / on target / inside the range, red = fail / off
 // target; hip and shoulder rotation name the side of the range: orange = too little, red = too much (hip rotation has
@@ -2956,7 +2957,7 @@ const V = {t0: 0, t1: 10, span: 10, follow: true, skel: true, dirty: true, hover
 try { Object.assign(V.layers, JSON.parse(localStorage.getItem('pipelineViewerLayers') || '{}')); } catch {}
 // the base rows above the rule rows, each with its switch in the Timeline layers card (all on by default)
 V.base = {frames: true, angle: true, stance: true, distance: true, activity: true, lead: true, rear: true, def: true, steps: true,
-          leadP: false, rearP: false, defP: false};                // the probability rows: on when asked for
+          leadP: false, rearP: false, defP: false, impP: false};                // the probability rows: on when asked for
 try { Object.assign(V.base, JSON.parse(localStorage.getItem('pipelineViewerBase') || '{}')); } catch {}
 // the sub-switches under Lead / Rear / Defense: the types hidden on that row only, kept across videos (the
 // Round tab's chips hide a type on every row, for this video). hid() is THE test: every row, hover, HUD and key jump asks it
@@ -3004,7 +3005,7 @@ async function buildVideo(src, sig, lite = false) {
     .catch(() => null);
   // rule_thresholds.json: the snapshot of every rule threshold this video was computed with (run_all.py copies it next
   // to the stage folders); null for an older folder, and the page then says so wherever a threshold would go
-  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, chj, cdj, exj, stRuns, stepCsv, distCsv, ppj, dpj] = await Promise.all([
+  const [pjs, angleCsv, defCsv, impCsv, th, stj, glj, bwj, chj, cdj, exj, stRuns, stepCsv, distCsv, ppj, dpj, ipj] = await Promise.all([
     jsn(STAGES.punchJson), lite ? null : txt(STAGES.angle), txt(STAGES.defenses), txt(STAGES.punches), jsn(['rule_thresholds.json']),
     jsn(['stance', 'stance.json']),                         // the stance stage (2026-10-09): who run_all mirrored, and why
     jsn(['gloves', 'gloves.json']),                         // the gloves stage (2026-10-09): no rule reads it yet
@@ -3016,7 +3017,8 @@ async function buildVideo(src, sig, lite = false) {
     lite ? null : txt(['steps', 'steps.csv']),              // every foot move (2026-10-23): the Steps row
     lite ? null : txt(['camera_distance', 'distance.csv']),    // camera -> hips every frame (2026-10-24): the Distance row
     lite ? null : jsn(STAGES.punchProbs),                   // the models' per-frame probabilities (2026-10-28): the
-    lite ? null : jsn(STAGES.defProbs)]);                   // probability rows
+    lite ? null : jsn(STAGES.defProbs),                     // probability rows
+    lite ? null : jsn(STAGES.impProbs)]);                   // each punch's impact curve (2026-10-28): the Impact row
   const hasImpact = !!impCsv, pcsv = impCsv || await txt(STAGES.punchesFallback);
   if (!pcsv && !angleCsv && !defCsv) throw new Error(`“${src.name}” has none of punch_classification / facing_angle / defense_classification — pick a video folder inside pipeline_tests, or the data folder.`);
 
@@ -3055,6 +3057,7 @@ async function buildVideo(src, sig, lite = false) {
     kind: 'd', sf: +r.start_frame, ef: +r.end_frame, type: r.defense_type, side: r.side, share: +r.move_share, detector: r.detector, strength: +r.strength,
     prob: +r.mean_move_prob})).sort((a, b) => a.sf - b.sf);
   const byKey = new Map(N.punches.map(p => [`${p.sf}|${p.hand}`, p]));
+  N.impCurves = impCurves(ipj, byKey);
   const num = v => v === '' || v === undefined ? null : +v;
   N.has = {}; N.layerSum = {}; N.items = {}; N.itemSkips = {};
   const SUMS = {sameDef: 'same_defense', samePunch: 'same_punches', bodyShots: 'bodyshots', defAfter: 'defense_after_combo',
@@ -3576,6 +3579,50 @@ function probTip(k, f) {
     + rows.map(([name, col, p]) => `<b style="color:${col}">●</b> ${name} <b class="num">${p.toFixed(3)}</b>`).join('<br>')
     + (inFront ? `<br><span class="m">frontal footage: the frontal detectors decide here, not defense6</span>` : '');
 }
+// ── the Impact row (2026-10-28): each punch's impact confidence curve from punch_impact/impact_probs.json - the impact
+//    spotter's per-frame confidence (0-1) over its 2.1 s window, on its 30 fps grid. Solid inside the punch's own span
+//    (the only part the decode searches), faint outside it; a white dot at the impact frame it chose. Off by default ──
+const IMP_WHAT = 'the impact spotter’s confidence on every frame of each punch’s window, before its decode: solid over the punch itself (the only part it searches), faint around it, in the punch’s colour (rear dashed); white dot = the impact frame it picked. It picks from the curve smoothed and weighed by where impacts usually fall in a punch, so the dot is not always on the highest point; hover for the numbers';
+function impCurves(j, byKey) {
+  if (!j?.punches?.length) return null;
+  return j.punches.map(q => {
+    const p = Float32Array.from(q.probs), e = byKey.get(`${q.start_frame}|${q.hand}`), dt = j.dt;
+    const at = t => q.t0 + t * dt;                         // point index → seconds
+    return {kind: 'imp', p, dt, t0: q.t0, span: q.span, hand: q.hand, impact: q.impact_frame, punch: e || null,
+            type: e?.type, sf: q.start_frame, ef: e?.ef ?? q.start_frame, a: at(q.span[0]), b: at(q.span[1] + 1)};
+  });
+}
+function drawImpact(c, W, f) {
+  const [y, h] = TR.impP, top = y + 5, bot = y + h - 5, ym = v => bot - Math.min(1, Math.max(0, v)) * (bot - top), fps = S.fps;
+  c.lineJoin = 'round';
+  for (const q of S.impCurves) {
+    const n = q.p.length, xs = i => tx(q.t0 + i * q.dt + 0.5 / fps);
+    if (xs(n - 1) < L || xs(0) > L + W) continue;
+    const col = styleP(q.type).c, on = V.hover === q || (q.punch && q.punch.sf <= f && f <= q.punch.ef);
+    c.setLineDash(q.hand === 'rear' ? [4, 3] : []);
+    for (const [i0, i1, a] of [[0, q.span[0], 0.25], [q.span[1], n - 1, 0.25], [q.span[0], q.span[1], on ? 1 : 0.85]]) {
+      if (i1 <= i0) continue;
+      c.beginPath(); for (let i = i0; i <= i1; i++) i === i0 ? c.moveTo(xs(i), ym(q.p[i])) : c.lineTo(xs(i), ym(q.p[i]));
+      c.globalAlpha = a; c.strokeStyle = col; c.lineWidth = on ? 2.2 : 1.6; c.stroke();
+    }
+    c.setLineDash([]); c.globalAlpha = 1;
+    if (q.impact != null) {                                 // the frame it picked, on the curve
+      const t = (q.impact + 0.5) / fps, i = Math.max(0, Math.min(n - 1, Math.round((q.impact / fps - q.t0) / q.dt)));
+      c.beginPath(); c.arc(tx(t), ym(q.p[i]), on ? 4 : 3, 0, 2 * Math.PI);
+      c.fillStyle = '#fff'; c.fill(); c.strokeStyle = col; c.lineWidth = 1.5; c.stroke();
+    }
+  }
+}
+function impTip(q) {
+  const fps = S.fps, s = styleP(q.type), fr = i => Math.round((q.t0 + i * q.dt) * fps);
+  let pk = q.span[0]; for (let i = q.span[0]; i <= q.span[1]; i++) if (q.p[i] > q.p[pk]) pk = i;
+  const ii = q.impact == null ? null : Math.max(0, Math.min(q.p.length - 1, Math.round((q.impact / fps - q.t0) / q.dt)));
+  return `<b style="color:${s.c}">●</b> <b>${cap(q.hand)} ${s.name}</b> <span class="m num">${fmtT(q.sf / fps)}</span><br>`
+    + (ii == null ? '<span class="m">no impact picked</span><br>'
+       : `impact <b class="num">f ${q.impact}</b> · confidence there <b class="num">${q.p[ii].toFixed(3)}</b><br>`)
+    + `<span class="m num">highest inside the punch ${q.p[pk].toFixed(3)} at f ${fr(pk)} · searched f ${fr(q.span[0])}–${fr(q.span[1])}</span><br>`
+    + `<span class="m">the pick reads the curve smoothed and weighed by where impacts usually fall in a punch</span>`;
+}
 // The base rows: [key, the card's name, what it shows, whether this video has it]. Order = top to bottom.
 const BASE_ROWS = [
   ['frames', 'Frames', 'one dot per video frame, at the frame’s middle — where the playhead sits on it; the frame on screen is the red dot; numbers every few frames. A punch block covers its frames’ dots exactly, from its start frame’s to its end frame’s. Click a dot to go to that frame (or type a frame number in the box beside ◀ ▶). Zoom in until the dots show', () => true],
@@ -3587,6 +3634,7 @@ const BASE_ROWS = [
   ['leadP', 'Lead probability', PROB_WHAT.punch, () => !!S.probs?.leadP],
   ['rear', 'Rear', 'rear-hand punches, white tick = the impact frame', () => true],
   ['rearP', 'Rear probability', PROB_WHAT.punch, () => !!S.probs?.rearP],
+  ['impP', 'Impact confidence', IMP_WHAT, () => !!S.impCurves?.length],
   ['def', 'Defense', 'defensive moves: facing the camera the frontal detectors (slips by the Slip exploration lens rule, rolls, ducks), defense6 at every other angle (backend run_defense.py)', () => S.hasDef],
   ['defP', 'Defense probability', PROB_WHAT.def, () => !!S.probs?.defP],
   ['steps', 'Steps', 'every foot move, lead foot on top, rear below: the app’s foot-move counter (Feet stance) — a foot’s speed over 0.6 torso lengths a second until back under 0.35. Measured on 545 labeled foot moves (any angle): it finds 87 %, about 3 in 10 of its moves are not real steps, and about one step in six shows as two', () => S.hasSteps],
@@ -5159,11 +5207,11 @@ let TR = {}, laneTop = 0;                                       // laneTop: the 
 // each base row's height and the gap under it: lead / rear sit close as a pair
 // Every lane's height; lanes sit LANE_GAP apart, groups GROUP_GAP apart under a HEAD_H header (2026-10-22 redesign:
 // grouping by space and type, no bands or outlines - the way Apple's own charts and track views read).
-const BASE_GEOM = {frames: 30, angle: 150, stance: 32, distance: 80, activity: 96, lead: 30, rear: 30, def: 30, steps: 36, leadP: 56, rearP: 56, defP: 56};
+const BASE_GEOM = {frames: 30, angle: 150, stance: 32, distance: 80, activity: 96, lead: 30, rear: 30, def: 30, steps: 36, leadP: 56, rearP: 56, defP: 56, impP: 56};
 const LANE_GAP = 6, GROUP_GAP = 20, HEAD_H = 24, RULE_H = 28;
 // The base rows in two groups (the rule rows are the third): what the body does and what he does.
 const BASE_GROUP = {frames: 'Video', angle: 'Body', stance: 'Body', distance: 'Body', activity: 'Actions', lead: 'Actions', rear: 'Actions', def: 'Actions', steps: 'Actions',
-                    leadP: 'Actions', rearP: 'Actions', defP: 'Actions'};
+                    leadP: 'Actions', rearP: 'Actions', defP: 'Actions', impP: 'Actions'};
 // the Steps row's two feet
 const STEPCOL = {lead: '#64d2ff', rear: '#5e5ce6'};
 // the Distance row: its colour, its fixed scale (the same for every video, so videos compare by eye) and gridlines
@@ -5300,7 +5348,7 @@ function drawTimeline(f) {
   const W = TW - L - RPAD;
   // the label column, the group headers and the lanes (2026-10-22 redesign: space and type do the grouping)
   const names = {frames: 'Frames', angle: 'Facing', stance: 'Stance', distance: 'Distance', activity: 'Activity', lead: 'Lead hand', rear: 'Rear hand', def: 'Defense', steps: 'Steps', 
-                 leadP: 'Lead prob.', rearP: 'Rear prob.', defP: 'Defense prob.', over: 'Overview', ...LNAME};
+                 leadP: 'Lead prob.', rearP: 'Rear prob.', defP: 'Defense prob.', impP: 'Impact conf.', over: 'Overview', ...LNAME};
   const lane = css('--lane') || 'rgba(120,120,128,0.075)', F = LANE_FONT, KEY = LANE_KEY();
   const step = niceStep(V.t1 - V.t0, W), ticks = [];
   for (let t = Math.ceil(V.t0 / step) * step; t <= V.t1 + 1e-9; t += step) ticks.push(t);
@@ -5418,6 +5466,7 @@ function drawTimeline(f) {
   }
   if (TR.activity) drawActivity(c, W, grid, text3);
   for (const k of PROB_KEYS) if (TR[k]) drawProbs(c, k, W, text3);
+  if (TR.impP) drawImpact(c, W, f);
   if (TR.distance) drawDistance(c, W, grid, text3);
   if (TR.def) for (const e of S.defenses) if (!hid(e)) block(e, TR.def[0], TR.def[1], styleD(e.type), e.sf <= f && f <= e.ef);
   if (TR.steps) {                                             // the Steps row: lead foot's moves on the top half, rear's below
@@ -5766,6 +5815,7 @@ function hit(x, y) {
   if (inRow(TR.activity)) { const A = activityData(); return A && f >= 0 && f < A.n ? {kind: 'act', f, sf: f, ef: f} : null; }
   if (inRow(TR.stance)) return S.stanceRuns.find(e => f >= e.sf && f <= e.ef && e.reason !== 'no_reading') || null;
   if (inRow(TR.def)) return find(S.defenses, () => true);
+  if (inRow(TR.impP)) { const t = xt(x); return S.impCurves.find(q => t >= q.a && t <= q.b) || null; }
   for (const k of PROB_KEYS) if (inRow(TR[k])) return f >= 0 && f < S.probs[k].n ? {kind: 'prob', row: k, f, sf: f, ef: f} : null;
   if (inRow(TR.steps)) {                                      // the cursor's half picks the foot
     const foot = y < TR.steps[0] + TR.steps[1] / 2 ? 'lead' : 'rear';
@@ -5886,6 +5936,8 @@ function tip(e, cx, cy) {
     el.innerHTML = `<b style="color:${DIST.col}">●</b> <b>Distance to the camera</b> <span class="m num">${fmtT(e.f / fps)}</span><br>`
       + `<b class="num">${m(D.sm[e.f])}</b> <span class="m">median over 0.5 s · this frame ${m(D.raw[e.f])}</span><br>`
       + `<span class="m">${S.distInfo?.rule || ''}</span>`;
+  } else if (e.kind === 'imp') {
+    el.innerHTML = impTip(e);
   } else if (e.kind === 'prob') {
     el.innerHTML = probTip(e.row, e.f);
   } else if (e.kind === 'step') {
